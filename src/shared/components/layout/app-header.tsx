@@ -28,7 +28,14 @@ export function AppHeader() {
   return (
     <header className="header-blur sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-border/70 px-3 md:px-4">
       {collapsed && (
-        <Button variant="ghost" size="icon" className="hidden h-8 w-8 md:inline-flex" onClick={toggle}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="hidden h-8 w-8 md:inline-flex"
+          onClick={toggle}
+          title="باز کردن منو"
+          aria-label="باز کردن منو"
+        >
           <PanelRightOpen className="h-4 w-4" />
         </Button>
       )}

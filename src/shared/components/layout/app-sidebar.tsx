@@ -39,28 +39,25 @@ export function AppSidebar() {
     <aside
       className={cn(
         "sidebar-surface relative hidden shrink-0 border-l border-border/70 text-sidebar-foreground transition-[width] duration-200 md:flex md:flex-col",
-        collapsed ? "w-[72px]" : "w-60"
+        collapsed ? "w-[68px]" : "w-60"
       )}
     >
-      <div className="flex h-12 items-center justify-between gap-2 border-b border-border/70 px-3">
-        <Link href="/dashboard" className="flex min-w-0 items-center gap-2 font-semibold">
+      {/* Header: only brand — toggle moved to bottom to avoid overlap */}
+      <div
+        className={cn(
+          "flex h-12 items-center border-b border-border/70 px-3",
+          collapsed ? "justify-center" : "justify-start gap-2"
+        )}
+      >
+        <Link href="/dashboard" className="flex min-w-0 items-center gap-2 font-semibold" title="هماره ERP">
           <div className="brand-mark flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm text-white">
             ه
           </div>
           {!collapsed && <span className="truncate text-sm">هماره ERP</span>}
         </Link>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 shrink-0"
-          onClick={toggle}
-          aria-label={collapsed ? "باز کردن منو" : "جمع کردن منو"}
-        >
-          {collapsed ? <PanelRightOpen className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}
-        </Button>
       </div>
 
-      <nav className="flex-1 space-y-0.5 p-2">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
         {navItems.map((item) => {
           const active =
             item.href === "/dashboard"
@@ -87,11 +84,31 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {!collapsed && (
-        <div className="border-t border-border/70 p-3 text-[11px] text-muted-foreground">
-          نسخه ۰.۱.۰ · فاز فرانت
-        </div>
-      )}
+      {/* Collapse control always at bottom — never overlaps logo */}
+      <div className="border-t border-border/70 p-2">
+        <Button
+          variant="ghost"
+          onClick={toggle}
+          className={cn(
+            "h-9 w-full text-xs text-muted-foreground hover:text-foreground",
+            collapsed ? "px-0" : "justify-start gap-2"
+          )}
+          aria-label={collapsed ? "باز کردن منو" : "جمع کردن منو"}
+          title={collapsed ? "باز کردن منو" : "جمع کردن منو"}
+        >
+          {collapsed ? (
+            <PanelRightOpen className="h-4 w-4" />
+          ) : (
+            <>
+              <PanelRightClose className="h-4 w-4" />
+              <span>جمع کردن منو</span>
+            </>
+          )}
+        </Button>
+        {!collapsed && (
+          <div className="px-2 pb-1 text-[11px] text-muted-foreground">نسخه ۰.۱.۰ · فاز فرانت</div>
+        )}
+      </div>
     </aside>
   );
 }
