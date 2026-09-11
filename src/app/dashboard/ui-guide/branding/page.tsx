@@ -78,34 +78,26 @@ export default function BrandingGuidePage() {
       <GuideRulesBox>
         <ul className="list-disc space-y-1 pr-5">
           <li>
-            <strong className="text-foreground">دامنه کاستم مستأجر:</strong> فقط
-            پالت رنگی (Theme Tokens)، لوگو، Favicon، نام محصول و شعار. ساختار
-            کامپوننت‌ها و الگوهای تعامل قفل است.
+            <strong className="text-foreground">دامنه کاستم مستأجر:</strong> فقط پالت رنگی
+            (Theme Tokens)، لوگو، Favicon، نام محصول و شعار. ساختار کامپوننت‌ها و الگوهای
+            تعامل قفل است.
           </li>
           <li>
             تمام رنگ‌های عملیاتی از CSS Variables (
-            <code className="rounded bg-muted px-1">--primary</code> و ...)
-            خوانده می‌شوند تا تعویض Theme بدون بازنویسی کامپوننت ممکن باشد.
+            <code className="rounded bg-muted px-1">--primary</code> و ...) خوانده می‌شوند.
           </li>
           <li>
-            هر مستأجر می‌تواند یکی از پالت‌های رسمی را انتخاب کند یا در آینده
-            پالت سفارشی محدود (با رعایت کنتراست WCAG AA) تعریف کند.
+            لوگو در سه اسلات: Sidebar Mark، Header Mark، صفحه ورود. Fallback: Mark متنی با{" "}
+            <code className="rounded bg-muted px-1">brand-mark</code> (هم‌راستا با سیاست آیکون
+            B برای تأکید).
           </li>
-          <li>
-            لوگو باید در سه اسلات پشتیبانی شود: Sidebar Mark، Header Mark، صفحه
-            ورود. در نبود لوگو، Mark متنی (حرف اول) با گرادیان برند نمایش داده
-            می‌شود.
-          </li>
-          <li>
-            Dark Mode باید همان توکن‌های مستأجر را محترم بشمارد؛ فقط مقادیر Light/Dark
-            عوض می‌شوند، نه هویت برند.
-          </li>
+          <li>Dark Mode همان توکن‌های مستأجر را حفظ می‌کند؛ فقط مقادیر Light/Dark عوض می‌شوند.</li>
         </ul>
       </GuideRulesBox>
 
       <GuideSection
         title="۱) پالت‌های رسمی پلتفرم"
-        description="این پالت‌ها نقطه شروع انتخاب هویت بصری مستأجر هستند. پیش‌فرض پلتفرم: سبز جنگلی + کرم روشن."
+        description="پیش‌فرض پلتفرم: سبز جنگلی + کرم روشن."
       >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {themePalettes.map((palette) => (
@@ -114,7 +106,7 @@ export default function BrandingGuidePage() {
               type="button"
               onClick={() => setPaletteId(palette.id)}
               className={cn(
-                "rounded-xl border bg-card p-3 text-right transition",
+                "rounded-xl border bg-card p-3 text-right transition elevate-hover",
                 paletteId === palette.id
                   ? "border-primary ring-2 ring-primary/20"
                   : "border-border/70 hover:border-primary/40"
@@ -139,10 +131,7 @@ export default function BrandingGuidePage() {
         </div>
       </GuideSection>
 
-      <GuideSection
-        title="۲) فضاهای برندینگ قابل کاستم"
-        description="مقادیر زیر در محیط واقعی از تنظیمات مستأجر خوانده می‌شوند. اینجا برای پیش‌نمایش زنده قابل ویرایش‌اند."
-      >
+      <GuideSection title="۲) فضاهای برندینگ قابل کاستم">
         <div className="grid gap-4 md:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="brand-name">نام محصول / برند</Label>
@@ -152,7 +141,6 @@ export default function BrandingGuidePage() {
               onChange={(e) =>
                 setBrand((prev) => ({ ...prev, productName: e.target.value }))
               }
-              placeholder="هماره ERP"
             />
           </div>
           <div className="space-y-2">
@@ -160,10 +148,7 @@ export default function BrandingGuidePage() {
             <Input
               id="brand-slogan"
               value={brand.slogan}
-              onChange={(e) =>
-                setBrand((prev) => ({ ...prev, slogan: e.target.value }))
-              }
-              placeholder="سیستم یکپارچه مدیریت کسب‌وکار"
+              onChange={(e) => setBrand((prev) => ({ ...prev, slogan: e.target.value }))}
             />
           </div>
           <div className="space-y-2">
@@ -173,26 +158,19 @@ export default function BrandingGuidePage() {
               value={brand.logoMark}
               maxLength={2}
               onChange={(e) =>
-                setBrand((prev) => ({
-                  ...prev,
-                  logoMark: e.target.value || "ه",
-                }))
+                setBrand((prev) => ({ ...prev, logoMark: e.target.value || "ه" }))
               }
-              placeholder="ه"
             />
           </div>
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <Card>
+          <Card className="elevate-hover">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-sm">
                 <Building2 className="h-4 w-4" />
                 اسلات Sidebar
               </CardTitle>
-              <CardDescription className="text-xs">
-                عرض جمع‌شده و باز — Mark + نام کوتاه
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-muted/30 p-3">
@@ -209,36 +187,27 @@ export default function BrandingGuidePage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="elevate-hover">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-sm">
                 <ImageIcon className="h-4 w-4" />
                 اسلات Header / Favicon
               </CardTitle>
-              <CardDescription className="text-xs">
-                نسخه فشرده برای نوار بالا و تب مرورگر
-              </CardDescription>
             </CardHeader>
             <CardContent className="flex items-center gap-3">
               <div className="brand-mark flex h-8 w-8 items-center justify-center rounded-md text-xs text-white">
                 {brand.logoMark}
               </div>
-              <div className="text-xs text-muted-foreground">
-                Favicon و App Icon باید از همان فایل لوگوی اصلی تولید شوند (SVG
-                ترجیحی).
-              </div>
+              <div className="text-xs text-muted-foreground">SVG ترجیحی از همان فایل لوگو</div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="elevate-hover">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-sm">
                 <Type className="h-4 w-4" />
                 صفحه ورود
               </CardTitle>
-              <CardDescription className="text-xs">
-                لوگو بزرگ + نام + شعار در مرکز
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="rounded-lg border border-dashed border-border/80 bg-muted/20 p-4 text-center">
@@ -253,10 +222,7 @@ export default function BrandingGuidePage() {
         </div>
       </GuideSection>
 
-      <GuideSection
-        title="۳) پیش‌نمایش زنده با Theme Tokens"
-        description="این بلوک با CSS Variables پالت انتخاب‌شده رندر می‌شود. در محصول واقعی همین مکانیزم برای هر Tenant اعمال می‌گردد."
-      >
+      <GuideSection title="۳) پیش‌نمایش زنده با Theme Tokens">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Button
             size="sm"
@@ -274,9 +240,7 @@ export default function BrandingGuidePage() {
             <Moon className="ml-1.5 h-3.5 w-3.5" />
             Dark (نمایشی)
           </Button>
-          <span className="text-xs text-muted-foreground">
-            پالت فعال: {activePalette.name}
-          </span>
+          <span className="text-xs text-muted-foreground">پالت فعال: {activePalette.name}</span>
         </div>
 
         <div
@@ -303,13 +267,12 @@ export default function BrandingGuidePage() {
             <Alert>
               <AlertTitle>هویت بصری مستأجر</AlertTitle>
               <AlertDescription>
-                دکمه‌ها، کارت‌ها، نشان‌ها و فوکوس همگی از توکن‌های همین پالت تغذیه
-                می‌شوند. ساختار UI ثابت می‌ماند.
+                کنترل‌ها از توکن‌های همین پالت تغذیه می‌شوند. ساختار UI ثابت است.
               </AlertDescription>
             </Alert>
 
             <div className="grid gap-3 md:grid-cols-3">
-              <Card>
+              <Card className="elevate-hover">
                 <CardHeader className="pb-2">
                   <CardDescription>اسناد امروز</CardDescription>
                   <CardTitle className="text-2xl">۱۲۸</CardTitle>
@@ -318,7 +281,7 @@ export default function BrandingGuidePage() {
                   <Badge variant="success">+۱۲٪</Badge>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="elevate-hover">
                 <CardHeader className="pb-2">
                   <CardDescription>در انتظار تأیید</CardDescription>
                   <CardTitle className="text-2xl">۲۴</CardTitle>
@@ -327,7 +290,7 @@ export default function BrandingGuidePage() {
                   <Badge variant="warning">نیاز به اقدام</Badge>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="elevate-hover">
                 <CardHeader className="pb-2">
                   <CardDescription>کالاهای فعال</CardDescription>
                   <CardTitle className="text-2xl">۳٬۴۲۰</CardTitle>
@@ -338,12 +301,9 @@ export default function BrandingGuidePage() {
               </Card>
             </div>
 
-            <Card>
+            <Card className="elevate-hover">
               <CardHeader>
                 <CardTitle className="text-sm">نمونه کنترل‌ها</CardTitle>
-                <CardDescription>
-                  رنگ Primary / Secondary / Destructive از پالت فعال
-                </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-2">
                 <Button>اصلی</Button>
@@ -367,34 +327,31 @@ export default function BrandingGuidePage() {
       <GuideSection title="۴) قوانین تصمیم‌گیری (Do / Don’t)">
         <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
-            <div className="mb-2 font-medium text-emerald-800 dark:text-emerald-200">
-              انجام بده
-            </div>
+            <div className="mb-2 font-medium text-emerald-800 dark:text-emerald-200">انجام بده</div>
             <ul className="list-disc space-y-1 pr-5 text-muted-foreground">
               <li>فقط از توکن‌های CSS برای رنگ استفاده کن.</li>
               <li>لوگو را در اسلات‌های تعریف‌شده قرار بده.</li>
-              <li>کنتراست متن روی Primary را قبل از انتشار بسنج.</li>
-              <li>Fallback متنی برای لوگو همیشه فعال باشد.</li>
+              <li>کنتراست WCAG AA را قبل از انتشار بسنج.</li>
             </ul>
           </div>
           <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-4 text-sm dark:border-rose-900 dark:bg-rose-950/30">
-            <div className="mb-2 font-medium text-rose-800 dark:text-rose-200">
-              انجام نده
-            </div>
+            <div className="mb-2 font-medium text-rose-800 dark:text-rose-200">انجام نده</div>
             <ul className="list-disc space-y-1 pr-5 text-muted-foreground">
-              <li>رنگ هگز ثابت داخل کامپوننت‌های عملیاتی نگذار.</li>
-              <li>ساختار Sidebar / Header / Form را برای یک مشتری عوض نکن.</li>
-              <li>پالت سفارشی بدون بررسی WCAG AA نپذیر.</li>
-              <li>شعار را جایگزین برچسب‌های عملیاتی سیستم نکن.</li>
+              <li>رنگ هگز ثابت داخل کامپوننت عملیاتی نگذار.</li>
+              <li>ساختار Shell را برای یک مشتری عوض نکن.</li>
+              <li>پالت بدون بررسی کنتراست نپذیر.</li>
             </ul>
           </div>
         </div>
       </GuideSection>
 
       <div className="rounded-xl border border-border/70 bg-muted/30 p-4 text-xs text-muted-foreground">
-        <strong className="text-foreground">مرحله بعد:</strong> UI-01 Foundations
-        (Typography، Spacing، Radius، Elevation، Icon). پس از تثبیت پایه‌ها، بقیه
-        صفحات از همین توکن‌های برندینگ تغذیه می‌شوند.
+        <strong className="text-foreground">وضعیت زنجیره:</strong> UI-01 Foundations و سیاست آیکون{" "}
+        <strong className="text-foreground">B+D</strong> قفل شده‌اند. UI-02 Layout این توکن‌ها را در
+        Shell و ترکیب صفحه اعمال می‌کند.{" "}
+        <a href="/dashboard/ui-guide/layout" className="text-primary underline-offset-2 hover:underline">
+          مشاهده UI-02
+        </a>
       </div>
     </div>
   );
