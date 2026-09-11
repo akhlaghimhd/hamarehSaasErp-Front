@@ -24,7 +24,7 @@
     --border: 60 12% 90%;
     --input: 60 12% 90%;
     --ring: 142 72% 24%;
-    --radius: 0.5rem;
+    --radius: 0.75rem;
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 150 20% 22%;
     --sidebar-primary: 142 72% 24%;
@@ -33,6 +33,19 @@
     --sidebar-accent-foreground: 142 55% 20%;
     --sidebar-border: 60 12% 90%;
     --sidebar-ring: 142 72% 24%;
+
+    /* Surface depth tokens */
+    --shadow-xs: 0 1px 2px hsl(150 20% 20% / 0.04);
+    --shadow-sm: 0 1px 2px hsl(150 20% 20% / 0.05), 0 1px 3px hsl(150 20% 20% / 0.06);
+    --shadow-md: 0 4px 12px hsl(150 25% 20% / 0.06), 0 1px 3px hsl(150 20% 20% / 0.04);
+    --shadow-lg: 0 10px 30px hsl(150 30% 18% / 0.08), 0 2px 8px hsl(150 20% 20% / 0.04);
+    --shadow-primary: 0 6px 16px hsl(142 72% 24% / 0.22);
+    --gradient-page: linear-gradient(165deg, hsl(60 30% 99%) 0%, hsl(80 25% 97%) 45%, hsl(150 20% 97%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(60 25% 99%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(142 72% 28%) 0%, hsl(152 65% 22%) 100%);
+    --gradient-primary-hover: linear-gradient(135deg, hsl(142 72% 32%) 0%, hsl(152 65% 24%) 100%);
+    --gradient-sidebar: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(80 30% 98%) 100%);
+    --gradient-brand: linear-gradient(135deg, hsl(142 72% 28%) 0%, hsl(90 55% 40%) 100%);
   }
 
   .dark {
@@ -63,6 +76,18 @@
     --sidebar-accent-foreground: 60 12% 92%;
     --sidebar-border: 150 12% 16%;
     --sidebar-ring: 142 55% 42%;
+
+    --shadow-xs: 0 1px 2px hsl(0 0% 0% / 0.2);
+    --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.25), 0 1px 3px hsl(0 0% 0% / 0.2);
+    --shadow-md: 0 4px 12px hsl(0 0% 0% / 0.3);
+    --shadow-lg: 0 10px 30px hsl(0 0% 0% / 0.35);
+    --shadow-primary: 0 6px 18px hsl(142 55% 30% / 0.35);
+    --gradient-page: linear-gradient(165deg, hsl(150 22% 9%) 0%, hsl(150 18% 8%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(150 18% 12%) 0%, hsl(150 18% 10%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(142 55% 40%) 0%, hsl(152 50% 32%) 100%);
+    --gradient-primary-hover: linear-gradient(135deg, hsl(142 55% 46%) 0%, hsl(152 50% 36%) 100%);
+    --gradient-sidebar: linear-gradient(180deg, hsl(150 20% 10%) 0%, hsl(150 20% 8%) 100%);
+    --gradient-brand: linear-gradient(135deg, hsl(142 55% 40%) 0%, hsl(90 40% 35%) 100%);
   }
 }
 
@@ -71,6 +96,47 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply text-foreground font-sans antialiased;
+    background: var(--gradient-page);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  .surface-card {
+    background: var(--gradient-card);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .surface-card-hover {
+    transition: box-shadow 180ms ease, transform 180ms ease;
+  }
+
+  .surface-card-hover:hover {
+    box-shadow: var(--shadow-md);
+  }
+
+  .btn-primary-gradient {
+    background-image: var(--gradient-primary);
+    box-shadow: var(--shadow-primary);
+  }
+
+  .btn-primary-gradient:hover {
+    background-image: var(--gradient-primary-hover);
+  }
+
+  .brand-mark {
+    background-image: var(--gradient-brand);
+    box-shadow: var(--shadow-primary);
+  }
+
+  .sidebar-surface {
+    background: var(--gradient-sidebar);
+  }
+
+  .header-blur {
+    background: hsl(var(--background) / 0.85);
+    backdrop-filter: blur(10px);
   }
 }

@@ -18,22 +18,52 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">داشبورد</h1>
         <p className="text-sm text-muted-foreground">
-          پیش‌نمایش کامپوننت‌های پایه Design System (فاز A)
+          هویت بصری هماره — سبز جنگلی، کرم روشن، سایه و گرادیان ملایم
         </p>
       </div>
 
-      <Alert variant="success">
+      <Alert className="border-primary/20 bg-gradient-to-l from-primary/5 to-transparent shadow-[var(--shadow-xs)]">
         <AlertTitle>پایه قالب آماده شد</AlertTitle>
         <AlertDescription>
-          ظاهر دکمه‌ها، فرم‌ها و کارت‌ها از الگوی shadcn/ui Admin گرفته شده است. از این به بعد همه صفحات روی همین پایه ساخته می‌شوند.
+          دکمه‌ها با گرادیان، کارت‌ها با عمق سطحی، و پس‌زمینه با تناژ کرم-سبز ملایم تنظیم شده‌اند.
         </AlertDescription>
       </Alert>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>اسناد امروز</CardDescription>
+            <CardTitle className="text-3xl">۱۲۸</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Badge variant="success">+۱۲٪ نسبت به دیروز</Badge>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>در انتظار تأیید</CardDescription>
+            <CardTitle className="text-3xl">۲۴</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Badge variant="warning">نیاز به اقدام</Badge>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>کالاهای فعال</CardDescription>
+            <CardTitle className="text-3xl">۳٬۴۲۰</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Badge>موجودی به‌روز</Badge>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>دکمه‌ها</CardTitle>
-            <CardDescription>انواع و اندازه‌های استاندارد</CardDescription>
+            <CardDescription>گرادیان روی دکمه اصلی + سایه رنگی</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
             <Button>اصلی</Button>
@@ -65,7 +95,7 @@ export default function DashboardPage() {
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>نمونه فرم</CardTitle>
-            <CardDescription>فیلد ورودی با برچسب فارسی و راست‌چین</CardDescription>
+            <CardDescription>فیلد با سایه خیلی ملایم و فوکوس رنگی</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">

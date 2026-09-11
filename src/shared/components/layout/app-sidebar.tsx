@@ -29,10 +29,10 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden w-64 shrink-0 border-l bg-sidebar text-sidebar-foreground md:flex md:flex-col">
-      <div className="flex h-14 items-center border-b px-4">
+    <aside className="sidebar-surface hidden w-64 shrink-0 border-l border-border/80 text-sidebar-foreground md:flex md:flex-col">
+      <div className="flex h-14 items-center border-b border-border/80 px-4">
         <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm">
+          <div className="brand-mark flex h-8 w-8 items-center justify-center rounded-lg text-sm text-white">
             ه
           </div>
           <span>هماره ERP</span>
@@ -47,10 +47,10 @@ export function AppSidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-200",
                 active
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-[var(--shadow-xs)]"
+                  : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
               )}
             >
               <Icon className="h-4 w-4" />
@@ -59,7 +59,9 @@ export function AppSidebar() {
           );
         })}
       </nav>
-      <div className="border-t p-3 text-xs text-muted-foreground">نسخه ۰.۱.۰ · فاز فرانت</div>
+      <div className="border-t border-border/80 p-3 text-xs text-muted-foreground">
+        نسخه ۰.۱.۰ · فاز فرانت
+      </div>
     </aside>
   );
 }
