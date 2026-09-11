@@ -12,8 +12,8 @@ import {
   Building2,
   Palette,
   Component,
-  PanelRightClose,
-  PanelRightOpen,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { useSidebar } from "@/shared/components/layout/sidebar-context";
@@ -42,22 +42,45 @@ export function AppSidebar() {
         collapsed ? "w-[68px]" : "w-60"
       )}
     >
-      {/* Header: only brand — toggle moved to bottom to avoid overlap */}
       <div
         className={cn(
-          "flex h-12 items-center border-b border-border/70 px-3",
-          collapsed ? "justify-center" : "justify-start gap-2"
+          "flex h-12 items-center border-b border-border/70 px-2",
+          collapsed ? "justify-center" : "justify-between gap-1 px-3"
         )}
       >
-        <Link href="/dashboard" className="flex min-w-0 items-center gap-2 font-semibold" title="هماره ERP">
-          <div className="brand-mark flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm text-white">
-            ه
-          </div>
-          {!collapsed && <span className="truncate text-sm">هماره ERP</span>}
-        </Link>
+        {!collapsed && (
+          <Link href="/dashboard" className="flex min-w-0 items-center gap-2 font-semibold">
+            <div className="brand-mark flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm text-white">
+              ه
+            </div>
+            <span className="truncate text-sm">هماره ERP</span>
+          </Link>
+        )}
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0"
+          onClick={toggle}
+          title={collapsed ? "باز کردن منو" : "جمع کردن منو"}
+          aria-label={collapsed ? "باز کردن منو" : "جمع کردن منو"}
+        >
+          {/* RTL: collapsed shows chevrons that point to expand */}
+          {collapsed ? <ChevronsLeft className="h-4 w-4" /> : <ChevronsRight className="h-4 w-4" />}
+        </Button>
       </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
+        {collapsed && (
+          <Link
+            href="/dashboard"
+            title="هماره ERP"
+            className="mb-1 flex items-center justify-center rounded-lg py-1"
+          >
+            <div className="brand-mark flex h-8 w-8 items-center justify-center rounded-lg text-sm text-white">ه</div>
+          </Link>
+        )}
+
         {navItems.map((item) => {
           const active =
             item.href === "/dashboard"
@@ -84,31 +107,11 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {/* Collapse control always at bottom — never overlaps logo */}
-      <div className="border-t border-border/70 p-2">
-        <Button
-          variant="ghost"
-          onClick={toggle}
-          className={cn(
-            "h-9 w-full text-xs text-muted-foreground hover:text-foreground",
-            collapsed ? "px-0" : "justify-start gap-2"
-          )}
-          aria-label={collapsed ? "باز کردن منو" : "جمع کردن منو"}
-          title={collapsed ? "باز کردن منو" : "جمع کردن منو"}
-        >
-          {collapsed ? (
-            <PanelRightOpen className="h-4 w-4" />
-          ) : (
-            <>
-              <PanelRightClose className="h-4 w-4" />
-              <span>جمع کردن منو</span>
-            </>
-          )}
-        </Button>
-        {!collapsed && (
-          <div className="px-2 pb-1 text-[11px] text-muted-foreground">نسخه ۰.۱.۰ · فاز فرانت</div>
-        )}
-      </div>
+      {!collapsed && (
+        <div className="border-t border-border/70 p-3 text-[11px] text-muted-foreground">
+          نسخه ۰.۱.۰ · فاز فرانت
+        </div>
+      )}
     </aside>
   );
 }
