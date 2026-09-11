@@ -10,11 +10,13 @@ import {
   Users,
   Settings,
   Building2,
+  Palette,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "داشبورد", icon: LayoutDashboard },
+  { href: "/themes", label: "پالت رنگ", icon: Palette },
   { href: "/dashboard/organization", label: "سازمان", icon: Building2 },
   { href: "/dashboard/inventory", label: "انبار و کالا", icon: Warehouse },
   { href: "/dashboard/sales", label: "خرید و فروش", icon: ShoppingCart },
