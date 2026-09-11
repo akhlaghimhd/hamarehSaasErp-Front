@@ -33,7 +33,7 @@ const navItems = [
   { href: "/dashboard/settings", label: "تنظیمات", icon: Settings },
 ];
 
-export default function AppSidebar() {
+export function AppSidebar() {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebar();
 
@@ -116,5 +116,3 @@ export default function AppSidebar() {
     </aside>
   );
 }
-
-export { AppSidebar };
