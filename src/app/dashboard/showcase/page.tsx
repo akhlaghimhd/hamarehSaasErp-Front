@@ -66,7 +66,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/components/ui/table";
-import { cn } from "@/shared/lib/utils";
 
 type DocRow = {
   id: string;
@@ -106,21 +105,38 @@ const statusMap = {
 
 type SortKey = "code" | "title" | "amount" | "status";
 
+function ChartTooltip({ active, payload, label }: {
+  active?: boolean;
+  payload?: Array<{ name?: string; value?: number; color?: string }>;
+  label?: string;
+}) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-md border border-border/80 bg-popover px-2.5 py-1.5 text-[11px] shadow-[var(--shadow-sm)]">
+      <div className="mb-1 font-medium">{label}</div>
+      {payload.map((item) => (
+        <div key={item.name} className="flex items-center gap-2 text-muted-foreground">
+          <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: item.color }} />
+          <span>{item.name}:</span>
+          <span className="text-foreground">{item.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ShowcasePage() {
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("code");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(1);
-  const pageSize = 4;
+  const [pageSize, setPageSize] = useState(5);
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
 
   const filtered = useMemo(() => {
     const q = query.trim();
     let rows = seedRows.filter(
-      (r) =>
-        !q ||
-        r.code.includes(q) ||
-        r.title.includes(q) ||
-        r.warehouse.includes(q)
+      (r) => !q || r.code.includes(q) || r.title.includes(q) || r.warehouse.includes(q)
     );
     rows = [...rows].sort((a, b) => {
       const av = a[sortKey];
@@ -137,11 +153,12 @@ export default function ShowcasePage() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const selectedCount = Object.values(selected).filter(Boolean).length;
+  const allPageSelected = pageRows.length > 0 && pageRows.every((r) => selected[r.id]);
 
   function toggleSort(key: SortKey) {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
       setSortKey(key);
       setSortDir("asc");
     }
@@ -149,90 +166,67 @@ export default function ShowcasePage() {
 
   function SortIcon({ column }: { column: SortKey }) {
     if (sortKey !== column) return <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />;
-    return sortDir === "asc" ? (
-      <ArrowUp className="h-3.5 w-3.5" />
-    ) : (
-      <ArrowDown className="h-3.5 w-3.5" />
-    );
+    return sortDir === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />;
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">نمایشگاه کامپوننت‌ها</h1>
-          <p className="text-sm text-muted-foreground">
-            همه المان‌های پرکاربرد ERP در یک صفحه — برای تأیید ظاهر پایه قبل از ساخت صفحات واقعی
+          <h1 className="text-xl font-semibold tracking-tight">نمایشگاه کامپوننت‌ها</h1>
+          <p className="text-xs text-muted-foreground">
+            بررسی ظاهر پایه قبل از صفحات واقعی
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() =>
-              toast.message("یادآوری", { description: "۳ سند در انتظار تأیید شماست." })
-            }
-          >
+        <div className="flex flex-wrap gap-1.5">
+          <Button size="sm" variant="outline" onClick={() => toast.message("یادآوری", { description: "۳ سند در انتظار تأیید شماست." })}>
             نوتیف ساده
           </Button>
-          <Button
-            onClick={() =>
-              toast.success("ذخیره شد", { description: "سند GR-1405-001 با موفقیت ثبت شد." })
-            }
-          >
+          <Button size="sm" onClick={() => toast.success("ذخیره شد", { description: "سند GR-1405-001 ثبت شد." })}>
             نوتیف موفقیت
           </Button>
-          <Button
-            variant="destructive"
-            onClick={() =>
-              toast.error("خطا در ثبت", { description: "ارتباط با سرور برقرار نشد." })
-            }
-          >
+          <Button size="sm" variant="destructive" onClick={() => toast.error("خطا در ثبت", { description: "ارتباط با سرور برقرار نشد." })}>
             نوتیف خطا
           </Button>
         </div>
       </div>
 
-      <Alert className="border-primary/20 bg-gradient-to-l from-primary/5 to-transparent">
-        <AlertTitle>هدف این صفحه</AlertTitle>
-        <AlertDescription>
-          ظاهر دکمه، فرم، جدول، پاپ‌آپ، تب، سوییچ، اسکلتون، نمودار و اعلان را یکجا ببینید و نظر بدهید.
-          بعد از جمع‌بندی، سراغ صفحات واقعی ماژول می‌رویم.
+      <Alert className="border-primary/15 bg-gradient-to-l from-primary/[0.06] to-transparent py-3">
+        <AlertTitle className="text-sm">هدف این صفحه</AlertTitle>
+        <AlertDescription className="text-xs">
+          جدول، فرم، پاپ‌آپ، تب، نمودار و اعلان را یکجا ببینید و اصلاح بگویید.
         </AlertDescription>
       </Alert>
 
-      {/* KPI */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {["اسناد امروز", "در انتظار تأیید", "کالاهای فعال", "انبارها"].map((title, i) => (
           <Card key={title}>
-            <CardHeader className="pb-2">
+            <CardHeader className="pb-1">
               <CardDescription>{title}</CardDescription>
-              <CardTitle className="text-3xl">{["۱۲۸", "۲۴", "۳٬۴۲۰", "۱۲"][i]}</CardTitle>
+              <CardTitle className="text-2xl">{["۱۲۸", "۲۴", "۳٬۴۲۰", "۱۲"][i]}</CardTitle>
             </CardHeader>
             <CardContent>
-              <Badge variant={i === 1 ? "warning" : "success"}>
-                {i === 1 ? "نیاز به اقدام" : "پایدار"}
-              </Badge>
+              <Badge variant={i === 1 ? "warning" : "success"}>{i === 1 ? "نیاز به اقدام" : "پایدار"}</Badge>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Charts */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>نمودار ستونی ورود/خروج</CardTitle>
-            <CardDescription>نمونه Recharts — سبک و سریع</CardDescription>
+            <CardDescription>میله باریک‌تر + تولتیپ فشرده</CardDescription>
           </CardHeader>
-          <CardContent className="h-64">
+          <CardContent className="h-52">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
+              <BarChart data={chartData} barCategoryGap="28%" barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
-                <YAxis tickLine={false} axisLine={false} fontSize={12} />
-                <Tooltip />
-                <Bar dataKey="inbound" name="ورود" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="outbound" name="خروج" fill="hsl(var(--muted-foreground) / 0.35)" radius={[6, 6, 0, 0]} />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={11} tickMargin={6} />
+                <YAxis tickLine={false} axisLine={false} fontSize={11} width={28} />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: "hsl(var(--muted) / 0.45)" }} />
+                <Bar dataKey="inbound" name="ورود" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} maxBarSize={18} />
+                <Bar dataKey="outbound" name="خروج" fill="hsl(var(--muted-foreground) / 0.35)" radius={[4, 4, 0, 0]} maxBarSize={18} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -241,33 +235,35 @@ export default function ShowcasePage() {
         <Card>
           <CardHeader>
             <CardTitle>روند اسناد</CardTitle>
-            <CardDescription>نمودار خطی ساده</CardDescription>
+            <CardDescription>نمودار خطی فشرده</CardDescription>
           </CardHeader>
-          <CardContent className="h-64">
+          <CardContent className="h-52">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
-                <YAxis tickLine={false} axisLine={false} fontSize={12} />
-                <Tooltip />
-                <Line type="monotone" dataKey="inbound" name="ورود" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="outbound" name="خروج" stroke="hsl(142 40% 45%)" strokeWidth={2} dot={false} />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={11} tickMargin={6} />
+                <YAxis tickLine={false} axisLine={false} fontSize={11} width={28} />
+                <Tooltip content={<ChartTooltip />} />
+                <Line type="monotone" dataKey="inbound" name="ورود" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
+                <Line type="monotone" dataKey="outbound" name="خروج" stroke="hsl(142 40% 45%)" strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
 
-      {/* Table */}
       <Card>
-        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
           <div>
             <CardTitle>جدول اسناد انبار</CardTitle>
-            <CardDescription>جستجو + سورت ستون + صفحه‌بندی</CardDescription>
+            <CardDescription>
+              انتخاب چندتایی با چک‌باکس مربعی · سورت · تعداد در صفحه
+              {selectedCount > 0 ? ` · ${selectedCount} انتخاب‌شده` : ""}
+            </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Input
-              className="w-56"
+              className="h-9 w-52"
               placeholder="جستجو کد / عنوان / انبار..."
               value={query}
               onChange={(e) => {
@@ -277,7 +273,7 @@ export default function ShowcasePage() {
             />
             <Dialog>
               <DialogTrigger asChild>
-                <Button>
+                <Button size="sm">
                   <Plus className="h-4 w-4" />
                   سند جدید
                 </Button>
@@ -285,17 +281,17 @@ export default function ShowcasePage() {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>ایجاد سند انبار</DialogTitle>
-                  <DialogDescription>نمونه پاپ‌آپ فرم — بعداً به فرم واقعی وصل می‌شود.</DialogDescription>
+                  <DialogDescription>نمونه پاپ‌آپ فرم</DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-3 py-2">
-                  <div className="space-y-2">
-                    <Label>عنوان سند</Label>
-                    <Input placeholder="مثلاً رسید خرید قطعات" />
+                <div className="grid gap-3 py-1">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">عنوان سند</Label>
+                    <Input className="h-9" placeholder="مثلاً رسید خرید قطعات" />
                   </div>
-                  <div className="space-y-2">
-                    <Label>انبار</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">انبار</Label>
                     <Select defaultValue="central">
-                      <SelectTrigger>
+                      <SelectTrigger className="h-9">
                         <SelectValue placeholder="انتخاب انبار" />
                       </SelectTrigger>
                       <SelectContent>
@@ -305,20 +301,18 @@ export default function ShowcasePage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label>توضیحات</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">توضیحات</Label>
                     <Textarea placeholder="یادداشت اختیاری..." />
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button
-                    onClick={() => {
-                      toast.success("سند پیش‌نویس ذخیره شد");
-                    }}
-                  >
+                  <Button size="sm" onClick={() => toast.success("سند پیش‌نویس ذخیره شد")}>
                     ذخیره
                   </Button>
-                  <Button variant="outline">انصراف</Button>
+                  <Button size="sm" variant="outline">
+                    انصراف
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -329,37 +323,53 @@ export default function ShowcasePage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-10">
-                  <Checkbox aria-label="انتخاب همه" />
+                  <Checkbox
+                    checked={allPageSelected}
+                    onCheckedChange={(v) => {
+                      const next = { ...selected };
+                      pageRows.forEach((r) => {
+                        next[r.id] = Boolean(v);
+                      });
+                      setSelected(next);
+                    }}
+                    aria-label="انتخاب همه ردیف‌های صفحه"
+                  />
                 </TableHead>
                 <TableHead>
-                  <button className="inline-flex items-center gap-1" onClick={() => toggleSort("code")}>
+                  <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleSort("code")}>
                     کد <SortIcon column="code" />
                   </button>
                 </TableHead>
                 <TableHead>
-                  <button className="inline-flex items-center gap-1" onClick={() => toggleSort("title")}>
+                  <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleSort("title")}>
                     عنوان <SortIcon column="title" />
                   </button>
                 </TableHead>
                 <TableHead>انبار</TableHead>
                 <TableHead>
-                  <button className="inline-flex items-center gap-1" onClick={() => toggleSort("amount")}>
+                  <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleSort("amount")}>
                     مبلغ <SortIcon column="amount" />
                   </button>
                 </TableHead>
                 <TableHead>
-                  <button className="inline-flex items-center gap-1" onClick={() => toggleSort("status")}>
+                  <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleSort("status")}>
                     وضعیت <SortIcon column="status" />
                   </button>
                 </TableHead>
-                <TableHead className="w-12" />
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {pageRows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow key={row.id} data-state={selected[row.id] ? "selected" : undefined}>
                   <TableCell>
-                    <Checkbox aria-label={`انتخاب ${row.code}`} />
+                    <Checkbox
+                      checked={Boolean(selected[row.id])}
+                      onCheckedChange={(v) =>
+                        setSelected((prev) => ({ ...prev, [row.id]: Boolean(v) }))
+                      }
+                      aria-label={`انتخاب ${row.code}`}
+                    />
                   </TableCell>
                   <TableCell className="font-medium">{row.code}</TableCell>
                   <TableCell>{row.title}</TableCell>
@@ -369,7 +379,7 @@ export default function ShowcasePage() {
                     <Badge variant={statusMap[row.status].variant}>{statusMap[row.status].label}</Badge>
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" aria-label="عملیات">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="عملیات">
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </TableCell>
@@ -378,26 +388,35 @@ export default function ShowcasePage() {
             </TableBody>
           </Table>
 
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              {filtered.length} ردیف · صفحه {page} از {totalPages}
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>
+                {filtered.length} ردیف · صفحه {page} از {totalPages}
+              </span>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(v) => {
+                  setPageSize(Number(v));
+                  setPage(1);
+                }}
               >
+                <SelectTrigger className="h-8 w-[110px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">۵ در صفحه</SelectItem>
+                  <SelectItem value="8">۸ در صفحه</SelectItem>
+                  <SelectItem value="10">۱۰ در صفحه</SelectItem>
+                  <SelectItem value="20">۲۰ در صفحه</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button variant="outline" size="sm" className="h-8" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
                 <ChevronRight className="h-4 w-4" />
                 قبلی
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              >
+              <Button variant="outline" size="sm" className="h-8" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
                 بعدی
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -406,23 +425,22 @@ export default function ShowcasePage() {
         </CardContent>
       </Card>
 
-      {/* Forms / controls */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>فرم و کنترل‌ها</CardTitle>
-            <CardDescription>اینپوت، سلکت، چک‌باکس، سوییچ، متن‌بلند</CardDescription>
+            <CardDescription>چک‌باکس مربعی برای گزینه‌های چندانتخابی · سوییچ برای روشن/خاموش</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>نام کالا</Label>
-                <Input placeholder="لپ‌تاپ ایسوس ۱۵" />
+          <CardContent className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs">نام کالا</Label>
+                <Input className="h-9" placeholder="لپ‌تاپ ایسوس ۱۵" />
               </div>
-              <div className="space-y-2">
-                <Label>گروه کالا</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs">گروه کالا</Label>
                 <Select>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-9">
                     <SelectValue placeholder="انتخاب کنید" />
                   </SelectTrigger>
                   <SelectContent>
@@ -433,12 +451,12 @@ export default function ShowcasePage() {
                 </Select>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>توضیحات</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">توضیحات</Label>
               <Textarea placeholder="توضیح تکمیلی..." />
             </div>
             <Separator />
-            <div className="flex flex-wrap items-center gap-6">
+            <div className="flex flex-wrap items-center gap-5">
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox defaultChecked />
                 قابل فروش
@@ -453,31 +471,33 @@ export default function ShowcasePage() {
               </label>
             </div>
           </CardContent>
-          <CardFooter className="gap-2">
-            <Button>ذخیره</Button>
-            <Button variant="secondary">پیش‌نویس</Button>
-            <Button variant="outline">انصراف</Button>
+          <CardFooter>
+            <Button size="sm">ذخیره</Button>
+            <Button size="sm" variant="secondary">
+              پیش‌نویس
+            </Button>
+            <Button size="sm" variant="outline">
+              انصراف
+            </Button>
           </CardFooter>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle>تب‌ها، جداکننده، لودینگ</CardTitle>
-            <CardDescription>الگوهای رایج صفحه جزئیات</CardDescription>
+            <CardDescription>چینش راست‌چین</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="info">
+            <Tabs defaultValue="info" dir="rtl">
               <TabsList>
                 <TabsTrigger value="info">اطلاعات</TabsTrigger>
                 <TabsTrigger value="stock">موجودی</TabsTrigger>
                 <TabsTrigger value="history">تاریخچه</TabsTrigger>
               </TabsList>
-              <TabsContent value="info" className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  محتوای تب اطلاعات کالا. جداکننده زیر این متن آمده است.
-                </p>
+              <TabsContent value="info" className="space-y-2.5">
+                <p className="text-xs text-muted-foreground">محتوای تب اطلاعات کالا</p>
                 <Separator />
-                <div className="grid gap-2 text-sm">
+                <div className="grid gap-1.5 text-sm">
                   <div className="flex justify-between"><span className="text-muted-foreground">کد</span><span>ITM-00125</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">واحد</span><span>عدد</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">وضعیت</span><Badge variant="success">فعال</Badge></div>
@@ -486,14 +506,12 @@ export default function ShowcasePage() {
               <TabsContent value="stock">
                 <p className="text-sm">موجودی قابل فروش: <strong>۱٬۲۴۰</strong></p>
               </TabsContent>
-              <TabsContent value="history" className="space-y-3">
-                <p className="text-sm text-muted-foreground">نمونه اسکلتون لودینگ:</p>
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-5/6" />
-                  <Skeleton className="h-4 w-2/3" />
-                  <Skeleton className="h-20 w-full rounded-lg" />
-                </div>
+              <TabsContent value="history" className="space-y-2">
+                <p className="text-xs text-muted-foreground">نمونه اسکلتون لودینگ</p>
+                <Skeleton className="h-3.5 w-full" />
+                <Skeleton className="h-3.5 w-5/6" />
+                <Skeleton className="h-3.5 w-2/3" />
+                <Skeleton className="h-16 w-full rounded-lg" />
               </TabsContent>
             </Tabs>
           </CardContent>
@@ -504,18 +522,18 @@ export default function ShowcasePage() {
         <CardHeader>
           <CardTitle>حالت‌های بازخورد</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-3">
-          <Alert variant="success">
-            <AlertTitle>موفق</AlertTitle>
-            <AlertDescription>عملیات با موفقیت انجام شد.</AlertDescription>
+        <CardContent className="grid gap-2 md:grid-cols-3">
+          <Alert variant="success" className="py-2.5">
+            <AlertTitle className="text-sm">موفق</AlertTitle>
+            <AlertDescription className="text-xs">عملیات با موفقیت انجام شد.</AlertDescription>
           </Alert>
-          <Alert variant="warning">
-            <AlertTitle>هشدار</AlertTitle>
-            <AlertDescription>موجودی به حد نقطه سفارش رسیده است.</AlertDescription>
+          <Alert variant="warning" className="py-2.5">
+            <AlertTitle className="text-sm">هشدار</AlertTitle>
+            <AlertDescription className="text-xs">موجودی به حد نقطه سفارش رسیده است.</AlertDescription>
           </Alert>
-          <Alert variant="destructive">
-            <AlertTitle>خطا</AlertTitle>
-            <AlertDescription>ثبت سند به دلیل قفل دوره مالی ممکن نیست.</AlertDescription>
+          <Alert variant="destructive" className="py-2.5">
+            <AlertTitle className="text-sm">خطا</AlertTitle>
+            <AlertDescription className="text-xs">ثبت سند به دلیل قفل دوره مالی ممکن نیست.</AlertDescription>
           </Alert>
         </CardContent>
       </Card>
