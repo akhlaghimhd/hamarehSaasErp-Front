@@ -1,78 +1,53 @@
-# Hamareh SaaS ERP – Frontend
+# Hamareh SaaS ERP — Frontend
 
-Official Frontend repository for Hamareh ERP Platform.
+مخزن رسمی Frontend پلتفرم هماره ERP.
 
-## Official Repositories
+## تصمیم‌های قفل‌شده
 
-| Type              | URL                                                      |
-|-------------------|----------------------------------------------------------|
-| Backend           | https://github.com/akhlaghimhd/hamarehSaasErp.git        |
-| Frontend          | https://github.com/akhlaghimhd/hamarehSaasErp-Front.git  |
-| Architecture Docs | https://github.com/akhlaghimhd/hamareh-erp-docs.git      |
+- مخزن جدا از Backend
+- فقط Web در فاز اول
+- Next.js + TypeScript + Tailwind + **shadcn/ui**
+- TanStack Query + Zustand + React Hook Form + Zod
+- زبان UI: **فارسی** | جهت: **RTL** | فونت: **Vazirmatn**
+- اولویت ماژول: Foundation → Inventory → Procurement/Sales → Accounting
 
-## Tech Stack (Locked)
+## پایه ظاهری (قالب)
 
-- Next.js 15 (App Router) + TypeScript
-- Tailwind CSS + Shadcn/UI
-- TanStack Query
-- Zustand
-- React Hook Form + Zod
-- Axios
+ظاهر پروژه بر اساس الگوی **shadcn/ui Admin** بنا شده است  
+(هم‌تراز با قالب‌های رایجی مثل `shadcn-admin` از نظر دکمه، فرم، کارت، سایدبار و تم).
 
-## Getting Started
+ساختار ماژولار خود پروژه (`api` / `auth` / `modules` / `store`) حفظ شده و لایه UI Admin روی آن سوار شده است.
+
+## اجرای لوکال
 
 ```bash
-# Clone
-git clone https://github.com/akhlaghimhd/hamarehSaasErp-Front.git
-cd hamarehSaasErp-Front
-
-# Install dependencies
+git pull origin main
 pnpm install
-# or: npm install
+# یا: npm install
 
-# Environment
 cp .env.example .env.local
-
-# Run
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+آدرس‌ها:
+- صفحه شروع: http://localhost:3000
+- داشبورد و پیش‌نمایش کامپوننت‌ها: http://localhost:3000/dashboard
 
-## Project Structure
+## ساختار
 
 ```
 src/
-├── app/                  # Next.js App Router (pages + layout + providers)
-├── api/                  # API client & services
-├── auth/                 # Auth related logic
-├── modules/              # Feature modules (inventory, sales, ...)
-├── shared/               # Shared UI, hooks, utils, components
-│   ├── components/
-│   │   └── ui/           # Shadcn components
-│   ├── hooks/
-│   └── lib/
-└── store/                # Zustand stores (auth, tenant, ...)
+  app/                 # App Router (صفحات)
+  api/                 # API Client مرکزی
+  auth/                # جریان احراز هویت
+  modules/             # ماژول‌های کسب‌وکار
+  shared/
+    components/ui/     # کامپوننت‌های shadcn
+    components/layout/ # سایدبار و هدر
+    lib/               # ابزارها
+  store/               # Zustand stores
 ```
 
-## Architecture Rules (Non-Negotiable)
+## فاز فعلی
 
-See: `Frontend_Phase_Kickoff_Decision_Record_v1.0.md` in the docs repository.
-
-- Frontend talks to Backend **only** via versioned API (`/api/v1/...`)
-- No business logic in Frontend
-- Tenant Context must be preserved
-- RTL + Mobile-First required
-
-## Phase 0 Status
-
-- [x] Project scaffold & config files
-- [x] Base folder structure
-- [x] API Client (axios)
-- [x] Auth Store (Zustand)
-- [x] Tenant Store (Zustand)
-- [x] TanStack Query Provider
-- [ ] Design System in Figma
-- [ ] Auth Flow (Login page + integration)
-- [ ] Core Shell (Layout + Sidebar + Header)
-- [ ] Shadcn UI components installation
+Phase 0: اسکلت + قالب Admin + RTL + فونت + کامپوننت‌های پایه (دکمه، ورودی، کارت، نشان، هشدار)
