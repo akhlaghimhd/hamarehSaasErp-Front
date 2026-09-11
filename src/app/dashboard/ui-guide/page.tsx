@@ -54,7 +54,7 @@ const guides: GuideItem[] = [
     title: "Foundations",
     description: "تایپوگرافی، فاصله‌گذاری، شعاع، سایه، آیکون و مقیاس‌های پایه",
     phase: "فاز ۱",
-    status: "planned",
+    status: "ready",
     icon: Type,
   },
   {
