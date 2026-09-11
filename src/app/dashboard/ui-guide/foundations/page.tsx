@@ -38,7 +38,6 @@ const meta = {
   status: "ready" as const,
 };
 
-/** Typography tied to semantic palette tokens */
 const typeScale = [
   {
     token: "Display",
@@ -145,69 +144,19 @@ const radiusScale = [
 ];
 
 const elevationScale = [
-  {
-    token: "xs",
-    css: "var(--shadow-xs)",
-    hoverClass: "elevate-hover",
-    usage: "جداسازی ملایم ردیف و کنترل",
-  },
-  {
-    token: "sm",
-    css: "var(--shadow-sm)",
-    hoverClass: "elevate-hover",
-    usage: "کارت پیش‌فرض — با hover به md می‌رود",
-  },
-  {
-    token: "md",
-    css: "var(--shadow-md)",
-    hoverClass: "elevate-hover-strong",
-    usage: "Dropdown، Popover، کارت تعاملی",
-  },
-  {
-    token: "lg",
-    css: "var(--shadow-lg)",
-    hoverClass: "",
-    usage: "Modal، Drawer، لایه بالا (ثابت)",
-  },
-  {
-    token: "primary",
-    css: "var(--shadow-primary)",
-    hoverClass: "",
-    usage: "دکمه Primary و Brand Mark",
-  },
+  { token: "xs", css: "var(--shadow-xs)", hoverClass: "elevate-hover", usage: "جداسازی ملایم ردیف و کنترل" },
+  { token: "sm", css: "var(--shadow-sm)", hoverClass: "elevate-hover", usage: "کارت پیش‌فرض — با hover به md می‌رود" },
+  { token: "md", css: "var(--shadow-md)", hoverClass: "elevate-hover-strong", usage: "Dropdown، Popover، کارت تعاملی" },
+  { token: "lg", css: "var(--shadow-lg)", hoverClass: "", usage: "Modal، Drawer، لایه بالا (ثابت)" },
+  { token: "primary", css: "var(--shadow-primary)", hoverClass: "", usage: "دکمه Primary و Brand Mark" },
 ];
 
 const surfacePatterns = [
-  {
-    id: "dots",
-    title: "Dots",
-    className: "pattern-dots",
-    usage: "پس‌زمینه بخش خالی، Empty State ملایم",
-  },
-  {
-    id: "grid",
-    title: "Grid",
-    className: "pattern-grid",
-    usage: "ناحیه داشبورد / پنل تحلیلی",
-  },
-  {
-    id: "diagonal",
-    title: "Diagonal",
-    className: "pattern-diagonal",
-    usage: "هدر ماژول یا نوار جانبی تزئینی",
-  },
-  {
-    id: "soft-noise",
-    title: "Soft Noise",
-    className: "pattern-soft-noise",
-    usage: "کارت KPI و سطح‌های برجسته",
-  },
-  {
-    id: "mesh",
-    title: "Mesh Glow",
-    className: "pattern-mesh",
-    usage: "Hero صفحه ورود یا Welcome",
-  },
+  { id: "dots", title: "Dots", className: "pattern-dots", usage: "پس‌زمینه بخش خالی، Empty State ملایم" },
+  { id: "grid", title: "Grid", className: "pattern-grid", usage: "ناحیه داشبورد / پنل تحلیلی" },
+  { id: "diagonal", title: "Diagonal", className: "pattern-diagonal", usage: "هدر ماژول یا نوار جانبی تزئینی" },
+  { id: "soft-noise", title: "Soft Noise", className: "pattern-soft-noise", usage: "کارت KPI و سطح‌های برجسته" },
+  { id: "mesh", title: "Mesh Glow", className: "pattern-mesh", usage: "Hero صفحه ورود یا Welcome" },
 ];
 
 const iconSizes = [
@@ -219,51 +168,8 @@ const iconSizes = [
 ];
 
 const densityCompare = [
-  {
-    name: "Comfortable (پیش‌فرض)",
-    row: "h-10",
-    pad: "p-4",
-    text: "text-sm",
-    note: "کار روزمره ERP — خوانایی بالا",
-  },
-  {
-    name: "Compact",
-    row: "h-8",
-    pad: "p-3",
-    text: "text-xs",
-    note: "جداول پرتراکم و صفحات عملیاتی",
-  },
-];
-
-const iconProposals = [
-  {
-    id: "A",
-    title: "پیشنهاد A — Lucide خالص (فعلی)",
-    pros: "سبک، tree-shake، یکدست، لود سریع",
-    cons: "چهره خیلی رایج در محصولات SaaS",
-    verdict: "پایه امن؛ برای تمایز بصری کافی نیست",
-  },
-  {
-    id: "B",
-    title: "پیشنهاد B — Hybrid (توصیه)",
-    pros: "Lucide برای UI عمومی + مجموعه آیکون ماژولی سفارشی/متمایز برای Inventory، PS، Workflow",
-    cons: "نیاز به نگهداری ۲ لایه و راهنمای انتخاب",
-    verdict: "بهترین تعادل سرعت + هویت",
-  },
-  {
-    id: "C",
-    title: "پیشنهاد C — Phosphor یا Tabler به‌جای Lucide",
-    pros: "تنوع وزن (thin/light/regular/bold) و ظاهر کمی متفاوت‌تر",
-    cons: "بازنویسی همه آیکون‌های فعلی؛ هزینه مهاجرت",
-    verdict: "فقط اگر بخواهیم کل زبان آیکون را عوض کنیم",
-  },
-  {
-    id: "D",
-    title: "پیشنهاد D — Duotone انتخابی",
-    pros: "برای Empty State، ماژول‌های اصلی و Onboarding روح بصری قوی",
-    cons: "در جدول و منوی فشرده شلوغ می‌شود",
-    verdict: "فقط در سطوح بزرگ و نمایشی، نه در Data Grid",
-  },
+  { name: "Comfortable (پیش‌فرض)", row: "h-10", pad: "p-4", text: "text-sm", note: "کار روزمره ERP — خوانایی بالا" },
+  { name: "Compact", row: "h-8", pad: "p-3", text: "text-xs", note: "جداول پرتراکم و صفحات عملیاتی" },
 ];
 
 export default function FoundationsGuidePage() {
@@ -274,31 +180,20 @@ export default function FoundationsGuidePage() {
       <GuideRulesBox>
         <ul className="list-disc space-y-1 pr-5">
           <li>
-            فونت رسمی: <strong className="text-foreground">Vazirmatn</strong>. رنگ متن فقط از
-            توکن‌های معنایی پالت (<code className="rounded bg-muted px-1">foreground</code>،{" "}
-            <code className="rounded bg-muted px-1">muted-foreground</code>،{" "}
-            <code className="rounded bg-muted px-1">primary</code>،{" "}
-            <code className="rounded bg-muted px-1">destructive</code>).
+            فونت رسمی: <strong className="text-foreground">Vazirmatn</strong>. رنگ متن فقط از توکن‌های
+            معنایی پالت.
           </li>
           <li>مقیاس فاصله: ۸ نقطه. شعاع از <code className="rounded bg-muted px-1">--radius</code>.</li>
+          <li>Elevation المان را از صفحه جدا می‌کند؛ کارت تعاملی با hover سایه قوی‌تر می‌گیرد.</li>
+          <li>الگوهای سطحی CSS فقط برای فضاهای خالی و Hero — نه جدول/فرم پرتراکم.</li>
           <li>
-            Elevation باید المان را از صفحه جدا کند؛ کارت‌های تعاملی با hover سایه قوی‌تر
-            می‌گیرند.
-          </li>
-          <li>
-            الگوهای سطحی CSS (بدون عکس) برای فضاهای خالی و Hero مجازند؛ در جدول و فرم پرتراکم
-            استفاده نکن.
-          </li>
-          <li>
-            سیاست آیکون نهایی پس از تأیید پیشنهادها در همین صفحه قفل می‌شود (فعلاً Lucide پایه).
+            <strong className="text-foreground">سیاست آیکون قفل‌شده B+D:</strong> پایه Lucide؛ Chip/Brand
+            برای تأکید؛ Phosphor Duotone فقط Empty/Hero؛ Tabler ممنوع.
           </li>
         </ul>
       </GuideRulesBox>
 
-      <GuideSection
-        title="۱) تایپوگرافی + رنگ معنایی"
-        description="هر سطح متن به یک توکن رنگ از پالت وصل است تا با تعویض Theme مستأجر، شدت و هویت درست بماند."
-      >
+      <GuideSection title="۱) تایپوگرافی + رنگ معنایی">
         <div className="overflow-hidden rounded-xl border border-border/70 surface-card">
           <div className="grid grid-cols-[130px_1fr_110px_100px] gap-0 border-b border-border/70 bg-muted/40 px-3 py-2 text-[11px] font-medium text-muted-foreground">
             <span>توکن</span>
@@ -323,23 +218,9 @@ export default function FoundationsGuidePage() {
             </div>
           ))}
         </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {[
-            { label: "foreground", className: "bg-foreground" },
-            { label: "muted-foreground", className: "bg-muted-foreground" },
-            { label: "primary", className: "bg-primary" },
-            { label: "destructive", className: "bg-destructive" },
-            { label: "secondary", className: "bg-secondary border border-border" },
-          ].map((c) => (
-            <div key={c.label} className="flex items-center gap-2 rounded-lg border border-border/60 px-2 py-1.5">
-              <span className={cn("h-4 w-4 rounded-full", c.className)} />
-              <span className="font-mono text-[10px] text-muted-foreground">{c.label}</span>
-            </div>
-          ))}
-        </div>
       </GuideSection>
 
-      <GuideSection title="۲) فاصله‌گذاری (Spacing) — تأییدشده" description="واحد پایه ۸px.">
+      <GuideSection title="۲) فاصله‌گذاری (Spacing) — تأییدشده">
         <div className="space-y-2">
           {spacingScale.map((item) => (
             <div
@@ -382,18 +263,12 @@ export default function FoundationsGuidePage() {
         </div>
       </GuideSection>
 
-      <GuideSection
-        title="۴) Elevation، Hover و جداسازی از صفحه"
-        description="سایه برای جدا کردن سطح از پس‌زمینه است. روی کارت‌های تعاملی موس را حرکت بده تا تقویت سایه را ببینی."
-      >
+      <GuideSection title="۴) Elevation، Hover و جداسازی">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {elevationScale.map((item) => (
             <div
               key={item.token}
-              className={cn(
-                "rounded-xl border border-border/50 bg-card p-4",
-                item.hoverClass
-              )}
+              className={cn("rounded-xl border border-border/50 bg-card p-4", item.hoverClass)}
               style={{
                 boxShadow: `var(--shadow-${item.token === "primary" ? "primary" : item.token})`,
               }}
@@ -401,33 +276,12 @@ export default function FoundationsGuidePage() {
               <div className="text-sm font-medium text-foreground">shadow-{item.token}</div>
               <div className="mt-1 font-mono text-[10px] text-muted-foreground">{item.css}</div>
               <div className="mt-2 text-xs text-muted-foreground">{item.usage}</div>
-              {item.hoverClass ? (
-                <div className="mt-2 text-[10px] text-primary">Hover → سایه قوی‌تر</div>
-              ) : null}
             </div>
           ))}
         </div>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <div className="rounded-xl border border-border/60 bg-card p-4 elevate-hover">
-            <div className="text-sm font-medium text-foreground">کارت تعاملی نمونه</div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              در حالت عادی shadow-sm؛ با hover به md می‌رود و ۱px بالا می‌آید.
-            </p>
-          </div>
-          <div className="rounded-xl border border-border/60 bg-card p-4 elevate-hover-strong">
-            <div className="text-sm font-medium text-foreground">کارت برجسته نمونه</div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              برای KPI و اکشن‌های مهم؛ hover به shadow-lg.
-            </p>
-          </div>
-        </div>
       </GuideSection>
 
-      <GuideSection
-        title="۵) الگوهای سطحی CSS (بدون عکس)"
-        description="برای دادن روح بصری به فضاهای خشک داشبورد — سبک، تکرارشونده، وابسته به توکن primary."
-      >
+      <GuideSection title="۵) الگوهای سطحی CSS">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {surfacePatterns.map((p) => (
             <div
@@ -445,16 +299,44 @@ export default function FoundationsGuidePage() {
             </div>
           ))}
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">
-          <strong className="text-foreground">قانون:</strong> الگو فقط روی سطوح خالی، Hero، Empty
-          State و پس‌زمینه بخش — نه روی ردیف جدول، نه روی فیلد فرم پرتراکم.
-        </p>
       </GuideSection>
 
       <GuideSection
-        title="۶) سیستم آیکون — وضعیت فعلی و پیشنهادها"
-        description="اولویت: سرعت لود، سپس تمایز بصری. تصمیم نهایی را تو می‌گیری."
+        title="۶) سیستم آیکون — قفل B + D"
+        description="این بخش دیگر پیشنهاد نیست؛ قانون محصول است. جزئیات زنده در Icon Lab."
       >
+        <div className="mb-4 rounded-xl border border-primary/25 bg-primary/5 p-4 text-sm">
+          <div className="mb-2 font-medium text-primary">قانون قفل‌شده</div>
+          <ul className="list-disc space-y-1 pr-5 text-muted-foreground">
+            <li>
+              <strong className="text-foreground">پایه:</strong> Lucide Outline در منو، جدول، فرم، دکمه.
+            </li>
+            <li>
+              <strong className="text-foreground">تأکید (B):</strong> Lucide داخل Chip یا Brand Mark برای
+              Sidebar سطح۱، Page Header، کارت ماژول.
+            </li>
+            <li>
+              <strong className="text-foreground">نمایشی (D):</strong> Phosphor{" "}
+              <code className="rounded bg-muted px-1">weight="duotone"</code> فقط Empty / Hero /
+              Onboarding.
+            </li>
+            <li>
+              <strong className="text-foreground">ممنوع:</strong> Tabler · Duotone در جدول · کتابخانه
+              سوم بدون تصمیم معماری.
+            </li>
+            <li>
+              اندازه استاندارد رابط: <code className="rounded bg-muted px-1">h-4 w-4</code> (16px).
+              رنگ از <code className="rounded bg-muted px-1">currentColor</code>.
+            </li>
+          </ul>
+          <a
+            href="/dashboard/ui-guide/icon-lab"
+            className="mt-3 inline-flex text-xs font-medium text-primary underline-offset-2 hover:underline"
+          >
+            مشاهده Icon Lab →
+          </a>
+        </div>
+
         <div className="mb-4 flex flex-wrap items-end gap-6 rounded-xl border border-border/70 bg-card p-4">
           {iconSizes.map((item) => (
             <div key={item.token} className="flex flex-col items-center gap-2">
@@ -467,7 +349,7 @@ export default function FoundationsGuidePage() {
           ))}
         </div>
 
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
           {[Home, Search, Package, Warehouse, ShoppingCart, FileText, User, Settings, Bell, Check, ChevronLeft].map(
             (Icon, i) => (
               <div
@@ -478,35 +360,6 @@ export default function FoundationsGuidePage() {
               </div>
             )
           )}
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          {iconProposals.map((p) => (
-            <Card key={p.id} className="elevate-hover">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-foreground">{p.title}</CardTitle>
-                <CardDescription className="text-xs">{p.verdict}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-1 text-xs text-muted-foreground">
-                <div>
-                  <span className="font-medium text-emerald-700 dark:text-emerald-300">مزیت: </span>
-                  {p.pros}
-                </div>
-                <div>
-                  <span className="font-medium text-rose-700 dark:text-rose-300">هزینه: </span>
-                  {p.cons}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
-          <strong className="text-foreground">توصیه معماری من:</strong> پیشنهاد B — Lucide به‌عنوان
-          پایه سریع برای کنترل‌ها و جداول؛ برای هویت ماژول‌ها (انبار، خرید، گردش‌کار، مالی) یک
-          لایه آیکون متمایزتر (سفارشی یا Phosphor Duotone محدود) فقط در Sidebar سطح اول، Empty
-          State و Page Header. این‌طور هم لود سبک می‌ماند هم چهره پلتفرم از قالب‌های تکراری جدا
-          می‌شود.
         </div>
       </GuideSection>
 
@@ -531,18 +384,6 @@ export default function FoundationsGuidePage() {
                     فعال
                   </Badge>
                 </div>
-                <div
-                  className={cn(
-                    "flex items-center justify-between rounded-lg border border-border/70",
-                    mode.pad,
-                    mode.row
-                  )}
-                >
-                  <span className={cn(mode.text, "text-foreground")}>ردیف دوم</span>
-                  <Badge variant="outline" className="text-[10px]">
-                    پیش‌نویس
-                  </Badge>
-                </div>
               </CardContent>
             </Card>
           ))}
@@ -554,19 +395,19 @@ export default function FoundationsGuidePage() {
           <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
             <div className="mb-2 font-medium text-emerald-800 dark:text-emerald-200">انجام بده</div>
             <ul className="list-disc space-y-1 pr-5 text-muted-foreground">
-              <li>رنگ متن را از توکن معنایی پالت بگیر.</li>
-              <li>روی کارت‌های تعاملی از elevate-hover استفاده کن.</li>
-              <li>الگوی CSS را فقط برای فضاهای خالی و Hero به کار ببر.</li>
-              <li>آیکون پایه را یکدست نگه دار؛ تمایز را در نقاط برند بگذار.</li>
+              <li>رنگ متن و آیکون را از توکن معنایی بگیر.</li>
+              <li>در جدول فقط Lucide Outline کوچک بگذار.</li>
+              <li>برای Sidebar سطح۱ از Chip یا Brand استفاده کن.</li>
+              <li>Duotone را فقط در Empty/Hero با Phosphor بگذار.</li>
             </ul>
           </div>
           <div className="rounded-xl border border-rose-200/80 bg-rose-50/60 p-4 text-sm dark:border-rose-900 dark:bg-rose-950/30">
             <div className="mb-2 font-medium text-rose-800 dark:text-rose-200">انجام نده</div>
             <ul className="list-disc space-y-1 pr-5 text-muted-foreground">
-              <li>رنگ خاکستری هگز ثابت برای متن ننویس.</li>
-              <li>سایه را از صفحه حذف نکن تا همه‌چیز تخت شود.</li>
-              <li>الگوی نقطه‌ای روی جدول شلوغ نگذار.</li>
-              <li>چند کتابخانه آیکون را بدون سیاست مخلوط نکن.</li>
+              <li>Tabler یا کتابخانه سوم اضافه نکن.</li>
+              <li>Duotone را در Data Grid نگذار.</li>
+              <li>سایه هگز ثابت و فاصله خارج از مقیاس ۸ نقطه ننویس.</li>
+              <li>npm و pnpm را در این پروژه مخلوط نکن (رسمی: pnpm).</li>
             </ul>
           </div>
         </div>
@@ -575,8 +416,8 @@ export default function FoundationsGuidePage() {
       <Separator />
 
       <div className="rounded-xl border border-border/70 bg-muted/30 p-4 text-xs text-muted-foreground">
-        <strong className="text-foreground">منتظر تصمیم تو:</strong> کدام پیشنهاد آیکون را قفل
-        کنیم؟ (A / B / C / D). بعد از تأیید، به UI-02 Layout می‌رویم.
+        <strong className="text-foreground">مرحله بعد:</strong> UI-02 Layout & Structure — با پایه‌های
+        قفل‌شده این صفحه.
       </div>
     </div>
   );
