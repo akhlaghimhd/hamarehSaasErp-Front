@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ComponentType } from "react";
 import {
   GuidePageHeader,
   GuideRulesBox,
@@ -9,13 +9,6 @@ import {
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/shared/components/ui/card";
 import { Separator } from "@/shared/components/ui/separator";
 import { cn } from "@/shared/lib/utils";
 import {
@@ -32,7 +25,6 @@ import {
   User,
   Command,
   Home,
-  Check,
 } from "lucide-react";
 
 const meta = {
@@ -47,7 +39,7 @@ const meta = {
 type NavItem = {
   id: string;
   label: string;
-  Icon: React.ComponentType<{ className?: string }>;
+  Icon: ComponentType<{ className?: string }>;
   children?: { id: string; label: string }[];
 };
 
@@ -103,19 +95,18 @@ export default function NavigationGuidePage() {
         <ul className="list-disc space-y-1 pr-5">
           <li>
             Sidebar سطح۱: آیکون Lucide داخل <strong className="text-foreground">Chip</strong> (سیاست
-            B). زیرمنو بدون Chip اضافه — فقط متن.
+            B). زیرمنو بدون Chip — فقط متن.
           </li>
-          <li>Active item: پس‌زمینه <code className="rounded bg-muted px-1">primary/10</code> + متن primary.</li>
-          <li>Header: جستجو، اعلان، کاربر؛ باز شدن Command Palette با میانبر نمایشی ⌘K / Ctrl+K.</li>
+          <li>
+            Active: <code className="rounded bg-muted px-1">primary/10</code> + متن primary.
+          </li>
+          <li>Header: جستجو، اعلان، کاربر؛ Command Palette با ⌘K / Ctrl+K.</li>
           <li>Breadcrumb حداکثر ۳–۴ سطح؛ سطح آخر بدون لینک.</li>
-          <li>Tabs برای سوییچ نمای هم‌تراز در یک صفحه — جایگزین Sidebar نیست.</li>
+          <li>Tabs فقط برای نمای هم‌سطح — جایگزین Sidebar نیست.</li>
         </ul>
       </GuideRulesBox>
 
-      <GuideSection
-        title="۱) Sidebar — باز، Active، زیرمنو"
-        description="همان Shell UI-02؛ اینجا رفتار انتخاب و گروه باز/بسته مشخص می‌شود."
-      >
+      <GuideSection title="۱) Sidebar — باز، Active، زیرمنو">
         <div className="max-w-xs overflow-hidden rounded-xl border border-border/70 bg-card shadow-[var(--shadow-sm)]">
           <div className="flex items-center gap-2 border-b border-border/60 p-2.5">
             <div className="brand-mark flex h-8 w-8 items-center justify-center rounded-lg text-xs text-white">
@@ -187,27 +178,22 @@ export default function NavigationGuidePage() {
             })}
           </nav>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          روی «انبار» و زیرمنوها کلیک کن. Active و باز/بسته بودن گروه را ببین.
-        </p>
       </GuideSection>
 
       <GuideSection title="۲) Header — جستجو، اعلان، کاربر، Command">
         <div className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-[var(--shadow-sm)]">
           <div className="header-blur flex h-12 items-center justify-between gap-3 border-b border-border/70 px-3">
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setCmdOpen(true)}
-                className="flex h-8 max-w-xs flex-1 items-center gap-2 rounded-lg border border-border/70 bg-muted/30 px-2.5 text-xs text-muted-foreground transition hover:border-primary/30"
-              >
-                <Search className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">جستجو یا دستور…</span>
-                <kbd className="mr-auto hidden rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[10px] sm:inline">
-                  ⌘K
-                </kbd>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setCmdOpen(true)}
+              className="flex h-8 max-w-xs flex-1 items-center gap-2 rounded-lg border border-border/70 bg-muted/30 px-2.5 text-xs text-muted-foreground transition hover:border-primary/30"
+            >
+              <Search className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">جستجو یا دستور…</span>
+              <kbd className="mr-auto hidden rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[10px] sm:inline">
+                ⌘K
+              </kbd>
+            </button>
             <div className="flex items-center gap-1">
               <Button size="sm" variant="ghost" className="relative h-8 w-8 p-0">
                 <Bell className="h-4 w-4" />
@@ -220,9 +206,6 @@ export default function NavigationGuidePage() {
                 <span className="hidden text-xs sm:inline">کاربر</span>
               </Button>
             </div>
-          </div>
-          <div className="p-3 text-xs text-muted-foreground">
-            کلیک روی نوار جستجو → پیش‌نمایش Command Palette پایین صفحه.
           </div>
         </div>
       </GuideSection>
@@ -249,9 +232,6 @@ export default function NavigationGuidePage() {
             );
           })}
         </nav>
-        <p className="mt-2 text-xs text-muted-foreground">
-          در RTL جهت شورون معکوس است. سطح آخر bold و بدون لینک.
-        </p>
       </GuideSection>
 
       <GuideSection title="۴) Tabs — نماهای هم‌سطح">
@@ -280,21 +260,16 @@ export default function NavigationGuidePage() {
             ))}
           </div>
           <div className="p-4 text-xs text-muted-foreground">
-            محتوای نمای «
-            {tab === "list" ? "فهرست" : tab === "board" ? "بورد" : "بایگانی"}» — Tabs برای تعویض
-            نماست نه برای ماژول‌های جدا.
+            نمای «{tab === "list" ? "فهرست" : tab === "board" ? "بورد" : "بایگانی"}»
           </div>
         </div>
       </GuideSection>
 
-      <GuideSection title="۵) Command Palette (پیش‌نمایش)">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={() => setCmdOpen((v) => !v)}>
-            <Command className="ml-1.5 h-3.5 w-3.5" />
-            {cmdOpen ? "بستن Palette" : "باز کردن Palette"}
-          </Button>
-          <span className="text-xs text-muted-foreground">جایگزین سریع ناوبری و اقدام</span>
-        </div>
+      <GuideSection title="۵) Command Palette">
+        <Button size="sm" onClick={() => setCmdOpen((v) => !v)}>
+          <Command className="ml-1.5 h-3.5 w-3.5" />
+          {cmdOpen ? "بستن Palette" : "باز کردن Palette"}
+        </Button>
         {cmdOpen ? (
           <div className="mt-3 overflow-hidden rounded-xl border border-border/70 bg-card shadow-[var(--shadow-lg)]">
             <div className="border-b border-border/60 p-2">
@@ -356,24 +331,23 @@ export default function NavigationGuidePage() {
         </div>
       </GuideSection>
 
-      <GuideSection title="۷) Do / Don’t ناوبری">
+      <GuideSection title="۷) Do / Don’t">
         <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
             <div className="mb-2 font-medium text-emerald-800 dark:text-emerald-200">انجام بده</div>
             <ul className="list-disc space-y-1 pr-5 text-muted-foreground">
-              <li>Chip فقط روی سطح۱ Sidebar.</li>
-              <li>یک Active واضح در هر شاخه.</li>
-              <li>Breadcrumb کوتاه و معنادار.</li>
-              <li>Command Palette برای کاربر حرفه‌ای ERP.</li>
+              <li>Chip فقط سطح۱ Sidebar</li>
+              <li>یک Active واضح</li>
+              <li>Breadcrumb کوتاه</li>
+              <li>Command برای کاربر حرفه‌ای</li>
             </ul>
           </div>
           <div className="rounded-xl border border-rose-200/80 bg-rose-50/60 p-4 text-sm dark:border-rose-900 dark:bg-rose-950/30">
             <div className="mb-2 font-medium text-rose-800 dark:text-rose-200">انجام نده</div>
             <ul className="list-disc space-y-1 pr-5 text-muted-foreground">
-              <li>Tabs را جای منوی اصلی ماژول نگذار.</li>
-              <li>بیش از دو سطح تو در تو در Sidebar بدون نیاز واقعی.</li>
-              <li>Duotone در آیتم منو.</li>
-              <li>جستجوی Header بدون مسیر Command/نتیجه.</li>
+              <li>Tabs جای منوی ماژول</li>
+              <li>Duotone در منو</li>
+              <li>بیش از دو سطح تو در تو بدون نیاز</li>
             </ul>
           </div>
         </div>
@@ -386,16 +360,12 @@ export default function NavigationGuidePage() {
           <a href="/dashboard/ui-guide/layout">UI-02 Layout</a>
         </Button>
         <Button asChild variant="outline" size="sm">
-          <a href="/dashboard/ui-guide/icon-lab">Icon Lab</a>
-        </Button>
-        <Button asChild variant="outline" size="sm">
           <a href="/dashboard/ui-guide">فهرست</a>
         </Button>
       </div>
 
       <div className="rounded-xl border border-border/70 bg-muted/30 p-4 text-xs text-muted-foreground">
-        <strong className="text-foreground">مرحله بعد:</strong> UI-04 Forms & Data Entry — ورودی‌ها،
-        اعتبارسنجی، چیدمان فرم روی همان Shell و ناوبری.
+        <strong className="text-foreground">مرحله بعد:</strong> UI-04 Forms & Data Entry
       </div>
     </div>
   );
