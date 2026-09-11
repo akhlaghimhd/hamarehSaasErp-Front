@@ -34,7 +34,7 @@ const meta = {
   code: "UI-02",
   title: "Layout & Structure",
   description:
-    "اسکلت صفحه: App Shell، عرض محتوا، Grid، Sticky، Split View، Density و ترکیب واقعی بلوک‌ها با توکن‌های UI-00/UI-01 و سیاست آیکون B+D.",
+    "اسکلت صفحه: App Shell، عرض محتوا، Grid، Sticky، Split View، Density و قوانین ترکیب فرم+جدول بدون پرت فضا.",
   phase: "فاز ۱",
   status: "ready" as const,
 };
@@ -59,34 +59,33 @@ export default function LayoutGuidePage() {
     <div className="space-y-6">
       <GuidePageHeader meta={meta} />
 
-      <GuideRulesBox title="قوانین چیدمان (وابسته به تصمیم‌های قبلی)">
+      <GuideRulesBox title="قوانین چیدمان">
         <ul className="list-disc space-y-1 pr-5">
           <li>
-            فاصله صفحه از UI-01: main در دسکتاپ <code className="rounded bg-muted px-1">p-4</code>،
-            فاصله عمودی بخش‌ها <code className="rounded bg-muted px-1">space-y-6</code>.
+            فاصله: main دسکتاپ <code className="rounded bg-muted px-1">p-4</code>، بین بخش‌ها{" "}
+            <code className="rounded bg-muted px-1">space-y-6</code>.
           </li>
           <li>
-            آیکون منو: سیاست <strong className="text-foreground">B+D</strong> — Lucide داخل Chip در
-            Sidebar سطح۱؛ Outline ساده در لیست فشرده.
+            آیکون: B+D — Chip در Sidebar سطح۱؛ Outline در لیست/جدول.
           </li>
           <li>
-            سایه و سطح: کارت‌ها <code className="rounded bg-muted px-1">elevate-hover</code>؛ جداسازی
-            از پس‌زمینه با shadow توکن.
+            <strong className="text-foreground">عرض:</strong> روی مانیتور عریض، بلوک فرم/متن را تا افق
+            نکش؛ از max-width استفاده کن تا خط چشم خسته نشود.
           </li>
           <li>
-            عرض محتوا: حداکثر خوانا برای فرم/جدول؛ از کشیدن بی‌نهایت روی مانیتور عریض خودداری کن.
+            <strong className="text-foreground">Sticky:</strong> فقط نوار ابزار همان ناحیه اسکرول
+            (مثلاً جدول) — نه کل صفحه و نه چند لایه تو در تو.
           </li>
-          <li>Sticky فقط برای Header صفحه و نوار ابزار جدول — نه برای همه کارت‌ها.</li>
+          <li>
+            <strong className="text-foreground">فرم + جدول:</strong> کنار هم فقط وقتی فرم کوتاه است؛
+            وگرنه زیر هم یا فرم در Modal/Drawer.
+          </li>
         </ul>
       </GuideRulesBox>
 
-      <GuideSection
-        title="۱) App Shell — آناتومی"
-        description="ساختار ثابت محصول: Sidebar + Header + Main. جزئیات Navigation در UI-03 تکمیل می‌شود."
-      >
+      <GuideSection title="۱) App Shell — آناتومی">
         <div className="overflow-hidden rounded-xl border border-border/70 shadow-[var(--shadow-sm)]">
-          <div className="flex min-h-[320px]">
-            {/* Sidebar demo */}
+          <div className="flex min-h-[280px]">
             <aside
               className={cn(
                 "flex shrink-0 flex-col border-l border-border/70 bg-card transition-all",
@@ -100,7 +99,6 @@ export default function LayoutGuidePage() {
                 {!sidebarCollapsed && (
                   <div className="min-w-0">
                     <div className="truncate text-xs font-semibold">هماره ERP</div>
-                    <div className="truncate text-[10px] text-muted-foreground">Shell</div>
                   </div>
                 )}
               </div>
@@ -108,7 +106,7 @@ export default function LayoutGuidePage() {
                 {navItems.map(({ label, Icon }) => (
                   <div
                     key={label}
-                    className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs text-muted-foreground hover:bg-sidebar-accent"
                   >
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                       <Icon className="h-3.5 w-3.5" />
@@ -118,22 +116,17 @@ export default function LayoutGuidePage() {
                 ))}
               </nav>
             </aside>
-
-            {/* Main column */}
             <div className="flex min-w-0 flex-1 flex-col">
               <header className="header-blur flex h-12 items-center justify-between border-b border-border/70 px-3">
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 w-8 p-0"
-                    onClick={() => setSidebarCollapsed((v) => !v)}
-                  >
-                    <Menu className="h-4 w-4" />
-                  </Button>
-                  <span className="text-xs text-muted-foreground">Header · جستجو / اعلان</span>
-                </div>
-                <div className="flex items-center gap-1.5">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setSidebarCollapsed((v) => !v)}
+                >
+                  <Menu className="h-4 w-4" />
+                </Button>
+                <div className="flex gap-1">
                   <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
                     <Search className="h-4 w-4" />
                   </Button>
@@ -142,80 +135,67 @@ export default function LayoutGuidePage() {
                   </Button>
                 </div>
               </header>
-              <main className={cn("flex-1 space-y-3 bg-muted/20", pad)}>
-                <div className="text-xs font-medium text-foreground">Main Content</div>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {["اسناد امروز", "در انتظار", "موجودی"].map((t) => (
-                    <div
-                      key={t}
-                      className="rounded-lg border border-border/60 bg-card p-3 elevate-hover"
-                    >
-                      <div className="text-[11px] text-muted-foreground">{t}</div>
-                      <div className="text-lg font-semibold text-foreground">—</div>
-                    </div>
-                  ))}
-                </div>
+              <main className={cn("flex-1 bg-muted/20", pad)}>
+                <div className="text-xs text-muted-foreground">ناحیه Main — محتوای صفحه</div>
               </main>
             </div>
           </div>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          دکمه منو را بزن تا حالت جمع‌شده Sidebar را ببینی. آیکون‌ها با Chip (سیاست B) هستند.
-        </p>
       </GuideSection>
 
       <GuideSection
-        title="۲) عرض محتوا و Grid"
-        description="روی مانیتور عریض، محتوا نباید تا افق کشیده شود. از شبکه ۱۲ ستونی ذهنی استفاده کن."
+        title="۲) max-w-5xl یعنی چه؟"
+        description="یک سقف عرض برای خوانایی — نه اینکه جدول همیشه باریک باشد."
       >
-        <div className="space-y-3">
-          <div className="rounded-xl border border-border/70 bg-card p-3">
-            <div className="mb-2 text-xs font-medium text-foreground">Full bleed (فقط Shell)</div>
-            <div className="grid grid-cols-12 gap-1">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="flex h-8 items-center justify-center rounded bg-primary/15 font-mono text-[10px] text-primary"
-                >
-                  {i + 1}
-                </div>
-              ))}
+        <div className="space-y-3 text-sm text-muted-foreground">
+          <p>
+            <code className="rounded bg-muted px-1 text-foreground">max-w-5xl</code> در Tailwind یعنی
+            حداکثر عرض حدود <strong className="text-foreground">۶۴rem ≈ ۱۰۲۴px</strong>. روی مانیتور
+            ۲۷ اینچ عریض، اگر فرم را تا لب راست بکشی، خط‌ها خیلی طولانی می‌شوند و چشم خسته می‌شود.
+          </p>
+          <ul className="list-disc space-y-1 pr-5">
+            <li>
+              <strong className="text-foreground">فرم، متن راهنما، کارت تنظیمات:</strong> داخل
+              max-w-3xl تا max-w-5xl بگذار.
+            </li>
+            <li>
+              <strong className="text-foreground">جدول داده با ستون زیاد:</strong> می‌تواند عرض کامل
+              Main را بگیرد و افقی اسکرول شود — اجباری به max-w-5xl نیست.
+            </li>
+            <li>
+              Shell (Sidebar+Header) همیشه full-width است؛ محدودیت عرض فقط روی بلوک محتواست.
+            </li>
+          </ul>
+        </div>
+        <div className="mt-3 space-y-2">
+          <div className="rounded-lg border border-border/70 bg-card p-2">
+            <div className="mb-1 text-[11px] text-muted-foreground">مانیتور عریض — بدون سقف</div>
+            <div className="h-8 w-full rounded bg-rose-500/20 text-center text-[10px] leading-8 text-rose-800 dark:text-rose-200">
+              خط خیلی بلند ← خوانایی ضعیف
             </div>
           </div>
-          <div className="mx-auto max-w-5xl rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3">
-            <div className="mb-2 text-xs font-medium text-primary">
-              max-w-5xl · محدوده پیشنهادی فرم و جدول استاندارد
-            </div>
-            <div className="grid gap-2 md:grid-cols-2">
-              <div className="rounded-lg border border-border/60 bg-card p-3 text-xs text-muted-foreground">
-                ستون فرم
-              </div>
-              <div className="rounded-lg border border-border/60 bg-card p-3 text-xs text-muted-foreground">
-                ستون خلاصه / ساید
-              </div>
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-2">
+            <div className="mb-1 text-[11px] text-primary">با max-w-5xl (فرم)</div>
+            <div className="mx-auto h-8 max-w-5xl rounded bg-primary/20 text-center text-[10px] leading-8 text-primary">
+              عرض محدود ← راحت‌تر خوانده می‌شود
             </div>
           </div>
         </div>
       </GuideSection>
 
-      <GuideSection
-        title="۳) Page Header استاندارد"
-        description="الگوی ثابت بالای هر صفحه عملیاتی — عنوان، توضیح کوتاه، اکشن‌های اصلی."
-      >
+      <GuideSection title="۳) Page Header استاندارد">
         <div className="rounded-xl border border-border/70 bg-card p-4 elevate-hover">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <FileText className="h-4 w-4" />
-                </span>
-                <div>
-                  <h3 className="text-base font-semibold text-foreground">اسناد انبار</h3>
-                  <p className="text-xs text-muted-foreground">ثبت، تأیید و ردیابی اسناد ورود و خروج</p>
-                </div>
+            <div className="flex items-center gap-2">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <FileText className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="text-base font-semibold text-foreground">اسناد انبار</h3>
+                <p className="text-xs text-muted-foreground">ثبت و ردیابی ورود و خروج</p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-2">
               <Button size="sm" variant="outline">
                 خروجی
               </Button>
@@ -225,11 +205,8 @@ export default function LayoutGuidePage() {
         </div>
       </GuideSection>
 
-      <GuideSection
-        title="۴) Density روی چیدمان"
-        description="همان دو حالت UI-01 — تغییر Density نباید منطق صفحه را عوض کند، فقط فشردگی."
-      >
-        <div className="mb-3 flex flex-wrap gap-2">
+      <GuideSection title="۴) Density">
+        <div className="mb-3 flex gap-2">
           <Button
             size="sm"
             variant={density === "comfortable" ? "default" : "outline"}
@@ -246,46 +223,40 @@ export default function LayoutGuidePage() {
           </Button>
         </div>
         <div className="rounded-xl border border-border/70 bg-card">
-          {["پیش‌نویس · GR-1404-001", "در انتظار · GI-1404-014", "تأیید شده · TR-1404-003"].map(
-            (row) => (
-              <div
-                key={row}
-                className={cn(
-                  "flex items-center justify-between border-b border-border/50 last:border-0",
-                  pad,
-                  rowH
-                )}
-              >
-                <span className={cn("flex items-center gap-2 text-foreground", text)}>
-                  <FileText className="h-3.5 w-3.5 text-primary" />
-                  {row}
-                </span>
-                <Badge variant="outline" className="text-[10px]">
-                  عملیات
-                </Badge>
-              </div>
-            )
-          )}
+          {["پیش‌نویس · GR-001", "در انتظار · GI-014", "تأیید شده · TR-003"].map((row) => (
+            <div
+              key={row}
+              className={cn(
+                "flex items-center justify-between border-b border-border/50 last:border-0",
+                pad,
+                rowH
+              )}
+            >
+              <span className={cn("flex items-center gap-2 text-foreground", text)}>
+                <FileText className="h-3.5 w-3.5 text-primary" />
+                {row}
+              </span>
+              <Badge variant="outline" className="text-[10px]">
+                عملیات
+              </Badge>
+            </div>
+          ))}
         </div>
       </GuideSection>
 
       <GuideSection
-        title="۵) Split View — لیست + جزئیات"
-        description="الگوی رایج ERP: انتخاب از لیست، ویرایش در پنل کناری. حداقل پرت فضا."
+        title="۵) Split View — لیست + جزئیات (نه فرم سنگین)"
+        description="برای انتخاب یک رکورد و دیدن جزئیات کنار آن. فرم طولانی اینجا جا نمی‌گیرد."
       >
-        <div className="grid min-h-[240px] gap-0 overflow-hidden rounded-xl border border-border/70 md:grid-cols-[minmax(200px,280px)_1fr]">
+        <div className="grid min-h-[220px] overflow-hidden rounded-xl border border-border/70 md:grid-cols-[minmax(180px,260px)_1fr]">
           <div className="border-l border-border/70 bg-card">
-            <div className="border-b border-border/60 px-3 py-2 text-xs font-medium text-foreground">
-              فهرست
-            </div>
+            <div className="border-b border-border/60 px-3 py-2 text-xs font-medium">فهرست</div>
             {["کالای A", "کالای B", "کالای C"].map((item, i) => (
               <div
                 key={item}
                 className={cn(
-                  "flex items-center gap-2 border-b border-border/40 px-3 py-2.5 text-xs last:border-0",
-                  i === 0
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted/40"
+                  "flex items-center gap-2 px-3 py-2.5 text-xs",
+                  i === 0 ? "bg-primary/10 text-primary" : "text-muted-foreground"
                 )}
               >
                 <Package className="h-3.5 w-3.5" />
@@ -293,30 +264,40 @@ export default function LayoutGuidePage() {
               </div>
             ))}
           </div>
-          <div className="space-y-3 bg-muted/15 p-4">
+          <div className="space-y-2 bg-muted/15 p-4">
             <div className="text-sm font-semibold text-foreground">جزئیات کالای A</div>
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="rounded-lg border border-border/60 bg-card p-3 text-xs">
                 <div className="text-muted-foreground">کد</div>
-                <div className="font-medium text-foreground">ITM-001</div>
+                <div className="font-medium">ITM-001</div>
               </div>
               <div className="rounded-lg border border-border/60 bg-card p-3 text-xs">
                 <div className="text-muted-foreground">موجودی</div>
-                <div className="font-medium text-foreground">۱۲۰</div>
+                <div className="font-medium">۱۲۰</div>
               </div>
             </div>
-            <Button size="sm">ویرایش</Button>
           </div>
         </div>
       </GuideSection>
 
       <GuideSection
-        title="۶) Sticky Toolbar"
-        description="نوار ابزار جدول می‌تواند sticky باشد؛ کل صفحه را sticky نکن."
+        title="۶) Sticky Toolbar یعنی چه؟"
+        description="وقتی جدول را اسکرول می‌کنی، نوار فیلتر/دکمهٔ «جدید» بالای همان جدول می‌ماند — نه اینکه کل صفحه قفل شود."
       >
-        <div className="max-h-48 overflow-auto rounded-xl border border-border/70">
+        <div className="space-y-2 text-xs text-muted-foreground">
+          <p>
+            <strong className="text-foreground">درست:</strong> یک باکس جدول با ارتفاع محدود؛ داخلش
+            اسکرول. نوار ابزار با <code className="rounded bg-muted px-1">sticky top-0</code> به بالای
+            همان باکس می‌چسبد.
+          </p>
+          <p>
+            <strong className="text-foreground">غلط:</strong> sticky کردن Header + فیلتر + فرم + چند
+            کارت روی هم → صفحه خفه و گیج‌کننده می‌شود.
+          </p>
+        </div>
+        <div className="mt-3 max-h-44 overflow-auto rounded-xl border border-border/70">
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border/70 bg-card/95 px-3 py-2 backdrop-blur">
-            <span className="text-xs font-medium text-foreground">۱۲ نتیجه</span>
+            <span className="text-xs font-medium text-foreground">۱۲ نتیجه · نوار چسبان</span>
             <div className="flex gap-1.5">
               <Button size="sm" variant="outline" className="h-7 text-[11px]">
                 فیلتر
@@ -326,15 +307,15 @@ export default function LayoutGuidePage() {
               </Button>
             </div>
           </div>
-          <div className="space-y-0 bg-card">
-            {Array.from({ length: 8 }).map((_, i) => (
+          <div className="bg-card">
+            {Array.from({ length: 10 }).map((_, i) => (
               <div
                 key={i}
                 className="flex h-9 items-center justify-between border-b border-border/40 px-3 text-xs text-muted-foreground"
               >
                 <span className="flex items-center gap-2">
                   <FileText className="h-3.5 w-3.5 text-primary" />
-                  ردیف نمونه {i + 1}
+                  ردیف {i + 1} — اسکرول کن؛ نوار بالا می‌ماند
                 </span>
                 <ChevronLeft className="h-3.5 w-3.5" />
               </div>
@@ -343,68 +324,153 @@ export default function LayoutGuidePage() {
         </div>
       </GuideSection>
 
-      <GuideSection title="۷) ترکیب واقعی — فرم + جدول (پیش‌نمایش UI-10)">
-        <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
-          <Card className="elevate-hover">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">فرم ثبت سریع</CardTitle>
-              <CardDescription className="text-xs">ورود داده در کنار فهرست</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="h-9 rounded-lg border border-border/70 bg-muted/20 px-3 text-xs leading-9 text-muted-foreground">
-                عنوان سند
+      <GuideSection
+        title="۷) ترکیب فرم + جدول — قوانین واقعی (پاسخ نگرانی تو)"
+        description="کنار هم گذاشتن همیشه درست نیست. سه الگوی مجاز:"
+      >
+        <div className="mb-4 space-y-2 rounded-xl border border-amber-200/80 bg-amber-50/50 p-3 text-xs text-muted-foreground dark:border-amber-900 dark:bg-amber-950/20">
+          <strong className="text-foreground">مشکل الگوی خام «دو ستون همیشه»:</strong>
+          اگر فیلدهای فرم زیاد شود ستون فرم بلند می‌شود؛ جدول در ستون کناری یا تنگ می‌ماند یا زیر فرم
+          فضای خالی مرده ایجاد می‌شود. وقتی رکوردهای جدول زیاد شود، دو ارتفاع ناهماهنگ می‌شوند.
+        </div>
+
+        {/* Pattern A */}
+        <div className="mb-4 space-y-2">
+          <div className="text-sm font-medium text-foreground">
+            الگو A — پیش‌فرض ERP: عمودی (فرم بالا → جدول پایین)
+          </div>
+          <p className="text-xs text-muted-foreground">
+            برای فرم متوسط/سنگین و جدول واقعی. هر بلوک عرض کامل می‌گیرد؛ جدول اسکرول مستقل دارد.
+          </p>
+          <div className="space-y-3 rounded-xl border border-border/70 bg-card p-3">
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+              <div className="mb-2 text-xs font-medium text-foreground">فرم ثبت</div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="h-8 rounded-md border border-border/60 bg-card px-2 text-[11px] leading-8 text-muted-foreground">
+                  عنوان
+                </div>
+                <div className="h-8 rounded-md border border-border/60 bg-card px-2 text-[11px] leading-8 text-muted-foreground">
+                  انبار
+                </div>
+                <div className="h-8 rounded-md border border-border/60 bg-card px-2 text-[11px] leading-8 text-muted-foreground sm:col-span-2">
+                  توضیحات
+                </div>
               </div>
-              <div className="h-9 rounded-lg border border-border/70 bg-muted/20 px-3 text-xs leading-9 text-muted-foreground">
-                انبار
-              </div>
-              <Button size="sm" className="w-full">
+              <Button size="sm" className="mt-2">
                 ذخیره
               </Button>
-            </CardContent>
-          </Card>
-          <Card className="elevate-hover">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">اسناد اخیر</CardTitle>
-              <CardDescription className="text-xs">همان صفحه — بدون پرت عمودی زیاد</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-0 p-0">
-              {["GR-001", "GI-002", "TR-003"].map((c) => (
+            </div>
+            <div className="max-h-36 overflow-auto rounded-lg border border-border/60">
+              <div className="sticky top-0 border-b border-border/60 bg-card px-3 py-1.5 text-[11px] font-medium">
+                فهرست اسناد
+              </div>
+              {Array.from({ length: 6 }).map((_, i) => (
                 <div
-                  key={c}
-                  className="flex h-9 items-center justify-between border-t border-border/50 px-4 text-xs"
+                  key={i}
+                  className="flex h-8 items-center gap-2 border-b border-border/40 px-3 text-[11px] last:border-0"
                 >
-                  <span className="flex items-center gap-2 text-foreground">
+                  <FileText className="h-3.5 w-3.5 text-primary" />
+                  سند نمونه {i + 1}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Pattern B */}
+        <div className="mb-4 space-y-2">
+          <div className="text-sm font-medium text-foreground">
+            الگو B — کنار هم فقط «ثبت سریع» (۲ تا ۴ فیلد) + لیست اخیر
+          </div>
+          <p className="text-xs text-muted-foreground">
+            شرط: فرم کوتاه بماند. جدول/لیست ستون خودش اسکرول مستقل دارد (
+            <code className="rounded bg-muted px-1">max-h</code> + overflow) تا ارتفاع فرم فضای خالی
+            زیر جدول نسازد.
+          </p>
+          <div className="grid items-start gap-3 lg:grid-cols-[minmax(220px,320px)_1fr]">
+            <div className="rounded-xl border border-border/70 bg-card p-3">
+              <div className="mb-2 text-xs font-medium">ثبت سریع</div>
+              <div className="space-y-2">
+                <div className="h-8 rounded-md border border-border/60 bg-muted/20 px-2 text-[11px] leading-8 text-muted-foreground">
+                  عنوان
+                </div>
+                <div className="h-8 rounded-md border border-border/60 bg-muted/20 px-2 text-[11px] leading-8 text-muted-foreground">
+                  انبار
+                </div>
+                <Button size="sm" className="w-full">
+                  ذخیره
+                </Button>
+              </div>
+            </div>
+            <div className="max-h-40 overflow-auto rounded-xl border border-border/70 bg-card">
+              <div className="sticky top-0 border-b border-border/60 bg-card px-3 py-1.5 text-[11px] font-medium">
+                اخیر (اسکرول مستقل)
+              </div>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex h-8 items-center justify-between border-b border-border/40 px-3 text-[11px] last:border-0"
+                >
+                  <span className="flex items-center gap-2">
                     <FileText className="h-3.5 w-3.5 text-primary" />
-                    {c}
+                    GR-00{i + 1}
                   </span>
-                  <Badge variant="secondary" className="text-[10px]">
+                  <Badge variant="secondary" className="text-[9px]">
                     پیش‌نویس
                   </Badge>
                 </div>
               ))}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+        </div>
+
+        {/* Pattern C */}
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-foreground">
+            الگو C — جدول تمام‌عرض + فرم در Modal / Drawer
+          </div>
+          <p className="text-xs text-muted-foreground">
+            وقتی فرم سنگین است یا جدول ستون زیاد دارد: صفحه = جدول کامل؛ «جدید/ویرایش» فرم را در
+            لایه رویی باز می‌کند. هیچ فضای مرده‌ای زیر فرم نمی‌ماند.
+          </p>
+          <div className="rounded-xl border border-border/70 bg-card p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-medium">جدول تمام‌عرض Main</span>
+              <Button size="sm" className="h-7 text-[11px]">
+                جدید (باز شدن Drawer)
+              </Button>
+            </div>
+            <div className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-3 py-6 text-center text-[11px] text-muted-foreground">
+              Data Grid کامل — فرم جدا در Overlay (جزئیات در UI-04 و UI-07)
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
+          <strong className="text-foreground">قانون قفل‌شونده:</strong> پیش‌فرض الگو A. الگو B فقط با
+          فرم ≤ ۴ فیلد و لیست با اسکرول مستقل. الگو C برای فرم سنگین یا جدول عریض. اجبار دو ستون
+          برابر برای همه صفحات ممنوع است.
         </div>
       </GuideSection>
 
-      <GuideSection title="۸) Do / Don’t چیدمان">
+      <GuideSection title="۸) Do / Don’t">
         <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
             <div className="mb-2 font-medium text-emerald-800 dark:text-emerald-200">انجام بده</div>
             <ul className="list-disc space-y-1 pr-5 text-muted-foreground">
-              <li>Shell ثابت نگه دار؛ محتوا داخل Main تغییر کند.</li>
-              <li>از max-width برای فرم/جدول استاندارد استفاده کن.</li>
-              <li>Chip آیکون در Sidebar سطح۱ (B+D).</li>
-              <li>Density را بدون تغییر ساختار منطقی اعمال کن.</li>
+              <li>فرم سنگین را زیر هم یا در Drawer بگذار.</li>
+              <li>به جدول اسکرول مستقل بده.</li>
+              <li>Sticky را فقط روی نوار همان ناحیه بگذار.</li>
+              <li>max-width برای متن/فرم؛ جدول می‌تواند عریض‌تر باشد.</li>
             </ul>
           </div>
           <div className="rounded-xl border border-rose-200/80 bg-rose-50/60 p-4 text-sm dark:border-rose-900 dark:bg-rose-950/30">
             <div className="mb-2 font-medium text-rose-800 dark:text-rose-200">انجام نده</div>
             <ul className="list-disc space-y-1 pr-5 text-muted-foreground">
-              <li>چند سطح Sticky تو در تو نساز.</li>
-              <li>محتوا را روی ultrawide تا لب افق نکش.</li>
-              <li>Sidebar را برای هر مستأجر بازطراحی نکن.</li>
-              <li>Duotone را در لیست فشرده نگذار.</li>
+              <li>دو ستون اجباری وقتی فرم بلند است.</li>
+              <li>ارتفاع ستون‌ها را به هم قفل نکن تا فضای خالی مرده بسازد.</li>
+              <li>کل صفحه را sticky نکن.</li>
+              <li>فرم را روی ultrawide تا افق نکش.</li>
             </ul>
           </div>
         </div>
@@ -412,21 +478,16 @@ export default function LayoutGuidePage() {
 
       <Separator />
 
-      <div className="flex flex-wrap gap-2 text-xs">
+      <div className="flex flex-wrap gap-2">
         <Button asChild variant="outline" size="sm">
-          <a href="/dashboard/ui-guide/foundations">UI-01 Foundations</a>
+          <a href="/dashboard/ui-guide/navigation">UI-03 Navigation</a>
         </Button>
         <Button asChild variant="outline" size="sm">
-          <a href="/dashboard/ui-guide/icon-lab">Icon Lab</a>
+          <a href="/dashboard/ui-guide/foundations">UI-01</a>
         </Button>
         <Button asChild variant="outline" size="sm">
-          <a href="/dashboard/ui-guide/branding">UI-00 Branding</a>
+          <a href="/dashboard/ui-guide">فهرست</a>
         </Button>
-      </div>
-
-      <div className="rounded-xl border border-border/70 bg-muted/30 p-4 text-xs text-muted-foreground">
-        <strong className="text-foreground">مرحله بعد:</strong> UI-03 Navigation & Wayfinding — جزئیات
-        Sidebar، Header، Breadcrumb، Tabs، Command Palette (با رعایت Shell همین صفحه).
       </div>
     </div>
   );
