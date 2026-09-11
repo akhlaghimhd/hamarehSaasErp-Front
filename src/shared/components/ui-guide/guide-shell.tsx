@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { cn } from "@/shared/lib/utils";
 import { Badge } from "@/shared/components/ui/badge";
@@ -63,7 +64,7 @@ export function GuideRulesBox({
   className,
 }: {
   title?: string;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 }) {
   return (
@@ -87,7 +88,7 @@ export function GuideSection({
 }: {
   title: string;
   description?: string;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 }) {
   return (
