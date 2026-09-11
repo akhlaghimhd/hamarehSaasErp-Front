@@ -4,9 +4,10 @@ import { Providers } from "./providers";
 import "./globals.css";
 
 const vazirmatn = Vazirmatn({
-  subsets: ["arabic"],
+  subsets: ["arabic", "latin"],
   variable: "--font-vazirmatn",
   display: "swap",
+  weight: ["300", "400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -24,7 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
-      <body className={`${vazirmatn.variable} font-sans`}>
+      <body className={`${vazirmatn.variable} ${vazirmatn.className} font-sans antialiased`}>
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -22,7 +22,23 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
       <QueryClientProvider client={queryClient}>
         {children}
-        <Toaster richColors position="top-center" dir="rtl" closeButton />
+        <Toaster
+          richColors
+          position="top-center"
+          dir="rtl"
+          closeButton
+          toastOptions={{
+            classNames: {
+              toast:
+                "font-sans !font-[family-name:var(--font-vazirmatn)] text-sm shadow-[var(--shadow-md)] border border-border/70",
+              title: "font-medium",
+              description: "text-xs opacity-90",
+            },
+            style: {
+              fontFamily: "var(--font-vazirmatn), Tahoma, sans-serif",
+            },
+          }}
+        />
       </QueryClientProvider>
     </ThemeProvider>
   );

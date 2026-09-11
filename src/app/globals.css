@@ -3,7 +3,6 @@
 @tailwind utilities;
 
 @layer base {
-  /* Default: Forest + lighter cream (Hamareh platform default) */
   :root {
     --background: 60 25% 98%;
     --foreground: 150 30% 12%;
@@ -13,18 +12,18 @@
     --popover-foreground: 150 30% 12%;
     --primary: 142 72% 24%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 80 40% 94%;
+    --secondary: 80 35% 94%;
     --secondary-foreground: 142 50% 20%;
-    --muted: 60 18% 96%;
+    --muted: 60 16% 96%;
     --muted-foreground: 150 10% 40%;
-    --accent: 80 45% 93%;
+    --accent: 80 40% 93%;
     --accent-foreground: 142 55% 22%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
     --border: 60 12% 90%;
     --input: 60 12% 90%;
     --ring: 142 72% 24%;
-    --radius: 0.75rem;
+    --radius: 0.65rem;
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 150 20% 22%;
     --sidebar-primary: 142 72% 24%;
@@ -34,18 +33,18 @@
     --sidebar-border: 60 12% 90%;
     --sidebar-ring: 142 72% 24%;
 
-    /* Surface depth tokens */
     --shadow-xs: 0 1px 2px hsl(150 20% 20% / 0.04);
-    --shadow-sm: 0 1px 2px hsl(150 20% 20% / 0.05), 0 1px 3px hsl(150 20% 20% / 0.06);
-    --shadow-md: 0 4px 12px hsl(150 25% 20% / 0.06), 0 1px 3px hsl(150 20% 20% / 0.04);
-    --shadow-lg: 0 10px 30px hsl(150 30% 18% / 0.08), 0 2px 8px hsl(150 20% 20% / 0.04);
-    --shadow-primary: 0 6px 16px hsl(142 72% 24% / 0.22);
-    --gradient-page: linear-gradient(165deg, hsl(60 30% 99%) 0%, hsl(80 25% 97%) 45%, hsl(150 20% 97%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(60 25% 99%) 100%);
-    --gradient-primary: linear-gradient(135deg, hsl(142 72% 28%) 0%, hsl(152 65% 22%) 100%);
-    --gradient-primary-hover: linear-gradient(135deg, hsl(142 72% 32%) 0%, hsl(152 65% 24%) 100%);
-    --gradient-sidebar: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(80 30% 98%) 100%);
-    --gradient-brand: linear-gradient(135deg, hsl(142 72% 28%) 0%, hsl(90 55% 40%) 100%);
+    --shadow-sm: 0 1px 2px hsl(150 20% 20% / 0.05), 0 4px 12px hsl(150 25% 20% / 0.04);
+    --shadow-md: 0 6px 18px hsl(150 25% 18% / 0.07), 0 1px 3px hsl(150 20% 20% / 0.04);
+    --shadow-lg: 0 14px 36px hsl(150 30% 16% / 0.1), 0 2px 8px hsl(150 20% 20% / 0.05);
+    --shadow-primary: 0 8px 20px hsl(142 72% 24% / 0.2);
+    --gradient-page: radial-gradient(1200px 500px at 100% -10%, hsl(90 40% 94% / 0.7), transparent 55%),
+      linear-gradient(165deg, hsl(60 30% 99%) 0%, hsl(80 22% 97.5%) 50%, hsl(150 18% 97%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(60 30% 99.2%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(142 70% 30%) 0%, hsl(155 60% 22%) 100%);
+    --gradient-primary-hover: linear-gradient(135deg, hsl(142 70% 34%) 0%, hsl(155 60% 25%) 100%);
+    --gradient-sidebar: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(80 28% 98.5%) 100%);
+    --gradient-brand: linear-gradient(135deg, hsl(142 70% 30%) 0%, hsl(95 50% 38%) 100%);
   }
 
   .dark {
@@ -76,12 +75,11 @@
     --sidebar-accent-foreground: 60 12% 92%;
     --sidebar-border: 150 12% 16%;
     --sidebar-ring: 142 55% 42%;
-
     --shadow-xs: 0 1px 2px hsl(0 0% 0% / 0.2);
-    --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.25), 0 1px 3px hsl(0 0% 0% / 0.2);
-    --shadow-md: 0 4px 12px hsl(0 0% 0% / 0.3);
-    --shadow-lg: 0 10px 30px hsl(0 0% 0% / 0.35);
-    --shadow-primary: 0 6px 18px hsl(142 55% 30% / 0.35);
+    --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.25), 0 4px 12px hsl(0 0% 0% / 0.2);
+    --shadow-md: 0 6px 18px hsl(0 0% 0% / 0.3);
+    --shadow-lg: 0 14px 36px hsl(0 0% 0% / 0.35);
+    --shadow-primary: 0 8px 20px hsl(142 55% 30% / 0.35);
     --gradient-page: linear-gradient(165deg, hsl(150 22% 9%) 0%, hsl(150 18% 8%) 100%);
     --gradient-card: linear-gradient(180deg, hsl(150 18% 12%) 0%, hsl(150 18% 10%) 100%);
     --gradient-primary: linear-gradient(135deg, hsl(142 55% 40%) 0%, hsl(152 50% 32%) 100%);
@@ -95,11 +93,24 @@
   * {
     @apply border-border;
   }
+
+  html {
+    font-family: var(--font-vazirmatn), Tahoma, Arial, sans-serif;
+  }
+
   body {
-    @apply text-foreground font-sans antialiased;
+    @apply text-foreground antialiased;
+    font-family: var(--font-vazirmatn), Tahoma, Arial, sans-serif;
     background: var(--gradient-page);
     background-attachment: fixed;
     min-height: 100vh;
+  }
+
+  /* Sonner toast font */
+  [data-sonner-toaster],
+  [data-sonner-toast],
+  [data-sonner-toast] * {
+    font-family: var(--font-vazirmatn), Tahoma, Arial, sans-serif !important;
   }
 }
 
@@ -110,11 +121,12 @@
   }
 
   .surface-card-hover {
-    transition: box-shadow 180ms ease, transform 180ms ease;
+    transition: box-shadow 160ms ease, transform 160ms ease, border-color 160ms ease;
   }
 
   .surface-card-hover:hover {
     box-shadow: var(--shadow-md);
+    border-color: hsl(var(--primary) / 0.12);
   }
 
   .btn-primary-gradient {
@@ -136,7 +148,7 @@
   }
 
   .header-blur {
-    background: hsl(var(--background) / 0.85);
-    backdrop-filter: blur(10px);
+    background: hsl(var(--background) / 0.82);
+    backdrop-filter: blur(12px) saturate(1.15);
   }
 }
