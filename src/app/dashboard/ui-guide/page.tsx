@@ -83,7 +83,7 @@ const guides: GuideItem[] = [
     title: "Navigation & Wayfinding",
     description: "Sidebar، Header، Breadcrumb، Tabs و Command Palette",
     phase: "فاز ۱",
-    status: "planned",
+    status: "ready",
     icon: Navigation,
   },
   {
@@ -200,7 +200,13 @@ export default function UiGuideIndexPage() {
             آیکون <strong className="text-foreground">B+D</strong>: Lucide پایه · Chip/Brand تأکید ·
             Phosphor Duotone فقط Empty/Hero · Tabler ممنوع
           </li>
-          <li>Package manager فرانت: <strong className="text-foreground">pnpm</strong> (نه npm)</li>
+          <li>UI-02: App Shell، max-width محتوا، Split، Sticky محدود، Density روی چیدمان</li>
+          <li>
+            UI-03: Sidebar Active/زیرمنو، Header+⌘K، Breadcrumb کوتاه، Tabs فقط برای نمای هم‌سطح
+          </li>
+          <li>
+            Package manager فرانت: <strong className="text-foreground">pnpm</strong> (نه npm)
+          </li>
         </ul>
       </div>
 
