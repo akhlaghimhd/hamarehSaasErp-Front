@@ -1,5 +1,6 @@
 "use client";
 
+import type { ComponentType, ReactNode } from "react";
 import {
   GuidePageHeader,
   GuideRulesBox,
@@ -54,7 +55,13 @@ const meta = {
   status: "ready" as const,
 };
 
-type IconComp = React.ComponentType<{ className?: string; size?: number | string; weight?: string; stroke?: number }>;
+type IconComp = ComponentType<{
+  className?: string;
+  size?: number | string;
+  weight?: string;
+  stroke?: number;
+  strokeWidth?: number;
+}>;
 
 const rows: {
   key: string;
@@ -80,7 +87,7 @@ function IconCell({
   caption,
   className,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   caption?: string;
   className?: string;
 }) {
@@ -99,11 +106,11 @@ export default function IconLabPage() {
 
       <GuideRulesBox title="چطور تصمیم بگیری">
         <ul className="list-disc space-y-1 pr-5">
-          <li>اول ردیف «منوی عمودی» را نگاه کن — بیشترین تکرار روزانه اینجاست.</li>
+          <li>اول بخش «منوی عمودی» را نگاه کن — بیشترین تکرار روزانه اینجاست.</li>
           <li>بعد «جدول/فشرده» را ببین — اگر شلوغ شد، آن سبک برای Data Grid ممنوع است.</li>
-          <li>در نهایت «سطح نمایشی» را برای Empty State و Page Header مقایسه کن.</li>
+          <li>در نهایت درمان‌های Chip / Brand / Duotone را برای Empty و Header مقایسه کن.</li>
           <li>
-            بعد از دیدن، یکی از این‌ها را اعلام کن: <strong className="text-foreground">A / B / C / D</strong>
+            بعد از دیدن، یکی را اعلام کن: <strong className="text-foreground">A / B / C / D</strong>
           </li>
         </ul>
       </GuideRulesBox>
