@@ -24,6 +24,7 @@ import {
   Combine,
   Accessibility,
   ArrowLeft,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 
@@ -52,18 +53,28 @@ const guides: GuideItem[] = [
     code: "UI-01",
     href: "/dashboard/ui-guide/foundations",
     title: "Foundations",
-    description: "تایپوگرافی، فاصله‌گذاری، شعاع، سایه، آیکون و مقیاس‌های پایه",
+    description:
+      "تایپوگرافی، فاصله، شعاع، Elevation، الگو، Density — آیکون B+D قفل‌شده",
     phase: "فاز ۱",
     status: "ready",
     icon: Type,
   },
   {
+    code: "UI-01b",
+    href: "/dashboard/ui-guide/icon-lab",
+    title: "Icon Lab",
+    description: "نمایش زنده سیاست B+D: Lucide + Chip/Brand + Phosphor Duotone",
+    phase: "فاز ۱",
+    status: "ready",
+    icon: Sparkles,
+  },
+  {
     code: "UI-02",
     href: "/dashboard/ui-guide/layout",
     title: "Layout & Structure",
-    description: "App Shell، Grid، Density، Split View و چیدمان صفحه",
+    description: "App Shell، Grid، Density، Split View، Sticky و ترکیب فرم+جدول",
     phase: "فاز ۱",
-    status: "planned",
+    status: "ready",
     icon: LayoutTemplate,
   },
   {
@@ -175,21 +186,21 @@ export default function UiGuideIndexPage() {
           راهنمای رابط کاربری و تجربه کاربری
         </h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
-          این مجموعه صفحات، مرجع قطعی طراحی UI/UX پلتفرم هماره است. هر دسته
-          المان‌ها صفحه جداگانه دارد و تمام تصمیمات ظاهری، رفتاری، فاصله‌گذاری،
-          Dark Mode، Responsive و ترکیب واقعی المان‌ها اینجا ثبت می‌شود. از این
-          به بعد تصمیم‌گیری لحظه‌ای ممنوع است.
+          مرجع قطعی طراحی UI/UX پلتفرم هماره. هر تصمیم در صفحه خودش قفل می‌شود و در صفحات
+          بعدی/قبلی هم به‌صورت ترکیب‌شده دیده می‌شود تا ناسازگاری در کنار هم مشخص شود.
         </p>
       </div>
 
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm">
-        <div className="mb-2 font-medium text-primary">قوانین حاکم بر تمام صفحات راهنما</div>
+        <div className="mb-2 font-medium text-primary">تصمیم‌های قفل‌شده تا اینجا</div>
         <ul className="list-disc space-y-1 pr-5 text-muted-foreground">
-          <li>هر صفحه باید Header با کد + وضعیت + توضیح هدف داشته باشد.</li>
-          <li>باکس قوانین کلیدی (فاصله، اندازه، لایه، Dark/Light، Responsive، Accessibility) اجباری است.</li>
-          <li>حالت‌های Default / Hover / Focus / Disabled / Loading / Error / Empty نمایش داده شوند.</li>
-          <li>نسخه Comfortable و Compact و پشتیبانی از Theme Tokens مستأجر لحاظ شود.</li>
-          <li>ترکیب واقعی المان‌ها (Composition) در صفحه مربوطه یا UI-10 ثبت شود.</li>
+          <li>UI-00: توکن رنگ مستأجر + اسلات لوگو/شعار + Dark/Light</li>
+          <li>UI-01: تایپ، فاصله ۸pt، شعاع، Elevation+hover، الگوی CSS، Density</li>
+          <li>
+            آیکون <strong className="text-foreground">B+D</strong>: Lucide پایه · Chip/Brand تأکید ·
+            Phosphor Duotone فقط Empty/Hero · Tabler ممنوع
+          </li>
+          <li>Package manager فرانت: <strong className="text-foreground">pnpm</strong> (نه npm)</li>
         </ul>
       </div>
 
@@ -207,7 +218,7 @@ export default function UiGuideIndexPage() {
               )}
               aria-disabled={!isReady}
             >
-              <Card className="h-full transition group-hover:border-primary/30">
+              <Card className="h-full elevate-hover transition group-hover:border-primary/30">
                 <CardHeader className="space-y-3 pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -247,13 +258,11 @@ export default function UiGuideIndexPage() {
       </div>
 
       <div className="rounded-xl border border-border/70 bg-muted/30 p-4 text-xs text-muted-foreground">
-        <strong className="text-foreground">یادداشت حاکمیتی:</strong> پس از تکمیل
-        فازهای اصلی، سند{" "}
+        <strong className="text-foreground">یادداشت حاکمیتی:</strong> پس از تکمیل فازهای اصلی، سند{" "}
         <code className="rounded bg-muted px-1 py-0.5">
           Frontend_Design_System_Specification_v1.0.md
         </code>{" "}
-        در مخزن اسناد به‌روزرسانی می‌شود و Source of Truth بصری از Figma به این
-        صفحات زنده منتقل می‌گردد.
+        به‌روز می‌شود و Source of Truth بصری از Figma به این صفحات زنده منتقل می‌گردد.
       </div>
     </div>
   );
