@@ -8,7 +8,6 @@ import {
 } from "@/shared/components/ui-guide/guide-shell";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
-import { cn } from "@/shared/lib/utils";
 import {
   Package as LucidePackage,
   Warehouse as LucideWarehouse,
@@ -21,18 +20,17 @@ import {
   Bell as LucideBell,
   Check as LucideCheck,
 } from "lucide-react";
-import {
-  Package as PhPackage,
-  Warehouse as PhWarehouse,
-  ShoppingCart as PhCart,
-  FileText as PhFile,
-  Users as PhUsers,
-  Gear as PhGear,
-  House as PhHouse,
-  MagnifyingGlass as PhSearch,
-  Bell as PhBell,
-  Check as PhCheck,
-} from "@phosphor-icons/react";
+// Phosphor: prefer named icons without forcing full package compile
+import { Package as PhPackage } from "@phosphor-icons/react/dist/csr/Package";
+import { Warehouse as PhWarehouse } from "@phosphor-icons/react/dist/csr/Warehouse";
+import { ShoppingCart as PhCart } from "@phosphor-icons/react/dist/csr/ShoppingCart";
+import { FileText as PhFile } from "@phosphor-icons/react/dist/csr/FileText";
+import { Users as PhUsers } from "@phosphor-icons/react/dist/csr/Users";
+import { Gear as PhGear } from "@phosphor-icons/react/dist/csr/Gear";
+import { House as PhHouse } from "@phosphor-icons/react/dist/csr/House";
+import { MagnifyingGlass as PhSearch } from "@phosphor-icons/react/dist/csr/MagnifyingGlass";
+import { Bell as PhBell } from "@phosphor-icons/react/dist/csr/Bell";
+import { Check as PhCheck } from "@phosphor-icons/react/dist/csr/Check";
 import {
   IconPackage as TabPackage,
   IconBuildingWarehouse as TabWarehouse,
@@ -58,7 +56,7 @@ const meta = {
 type IconComp = ComponentType<{
   className?: string;
   size?: number | string;
-  weight?: string;
+  weight?: "thin" | "light" | "regular" | "bold" | "fill" | "duotone";
   stroke?: number;
   strokeWidth?: number;
 }>;
@@ -96,17 +94,13 @@ export default function IconLabPage() {
     <div className="space-y-6">
       <GuidePageHeader meta={meta} />
 
-      <GuideRulesBox title="نصب لازم (یک‌بار)">
+      <GuideRulesBox title="نکته نصب">
         <ul className="list-disc space-y-1 pr-5">
           <li>
-            بعد از pull این دستور را بزن:{" "}
-            <code className="rounded bg-muted px-1">npm install --legacy-peer-deps</code>
+            در این پروژه از <strong className="text-foreground">pnpm</strong> استفاده کن:{" "}
+            <code className="rounded bg-muted px-1">pnpm install</code>
           </li>
-          <li>
-            اگر خطای name/null دیدی:{" "}
-            <code className="rounded bg-muted px-1">npm cache clean --force</code> سپس دوباره install.
-          </li>
-          <li>بدون نصب این دو پکیج، صفحه ممکن است خطا بدهد یا آیکون‌ها نیاید.</li>
+          <li>مخلوط کردن npm و pnpm باعث خطای null در arborist می‌شود.</li>
         </ul>
       </GuideRulesBox>
 
@@ -184,7 +178,7 @@ export default function IconLabPage() {
                     >
                       <Icon
                         className="h-4 w-4 shrink-0"
-                        {...(col.lib === "phosphor" ? { weight: "regular" } : {})}
+                        {...(col.lib === "phosphor" ? { weight: "regular" as const } : {})}
                         {...(col.lib === "tabler" ? { stroke: 1.75 } : {})}
                       />
                       <span className="truncate">{row.label}</span>
@@ -204,10 +198,10 @@ export default function IconLabPage() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {(
             [
-              { weight: "thin", label: "Thin" },
-              { weight: "light", label: "Light" },
-              { weight: "regular", label: "Regular" },
-              { weight: "duotone", label: "Duotone" },
+              { weight: "thin" as const, label: "Thin" },
+              { weight: "light" as const, label: "Light" },
+              { weight: "regular" as const, label: "Regular" },
+              { weight: "duotone" as const, label: "Duotone" },
             ] as const
           ).map((w) => (
             <div key={w.weight} className="rounded-xl border border-border/70 bg-card p-4">
@@ -223,7 +217,7 @@ export default function IconLabPage() {
         </div>
       </GuideSection>
 
-      <GuideSection title="۴) درمان Lucide برای پیشنهاد B (بدون تعویض کتابخانه)">
+      <GuideSection title="۴) درمان Lucide برای پیشنهاد B">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border border-border/70 bg-card p-4">
             <div className="mb-3 text-xs font-medium">Outline</div>
