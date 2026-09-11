@@ -18,7 +18,10 @@ export interface ThemePalette {
 
 /**
  * HSL values without hsl() wrapper — compatible with shadcn CSS variables.
+ * Default platform palette: forest (سبز جنگلی + کرم روشن‌تر)
  */
+export const DEFAULT_PALETTE_ID: PaletteId = "forest";
+
 export const themePalettes: ThemePalette[] = [
   {
     id: "emerald",
@@ -127,11 +130,11 @@ export const themePalettes: ThemePalette[] = [
   },
   {
     id: "forest",
-    name: "۴) سبز جنگلی + کرم",
-    description: "متفاوت، گرم، به‌یادماندنی",
-    swatches: ["#166534", "#84CC16", "#F7F7F2"],
+    name: "۴) سبز جنگلی + کرم روشن",
+    description: "پیش‌فرض هماره — مدرن، گرم، متمایز",
+    swatches: ["#166534", "#84CC16", "#FCFCF8"],
     vars: {
-      background: "60 20% 96%",
+      background: "60 25% 98%",
       foreground: "150 30% 12%",
       card: "0 0% 100%",
       "card-foreground": "150 30% 12%",
@@ -139,24 +142,24 @@ export const themePalettes: ThemePalette[] = [
       "popover-foreground": "150 30% 12%",
       primary: "142 72% 24%",
       "primary-foreground": "0 0% 100%",
-      secondary: "80 50% 92%",
+      secondary: "80 40% 94%",
       "secondary-foreground": "142 50% 20%",
-      muted: "60 15% 93%",
+      muted: "60 18% 96%",
       "muted-foreground": "150 10% 40%",
-      accent: "80 60% 90%",
+      accent: "80 45% 93%",
       "accent-foreground": "142 55% 22%",
       destructive: "0 84% 60%",
       "destructive-foreground": "0 0% 100%",
-      border: "60 12% 88%",
-      input: "60 12% 88%",
+      border: "60 12% 90%",
+      input: "60 12% 90%",
       ring: "142 72% 24%",
       "sidebar-background": "0 0% 100%",
       "sidebar-foreground": "150 20% 22%",
       "sidebar-primary": "142 72% 24%",
       "sidebar-primary-foreground": "0 0% 100%",
-      "sidebar-accent": "80 45% 92%",
+      "sidebar-accent": "80 40% 94%",
       "sidebar-accent-foreground": "142 55% 20%",
-      "sidebar-border": "60 12% 88%",
+      "sidebar-border": "60 12% 90%",
       "sidebar-ring": "142 72% 24%",
     },
   },
@@ -239,4 +242,8 @@ export function applyPaletteVars(
   Object.entries(vars).forEach(([key, value]) => {
     element.style.setProperty(`--${key}`, value);
   });
+}
+
+export function getPaletteById(id: PaletteId) {
+  return themePalettes.find((p) => p.id === id) ?? themePalettes.find((p) => p.id === DEFAULT_PALETTE_ID)!;
 }

@@ -17,6 +17,7 @@ import {
 } from "@/shared/components/ui/card";
 import {
   applyPaletteVars,
+  DEFAULT_PALETTE_ID,
   themePalettes,
   type PaletteId,
 } from "@/shared/lib/theme-palettes";
@@ -40,10 +41,10 @@ const navItems = [
 ];
 
 export default function ThemesPreviewPage() {
-  const [activeId, setActiveId] = useState<PaletteId>("charcoal-amber");
+  const [activeId, setActiveId] = useState<PaletteId>(DEFAULT_PALETTE_ID);
   const previewRef = useRef<HTMLDivElement>(null);
 
-  const active = themePalettes.find((p) => p.id === activeId) ?? themePalettes[2];
+  const active = themePalettes.find((p) => p.id === activeId) ?? themePalettes[3];
 
   useEffect(() => {
     if (!previewRef.current) return;
@@ -57,7 +58,7 @@ export default function ThemesPreviewPage() {
           <div>
             <h1 className="text-xl font-semibold text-zinc-900">مقایسه پالت رنگی هماره</h1>
             <p className="text-sm text-zinc-600">
-              یک صفحه ثابت — فقط رنگ‌ها عوض می‌شوند. هر کدام را انتخاب کنید و حس کلی را ببینید.
+              پیش‌فرض پلتفرم: <span className="font-medium">سبز جنگلی + کرم روشن</span>. بقیه پالت‌ها برای انتخاب کاربر / هویت مستأجر آماده‌اند.
             </p>
           </div>
           <Button asChild variant="outline">
@@ -86,6 +87,11 @@ export default function ThemesPreviewPage() {
                     style={{ backgroundColor: color }}
                   />
                 ))}
+                {palette.id === DEFAULT_PALETTE_ID && (
+                  <span className="mr-auto rounded-full bg-zinc-900 px-2 py-0.5 text-[10px] text-white">
+                    پیش‌فرض
+                  </span>
+                )}
               </div>
               <div className="text-sm font-medium text-zinc-900">{palette.name}</div>
               <div className="text-xs text-zinc-500">{palette.description}</div>
@@ -94,10 +100,9 @@ export default function ThemesPreviewPage() {
         </div>
 
         <div className="rounded-xl border border-zinc-200 bg-white p-2 text-sm text-zinc-700">
-          پالت فعال: <span className="font-semibold">{active.name}</span> — {active.description}
+          پالت فعال در پیش‌نمایش: <span className="font-semibold">{active.name}</span> — {active.description}
         </div>
 
-        {/* Isolated preview surface — CSS variables scoped here */}
         <div
           ref={previewRef}
           className="overflow-hidden rounded-2xl border border-border bg-background text-foreground shadow-sm"
@@ -255,10 +260,6 @@ export default function ThemesPreviewPage() {
             </div>
           </div>
         </div>
-
-        <p className="text-center text-sm text-zinc-500">
-          بعد از انتخاب، فقط شماره پالت را بگویید تا همان را به‌عنوان هویت هماره قفل کنیم.
-        </p>
       </div>
     </div>
   );
