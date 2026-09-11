@@ -1,0 +1,259 @@
+"use client";
+
+import Link from "next/link";
+import { Badge } from "@/shared/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/shared/components/ui/card";
+import {
+  Palette,
+  Type,
+  LayoutTemplate,
+  Navigation,
+  FormInput,
+  Table2,
+  Bell,
+  Layers,
+  GitBranch,
+  BarChart3,
+  Combine,
+  Accessibility,
+  ArrowLeft,
+} from "lucide-react";
+import { cn } from "@/shared/lib/utils";
+
+type GuideItem = {
+  code: string;
+  href: string;
+  title: string;
+  description: string;
+  phase: string;
+  status: "ready" | "in-progress" | "planned";
+  icon: React.ComponentType<{ className?: string }>;
+};
+
+const guides: GuideItem[] = [
+  {
+    code: "UI-00",
+    href: "/dashboard/ui-guide/branding",
+    title: "Branding & Tenant Theming",
+    description:
+      "پالت رنگی قابل کاستم، لوگو، شعار، Favicon، فضاهای برند و توکن‌های مستأجر",
+    phase: "فاز ۰",
+    status: "ready",
+    icon: Palette,
+  },
+  {
+    code: "UI-01",
+    href: "/dashboard/ui-guide/foundations",
+    title: "Foundations",
+    description: "تایپوگرافی، فاصله‌گذاری، شعاع، سایه، آیکون و مقیاس‌های پایه",
+    phase: "فاز ۱",
+    status: "planned",
+    icon: Type,
+  },
+  {
+    code: "UI-02",
+    href: "/dashboard/ui-guide/layout",
+    title: "Layout & Structure",
+    description: "App Shell، Grid، Density، Split View و چیدمان صفحه",
+    phase: "فاز ۱",
+    status: "planned",
+    icon: LayoutTemplate,
+  },
+  {
+    code: "UI-03",
+    href: "/dashboard/ui-guide/navigation",
+    title: "Navigation & Wayfinding",
+    description: "Sidebar، Header، Breadcrumb، Tabs و Command Palette",
+    phase: "فاز ۱",
+    status: "planned",
+    icon: Navigation,
+  },
+  {
+    code: "UI-04",
+    href: "/dashboard/ui-guide/forms",
+    title: "Forms & Data Entry",
+    description: "انواع ورودی، اعتبارسنجی، چیدمان فرم و حالت‌های خطا",
+    phase: "فاز ۲",
+    status: "planned",
+    icon: FormInput,
+  },
+  {
+    code: "UI-05",
+    href: "/dashboard/ui-guide/data-display",
+    title: "Data Display & Tables",
+    description: "جدول پیشرفته، Card، List، Empty State و Skeleton",
+    phase: "فاز ۲",
+    status: "planned",
+    icon: Table2,
+  },
+  {
+    code: "UI-06",
+    href: "/dashboard/ui-guide/feedback",
+    title: "Feedback, Status & Loading",
+    description: "Alert، Toast، Status Chip، Progress و Loading Overlay",
+    phase: "فاز ۲",
+    status: "planned",
+    icon: Bell,
+  },
+  {
+    code: "UI-07",
+    href: "/dashboard/ui-guide/overlays",
+    title: "Overlays & Layered UI",
+    description: "Modal، Drawer، Popover، Tooltip و لایه‌بندی",
+    phase: "فاز ۳",
+    status: "planned",
+    icon: Layers,
+  },
+  {
+    code: "UI-08",
+    href: "/dashboard/ui-guide/workflow",
+    title: "Workflow & Process Patterns",
+    description: "Stepper، Approval، Kanban، Timeline و Activity Feed",
+    phase: "فاز ۳",
+    status: "planned",
+    icon: GitBranch,
+  },
+  {
+    code: "UI-09",
+    href: "/dashboard/ui-guide/charts",
+    title: "Charts & Reporting",
+    description: "KPI Card، Charts، Filter Panel و چیدمان گزارش",
+    phase: "فاز ۳",
+    status: "planned",
+    icon: BarChart3,
+  },
+  {
+    code: "UI-10",
+    href: "/dashboard/ui-guide/composition",
+    title: "Real-world Composition",
+    description: "ترکیب واقعی فرم + جدول + فیلتر با حداقل پرت فضا",
+    phase: "فاز ۴",
+    status: "planned",
+    icon: Combine,
+  },
+  {
+    code: "UI-11",
+    href: "/dashboard/ui-guide/accessibility",
+    title: "Accessibility, Motion & Rules",
+    description: "Focus، Keyboard، Reduced Motion و قوانین Do / Don’t",
+    phase: "فاز ۴",
+    status: "planned",
+    icon: Accessibility,
+  },
+];
+
+const statusLabel = {
+  ready: "آماده",
+  "in-progress": "در حال ساخت",
+  planned: "برنامه‌ریزی‌شده",
+} as const;
+
+const statusVariant = {
+  ready: "success",
+  "in-progress": "warning",
+  planned: "secondary",
+} as const;
+
+export default function UiGuideIndexPage() {
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="font-mono text-[11px]">
+            UI Guide
+          </Badge>
+          <Badge variant="success">Source of Truth</Badge>
+        </div>
+        <h1 className="text-xl font-semibold tracking-tight md:text-2xl">
+          راهنمای رابط کاربری و تجربه کاربری
+        </h1>
+        <p className="max-w-3xl text-sm text-muted-foreground">
+          این مجموعه صفحات، مرجع قطعی طراحی UI/UX پلتفرم هماره است. هر دسته
+          المان‌ها صفحه جداگانه دارد و تمام تصمیمات ظاهری، رفتاری، فاصله‌گذاری،
+          Dark Mode، Responsive و ترکیب واقعی المان‌ها اینجا ثبت می‌شود. از این
+          به بعد تصمیم‌گیری لحظه‌ای ممنوع است.
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm">
+        <div className="mb-2 font-medium text-primary">قوانین حاکم بر تمام صفحات راهنما</div>
+        <ul className="list-disc space-y-1 pr-5 text-muted-foreground">
+          <li>هر صفحه باید Header با کد + وضعیت + توضیح هدف داشته باشد.</li>
+          <li>باکس قوانین کلیدی (فاصله، اندازه، لایه، Dark/Light، Responsive، Accessibility) اجباری است.</li>
+          <li>حالت‌های Default / Hover / Focus / Disabled / Loading / Error / Empty نمایش داده شوند.</li>
+          <li>نسخه Comfortable و Compact و پشتیبانی از Theme Tokens مستأجر لحاظ شود.</li>
+          <li>ترکیب واقعی المان‌ها (Composition) در صفحه مربوطه یا UI-10 ثبت شود.</li>
+        </ul>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {guides.map((item) => {
+          const Icon = item.icon;
+          const isReady = item.status === "ready";
+          return (
+            <Link
+              key={item.code}
+              href={item.href}
+              className={cn(
+                "group block rounded-xl transition",
+                !isReady && "pointer-events-none opacity-70"
+              )}
+              aria-disabled={!isReady}
+            >
+              <Card className="h-full transition group-hover:border-primary/30">
+                <CardHeader className="space-y-3 pb-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge variant="outline" className="font-mono text-[10px]">
+                        {item.code}
+                      </Badge>
+                      <Badge variant={statusVariant[item.status]} className="text-[10px]">
+                        {statusLabel[item.status]}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm">{item.title}</CardTitle>
+                    <CardDescription className="mt-1 text-xs leading-relaxed">
+                      {item.description}
+                    </CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex items-center justify-between pt-0 text-xs text-muted-foreground">
+                  <span>{item.phase}</span>
+                  {isReady ? (
+                    <span className="inline-flex items-center gap-1 text-primary">
+                      مشاهده
+                      <ArrowLeft className="h-3 w-3" />
+                    </span>
+                  ) : (
+                    <span>به‌زودی</span>
+                  )}
+                </CardContent>
+              </Card>
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="rounded-xl border border-border/70 bg-muted/30 p-4 text-xs text-muted-foreground">
+        <strong className="text-foreground">یادداشت حاکمیتی:</strong> پس از تکمیل
+        فازهای اصلی، سند{" "}
+        <code className="rounded bg-muted px-1 py-0.5">
+          Frontend_Design_System_Specification_v1.0.md
+        </code>{" "}
+        در مخزن اسناد به‌روزرسانی می‌شود و Source of Truth بصری از Figma به این
+        صفحات زنده منتقل می‌گردد.
+      </div>
+    </div>
+  );
+}

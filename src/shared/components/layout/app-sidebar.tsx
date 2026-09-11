@@ -12,6 +12,7 @@ import {
   Building2,
   Palette,
   Component,
+  BookOpen,
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
@@ -21,6 +22,7 @@ import { Button } from "@/shared/components/ui/button";
 
 const navItems = [
   { href: "/dashboard", label: "داشبورد", icon: LayoutDashboard },
+  { href: "/dashboard/ui-guide", label: "راهنمای UI", icon: BookOpen },
   { href: "/dashboard/showcase", label: "نمایشگاه UI", icon: Component },
   { href: "/themes", label: "پالت رنگ", icon: Palette },
   { href: "/dashboard/organization", label: "سازمان", icon: Building2 },
@@ -31,7 +33,7 @@ const navItems = [
   { href: "/dashboard/settings", label: "تنظیمات", icon: Settings },
 ];
 
-export function AppSidebar() {
+export default function AppSidebar() {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebar();
 
@@ -65,7 +67,6 @@ export function AppSidebar() {
           title={collapsed ? "باز کردن منو" : "جمع کردن منو"}
           aria-label={collapsed ? "باز کردن منو" : "جمع کردن منو"}
         >
-          {/* RTL: collapsed shows chevrons that point to expand */}
           {collapsed ? <ChevronsLeft className="h-4 w-4" /> : <ChevronsRight className="h-4 w-4" />}
         </Button>
       </div>
@@ -115,3 +116,5 @@ export function AppSidebar() {
     </aside>
   );
 }
+
+export { AppSidebar };
