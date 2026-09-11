@@ -129,6 +129,27 @@
     border-color: hsl(var(--primary) / 0.12);
   }
 
+  .elevate-hover {
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 180ms ease, transform 180ms ease, border-color 180ms ease;
+  }
+
+  .elevate-hover:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+    border-color: hsl(var(--primary) / 0.14);
+  }
+
+  .elevate-hover-strong {
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 180ms ease, transform 180ms ease;
+  }
+
+  .elevate-hover-strong:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+  }
+
   .btn-primary-gradient {
     background-image: var(--gradient-primary);
     box-shadow: var(--shadow-primary);
@@ -150,5 +171,48 @@
   .header-blur {
     background: hsl(var(--background) / 0.82);
     backdrop-filter: blur(12px) saturate(1.15);
+  }
+
+  /* CSS-only surface patterns (no images) — use sparingly for atmosphere */
+  .pattern-dots {
+    background-color: hsl(var(--card));
+    background-image: radial-gradient(hsl(var(--primary) / 0.09) 1px, transparent 1px);
+    background-size: 14px 14px;
+  }
+
+  .pattern-grid {
+    background-color: hsl(var(--card));
+    background-image:
+      linear-gradient(hsl(var(--primary) / 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--primary) / 0.06) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  .pattern-diagonal {
+    background-color: hsl(var(--card));
+    background-image: repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 8px,
+      hsl(var(--primary) / 0.04) 8px,
+      hsl(var(--primary) / 0.04) 9px
+    );
+  }
+
+  .pattern-soft-noise {
+    background-color: hsl(var(--card));
+    background-image:
+      radial-gradient(hsl(var(--primary) / 0.05) 0.6px, transparent 0.6px),
+      radial-gradient(hsl(var(--foreground) / 0.03) 0.6px, transparent 0.6px);
+    background-size: 12px 12px, 18px 18px;
+    background-position: 0 0, 6px 8px;
+  }
+
+  .pattern-mesh {
+    background-color: hsl(var(--card));
+    background-image:
+      radial-gradient(at 20% 20%, hsl(var(--primary) / 0.08) 0, transparent 45%),
+      radial-gradient(at 80% 0%, hsl(var(--accent-foreground) / 0.06) 0, transparent 40%),
+      radial-gradient(at 50% 80%, hsl(var(--primary) / 0.05) 0, transparent 50%);
   }
 }
