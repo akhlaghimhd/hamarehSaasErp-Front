@@ -1,5 +1,6 @@
 "use client";
 
+import type { ComponentType } from "react";
 import Link from "next/link";
 import { Badge } from "@/shared/components/ui/badge";
 import {
@@ -33,7 +34,7 @@ type GuideItem = {
   description: string;
   phase: string;
   status: "ready" | "in-progress" | "planned";
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
 };
 
 const guides: GuideItem[] = [
