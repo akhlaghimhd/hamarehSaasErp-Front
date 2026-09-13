@@ -147,7 +147,7 @@ const guides: GuideItem[] = [
     title: "Real-world Composition",
     description: "ترکیب واقعی فرم + جدول + فیلتر با حداقل پرت فضا",
     phase: "فاز ۴",
-    status: "planned",
+    status: "ready",
     icon: Combine,
   },
   {
@@ -218,7 +218,10 @@ export default function UiGuideIndexPage() {
             Worklist
           </li>
           <li>
-            UI-09: KPI · Bar/Line/Area/Donut · Filter sticky · چیدمان گزارش · Empty نمودار
+            UI-09: KPI · Charts · Filter · (قابل بهبود بعدی)
+          </li>
+          <li>
+            UI-10: لیست+جزئیات · فرم سند هدر/خطوط/فوتر · Density · بدون reload
           </li>
           <li>
             Package manager: <strong className="text-foreground">pnpm</strong>
