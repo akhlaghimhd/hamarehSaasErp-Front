@@ -2,6 +2,7 @@
  * Login — OTP UX, SoftRing hydrate (UI-06), controlled identifier,
  * submit lock until edit after error.
  * Human gate after fail threshold; re-challenge on each later fail.
+ * Slide only shown when user clicks submit (not immediately after error).
  * Button loading follows UI-06: Loader2 + label (no elapsed counter).
  */
 
@@ -394,6 +395,7 @@ export default function LoginPage() {
   /**
    * Once fail threshold is reached, human gate stays armed until a successful login.
    * humanPassOnceRef allows exactly one proceed after the user completes the slide.
+   * UI is shown only on the next submit click — never forced right after an error.
    */
   const [humanGateArmed, setHumanGateArmed] = useState(false);
   const humanPassOnceRef = useRef(false);
@@ -506,9 +508,8 @@ export default function LoginPage() {
       setPasswordFails((prev) => {
         const nextFails = prev + 1;
         if (nextFails >= 3) {
+          // Arm only — slide appears on next button click
           setHumanGateArmed(true);
-          setPendingAfterCheck("password");
-          setNeedHumanCheck(true);
         }
         return nextFails;
       });
@@ -517,7 +518,7 @@ export default function LoginPage() {
 
   const onPasswordSubmit = async (values: PasswordForm) => {
     if (needHumanCheck || blockedUntilEdit) return;
-    // After 3 fails: every attempt needs a fresh slide (unless just passed)
+    // After 3 fails: every attempt needs a fresh slide (only when user clicks)
     if ((humanGateArmed || passwordFails >= 3) && !humanPassOnceRef.current) {
       setHumanGateArmed(true);
       setPendingAfterCheck("password");
@@ -561,9 +562,8 @@ export default function LoginPage() {
       setOtpFails((prev) => {
         const next = prev + 1;
         if (next >= 1) {
+          // Arm only — slide appears on next button click
           setHumanGateArmed(true);
-          setPendingAfterCheck("otp");
-          setNeedHumanCheck(true);
         }
         return next;
       });
@@ -595,7 +595,7 @@ export default function LoginPage() {
       return;
     }
 
-    // After 1 OTP error: every subsequent network request needs a fresh slide
+    // After 1 OTP error: every subsequent network request needs a fresh slide on click
     if ((humanGateArmed || otpFails >= 1) && !humanPassOnceRef.current) {
       setHumanGateArmed(true);
       setPendingAfterCheck("otp");
@@ -655,7 +655,6 @@ export default function LoginPage() {
   );
 
   const onHumanCheckPass = () => {
-    // One-shot ticket for the immediate action; gate stays armed if that action fails
     humanPassOnceRef.current = true;
     setNeedHumanCheck(false);
     const pending = pendingAfterCheck;
