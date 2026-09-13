@@ -101,7 +101,7 @@ const guides: GuideItem[] = [
     title: "Data Display & Tables",
     description: "جدول پیشرفته، Card، List، Empty State و Skeleton",
     phase: "فاز ۲",
-    status: "planned",
+    status: "ready",
     icon: Table2,
   },
   {
@@ -199,7 +199,12 @@ export default function UiGuideIndexPage() {
           <li>UI-02: Shell، max-width، Sticky، A/B/C فرم+جدول، بدون reload، قواعد Overlay</li>
           <li>UI-03: Sidebar، Header، Breadcrumb، Tabs، Command</li>
           <li>
-            UI-04: Label+* · خطا زیر فیلد · چیدمان ۱–۲ ستون · ثبت بدون reload · انصراف آزاد
+            UI-04: Label+* · خطا زیر فیلد · چیدمان ۱–۲ ستون · ثبت بدون reload · انصراف آزاد ·
+            شمسی · تب+ثبت موقت · DOM ثابت
+          </li>
+          <li>
+            UI-05: Density جدول · Sticky toolbar محدود · انتخاب ردیف · Empty (Phosphor) ·
+            Skeleton · Pagination · Card/List موبایل · اعداد LTR+فارسی
           </li>
           <li>
             Package manager: <strong className="text-foreground">pnpm</strong>
