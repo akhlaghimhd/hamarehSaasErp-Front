@@ -138,7 +138,7 @@ const guides: GuideItem[] = [
     title: "Charts & Reporting",
     description: "KPI Card، Charts، Filter Panel و چیدمان گزارش",
     phase: "فاز ۳",
-    status: "planned",
+    status: "ready",
     icon: BarChart3,
   },
   {
@@ -216,6 +216,9 @@ export default function UiGuideIndexPage() {
           <li>
             UI-08: Stepper · Approval با dirty-lock UI-02 · Kanban · Timeline · Activity ·
             Worklist
+          </li>
+          <li>
+            UI-09: KPI · Bar/Line/Area/Donut · Filter sticky · چیدمان گزارش · Empty نمودار
           </li>
           <li>
             Package manager: <strong className="text-foreground">pnpm</strong>
