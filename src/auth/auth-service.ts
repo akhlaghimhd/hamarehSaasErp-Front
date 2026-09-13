@@ -2,6 +2,10 @@
  * FE-P0-T03 — Auth Service Layer
  * Component → Service → apiClient → Backend
  * No business rules beyond transport and session wiring.
+ *
+ * Route prefix (ModuleServiceProvider):
+ *   IdentityCore → api/v1/identity-core + Routes prefix `identity`
+ *   → /api/v1/identity-core/identity/auth/login
  */
 
 import { apiPost, ApiClientError } from "@/api";
@@ -10,8 +14,8 @@ import { TENANT_HEADER } from "@/api/client";
 import { useAuthStore } from "./auth-store";
 import type { LoginCredentials } from "./types";
 
-const LOGIN_PATH = "/identity/auth/login";
-const LOGOUT_PATH = "/identity/auth/logout";
+const LOGIN_PATH = "/identity-core/identity/auth/login";
+const LOGOUT_PATH = "/identity-core/identity/auth/logout";
 
 export const authService = {
   /**
