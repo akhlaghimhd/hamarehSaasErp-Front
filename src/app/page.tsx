@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { Button } from "@/shared/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/shared/components/ui/card";
 
 export default function HomePage() {
   return (
@@ -9,12 +15,15 @@ export default function HomePage() {
         <CardHeader>
           <CardTitle>هماره ERP</CardTitle>
           <CardDescription>
-            اسکلت Frontend با الگوی Admin مبتنی بر shadcn/ui آماده است.
+            پلتفرم ERP چندمستأجری — برای شروع وارد حساب کاربری شوید.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <Button asChild>
-            <Link href="/dashboard">ورود به داشبورد</Link>
+            <Link href="/login">ورود به سیستم</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/dashboard">رفتن به داشبورد</Link>
           </Button>
           <p className="text-sm text-muted-foreground">
             فونت وزیرمتن · راست‌چین · تم آبی سازمانی

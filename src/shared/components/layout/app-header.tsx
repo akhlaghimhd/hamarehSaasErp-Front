@@ -10,6 +10,8 @@ import {
   HelpCircle,
   PanelRightOpen,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import {
@@ -21,9 +23,30 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
 import { useSidebar } from "@/shared/components/layout/sidebar-context";
+import { authService, useAuthStore } from "@/auth";
+
+function initials(first?: string, last?: string): string {
+  const a = (first ?? "").trim().charAt(0);
+  const b = (last ?? "").trim().charAt(0);
+  const value = `${a}${b}` || "ک";
+  return value;
+}
 
 export function AppHeader() {
   const { collapsed, toggle } = useSidebar();
+  const router = useRouter();
+  const user = useAuthStore((s) => s.user);
+  const activeTenantId = useAuthStore((s) => s.activeTenantId);
+
+  const displayName = user
+    ? `${user.first_name} ${user.last_name}`.trim() || user.email
+    : "کاربر";
+
+  const handleLogout = async () => {
+    await authService.logout();
+    toast.success("خروج با موفقیت انجام شد");
+    router.replace("/login");
+  };
 
   return (
     <header className="header-blur sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-border/70 px-3 md:px-4">
@@ -54,13 +77,27 @@ export function AppHeader() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-8 gap-2 rounded-full px-1.5">
               <div className="brand-mark flex h-7 w-7 items-center justify-center rounded-full text-[11px] text-white">
-                کا
+                {initials(user?.first_name, user?.last_name)}
               </div>
-              <span className="hidden text-xs font-medium sm:inline">کاربر نمونه</span>
+              <span className="hidden max-w-[9rem] truncate text-xs font-medium sm:inline">
+                {displayName}
+              </span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-52">
-            <DropdownMenuLabel>حساب کاربری</DropdownMenuLabel>
+          <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuLabel className="space-y-0.5">
+              <div>حساب کاربری</div>
+              {user?.email && (
+                <div className="text-xs font-normal text-muted-foreground" dir="ltr">
+                  {user.email}
+                </div>
+              )}
+              {activeTenantId && (
+                <div className="truncate text-[11px] font-normal text-muted-foreground" dir="ltr">
+                  Tenant: {activeTenantId}
+                </div>
+              )}
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
               <User className="h-4 w-4" />
@@ -79,7 +116,13 @@ export function AppHeader() {
               راهنما
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive">
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onSelect={(e) => {
+                e.preventDefault();
+                void handleLogout();
+              }}
+            >
               <LogOut className="h-4 w-4" />
               خروج از سیستم
             </DropdownMenuItem>
