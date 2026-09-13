@@ -129,7 +129,7 @@ const guides: GuideItem[] = [
     title: "Workflow & Process Patterns",
     description: "Stepper، Approval، Kanban، Timeline و Activity Feed",
     phase: "فاز ۳",
-    status: "planned",
+    status: "ready",
     icon: GitBranch,
   },
   {
@@ -197,23 +197,25 @@ export default function UiGuideIndexPage() {
         <ul className="list-disc space-y-1 pr-5 text-muted-foreground">
           <li>UI-00: توکن رنگ مستأجر + اسلات لوگو/شعار + Dark/Light</li>
           <li>UI-01: تایپ، فاصله، شعاع، Elevation+hover، الگو، Density · آیکون B+D</li>
-          <li>UI-02: Shell، max-width، Sticky، A/B/C فرم+جدول، بدون reload، قواعد Overlay</li>
+          <li>
+            UI-02: Shell، max-w، Sticky، A/B/C · Overlay dirty فقط ثبت/انصراف · بدون reload
+          </li>
           <li>UI-03: Sidebar، Header، Breadcrumb، Tabs، Command</li>
           <li>
-            UI-04: Label+* · خطا زیر فیلد · چیدمان ۱–۲ ستون · ثبت بدون reload · انصراف آزاد ·
-            شمسی · تب+ثبت موقت · DOM ثابت
+            UI-04: Label+* · خطا زیر فیلد · ۱–۲ ستون · ثبت بدون reload · تب+ثبت موقت · DOM ثابت
           </li>
           <li>
-            UI-05: انتخاب ستون · جزئیات اولویت DB · مالی · page-size · Empty ≠ جستجو · Stripe ·
-            stale · Card/List
+            UI-05: ستون · مالی · page-size · Empty≠جستجو · Stripe · stale · Card/List
           </li>
           <li>
-            UI-06: فیلد≠Toast · Alert ماندگار · Toast کوتاه · Status پالت · Overlay مسدودکننده ·
-            لودینگ جزئی · بازخورد همدلانه
+            UI-06: فیلد≠Toast · Alert · Toast · Status · Overlay مسدود · لودینگ · همدلانه
           </li>
           <li>
-            UI-07: Modal تأیید/فرم کوتاه · Drawer فیلتر/جزئیات · Popover منو/فیلتر · Tooltip کوتاه ·
-            یک لایه مسدود · Escape+backdrop · بدون reload
+            UI-07: Modal · Drawer · Popover · Tooltip · یک لایه مسدود · Escape+backdrop
+          </li>
+          <li>
+            UI-08: Stepper · Approval با dirty-lock UI-02 · Kanban · Timeline · Activity ·
+            Worklist
           </li>
           <li>
             Package manager: <strong className="text-foreground">pnpm</strong>
