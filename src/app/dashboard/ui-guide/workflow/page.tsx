@@ -23,6 +23,7 @@ import {
   Circle,
   Clock,
   FileText,
+  GripVertical,
   MessageSquare,
   Send,
   ThumbsDown,
@@ -33,7 +34,7 @@ const meta = {
   code: "UI-08",
   title: "Workflow & Process Patterns",
   description:
-    "Stepper، Approval، Kanban، Timeline و Activity Feed — با رعایت قواعد Overlay از UI-02.",
+    "Stepper، Approval، Kanban تعاملی، Timeline و Activity Feed — با رعایت قواعد Overlay از UI-02.",
   phase: "فاز ۳",
   status: "ready" as const,
 };
@@ -49,11 +50,13 @@ const steps = [
   { id: 4, title: "ثبت نهایی", desc: "اثر حسابداری / انبار" },
 ];
 
+type ColumnKey = "draft" | "pending" | "approved" | "rejected";
+
 type KanbanCard = {
   id: string;
   title: string;
   meta: string;
-  column: "draft" | "pending" | "approved" | "rejected";
+  column: ColumnKey;
 };
 
 const initialKanban: KanbanCard[] = [
@@ -64,12 +67,20 @@ const initialKanban: KanbanCard[] = [
   { id: "5", title: "PR-1403-003", meta: "درخواست خرید", column: "rejected" },
 ];
 
-const columns: { key: KanbanCard["column"]; label: string; tone: string }[] = [
+const columns: { key: ColumnKey; label: string; tone: string }[] = [
   { key: "draft", label: "پیش‌نویس", tone: "bg-muted/40" },
   { key: "pending", label: "در انتظار تأیید", tone: "bg-amber-500/5" },
   { key: "approved", label: "تأیید شده", tone: "bg-emerald-500/5" },
   { key: "rejected", label: "رد شده", tone: "bg-destructive/5" },
 ];
+
+/** در دمو همهٔ انتقال‌های منطقی مجازند؛ در محصول واقعی از transition matrix + permission */
+const allowedTransitions: Record<ColumnKey, ColumnKey[]> = {
+  draft: ["pending", "rejected"],
+  pending: ["approved", "rejected", "draft"],
+  approved: ["pending"],
+  rejected: ["draft", "pending"],
+};
 
 const timeline = [
   {
@@ -107,6 +118,9 @@ const timeline = [
 export default function WorkflowGuidePage() {
   const [activeStep, setActiveStep] = useState(2);
   const [kanban, setKanban] = useState(initialKanban);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<ColumnKey | null>(null);
+  const [moveMsg, setMoveMsg] = useState<string | null>(null);
   const [approveOpen, setApproveOpen] = useState(false);
   const [note, setNote] = useState("");
   const [decision, setDecision] = useState<"approve" | "reject" | null>(null);
@@ -133,9 +147,7 @@ export default function WorkflowGuidePage() {
     setSaving(true);
     window.setTimeout(() => {
       setSaving(false);
-      setLastResult(
-        decision === "approve" ? "سند تأیید شد" : "سند رد شد"
-      );
+      setLastResult(decision === "approve" ? "سند تأیید شد" : "سند رد شد");
       closeApprove();
       setActiveStep(decision === "approve" ? 4 : 1);
       setKanban((prev) =>
@@ -149,6 +161,51 @@ export default function WorkflowGuidePage() {
         )
       );
     }, 500);
+  }
+
+  function moveCard(cardId: string, to: ColumnKey) {
+    const card = kanban.find((c) => c.id === cardId);
+    if (!card || card.column === to) return;
+
+    const allowed = allowedTransitions[card.column];
+    if (!allowed.includes(to)) {
+      setMoveMsg(
+        `انتقال از «${columns.find((c) => c.key === card.column)?.label}» به «${columns.find((c) => c.key === to)?.label}» مجاز نیست.`
+      );
+      window.setTimeout(() => setMoveMsg(null), 2800);
+      return;
+    }
+
+    setKanban((prev) =>
+      prev.map((c) => (c.id === cardId ? { ...c, column: to } : c))
+    );
+    setMoveMsg(`${card.title} → ${columns.find((c) => c.key === to)?.label}`);
+    window.setTimeout(() => setMoveMsg(null), 2200);
+  }
+
+  function onDragStart(e: React.DragEvent, id: string) {
+    e.dataTransfer.setData("text/plain", id);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggingId(id);
+  }
+
+  function onDragEnd() {
+    setDraggingId(null);
+    setDropTarget(null);
+  }
+
+  function onDragOver(e: React.DragEvent, col: ColumnKey) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDropTarget(col);
+  }
+
+  function onDrop(e: React.DragEvent, col: ColumnKey) {
+    e.preventDefault();
+    const id = e.dataTransfer.getData("text/plain");
+    if (id) moveCard(id, col);
+    setDraggingId(null);
+    setDropTarget(null);
   }
 
   return (
@@ -172,7 +229,9 @@ export default function WorkflowGuidePage() {
           </li>
           <li>انصراف بدون سؤال · بدون رفرش صفحه بعد از تصمیم.</li>
           <li>Activity / Timeline منبع حقیقت برای «چه کسی چه کرد».</li>
-          <li>Kanban نمای مدیریتی · کارت فقط جابه‌جایی منطقی با permission.</li>
+          <li>
+            Kanban: drag بین ستون‌ها فقط روی transition مجاز · در محصول با permission.
+          </li>
         </ul>
       </GuideRulesBox>
 
@@ -191,8 +250,7 @@ export default function WorkflowGuidePage() {
                     <div
                       className={cn(
                         "flex h-8 w-8 items-center justify-center rounded-full border text-xs font-medium",
-                        done &&
-                          "border-emerald-500 bg-emerald-500 text-white",
+                        done && "border-emerald-500 bg-emerald-500 text-white",
                         current &&
                           "border-primary bg-primary text-primary-foreground",
                         !done &&
@@ -357,46 +415,87 @@ export default function WorkflowGuidePage() {
       </GuideSection>
 
       <GuideSection
-        title="۳) Kanban — نمای ستونی وضعیت"
-        description="مدیریت بصری صف تأیید. جابه‌جایی فقط با منطق مجاز."
+        title="۳) Kanban — جابه‌جایی بین ستون‌ها"
+        description="کارت را بکشید و رها کنید · یا از دکمهٔ میانبر ستون مقصد را بزنید. انتقال غیرمجاز رد می‌شود."
       >
+        {moveMsg ? (
+          <div className="mb-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-1.5 text-xs text-primary">
+            {moveMsg}
+          </div>
+        ) : null}
+
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {columns.map((col) => (
-            <div
-              key={col.key}
-              className={cn(
-                "rounded-xl border border-border/70 p-2",
-                col.tone
-              )}
-            >
-              <div className="mb-2 flex items-center justify-between px-1">
-                <span className="text-xs font-medium">{col.label}</span>
-                <Badge variant="secondary" className="text-[10px]">
-                  {toFa(kanban.filter((c) => c.column === col.key).length)}
-                </Badge>
-              </div>
-              <div className="space-y-2">
-                {kanban
-                  .filter((c) => c.column === col.key)
-                  .map((card) => (
+          {columns.map((col) => {
+            const isTarget = dropTarget === col.key && draggingId !== null;
+            const cards = kanban.filter((c) => c.column === col.key);
+            return (
+              <div
+                key={col.key}
+                className={cn(
+                  "rounded-xl border border-border/70 p-2 transition-colors",
+                  col.tone,
+                  isTarget && "border-primary ring-2 ring-primary/30"
+                )}
+                onDragOver={(e) => onDragOver(e, col.key)}
+                onDragLeave={() => setDropTarget((t) => (t === col.key ? null : t))}
+                onDrop={(e) => onDrop(e, col.key)}
+              >
+                <div className="mb-2 flex items-center justify-between px-1">
+                  <span className="text-xs font-medium">{col.label}</span>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {toFa(cards.length)}
+                  </Badge>
+                </div>
+                <div className="min-h-[4.5rem] space-y-2">
+                  {cards.map((card) => (
                     <div
                       key={card.id}
-                      className="rounded-lg border border-border/60 bg-card p-2.5 shadow-sm"
+                      draggable
+                      onDragStart={(e) => onDragStart(e, card.id)}
+                      onDragEnd={onDragEnd}
+                      className={cn(
+                        "cursor-grab rounded-lg border border-border/60 bg-card p-2.5 shadow-sm active:cursor-grabbing",
+                        draggingId === card.id && "opacity-50 ring-2 ring-primary/40"
+                      )}
                     >
-                      <div className="font-mono text-xs text-primary">
-                        {card.title}
-                      </div>
-                      <div className="mt-0.5 text-[11px] text-muted-foreground">
-                        {card.meta}
+                      <div className="flex items-start gap-1.5">
+                        <GripVertical className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-mono text-xs text-primary">
+                            {card.title}
+                          </div>
+                          <div className="mt-0.5 text-[11px] text-muted-foreground">
+                            {card.meta}
+                          </div>
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            {allowedTransitions[card.column].map((k) => (
+                              <button
+                                key={k}
+                                type="button"
+                                className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-primary hover:bg-primary/5 hover:text-primary"
+                                onClick={() => moveCard(card.id, k)}
+                              >
+                                → {columns.find((c) => c.key === k)?.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}
+                  {cards.length === 0 ? (
+                    <div className="flex h-16 items-center justify-center rounded-lg border border-dashed border-border/60 text-[11px] text-muted-foreground">
+                      {isTarget ? "اینجا رها کنید" : "خالی"}
+                    </div>
+                  ) : null}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">
-          در محصول واقعی drag-and-drop فقط اگر permission و transition مجاز باشد.
+          دمو: drag-and-drop + دکمهٔ میانبر. ماتریس transition نمونه اعمال شده (مثلاً تأیید‌شده
+          فقط به «در انتظار» برمی‌گردد). در محصول واقعی + permission.
         </p>
       </GuideSection>
 
@@ -415,10 +514,10 @@ export default function WorkflowGuidePage() {
                   "relative z-10 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-card",
                   item.tone === "success" &&
                     "border-emerald-500 text-emerald-600",
-                  item.tone === "warning" &&
-                    "border-amber-500 text-amber-600",
+                  item.tone === "warning" && "border-amber-500 text-amber-600",
                   item.tone === "info" && "border-primary text-primary",
-                  item.tone === "default" && "border-border text-muted-foreground"
+                  item.tone === "default" &&
+                    "border-border text-muted-foreground"
                 )}
               >
                 {item.tone === "success" ? (
@@ -552,21 +651,19 @@ export default function WorkflowGuidePage() {
               <li>تغییر وضعیت فقط از Workflow</li>
               <li>Stepper شفاف برای وضعیت فعلی</li>
               <li>تأیید/رد با یادداشت اختیاری</li>
-              <li>
-                Overlay dirty: فقط ثبت/انصراف می‌بندد (UI-02)
-              </li>
+              <li>Overlay dirty: فقط ثبت/انصراف (UI-02)</li>
+              <li>Kanban با transition مجاز + بازخورد</li>
               <li>Timeline و Activity برای حسابرسی</li>
-              <li>بدون رفرش بعد از تصمیم</li>
             </ul>
           </div>
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
             <div className="mb-2 font-medium text-destructive">انجام نده</div>
             <ul className="list-disc space-y-1.5 pr-5 text-xs text-muted-foreground">
-              <li>دکمهٔ «تأیید» بدون permission</li>
-              <li>پرش وضعیت خارج از تعریف Workflow</li>
+              <li>دکمهٔ تأیید بدون permission</li>
+              <li>پرش وضعیت خارج از ماتریس transition</li>
               <li>بستن Modal dirty با کلیک بیرون</li>
               <li>پنهان کردن تاریخچه تصمیم</li>
-              <li>جابه‌جایی Kanban بدون transition مجاز</li>
+              <li>drag بدون چک transition</li>
             </ul>
           </div>
         </div>
