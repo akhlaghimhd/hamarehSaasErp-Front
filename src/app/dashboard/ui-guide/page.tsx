@@ -111,7 +111,7 @@ const guides: GuideItem[] = [
     title: "Feedback, Status & Loading",
     description: "Alert، Toast، Status Chip، Progress و Loading Overlay",
     phase: "فاز ۲",
-    status: "planned",
+    status: "ready",
     icon: Bell,
   },
   {
@@ -207,6 +207,10 @@ export default function UiGuideIndexPage() {
             UI-05: انتخاب ستون (سقف عرض) · جزئیات با اولویت DB · مالی با جداکننده/اعشار ·
             page-size · Empty ≠ جستجوی خالی · Stripe ملایم · hover از توکن · stale+refresh ·
             Card/List چنددامنه
+          </li>
+          <li>
+            UI-06: خطای فیلد ≠ Toast · Alert ماندگار · Toast کوتاه · Status از پالت · Overlay
+            فقط مسدودکننده · دکمه loading + Skeleton
           </li>
           <li>
             Package manager: <strong className="text-foreground">pnpm</strong>
