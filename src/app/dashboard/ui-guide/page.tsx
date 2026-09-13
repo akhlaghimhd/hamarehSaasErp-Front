@@ -156,7 +156,7 @@ const guides: GuideItem[] = [
     title: "Accessibility, Motion & Rules",
     description: "Focus، Keyboard، Reduced Motion و قوانین Do / Don’t",
     phase: "فاز ۴",
-    status: "planned",
+    status: "ready",
     icon: Accessibility,
   },
 ];
@@ -205,7 +205,7 @@ export default function UiGuideIndexPage() {
             UI-04: Label+* · خطا زیر فیلد · ۱–۲ ستون · ثبت بدون reload · تب+ثبت موقت · DOM ثابت
           </li>
           <li>
-            UI-05: ستون · مالی · page-size · Empty≠جستجو · Stripe · stale · Card/List
+            UII-05: ستون · مالی · page-size · Empty≠جستجو · Stripe · stale · Card/List
           </li>
           <li>
             UI-06: فیلد≠Toast · Alert · Toast · Status · Overlay مسدود · لودینگ · همدلانه
@@ -222,6 +222,9 @@ export default function UiGuideIndexPage() {
           </li>
           <li>
             UI-10: لیست+جزئیات · فرم سند هدر/خطوط/فوتر · Density · بدون reload
+          </li>
+          <li>
+            UI-11: focus-visible · keyboard · reduced-motion · aria-live · چک‌لیست
           </li>
           <li>
             Package manager: <strong className="text-foreground">pnpm</strong>
