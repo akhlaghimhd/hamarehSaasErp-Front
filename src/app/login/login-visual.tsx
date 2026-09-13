@@ -14,14 +14,14 @@ interface LoginVisualProps {
 }
 
 const NODES = [
-  { id: 1, x: 22, y: 28, label: "فروش", delay: 0 },
-  { id: 2, x: 78, y: 22, label: "انبار", delay: 0.4 },
-  { id: 3, x: 18, y: 68, label: "مالی", delay: 0.8 },
-  { id: 4, x: 82, y: 72, label: "منابع", delay: 1.2 },
-  { id: 5, x: 50, y: 48, label: "هسته", delay: 0.2, core: true },
+  { id: 1, x: 22, y: 28, label: "فروش", delay: "0s" },
+  { id: 2, x: 78, y: 22, label: "انبار", delay: "0.4s" },
+  { id: 3, x: 18, y: 68, label: "مالی", delay: "0.8s" },
+  { id: 4, x: 82, y: 72, label: "منابع", delay: "1.2s" },
+  { id: 5, x: 50, y: 48, label: "هسته", delay: "0.2s", core: true },
 ];
 
-const LINKS = [
+const LINKS: [number, number][] = [
   [1, 5],
   [2, 5],
   [3, 5],
@@ -31,10 +31,10 @@ const LINKS = [
 ];
 
 export function LoginVisual({ active = false, className }: LoginVisualProps) {
-  const [pulse, setPulse] = useState(0);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    const t = window.setInterval(() => setPulse((p) => p + 1), 3200);
+    const t = window.setInterval(() => setTick((p) => p + 1), 2800);
     return () => window.clearInterval(t);
   }, []);
 
@@ -46,7 +46,7 @@ export function LoginVisual({ active = false, className }: LoginVisualProps) {
         className
       )}
     >
-      {/* soft ambient glow */}
+      {/* ambient glow */}
       <div
         className="pointer-events-none absolute inset-0 opacity-80"
         style={{
@@ -65,7 +65,6 @@ export function LoginVisual({ active = false, className }: LoginVisualProps) {
         }}
       />
 
-      {/* SVG network */}
       <svg
         className="absolute inset-0 h-full w-full"
         viewBox="0 0 100 100"
@@ -73,12 +72,12 @@ export function LoginVisual({ active = false, className }: LoginVisualProps) {
         aria-hidden
       >
         <defs>
-          <linearGradient id="linkGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <linearGradient id="loginLinkGrad" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="hsl(142 70% 55%)" stopOpacity="0.15" />
             <stop offset="50%" stopColor="hsl(142 70% 60%)" stopOpacity="0.55" />
             <stop offset="100%" stopColor="hsl(95 60% 50%)" stopOpacity="0.15" />
           </linearGradient>
-          <filter id="glow">
+          <filter id="loginGlow">
             <feGaussianBlur stdDeviation="1.2" result="coloredBlur" />
             <feMerge>
               <feMergeNode in="coloredBlur" />
@@ -97,14 +96,14 @@ export function LoginVisual({ active = false, className }: LoginVisualProps) {
               y1={na.y}
               x2={nb.x}
               y2={nb.y}
-              stroke="url(#linkGrad)"
+              stroke="url(#loginLinkGrad)"
               strokeWidth={0.35}
               className={cn(
-                "origin-center transition-opacity duration-700",
+                "transition-opacity duration-700",
                 active ? "opacity-100" : "opacity-70"
               )}
               style={{
-                animation: `linkPulse 3.6s ease-in-out ${i * 0.35}s infinite`,
+                animation: `loginLinkPulse 3.6s ease-in-out ${i * 0.35}s infinite`,
               }}
             />
           );
@@ -120,8 +119,7 @@ export function LoginVisual({ active = false, className }: LoginVisualProps) {
                 fill="none"
                 stroke="hsl(142 70% 55% / 0.35)"
                 strokeWidth={0.4}
-                className="animate-ping"
-                style={{ animationDuration: "2.8s" }}
+                style={{ animation: "loginCoreRing 2.8s ease-out infinite" }}
               />
             )}
             <circle
@@ -129,34 +127,31 @@ export function LoginVisual({ active = false, className }: LoginVisualProps) {
               cy={n.y}
               r={n.core ? 4.2 : 2.6}
               fill={n.core ? "hsl(142 70% 52%)" : "hsl(142 50% 42%)"}
-              filter="url(#glow)"
-              className={cn(
-                "transition-transform duration-500",
-                active && n.core && "scale-110"
-              )}
+              filter="url(#loginGlow)"
               style={{
                 animation: n.core
-                  ? `corePulse 2.4s ease-in-out infinite`
-                  : `nodeFloat 4s ease-in-out ${n.delay}s infinite`,
+                  ? "loginCorePulse 2.4s ease-in-out infinite"
+                  : `loginNodeFloat 4s ease-in-out ${n.delay} infinite`,
+                transformOrigin: `${n.x}px ${n.y}px`,
               }}
             />
-            {/* tiny orbit particles for core */}
             {n.core &&
-              [0, 1, 2].map((p) => (
-                <circle
-                  key={p}
-                  cx={n.x + Math.cos((pulse + p) * 1.2) * 7}
-                  cy={n.y + Math.sin((pulse + p) * 1.2) * 7}
-                  r={0.7}
-                  fill="hsl(95 70% 65% / 0.85)"
-                  className="transition-all duration-1000"
-                />
-              ))}
+              [0, 1, 2].map((p) => {
+                const angle = (tick + p * 2.1) * 0.9;
+                return (
+                  <circle
+                    key={p}
+                    cx={n.x + Math.cos(angle) * 7}
+                    cy={n.y + Math.sin(angle) * 7}
+                    r={0.7}
+                    fill="hsl(95 70% 65% / 0.85)"
+                  />
+                );
+              })}
           </g>
         ))}
       </svg>
 
-      {/* floating labels */}
       <div className="pointer-events-none absolute inset-0">
         {NODES.filter((n) => !n.core).map((n) => (
           <span
@@ -166,7 +161,7 @@ export function LoginVisual({ active = false, className }: LoginVisualProps) {
               left: `${n.x}%`,
               top: `${n.y + 6}%`,
               transform: "translateX(-50%)",
-              animation: `labelFade 5s ease-in-out ${n.delay}s infinite`,
+              animation: `loginLabelFade 5s ease-in-out ${n.delay} infinite`,
             }}
           >
             {n.label}
@@ -174,7 +169,6 @@ export function LoginVisual({ active = false, className }: LoginVisualProps) {
         ))}
       </div>
 
-      {/* bottom copy */}
       <div className="relative z-10 mt-auto flex flex-col gap-2 p-8 pb-10">
         <div className="flex items-center gap-2">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-sm font-bold backdrop-blur">
@@ -185,7 +179,7 @@ export function LoginVisual({ active = false, className }: LoginVisualProps) {
         <p className="max-w-[240px] text-sm leading-relaxed text-white/70">
           یکپارچگی ماژول‌ها، شفافیت داده و کنترل هوشمند — همه در یک نقطه ورود.
         </p>
-        <div className="mt-3 flex gap-1.5">
+        <div className="mt-3 flex flex-wrap gap-1.5">
           {["فروش", "انبار", "مالی", "منابع"].map((t) => (
             <span
               key={t}
@@ -196,47 +190,6 @@ export function LoginVisual({ active = false, className }: LoginVisualProps) {
           ))}
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes linkPulse {
-          0%,
-          100% {
-            stroke-opacity: 0.35;
-          }
-          50% {
-            stroke-opacity: 0.9;
-          }
-        }
-        @keyframes corePulse {
-          0%,
-          100% {
-            transform: scale(1);
-            opacity: 1;
-          }
-          50% {
-            transform: scale(1.12);
-            opacity: 0.9;
-          }
-        }
-        @keyframes nodeFloat {
-          0%,
-          100% {
-            transform: translateY(0);
-          }
-          50% {
-            transform: translateY(-1.2px);
-          }
-        }
-        @keyframes labelFade {
-          0%,
-          100% {
-            opacity: 0.45;
-          }
-          50% {
-            opacity: 0.85;
-          }
-        }
-      `}</style>
     </div>
   );
 }
