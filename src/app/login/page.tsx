@@ -1,7 +1,7 @@
 /**
  * Login — OTP UX, SoftRing hydrate (UI-06), controlled identifier,
- * server wait timer, submit lock until edit after error,
- * one-shot slide-to-verify human check (no double challenge).
+ * submit lock until edit after error, one-shot slide human check.
+ * Button loading follows UI-06: Loader2 + label (no elapsed counter).
  */
 
 "use client";
@@ -24,6 +24,7 @@ import {
   Building2,
   ArrowLeft,
   Pencil,
+  Loader2,
 } from "lucide-react";
 
 import { Button } from "@/shared/components/ui/button";
@@ -71,12 +72,6 @@ function formatMmSs(totalSec: number): string {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
   return `${toFa(m)}:${toFa(String(s).padStart(2, "0"))}`;
-}
-
-function formatWait(ms: number): string {
-  const sec = ms / 1000;
-  if (sec < 10) return toFa(sec.toFixed(1)) + "ث";
-  return toFa(Math.floor(sec)) + "ث";
 }
 
 const passwordSchema = z.object({
@@ -164,20 +159,6 @@ function BreathingDots({ className }: { className?: string }) {
           }}
         />
       ))}
-    </span>
-  );
-}
-
-function StoryLoader({ label, waitMs }: { label: string; waitMs?: number }) {
-  return (
-    <span className="inline-flex items-center gap-2">
-      <SoftRingLoader size="sm" />
-      <span className="text-sm">{label}</span>
-      {typeof waitMs === "number" && waitMs > 300 ? (
-        <span className="tabular-nums text-[11px] opacity-70" dir="ltr">
-          {formatWait(waitMs)}
-        </span>
-      ) : null}
     </span>
   );
 }
@@ -413,7 +394,6 @@ export default function LoginPage() {
   /** Sync flag — setState alone is too late when we immediately retry login */
   const humanVerifiedRef = useRef(false);
   const [blockedUntilEdit, setBlockedUntilEdit] = useState(false);
-  const [waitMs, setWaitMs] = useState(0);
 
   const [otpStep, setOtpStep] = useState<"mobile" | "code">("mobile");
   const [otpMobile, setOtpMobile] = useState("");
@@ -453,7 +433,6 @@ export default function LoginPage() {
   const passwordReg = register("password");
   const identifierValue = watch("identifier") ?? "";
   const passwordValue = watch("password") ?? "";
-  const serverWaiting = isSubmitting || otpBusy || orgBusy;
 
   const markEdited = () => {
     if (blockedUntilEdit) setBlockedUntilEdit(false);
@@ -482,16 +461,6 @@ export default function LoginPage() {
     const t = window.setInterval(tick, 1000);
     return () => window.clearInterval(t);
   }, [lastOtpSession]);
-
-  useEffect(() => {
-    if (!serverWaiting) {
-      setWaitMs(0);
-      return;
-    }
-    const started = Date.now();
-    const t = window.setInterval(() => setWaitMs(Date.now() - started), 100);
-    return () => window.clearInterval(t);
-  }, [serverWaiting]);
 
   const handleLoginResult = async (
     result: Awaited<ReturnType<typeof authService.loginWithPassword>>
@@ -584,7 +553,6 @@ export default function LoginPage() {
     }
     setOtpMobile(mobile);
 
-    // Soft resume: same number + code still valid + not an explicit resend
     if (
       !opts?.force &&
       lastOtpSession &&
@@ -596,7 +564,6 @@ export default function LoginPage() {
       return;
     }
 
-    // 2nd+ network attempt → human check once (ref avoids stale state)
     if (otpSendCount >= 1 && !humanVerifiedRef.current) {
       setPendingAfterCheck("otp");
       setNeedHumanCheck(true);
@@ -640,7 +607,6 @@ export default function LoginPage() {
   );
 
   const onHumanCheckPass = () => {
-    // Ref first so any immediate retry sees verified=true
     humanVerifiedRef.current = true;
     setHumanVerified(true);
     setNeedHumanCheck(false);
@@ -697,8 +663,9 @@ export default function LoginPage() {
           </div>
           <ErrorSlot message={formError} />
           {orgBusy && (
-            <div className="flex justify-center py-1 text-muted-foreground">
-              <StoryLoader label="در حال ورود به سازمان…" waitMs={waitMs} />
+            <div className="flex items-center justify-center gap-1.5 py-1 text-sm text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              در حال ورود به سازمان…
             </div>
           )}
           <div className="grid gap-2">
@@ -848,7 +815,10 @@ export default function LoginPage() {
             <div className="pt-2">
               <Button type="submit" className="h-9 w-full text-sm" disabled={isSubmitting || blockedUntilEdit}>
                 {isSubmitting ? (
-                  <StoryLoader label="در حال بررسی سرور…" waitMs={waitMs} />
+                  <span className="inline-flex items-center gap-1.5">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    در حال ورود…
+                  </span>
                 ) : (
                   "ورود به سیستم"
                 )}
@@ -904,7 +874,10 @@ export default function LoginPage() {
                 disabled={otpBusy || blockedUntilEdit || !otpMobile.trim()}
               >
                 {otpBusy ? (
-                  <StoryLoader label="در حال ارسال کد…" waitMs={waitMs} />
+                  <span className="inline-flex items-center gap-1.5">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    در حال ارسال…
+                  </span>
                 ) : (
                   "دریافت کد تأیید"
                 )}
@@ -986,7 +959,10 @@ export default function LoginPage() {
                 }
               >
                 {otpBusy ? (
-                  <StoryLoader label="در حال تأیید سرور…" waitMs={waitMs} />
+                  <span className="inline-flex items-center gap-1.5">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    در حال تأیید…
+                  </span>
                 ) : (
                   "تأیید و ورود"
                 )}
