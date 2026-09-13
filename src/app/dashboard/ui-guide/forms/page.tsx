@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, type ReactNode } from "react";
 import {
   GuidePageHeader,
   GuideRulesBox,
@@ -47,13 +47,14 @@ import {
   AlertTriangle,
   CheckCircle2,
   X,
+  Search,
 } from "lucide-react";
 
 const meta = {
   code: "UI-04",
   title: "Forms & Data Entry",
   description:
-    "فرم سریع و پیچیده، تب‌دار با ثبت موقت/نهایی، تاریخ شمسی، آپلود، همه حالت‌های فیلد، ویرایش با ردیابی تغییر.",
+    "فرم سریع و پیچیده، تب‌دار با ثبت موقت/نهایی، تاریخ شمسی، کاتالوگ کنترل‌ها، آپلود، ویرایش با ردیابی تغییر.",
   phase: "فاز ۲",
   status: "ready" as const,
 };
@@ -75,7 +76,16 @@ const SHAMSI_MONTHS = [
 
 const WEEKDAYS = ["ش", "ی", "د", "س", "چ", "پ", "ج"];
 
-/** نمایشی: تقویم شمسی سبک برای راهنما (بدون وابستگی سنگین) */
+const WAREHOUSE_OPTIONS = [
+  "انبار مرکزی",
+  "انبار جنوب",
+  "انبار شمال",
+  "انبار غرب",
+  "سردخانه",
+  "انبار قطعات",
+];
+
+/** تقویم شمسی راهنما — کلیک روی ماه/سال برای انتخاب سریع */
 function ShamsiDateField({
   label,
   value,
@@ -88,8 +98,10 @@ function ShamsiDateField({
   required?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [view, setView] = useState<"days" | "months" | "years">("days");
   const [y, setY] = useState(1404);
-  const [m, setM] = useState(6); // 1-based
+  const [m, setM] = useState(6);
+  const [yearPage, setYearPage] = useState(1400); // start of 12-year grid
 
   const daysInMonth = m <= 6 ? 31 : m <= 11 ? 30 : 29;
 
@@ -98,6 +110,7 @@ function ShamsiDateField({
     const dd = String(day).padStart(2, "0");
     onChange(`${y}/${mm}/${dd}`);
     setOpen(false);
+    setView("days");
   }
 
   return (
@@ -120,7 +133,10 @@ function ShamsiDateField({
           variant="outline"
           size="icon"
           className="shrink-0"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => {
+            setOpen((v) => !v);
+            setView("days");
+          }}
           aria-label="تقویم شمسی"
         >
           <CalendarDays className="h-4 w-4" />
@@ -128,14 +144,16 @@ function ShamsiDateField({
       </div>
       {open ? (
         <div className="absolute z-20 mt-1 w-[280px] rounded-xl border border-border/70 bg-card p-3 shadow-[var(--shadow-md)]">
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-2 flex items-center justify-between gap-1">
             <Button
               type="button"
               variant="ghost"
               size="icon"
               className="h-7 w-7"
               onClick={() => {
-                if (m === 1) {
+                if (view === "years") setYearPage((p) => p - 12);
+                else if (view === "months") setY((x) => x - 1);
+                else if (m === 1) {
                   setM(12);
                   setY((x) => x - 1);
                 } else setM((x) => x - 1);
@@ -143,8 +161,45 @@ function ShamsiDateField({
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <div className="text-xs font-medium">
-              {SHAMSI_MONTHS[m - 1]} {y}
+            <div className="flex items-center gap-1 text-xs font-medium">
+              {view === "days" ? (
+                <>
+                  <button
+                    type="button"
+                    className="rounded px-1.5 py-0.5 hover:bg-muted"
+                    onClick={() => setView("months")}
+                  >
+                    {SHAMSI_MONTHS[m - 1]}
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded px-1.5 py-0.5 hover:bg-muted"
+                    onClick={() => {
+                      setYearPage(Math.floor(y / 12) * 12);
+                      setView("years");
+                    }}
+                  >
+                    {y}
+                  </button>
+                </>
+              ) : null}
+              {view === "months" ? (
+                <button
+                  type="button"
+                  className="rounded px-1.5 py-0.5 hover:bg-muted"
+                  onClick={() => {
+                    setYearPage(Math.floor(y / 12) * 12);
+                    setView("years");
+                  }}
+                >
+                  {y}
+                </button>
+              ) : null}
+              {view === "years" ? (
+                <span className="px-1.5">
+                  {yearPage} – {yearPage + 11}
+                </span>
+              ) : null}
             </div>
             <Button
               type="button"
@@ -152,7 +207,9 @@ function ShamsiDateField({
               size="icon"
               className="h-7 w-7"
               onClick={() => {
-                if (m === 12) {
+                if (view === "years") setYearPage((p) => p + 12);
+                else if (view === "months") setY((x) => x + 1);
+                else if (m === 12) {
                   setM(1);
                   setY((x) => x + 1);
                 } else setM((x) => x + 1);
@@ -161,33 +218,85 @@ function ShamsiDateField({
               <ChevronLeft className="h-4 w-4" />
             </Button>
           </div>
-          <div className="mb-1 grid grid-cols-7 gap-0.5 text-center text-[10px] text-muted-foreground">
-            {WEEKDAYS.map((d) => (
-              <div key={d}>{d}</div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-0.5">
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const day = i + 1;
-              const token = `${y}/${String(m).padStart(2, "0")}/${String(day).padStart(2, "0")}`;
-              const selected = value === token;
-              return (
+
+          {view === "days" ? (
+            <>
+              <div className="mb-1 grid grid-cols-7 gap-0.5 text-center text-[10px] text-muted-foreground">
+                {WEEKDAYS.map((d) => (
+                  <div key={d}>{d}</div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-0.5">
+                {Array.from({ length: daysInMonth }).map((_, i) => {
+                  const day = i + 1;
+                  const token = `${y}/${String(m).padStart(2, "0")}/${String(day).padStart(2, "0")}`;
+                  const selected = value === token;
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => pick(day)}
+                      className={cn(
+                        "h-8 rounded-md text-xs hover:bg-primary/10",
+                        selected && "bg-primary text-primary-foreground hover:bg-primary"
+                      )}
+                    >
+                      {day}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : null}
+
+          {view === "months" ? (
+            <div className="grid grid-cols-3 gap-1">
+              {SHAMSI_MONTHS.map((name, idx) => (
                 <button
-                  key={day}
+                  key={name}
                   type="button"
-                  onClick={() => pick(day)}
+                  onClick={() => {
+                    setM(idx + 1);
+                    setView("days");
+                  }}
                   className={cn(
-                    "h-8 rounded-md text-xs hover:bg-primary/10",
-                    selected && "bg-primary text-primary-foreground hover:bg-primary"
+                    "rounded-md px-1 py-2 text-xs hover:bg-primary/10",
+                    m === idx + 1 && "bg-primary text-primary-foreground"
                   )}
                 >
-                  {day}
+                  {name}
                 </button>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          ) : null}
+
+          {view === "years" ? (
+            <div className="grid grid-cols-3 gap-1">
+              {Array.from({ length: 12 }).map((_, i) => {
+                const yr = yearPage + i;
+                return (
+                  <button
+                    key={yr}
+                    type="button"
+                    onClick={() => {
+                      setY(yr);
+                      setView("months");
+                    }}
+                    className={cn(
+                      "rounded-md px-1 py-2 text-xs hover:bg-primary/10",
+                      y === yr && "bg-primary text-primary-foreground"
+                    )}
+                  >
+                    {yr}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
           <p className="mt-2 text-[10px] text-muted-foreground">
-            در محصول واقعی از کتابخانهٔ جلالی تأییدشده استفاده می‌شود؛ اینجا الگوی UX قفل می‌شود.
+            روی نام ماه یا سال کلیک کنید تا انتخاب سریع شود. در محصول از کتابخانهٔ جلالی تأییدشده استفاده
+            می‌شود.
           </p>
         </div>
       ) : null}
@@ -209,6 +318,18 @@ type EditFields = {
   supplier: string;
 };
 
+/** فیلدهایی که ردیابی تغییر + بازگشت دارند (نه توضیحات بلند) */
+const TRACKED_KEYS: (keyof EditFields)[] = [
+  "code",
+  "name",
+  "group",
+  "warehouse",
+  "unit",
+  "minStock",
+  "barcode",
+  "supplier",
+];
+
 const EDIT_BASELINE: EditFields = {
   code: "ITM-100",
   name: "ورق فولادی",
@@ -222,22 +343,21 @@ const EDIT_BASELINE: EditFields = {
 };
 
 export default function FormsGuidePage() {
-  // Quick form
   const [qTitle, setQTitle] = useState("");
   const [qWh, setQWh] = useState("");
-
-  // Shamsi
   const [docDate, setDocDate] = useState("1404/06/20");
 
-  // Tabbed complex
   const [tab, setTab] = useState("base");
-  const [draftSaved, setDraftSaved] = useState(false);
+  const [tabDrafts, setTabDrafts] = useState<Record<string, boolean>>({
+    base: false,
+    finance: false,
+    extra: false,
+  });
   const [tabCode, setTabCode] = useState("");
   const [tabName, setTabName] = useState("");
   const [tabNote, setTabNote] = useState("");
   const [tabPrice, setTabPrice] = useState("");
 
-  // Upload
   const fileRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<UploadItem[]>([
     { id: "1", name: "فاکتور-ورود.pdf", size: "240 KB" },
@@ -246,8 +366,20 @@ export default function FormsGuidePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
 
-  // Edit change-tracking
   const [editVals, setEditVals] = useState<EditFields>({ ...EDIT_BASELINE });
+
+  // catalog demos
+  const [radioVal, setRadioVal] = useState("a");
+  const [multi, setMulti] = useState<string[]>(["main"]);
+  const [searchQ, setSearchQ] = useState("");
+  const [searchPick, setSearchPick] = useState("");
+  const [rangeVal, setRangeVal] = useState(40);
+
+  const filteredWh = useMemo(
+    () =>
+      WAREHOUSE_OPTIONS.filter((w) => w.includes(searchQ.trim()) || searchQ.trim() === ""),
+    [searchQ]
+  );
 
   function isFieldDirty(key: keyof EditFields) {
     return editVals[key] !== EDIT_BASELINE[key];
@@ -262,8 +394,7 @@ export default function FormsGuidePage() {
   }
 
   const dirtyCount = useMemo(
-    () => (Object.keys(EDIT_BASELINE) as (keyof EditFields)[]).filter(isFieldDirty).length,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    () => TRACKED_KEYS.filter((k) => editVals[k] !== EDIT_BASELINE[k]).length,
     [editVals]
   );
 
@@ -272,56 +403,55 @@ export default function FormsGuidePage() {
     const next: UploadItem[] = Array.from(list).map((f, i) => ({
       id: `${Date.now()}-${i}`,
       name: f.name,
-      size: f.size > 1024 * 1024 ? `${(f.size / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(f.size / 1024))} KB`,
+      size:
+        f.size > 1024 * 1024
+          ? `${(f.size / 1024 / 1024).toFixed(1)} MB`
+          : `${Math.max(1, Math.round(f.size / 1024))} KB`,
     }));
     setFiles((prev) => [...next, ...prev]);
   }
 
-  function FieldShell({
+  function saveTabDraft(id: string) {
+    setTabDrafts((d) => ({ ...d, [id]: true }));
+  }
+
+  function TrackedField({
     fieldKey,
     label,
     children,
   }: {
     fieldKey: keyof EditFields;
     label: string;
-    children: React.ReactNode;
+    children: (args: { className?: string }) => ReactNode;
   }) {
     const dirty = isFieldDirty(fieldKey);
     return (
-      <div
-        className={cn(
-          "space-y-1.5 rounded-lg p-2 transition",
-          dirty && "bg-amber-50/80 ring-1 ring-amber-300/70 dark:bg-amber-950/30 dark:ring-amber-800"
-        )}
-      >
-        <div className="flex items-center justify-between gap-2">
-          <Label className={cn(dirty && "text-amber-900 dark:text-amber-100")}>
-            {label}
-            {dirty ? (
-              <Badge variant="outline" className="mr-2 text-[9px] border-amber-400 text-amber-800">
-                تغییر
-              </Badge>
-            ) : null}
-          </Label>
+      <div className="space-y-1">
+        <Label>{label}</Label>
+        <div className="relative">
+          {children({
+            className: dirty
+              ? "border-amber-500 focus-visible:ring-amber-400/40 dark:border-amber-600"
+              : undefined,
+          })}
           {dirty ? (
-            <Button
+            <button
               type="button"
-              variant="ghost"
-              size="sm"
-              className="h-6 gap-1 px-1.5 text-[10px] text-muted-foreground"
+              title="بازگشت به مقدار قبلی"
+              className="absolute left-1.5 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
               onClick={() => restoreField(fieldKey)}
             >
-              <RotateCcw className="h-3 w-3" />
-              بازگشت
-            </Button>
+              <RotateCcw className="h-3.5 w-3.5" />
+            </button>
           ) : null}
         </div>
-        {children}
         {dirty ? (
-          <p className="text-[10px] text-muted-foreground">
-            قبلی: <span className="font-medium text-foreground">{EDIT_BASELINE[fieldKey]}</span>
+          <p className="text-[10px] leading-tight text-muted-foreground">
+            قبلی: {EDIT_BASELINE[fieldKey]}
           </p>
-        ) : null}
+        ) : (
+          <p className="h-3 text-[10px] opacity-0">.</p>
+        )}
       </div>
     );
   }
@@ -334,18 +464,18 @@ export default function FormsGuidePage() {
         <GuideRulesBox title="قوانین فرم (تکمیل‌شده)">
           <ul className="list-disc space-y-1 pr-5">
             <li>
-              <strong className="text-foreground">تاریخ همیشه شمسی</strong> در UI محصول — میلادی فقط در
-              لایهٔ API/ذخیره در صورت نیاز.
+              <strong className="text-foreground">تاریخ همیشه شمسی</strong> — کلیک روی ماه/سال برای
+              پرش سریع · میلادی فقط در API در صورت نیاز.
             </li>
             <li>
-              فرم سریع ≤۴ فیلد · فرم پیچیده تب‌دار با <strong className="text-foreground">ثبت موقت</strong>{" "}
-              و <strong className="text-foreground">ثبت نهایی</strong>.
+              فرم سریع ≤۴ فیلد · فرم پیچیده تب‌دار با ثبت موقت هر تب + ثبت نهایی سراسری.
             </li>
-            <li>خطا زیر فیلد · * روی برچسب · ثبت بدون رفرش صفحه (UI-02).</li>
+            <li>خطا زیر فیلد · * روی برچسب · ثبت بدون رفرش (UI-02).</li>
             <li>
-              ویرایش طولانی (≥۸ فیلد): فیلد تغییرکرده هایلایت · نمایش مقدار قبلی · دکمه بازگشت هر فیلد.
+              ویرایش طولانی: فقط کادر فیلدهای انتخابی (نه توضیحات) رنگی می‌شود · مقدار قبلی زیر فیلد
+              · دکمه بازگشت داخل فیلد.
             </li>
-            <li>Hint/Info قبل از ثبت حساس · آپلود با لیست و امکان تغییر نام/حذف.</li>
+            <li>Hint/Info قبل از ثبت حساس · آپلود با لیست و ویرایش نام/حذف.</li>
           </ul>
         </GuideRulesBox>
 
@@ -389,11 +519,11 @@ export default function FormsGuidePage() {
                 <Badge className="text-[10px]">تب‌دار · چندبخشی</Badge>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                داده دسته‌بندی‌شده که در یک صفحه جا نمی‌شود: تب + ثبت موقت + ثبت نهایی.
+                داده دسته‌بندی‌شده: تب + ثبت موقت هر تب + ثبت نهایی.
               </p>
               <ul className="list-disc space-y-1 pr-5 text-[11px] text-muted-foreground">
                 <li>هر تب یک دامنه (هویت / مالی / پیوست)</li>
-                <li>ثبت موقت = پیش‌نویس بدون اعتبارسنجی سخت همه تب‌ها</li>
+                <li>ثبت موقت = پیش‌نویس همان تب</li>
                 <li>ثبت نهایی = اعتبارسنجی همهٔ تب‌های الزامی</li>
               </ul>
             </div>
@@ -402,24 +532,33 @@ export default function FormsGuidePage() {
 
         {/* 2 Tabbed */}
         <GuideSection title="۲) فرم تب‌دار — ثبت موقت و ثبت نهایی">
+          <div className="mb-2 rounded-lg border border-border/60 bg-muted/20 p-3 text-[11px] text-muted-foreground">
+            <strong className="text-foreground">UX دکمه ثبت موقت:</strong> بهتر است{" "}
+            <em>داخل هر تب</em> باشد (ذخیره همان بخش) و در نوار پایین فقط «ثبت نهایی» و «انصراف» بماند.
+            تب‌های ذخیره‌شده با نقطهٔ سبز مشخص می‌شوند.
+          </div>
           <div className="max-w-3xl rounded-xl border border-border/70 bg-card p-4">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              {draftSaved ? (
-                <Badge variant="success" className="text-[10px]">
-                  پیش‌نویس ذخیره شد
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="text-[10px]">
-                  ذخیره نشده
-                </Badge>
-              )}
-            </div>
             <Tabs value={tab} onValueChange={setTab}>
               <TabsList>
-                <TabsTrigger value="base">اطلاعات پایه</TabsTrigger>
-                <TabsTrigger value="finance">مالی</TabsTrigger>
-                <TabsTrigger value="extra">توضیحات</TabsTrigger>
+                {(
+                  [
+                    { id: "base", label: "اطلاعات پایه" },
+                    { id: "finance", label: "مالی" },
+                    { id: "extra", label: "توضیحات" },
+                  ] as const
+                ).map((t) => (
+                  <TabsTrigger key={t.id} value={t.id} className="gap-1.5">
+                    {t.label}
+                    {tabDrafts[t.id] ? (
+                      <span
+                        className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"
+                        title="پیش‌نویس این تب ذخیره شده"
+                      />
+                    ) : null}
+                  </TabsTrigger>
+                ))}
               </TabsList>
+
               <TabsContent value="base" className="space-y-3">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
@@ -435,7 +574,11 @@ export default function FormsGuidePage() {
                     <Input value={tabName} onChange={(e) => setTabName(e.target.value)} />
                   </div>
                 </div>
+                <Button type="button" variant="secondary" size="sm" onClick={() => saveTabDraft("base")}>
+                  ثبت موقت این تب
+                </Button>
               </TabsContent>
+
               <TabsContent value="finance" className="space-y-3">
                 <div className="space-y-1.5">
                   <Label>قیمت پایه</Label>
@@ -446,22 +589,33 @@ export default function FormsGuidePage() {
                     dir="ltr"
                   />
                 </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => saveTabDraft("finance")}
+                >
+                  ثبت موقت این تب
+                </Button>
               </TabsContent>
+
               <TabsContent value="extra" className="space-y-3">
                 <div className="space-y-1.5">
                   <Label>یادداشت</Label>
                   <Textarea value={tabNote} onChange={(e) => setTabNote(e.target.value)} rows={3} />
                 </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => saveTabDraft("extra")}
+                >
+                  ثبت موقت این تب
+                </Button>
               </TabsContent>
             </Tabs>
+
             <div className="mt-4 flex flex-wrap gap-2 border-t border-border/60 pt-3">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setDraftSaved(true)}
-              >
-                ثبت موقت
-              </Button>
               <Button type="button">ثبت نهایی</Button>
               <Button type="button" variant="outline">
                 انصراف
@@ -473,20 +627,16 @@ export default function FormsGuidePage() {
         {/* 3 Shamsi */}
         <GuideSection title="۳) انتخاب تاریخ شمسی">
           <div className="max-w-sm rounded-xl border border-border/70 bg-card p-4">
-            <ShamsiDateField
-              label="تاریخ سند"
-              value={docDate}
-              onChange={setDocDate}
-              required
-            />
+            <ShamsiDateField label="تاریخ سند" value={docDate} onChange={setDocDate} required />
             <p className="mt-3 text-[11px] text-muted-foreground">
-              تقویم محصول: ماه/روز شمسی، هفته از شنبه. نمایش <code className="rounded bg-muted px-1">type="date"</code>{" "}
-              مرورگر (میلادی) در فرم‌های عملیاتی ممنوع است.
+              روی <strong className="text-foreground">نام ماه</strong> یا{" "}
+              <strong className="text-foreground">سال</strong> در هدر تقویم کلیک کنید.{" "}
+              <code className="rounded bg-muted px-1">type=&quot;date&quot;</code> میلادی در UI ممنوع است.
             </p>
           </div>
         </GuideSection>
 
-        {/* 4 All states */}
+        {/* 4 Field states */}
         <GuideSection title="۴) همهٔ حالت‌های محتمل فیلد">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {(
@@ -555,6 +705,184 @@ export default function FormsGuidePage() {
                 {s.el}
               </div>
             ))}
+          </div>
+        </GuideSection>
+
+        {/* 4b Control catalog */}
+        <GuideSection title="۴ب) کاتالوگ کنترل‌های مجاز فرم وب">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-3 rounded-xl border border-border/70 bg-card p-4">
+              <div className="text-xs font-medium">متن و ورودی‌های پایه</div>
+              <div className="space-y-1.5">
+                <Label>متن</Label>
+                <Input placeholder="عنوان" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>رمز</Label>
+                <Input type="password" placeholder="••••••" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>ایمیل</Label>
+                <Input type="email" placeholder="user@example.com" dir="ltr" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>تلفن</Label>
+                <Input type="tel" placeholder="0912…" dir="ltr" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>عدد</Label>
+                <Input type="number" placeholder="0" dir="ltr" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>جستجو</Label>
+                <div className="relative">
+                  <Search className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input className="pr-8" placeholder="جستجو…" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>زمان</Label>
+                <Input type="time" dir="ltr" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>بازه (Range)</Label>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={rangeVal}
+                  onChange={(e) => setRangeVal(Number(e.target.value))}
+                  className="w-full accent-primary"
+                />
+                <p className="text-[10px] text-muted-foreground">{rangeVal}%</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>متن چندخطی</Label>
+                <Textarea rows={2} placeholder="توضیح" />
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-xl border border-border/70 bg-card p-4">
+              <div className="text-xs font-medium">انتخاب‌ها</div>
+
+              <div className="space-y-1.5">
+                <Label>کشویی تک‌انتخابی</Label>
+                <Select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="یک مورد" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="a">گزینه الف</SelectItem>
+                    <SelectItem value="b">گزینه ب</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>کشویی با جستجو</Label>
+                <div className="rounded-md border border-border/70">
+                  <div className="flex items-center gap-1 border-b px-2">
+                    <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                    <input
+                      className="h-8 w-full bg-transparent text-xs outline-none"
+                      placeholder="جستجوی انبار…"
+                      value={searchQ}
+                      onChange={(e) => setSearchQ(e.target.value)}
+                    />
+                  </div>
+                  <ul className="max-h-28 overflow-auto p-1">
+                    {filteredWh.map((w) => (
+                      <li key={w}>
+                        <button
+                          type="button"
+                          className={cn(
+                            "w-full rounded-md px-2 py-1.5 text-right text-xs hover:bg-muted",
+                            searchPick === w && "bg-primary/10 text-primary"
+                          )}
+                          onClick={() => setSearchPick(w)}
+                        >
+                          {w}
+                        </button>
+                      </li>
+                    ))}
+                    {filteredWh.length === 0 ? (
+                      <li className="px-2 py-2 text-center text-[11px] text-muted-foreground">
+                        موردی نیست
+                      </li>
+                    ) : null}
+                  </ul>
+                  {searchPick ? (
+                    <div className="border-t px-2 py-1.5 text-[11px] text-muted-foreground">
+                      انتخاب: <span className="text-foreground">{searchPick}</span>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>چندانتخابی (چک‌لیست)</Label>
+                <div className="space-y-2 rounded-md border border-border/60 p-2">
+                  {[
+                    { id: "main", label: "انبار مرکزی" },
+                    { id: "south", label: "انبار جنوب" },
+                    { id: "north", label: "انبار شمال" },
+                  ].map((o) => (
+                    <div key={o.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`m-${o.id}`}
+                        checked={multi.includes(o.id)}
+                        onCheckedChange={(c) => {
+                          setMulti((prev) =>
+                            c === true ? [...prev, o.id] : prev.filter((x) => x !== o.id)
+                          );
+                        }}
+                      />
+                      <Label htmlFor={`m-${o.id}`} className="font-normal">
+                        {o.label}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>رادیو (تک‌انتخابی افقی)</Label>
+                <div className="flex flex-wrap gap-3">
+                  {[
+                    { id: "a", label: "عادی" },
+                    { id: "b", label: "فوری" },
+                    { id: "c", label: "بحرانی" },
+                  ].map((o) => (
+                    <label key={o.id} className="flex items-center gap-1.5 text-xs">
+                      <input
+                        type="radio"
+                        name="priority"
+                        value={o.id}
+                        checked={radioVal === o.id}
+                        onChange={() => setRadioVal(o.id)}
+                        className="accent-primary"
+                      />
+                      {o.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-4 pt-1">
+                <div className="flex items-center gap-2">
+                  <Checkbox id="cat-chk" />
+                  <Label htmlFor="cat-chk" className="font-normal">
+                    چک‌باکس
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch id="cat-sw" />
+                  <Label htmlFor="cat-sw" className="font-normal">
+                    سوئیچ
+                  </Label>
+                </div>
+              </div>
+            </div>
           </div>
         </GuideSection>
 
@@ -639,7 +967,7 @@ export default function FormsGuidePage() {
           </div>
         </GuideSection>
 
-        {/* 6 Info / hints */}
+        {/* 6 Info */}
         <GuideSection title="۶) Info و هشدار قبل از ثبت حساس">
           <div className="max-w-xl space-y-3">
             <div className="flex items-start gap-2 rounded-xl border border-sky-200/80 bg-sky-50/70 p-3 text-xs dark:border-sky-900 dark:bg-sky-950/30">
@@ -682,10 +1010,10 @@ export default function FormsGuidePage() {
           </div>
         </GuideSection>
 
-        {/* 7 Edit change tracking */}
+        {/* 7 Edit tracking */}
         <GuideSection
           title="۷) فرم ویرایش پیچیده — ردیابی تغییر و بازگشت"
-          description="برای فرم‌های ≥۸ فیلد: فیلد تغییرکرده هایلایت می‌شود، مقدار قبلی کوچک نمایش داده می‌شود، دکمه بازگشت همان فیلد."
+          description="فقط فیلدهای انتخابی/کوتاه: کادر کهربایی + مقدار قبلی زیر فیلد + آیکن بازگشت داخل فیلد. فیلد توضیحات ردیابی نمی‌شود تا فوکوس نپرد."
         >
           <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
             <Badge variant={dirtyCount ? "warning" : "secondary"}>
@@ -703,67 +1031,90 @@ export default function FormsGuidePage() {
               </Button>
             ) : null}
           </div>
-          <div className="max-w-3xl space-y-2 rounded-xl border border-border/70 bg-card p-3">
-            <div className="grid gap-2 sm:grid-cols-2">
-              <FieldShell fieldKey="code" label="کد">
-                <Input
-                  value={editVals.code}
-                  onChange={(e) => setEditField("code", e.target.value)}
-                />
-              </FieldShell>
-              <FieldShell fieldKey="name" label="نام">
-                <Input
-                  value={editVals.name}
-                  onChange={(e) => setEditField("name", e.target.value)}
-                />
-              </FieldShell>
-              <FieldShell fieldKey="group" label="گروه">
-                <Input
-                  value={editVals.group}
-                  onChange={(e) => setEditField("group", e.target.value)}
-                />
-              </FieldShell>
-              <FieldShell fieldKey="warehouse" label="انبار">
-                <Input
-                  value={editVals.warehouse}
-                  onChange={(e) => setEditField("warehouse", e.target.value)}
-                />
-              </FieldShell>
-              <FieldShell fieldKey="unit" label="واحد">
-                <Input
-                  value={editVals.unit}
-                  onChange={(e) => setEditField("unit", e.target.value)}
-                />
-              </FieldShell>
-              <FieldShell fieldKey="minStock" label="حداقل موجودی">
-                <Input
-                  value={editVals.minStock}
-                  onChange={(e) => setEditField("minStock", e.target.value)}
-                  dir="ltr"
-                />
-              </FieldShell>
-              <FieldShell fieldKey="barcode" label="بارکد">
-                <Input
-                  value={editVals.barcode}
-                  onChange={(e) => setEditField("barcode", e.target.value)}
-                  dir="ltr"
-                />
-              </FieldShell>
-              <FieldShell fieldKey="supplier" label="تأمین‌کننده">
-                <Input
-                  value={editVals.supplier}
-                  onChange={(e) => setEditField("supplier", e.target.value)}
-                />
-              </FieldShell>
-              <div className="sm:col-span-2">
-                <FieldShell fieldKey="description" label="توضیحات">
-                  <Textarea
-                    rows={2}
-                    value={editVals.description}
-                    onChange={(e) => setEditField("description", e.target.value)}
+          <div className="max-w-3xl space-y-3 rounded-xl border border-border/70 bg-card p-4">
+            <div className="grid gap-x-3 gap-y-1 sm:grid-cols-2">
+              <TrackedField fieldKey="code" label="کد">
+                {({ className }) => (
+                  <Input
+                    value={editVals.code}
+                    onChange={(e) => setEditField("code", e.target.value)}
+                    className={cn("pl-8", className)}
                   />
-                </FieldShell>
-              </div>
+                )}
+              </TrackedField>
+              <TrackedField fieldKey="name" label="نام">
+                {({ className }) => (
+                  <Input
+                    value={editVals.name}
+                    onChange={(e) => setEditField("name", e.target.value)}
+                    className={cn("pl-8", className)}
+                  />
+                )}
+              </TrackedField>
+              <TrackedField fieldKey="group" label="گروه">
+                {({ className }) => (
+                  <Input
+                    value={editVals.group}
+                    onChange={(e) => setEditField("group", e.target.value)}
+                    className={cn("pl-8", className)}
+                  />
+                )}
+              </TrackedField>
+              <TrackedField fieldKey="warehouse" label="انبار">
+                {({ className }) => (
+                  <Input
+                    value={editVals.warehouse}
+                    onChange={(e) => setEditField("warehouse", e.target.value)}
+                    className={cn("pl-8", className)}
+                  />
+                )}
+              </TrackedField>
+              <TrackedField fieldKey="unit" label="واحد">
+                {({ className }) => (
+                  <Input
+                    value={editVals.unit}
+                    onChange={(e) => setEditField("unit", e.target.value)}
+                    className={cn("pl-8", className)}
+                  />
+                )}
+              </TrackedField>
+              <TrackedField fieldKey="minStock" label="حداقل موجودی">
+                {({ className }) => (
+                  <Input
+                    value={editVals.minStock}
+                    onChange={(e) => setEditField("minStock", e.target.value)}
+                    className={cn("pl-8", className)}
+                    dir="ltr"
+                  />
+                )}
+              </TrackedField>
+              <TrackedField fieldKey="barcode" label="بارکد">
+                {({ className }) => (
+                  <Input
+                    value={editVals.barcode}
+                    onChange={(e) => setEditField("barcode", e.target.value)}
+                    className={cn("pl-8", className)}
+                    dir="ltr"
+                  />
+                )}
+              </TrackedField>
+              <TrackedField fieldKey="supplier" label="تأمین‌کننده">
+                {({ className }) => (
+                  <Input
+                    value={editVals.supplier}
+                    onChange={(e) => setEditField("supplier", e.target.value)}
+                    className={cn("pl-8", className)}
+                  />
+                )}
+              </TrackedField>
+            </div>
+            <div className="space-y-1.5">
+              <Label>توضیحات (بدون ردیابی بصری شلوغ)</Label>
+              <Textarea
+                rows={2}
+                value={editVals.description}
+                onChange={(e) => setEditField("description", e.target.value)}
+              />
             </div>
             <div className="flex gap-2 border-t border-border/60 pt-3">
               <Button type="button" disabled={!dirtyCount}>
@@ -774,9 +1125,6 @@ export default function FormsGuidePage() {
               </Button>
             </div>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            یک فیلد را عوض کن تا هایلایت کهربایی، «قبلی: …» و دکمه بازگشت ظاهر شود.
-          </p>
         </GuideSection>
 
         {/* 8 Do Don't */}
@@ -785,18 +1133,18 @@ export default function FormsGuidePage() {
             <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
               <div className="mb-2 font-medium text-emerald-800 dark:text-emerald-200">انجام بده</div>
               <ul className="list-disc space-y-1 pr-5 text-xs text-muted-foreground">
-                <li>تقویم شمسی در همه فرم‌های عملیاتی</li>
-                <li>ثبت موقت برای فرم‌های چندتب</li>
-                <li>هایلایت + بازگشت مقدار قبلی در ویرایش طولانی</li>
-                <li>Info/هشدار قبل از ثبت حساس</li>
+                <li>تقویم شمسی با پرش ماه/سال</li>
+                <li>ثبت موقت داخل تب · نقطه سبز روی تب ذخیره‌شده</li>
+                <li>فقط کادر فیلد تغییرکرده رنگی — نه کل ردیف</li>
+                <li>کاتالوگ کنترل مناسب نوع داده</li>
               </ul>
             </div>
             <div className="rounded-xl border bg-muted/25 p-4 text-sm">
               <div className="mb-2 font-medium">انجام نده</div>
               <ul className="list-disc space-y-1 pr-5 text-xs text-muted-foreground">
-                <li>input type=date میلادی در UI کاربر</li>
-                <li>یک صفحه بی‌نهایت بدون تب برای داده چنددامنه‌ای</li>
-                <li>ویرایش ۱۰ فیلد بدون نشان دادن چه چیزی عوض شده</li>
+                <li>type=date میلادی در UI</li>
+                <li>بازتیره‌بندی DOM طوری که فوکوس هنگام تایپ بپرد</li>
+                <li>هایلایت شلوغ دور فیلدهای توضیحات بلند</li>
               </ul>
             </div>
           </div>
