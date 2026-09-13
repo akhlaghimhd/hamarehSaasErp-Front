@@ -1,124 +1,112 @@
+"use client";
+
+import Link from "next/link";
+import { Building2, BookOpen, Component } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
-import { Input } from "@/shared/components/ui/input";
-import { Label } from "@/shared/components/ui/label";
 import { Badge } from "@/shared/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/shared/components/ui/card";
+import { PageHeader } from "@/shared/components/layout/page-header";
+import { useAuthStore } from "@/auth";
 
 export default function DashboardPage() {
+  const user = useAuthStore((s) => s.user);
+  const activeTenantId = useAuthStore((s) => s.activeTenantId);
+  const securityContext = useAuthStore((s) => s.securityContext);
+
+  const displayName = user
+    ? `${user.first_name} ${user.last_name}`.trim() || user.email
+    : "کاربر";
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">داشبورد</h1>
-        <p className="text-sm text-muted-foreground">
-          هویت بصری هماره — سبز جنگلی، کرم روشن، سایه و گرادیان ملایم
-        </p>
-      </div>
+      <PageHeader
+        title="داشبورد"
+        description="Shell فاز FE-P0 آماده مصرف ماژول‌ها است"
+      />
 
       <Alert className="border-primary/20 bg-gradient-to-l from-primary/5 to-transparent shadow-[var(--shadow-xs)]">
-        <AlertTitle>پایه قالب آماده شد</AlertTitle>
-        <AlertDescription>
-          دکمه‌ها با گرادیان، کارت‌ها با عمق سطحی، و پس‌زمینه با تناژ کرم-سبز ملایم تنظیم شده‌اند.
+        <AlertTitle>نشست فعال</AlertTitle>
+        <AlertDescription className="space-y-1 text-sm">
+          <div>
+            کاربر: <span className="font-medium">{displayName}</span>
+            {user?.email ? (
+              <span className="text-muted-foreground" dir="ltr">
+                {" "}
+                ({user.email})
+              </span>
+            ) : null}
+          </div>
+          {activeTenantId ? (
+            <div dir="ltr" className="text-xs text-muted-foreground">
+              Tenant: {activeTenantId}
+            </div>
+          ) : null}
+          {securityContext?.roles?.length ? (
+            <div className="flex flex-wrap gap-1 pt-1">
+              {securityContext.roles.map((r) => (
+                <Badge key={r.role_id} variant="secondary">
+                  {r.name || r.code}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
         </AlertDescription>
       </Alert>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>اسناد امروز</CardDescription>
-            <CardTitle className="text-3xl">۱۲۸</CardTitle>
+            <CardDescription>مسیر بعدی</CardDescription>
+            <CardTitle className="text-base">ماژول سازمان</CardTitle>
           </CardHeader>
-          <CardContent>
-            <Badge variant="success">+۱۲٪ نسبت به دیروز</Badge>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              اسکلت ماژول در <code className="text-[11px]">src/modules/organization</code> آماده است.
+            </p>
+            <Button asChild size="sm" variant="outline" className="gap-1.5">
+              <Link href="/dashboard/organization">
+                <Building2 className="h-3.5 w-3.5" />
+                رفتن به سازمان
+              </Link>
+            </Button>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>در انتظار تأیید</CardDescription>
-            <CardTitle className="text-3xl">۲۴</CardTitle>
+            <CardDescription>مرجع UI</CardDescription>
+            <CardTitle className="text-base">راهنمای UI</CardTitle>
           </CardHeader>
           <CardContent>
-            <Badge variant="warning">نیاز به اقدام</Badge>
+            <Button asChild size="sm" variant="outline" className="gap-1.5">
+              <Link href="/dashboard/ui-guide">
+                <BookOpen className="h-3.5 w-3.5" />
+                باز کردن راهنما
+              </Link>
+            </Button>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>کالاهای فعال</CardDescription>
-            <CardTitle className="text-3xl">۳٬۴۲۰</CardTitle>
+            <CardDescription>نمونه‌ها</CardDescription>
+            <CardTitle className="text-base">نمایشگاه UI</CardTitle>
           </CardHeader>
           <CardContent>
-            <Badge>موجودی به‌روز</Badge>
+            <Button asChild size="sm" variant="outline" className="gap-1.5">
+              <Link href="/dashboard/showcase">
+                <Component className="h-3.5 w-3.5" />
+                مشاهده نمونه‌ها
+              </Link>
+            </Button>
           </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>دکمه‌ها</CardTitle>
-            <CardDescription>گرادیان روی دکمه اصلی + سایه رنگی</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            <Button>اصلی</Button>
-            <Button variant="secondary">ثانویه</Button>
-            <Button variant="outline">خط‌دار</Button>
-            <Button variant="ghost">متنی</Button>
-            <Button variant="destructive">خطرناک</Button>
-            <Button size="sm">کوچک</Button>
-            <Button size="lg">بزرگ</Button>
-            <Button disabled>غیرفعال</Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>نشان وضعیت</CardTitle>
-            <CardDescription>برای اسناد و وضعیت‌های ERP</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            <Badge>پیش‌فرض</Badge>
-            <Badge variant="secondary">پیش‌نویس</Badge>
-            <Badge variant="warning">در انتظار تأیید</Badge>
-            <Badge variant="success">تأیید شده</Badge>
-            <Badge variant="destructive">رد شده</Badge>
-            <Badge variant="outline">بایگانی</Badge>
-          </CardContent>
-        </Card>
-
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>نمونه فرم</CardTitle>
-            <CardDescription>فیلد با سایه خیلی ملایم و فوکوس رنگی</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="item-name">نام کالا</Label>
-              <Input id="item-name" placeholder="مثال: لپ‌تاپ ایسوس ۱۵" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="item-code">کد کالا</Label>
-              <Input id="item-code" placeholder="ITM-00125" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="unit-price">قیمت واحد</Label>
-              <Input id="unit-price" type="number" placeholder="0" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="warehouse">انبار</Label>
-              <Input id="warehouse" placeholder="انبار مرکزی" disabled />
-            </div>
-          </CardContent>
-          <CardFooter className="gap-2">
-            <Button>ذخیره</Button>
-            <Button variant="outline">انصراف</Button>
-          </CardFooter>
         </Card>
       </div>
     </div>

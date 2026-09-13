@@ -9,6 +9,7 @@ import {
   Building2,
   HelpCircle,
   PanelRightOpen,
+  Menu,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -28,19 +29,24 @@ import { authService, useAuthStore } from "@/auth";
 function initials(first?: string, last?: string): string {
   const a = (first ?? "").trim().charAt(0);
   const b = (last ?? "").trim().charAt(0);
-  const value = `${a}${b}` || "ک";
-  return value;
+  return `${a}${b}` || "ک";
 }
 
 export function AppHeader() {
-  const { collapsed, toggle } = useSidebar();
+  const { collapsed, toggle, toggleMobile } = useSidebar();
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const activeTenantId = useAuthStore((s) => s.activeTenantId);
+  const securityContext = useAuthStore((s) => s.securityContext);
 
   const displayName = user
     ? `${user.first_name} ${user.last_name}`.trim() || user.email
     : "کاربر";
+
+  const roleLabel =
+    securityContext?.roles?.[0]?.name ||
+    securityContext?.roles?.[0]?.code ||
+    null;
 
   const handleLogout = async () => {
     await authService.logout();
@@ -50,6 +56,16 @@ export function AppHeader() {
 
   return (
     <header className="header-blur sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-border/70 px-3 md:px-4">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 md:hidden"
+        onClick={toggleMobile}
+        aria-label="منوی اصلی"
+      >
+        <Menu className="h-4 w-4" />
+      </Button>
+
       {collapsed && (
         <Button
           variant="ghost"
@@ -91,6 +107,9 @@ export function AppHeader() {
                 <div className="text-xs font-normal text-muted-foreground" dir="ltr">
                   {user.email}
                 </div>
+              )}
+              {roleLabel && (
+                <div className="text-[11px] font-normal text-muted-foreground">{roleLabel}</div>
               )}
               {activeTenantId && (
                 <div className="truncate text-[11px] font-normal text-muted-foreground" dir="ltr">
