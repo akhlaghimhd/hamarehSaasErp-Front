@@ -1,6 +1,5 @@
 /**
  * FE-P0-T01 — Shared API contract types aligned with Backend responses.
- * Backend Identity uses both `status` and legacy `success` keys; we normalize both.
  */
 
 export type ApiSuccessStatus = "success";
@@ -20,12 +19,6 @@ export interface ApiErrorResponse {
   errors?: Record<string, string[]>;
 }
 
-export interface ApiValidationError {
-  field?: string;
-  messages: string[];
-}
-
-/** Normalized error thrown / returned by the API layer for UI consumption. */
 export class ApiClientError extends Error {
   readonly statusCode: number;
   readonly message: string;
@@ -53,19 +46,25 @@ export class ApiClientError extends Error {
   }
 }
 
-/** Login response shape from IdentityCore AuthenticationService. */
 export interface LoginResponseData {
   access_token: string;
   token_type: string;
   expires_in: number | null;
+  requires_tenant_selection?: boolean;
   user: {
     user_id: string;
     tenant_user_id: string | null;
     first_name: string;
     last_name: string;
     email: string;
+    mobile?: string | null;
   };
   active_tenant_id: string | null;
+  organization?: {
+    tenant_id: string;
+    tenant_name: string | null;
+    tenant_code: string | null;
+  };
   security_context: {
     user_id: string;
     tenant_id: string | null;

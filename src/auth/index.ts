@@ -1,11 +1,9 @@
-/**
- * FE-P0-T02..T06 — Auth module public API
- */
-
 export { useAuthStore } from "./auth-store";
 export { authService } from "./auth-service";
+export type { OrganizationOption, LoginResult } from "./auth-service";
 export { TenantProvider, useTenantContext } from "./tenant-context";
 export { AuthGuard } from "./auth-guard";
+export { IdleLockProvider } from "./idle-lock";
 export type {
   AuthUser,
   AuthRole,

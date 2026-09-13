@@ -1,77 +1,147 @@
 /**
- * FE-P0-T03 — Auth Service Layer
- * Component → Service → apiClient → Backend
- * No business rules beyond transport and session wiring.
- *
- * Route prefix (ModuleServiceProvider):
- *   IdentityCore → api/v1/identity-core + Routes prefix `identity`
- *   → /api/v1/identity-core/identity/auth/login
+ * FE-P0-T03 — Auth Service (aligned with Backend identifier + OTP login)
+ * Tenant id is never typed by the user; resolved by Backend / org picker.
  */
 
 import { apiPost, ApiClientError } from "@/api";
 import type { ApiSuccessResponse, LoginResponseData } from "@/api/types";
-import { TENANT_HEADER } from "@/api/client";
 import { useAuthStore } from "./auth-store";
-import type { LoginCredentials } from "./types";
 
 const LOGIN_PATH = "/identity-core/identity/auth/login";
 const LOGOUT_PATH = "/identity-core/identity/auth/logout";
+const OTP_REQUEST_PATH = "/identity-core/identity/auth/otp/request";
+const OTP_VERIFY_PATH = "/identity-core/identity/auth/otp/verify";
+const SELECT_TENANT_PATH = "/identity-core/identity/auth/select-tenant";
+
+export interface OrganizationOption {
+  tenant_id: string;
+  tenant_code: string;
+  tenant_name: string;
+  slug: string | null;
+}
+
+export type LoginResult =
+  | { kind: "session"; data: LoginResponseData }
+  | {
+      kind: "select_org";
+      preAuthToken: string;
+      organizations: OrganizationOption[];
+      user: LoginResponseData["user"];
+    };
+
+function unwrapData<T extends Record<string, unknown>>(envelope: unknown): T {
+  if (envelope && typeof envelope === "object" && "data" in envelope) {
+    return (envelope as ApiSuccessResponse<T>).data;
+  }
+  return envelope as T;
+}
+
+function applySession(data: LoginResponseData) {
+  if (!data?.access_token) {
+    throw new ApiClientError({
+      statusCode: 500,
+      message: "پاسخ ورود از سرور ناقص است.",
+    });
+  }
+
+  useAuthStore.getState().setSession({
+    accessToken: data.access_token,
+    user: data.user,
+    securityContext: data.security_context,
+    activeTenantId: data.active_tenant_id,
+  });
+}
+
+function interpretLoginPayload(raw: Record<string, unknown>): LoginResult {
+  if (raw.requires_tenant_selection === true) {
+    return {
+      kind: "select_org",
+      preAuthToken: String(raw.pre_auth_token ?? ""),
+      organizations: (raw.organizations as OrganizationOption[]) ?? [],
+      user: raw.user as LoginResponseData["user"],
+    };
+  }
+
+  const data = raw as unknown as LoginResponseData;
+  applySession(data);
+  return { kind: "session", data };
+}
 
 export const authService = {
-  /**
-   * Login against IdentityCore.
-   * Tenant header is required by TenantContextMiddleware even on the login route.
-   */
-  async login(credentials: LoginCredentials): Promise<LoginResponseData> {
-    const envelope = await apiPost<
-      ApiSuccessResponse<LoginResponseData> | LoginResponseData
-    >(
-      LOGIN_PATH,
-      {
-        email: credentials.email,
-        password: credentials.password,
-        tenant_id: credentials.tenant_id,
-      },
-      {
-        headers: {
-          [TENANT_HEADER]: credentials.tenant_id,
-        },
-      }
-    );
-
-    // Support both enveloped and raw data shapes
-    const data =
-      envelope && typeof envelope === "object" && "data" in envelope
-        ? (envelope as ApiSuccessResponse<LoginResponseData>).data
-        : (envelope as LoginResponseData);
-
-    if (!data?.access_token) {
-      throw new ApiClientError({
-        statusCode: 500,
-        message: "پاسخ ورود از سرور ناقص است.",
-      });
-    }
-
-    const activeTenantId = data.active_tenant_id ?? credentials.tenant_id;
-
-    useAuthStore.getState().setSession({
-      accessToken: data.access_token,
-      user: data.user,
-      securityContext: data.security_context,
-      activeTenantId,
+  async loginWithPassword(identifier: string, password: string): Promise<LoginResult> {
+    const envelope = await apiPost(LOGIN_PATH, {
+      identifier: identifier.trim(),
+      password,
     });
-
-    return data;
+    const raw = unwrapData<Record<string, unknown>>(envelope);
+    return interpretLoginPayload(raw);
   },
 
-  /**
-   * Logout: best-effort call to Backend, always clear local session.
-   */
+  async requestOtp(mobile: string): Promise<{
+    expires_in: number;
+    resend_available_in: number;
+    debug_code?: string;
+  }> {
+    const envelope = await apiPost(OTP_REQUEST_PATH, { mobile: mobile.trim() });
+    return unwrapData(envelope);
+  },
+
+  async verifyOtp(mobile: string, code: string): Promise<LoginResult> {
+    const envelope = await apiPost(OTP_VERIFY_PATH, {
+      mobile: mobile.trim(),
+      code: code.trim(),
+    });
+    const raw = unwrapData<Record<string, unknown>>(envelope);
+    return interpretLoginPayload(raw);
+  },
+
+  async selectOrganization(preAuthToken: string, tenantId: string): Promise<void> {
+    // Temporarily put pre-auth token for this single call
+    const prev = useAuthStore.getState().accessToken;
+    useAuthStore.getState().setSession({
+      accessToken: preAuthToken,
+      user: useAuthStore.getState().user ?? {
+        user_id: "",
+        tenant_user_id: null,
+        first_name: "",
+        last_name: "",
+        email: "",
+      },
+      securityContext: useAuthStore.getState().securityContext ?? {
+        user_id: "",
+        tenant_id: null,
+        tenant_user_id: null,
+        roles: [],
+        permissions: [],
+        scopes: [],
+        is_owner: false,
+      },
+      activeTenantId: null,
+    });
+
+    try {
+      const envelope = await apiPost(SELECT_TENANT_PATH, { tenant_id: tenantId });
+      const raw = unwrapData<Record<string, unknown>>(envelope);
+      const result = interpretLoginPayload(raw);
+      if (result.kind !== "session") {
+        throw new ApiClientError({
+          statusCode: 500,
+          message: "انتخاب سازمان کامل نشد.",
+        });
+      }
+    } catch (e) {
+      if (prev) {
+        // leave store; caller handles
+      }
+      throw e;
+    }
+  },
+
   async logout(): Promise<void> {
     try {
       await apiPost(LOGOUT_PATH, {});
     } catch {
-      // Network/401 after partial clear — still wipe local session
+      // ignore
     } finally {
       useAuthStore.getState().clearSession();
     }
