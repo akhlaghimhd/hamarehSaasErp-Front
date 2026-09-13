@@ -1,7 +1,6 @@
 /**
- * Login — compact centered card, visible icon background,
- * fixed error slot (no layout jump), mobile maxLength,
- * legal footer, room for future links.
+ * Login — compact card, fixed error slots, Enter-submit on both modes,
+ * mobile length limit on password identifier, legal footer.
  */
 
 "use client";
@@ -46,6 +45,13 @@ function isValidIranMobile(raw: string): boolean {
   return IR_MOBILE_RE.test(normalizeMobile(raw));
 }
 
+/** If value looks like a phone (mostly digits), keep only digits and max 11 */
+function sanitizeIdentifierInput(raw: string): string {
+  const hasLetterOrAt = /[a-zA-Z@]/.test(raw);
+  if (hasLetterOrAt) return raw.slice(0, 120);
+  return raw.replace(/\D/g, "").slice(0, 11);
+}
+
 const passwordSchema = z.object({
   identifier: z
     .string()
@@ -56,9 +62,7 @@ const passwordSchema = z.object({
         const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
         return isEmail || isValidIranMobile(t);
       },
-      {
-        message: "فرمت ایمیل یا موبایل معتبر نیست",
-      }
+      { message: "فرمت ایمیل یا موبایل معتبر نیست" }
     ),
   password: z.string().min(6, "رمز عبور حداقل ۶ کاراکتر باشد"),
 });
@@ -179,7 +183,6 @@ function SoftHumanCheck({ onPass }: { onPass: () => void }) {
   );
 }
 
-/** Fixed-height error slot — prevents layout jump when messages appear */
 function ErrorSlot({ message }: { message: string | null }) {
   return (
     <div className="min-h-[2.25rem]" aria-live="polite">
@@ -217,7 +220,6 @@ function LoginShell({
         </div>
       </div>
 
-      {/* Legal + future links area */}
       <footer className="relative z-10 flex max-w-[720px] flex-col items-center gap-1.5 px-4 text-center">
         <nav className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
           <span className="cursor-default opacity-60">تعرفه</span>
@@ -259,11 +261,14 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<PasswordForm>({
     resolver: zodResolver(passwordSchema),
     defaultValues: { identifier: "", password: "" },
   });
+
+  const identifierReg = register("identifier");
 
   useEffect(() => {
     if (!isHydrated) hydrate();
@@ -462,8 +467,8 @@ export default function LoginPage() {
 
   return (
     <LoginShell>
-      {/* Form */}
-      <div className="flex w-full flex-col justify-center px-5 py-5 sm:px-6 lg:w-[54%]">
+      {/* Form column — extra bottom padding so button is not flush */}
+      <div className="flex w-full flex-col justify-center px-5 pb-7 pt-5 sm:px-6 lg:w-[54%]">
         <div className="mb-4">
           <div className="mb-2.5 inline-flex h-9 w-9 items-center justify-center rounded-lg brand-mark text-sm font-bold text-white shadow-[var(--shadow-primary)]">
             ه
@@ -474,7 +479,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Tabs */}
         <div className="mb-4 flex gap-0.5 border-b border-border">
           <button
             type="button"
@@ -521,7 +525,7 @@ export default function LoginPage() {
         {mode === "password" && (
           <form
             onSubmit={handleSubmit(onPasswordSubmit)}
-            className="space-y-3"
+            className="flex flex-col gap-3"
             noValidate
           >
             <div className="space-y-1.5">
@@ -534,7 +538,15 @@ export default function LoginPage() {
                 autoComplete="username"
                 className="h-9 text-left text-sm"
                 placeholder="0912... یا user@company.com"
-                {...register("identifier")}
+                name={identifierReg.name}
+                ref={identifierReg.ref}
+                onBlur={identifierReg.onBlur}
+                onChange={(e) => {
+                  const next = sanitizeIdentifierInput(e.target.value);
+                  e.target.value = next;
+                  void identifierReg.onChange(e);
+                  setValue("identifier", next, { shouldValidate: false });
+                }}
               />
               <p className="min-h-[1rem] text-[11px] text-destructive">
                 {errors.identifier?.message ?? "\u00a0"}
@@ -572,7 +584,7 @@ export default function LoginPage() {
 
             <ErrorSlot message={formError} />
 
-            <Button type="submit" className="h-9 w-full text-sm" disabled={isSubmitting}>
+            <Button type="submit" className="mt-1 h-9 w-full text-sm" disabled={isSubmitting}>
               {isSubmitting ? (
                 <StoryLoader label="در حال بررسی..." />
               ) : (
@@ -583,7 +595,7 @@ export default function LoginPage() {
         )}
 
         {mode === "otp" && (
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             {needHumanCheck ? (
               <SoftHumanCheck
                 onPass={() => {
@@ -593,7 +605,14 @@ export default function LoginPage() {
                 }}
               />
             ) : otpStep === "mobile" ? (
-              <>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void onRequestOtp();
+                }}
+                className="flex flex-col gap-3"
+                noValidate
+              >
                 <div className="space-y-1.5">
                   <Label htmlFor="otp-mobile" className="text-xs font-medium">
                     شماره موبایل <span className="text-destructive">*</span>
@@ -626,10 +645,9 @@ export default function LoginPage() {
                 <ErrorSlot message={formError} />
 
                 <Button
-                  type="button"
-                  className="h-9 w-full text-sm"
+                  type="submit"
+                  className="mt-1 h-9 w-full text-sm"
                   disabled={otpBusy || !otpMobile.trim()}
-                  onClick={() => void onRequestOtp()}
                 >
                   {otpBusy ? (
                     <StoryLoader label="در حال ارسال..." />
@@ -637,9 +655,16 @@ export default function LoginPage() {
                     "دریافت کد تأیید"
                   )}
                 </Button>
-              </>
+              </form>
             ) : (
-              <>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!otpBusy && otpCode.trim().length >= 4) void onVerifyOtp();
+                }}
+                className="flex flex-col gap-3"
+                noValidate
+              >
                 <div className="rounded-md border border-border bg-muted/30 px-2.5 py-2 text-xs">
                   کد به{" "}
                   <span dir="ltr" className="font-medium tracking-wide">
@@ -692,7 +717,7 @@ export default function LoginPage() {
 
                 <ErrorSlot message={formError} />
 
-                <div className="flex gap-2">
+                <div className="mt-1 flex gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -703,21 +728,19 @@ export default function LoginPage() {
                     ارسال مجدد
                   </Button>
                   <Button
-                    type="button"
+                    type="submit"
                     className="h-9 flex-1 text-sm"
                     disabled={otpBusy || otpCode.trim().length < 4}
-                    onClick={() => void onVerifyOtp()}
                   >
                     {otpBusy ? <StoryLoader label="تأیید..." /> : "تأیید و ورود"}
                   </Button>
                 </div>
-              </>
+              </form>
             )}
           </div>
         )}
       </div>
 
-      {/* Visual */}
       <div className="hidden lg:block lg:w-[46%]">
         <LoginVisual className="h-full min-h-[400px]" />
       </div>

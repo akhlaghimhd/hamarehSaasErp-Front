@@ -1,5 +1,5 @@
 /**
- * Subtle ERP icon field — low but visible opacity, irregular rotations.
+ * Subtle ERP icon field — fewer icons, clearer spacing, visible opacity.
  */
 
 "use client";
@@ -10,17 +10,13 @@ import {
   Calculator,
   Users,
   BarChart3,
-  ClipboardList,
   Building2,
   Truck,
   FileText,
   Settings,
   Layers,
-  PieChart,
   ShoppingCart,
   Boxes,
-  Landmark,
-  Network,
 } from "lucide-react";
 
 const ICONS = [
@@ -29,44 +25,29 @@ const ICONS = [
   Calculator,
   Users,
   BarChart3,
-  ClipboardList,
   Building2,
   Truck,
   FileText,
   Settings,
   Layers,
-  PieChart,
   ShoppingCart,
   Boxes,
-  Landmark,
-  Network,
 ];
 
+/** 12 icons — less clutter, still fills the page */
 const PLACEMENTS = [
-  { top: "5%", left: "3%", rot: -18, size: 32 },
-  { top: "10%", left: "20%", rot: 12, size: 26 },
-  { top: "7%", left: "46%", rot: -8, size: 30 },
-  { top: "12%", left: "70%", rot: 22, size: 28 },
-  { top: "4%", left: "88%", rot: -14, size: 24 },
-  { top: "26%", left: "6%", rot: 16, size: 28 },
-  { top: "30%", left: "28%", rot: -24, size: 34 },
-  { top: "24%", left: "55%", rot: 8, size: 26 },
-  { top: "32%", left: "80%", rot: -12, size: 30 },
-  { top: "46%", left: "2%", rot: 20, size: 26 },
-  { top: "50%", left: "18%", rot: -6, size: 32 },
-  { top: "44%", left: "42%", rot: 14, size: 28 },
-  { top: "52%", left: "66%", rot: -20, size: 30 },
-  { top: "48%", left: "90%", rot: 10, size: 24 },
-  { top: "66%", left: "8%", rot: -16, size: 28 },
-  { top: "70%", left: "34%", rot: 18, size: 32 },
-  { top: "64%", left: "58%", rot: -10, size: 26 },
-  { top: "72%", left: "82%", rot: 6, size: 30 },
-  { top: "86%", left: "5%", rot: 12, size: 26 },
-  { top: "88%", left: "26%", rot: -22, size: 28 },
-  { top: "84%", left: "50%", rot: 8, size: 32 },
-  { top: "90%", left: "74%", rot: -14, size: 24 },
-  { top: "38%", left: "94%", rot: 24, size: 26 },
-  { top: "16%", left: "94%", rot: -4, size: 22 },
+  { top: "8%", left: "6%", rot: -16, size: 30 },
+  { top: "10%", left: "42%", rot: 10, size: 26 },
+  { top: "7%", left: "78%", rot: -12, size: 28 },
+  { top: "28%", left: "12%", rot: 18, size: 28 },
+  { top: "30%", left: "55%", rot: -8, size: 32 },
+  { top: "26%", left: "88%", rot: 14, size: 24 },
+  { top: "52%", left: "5%", rot: -20, size: 28 },
+  { top: "50%", left: "38%", rot: 6, size: 30 },
+  { top: "54%", left: "72%", rot: -14, size: 26 },
+  { top: "76%", left: "15%", rot: 12, size: 28 },
+  { top: "78%", left: "48%", rot: -10, size: 30 },
+  { top: "74%", left: "82%", rot: 8, size: 26 },
 ];
 
 export function LoginBackground() {
@@ -86,7 +67,7 @@ export function LoginBackground() {
               left: p.left,
               width: p.size,
               height: p.size,
-              opacity: 0.07,
+              opacity: 0.08,
               transform: `rotate(${p.rot}deg)`,
             }}
             strokeWidth={1.35}
