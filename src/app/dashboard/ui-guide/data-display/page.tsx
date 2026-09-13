@@ -1,4 +1,1 @@
-"use client";
-
-import { useMemo, useState, type ReactNode } from "react";
-// CONTENT TOO LARGE - will use alternative
+see_file_/tmp/ui05_enhanced.tsx
