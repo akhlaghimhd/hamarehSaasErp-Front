@@ -109,7 +109,7 @@ const guides: GuideItem[] = [
     code: "UI-06",
     href: "/dashboard/ui-guide/feedback",
     title: "Feedback, Status & Loading",
-    description: "Alert، Toast، Status Chip، Progress و Loading Overlay",
+    description: "Alert، Toast، Status Chip، Progress، Loading و بازخورد همدلانه",
     phase: "فاز ۲",
     status: "ready",
     icon: Bell,
@@ -120,7 +120,7 @@ const guides: GuideItem[] = [
     title: "Overlays & Layered UI",
     description: "Modal، Drawer، Popover، Tooltip و لایه‌بندی",
     phase: "فاز ۳",
-    status: "planned",
+    status: "ready",
     icon: Layers,
   },
   {
@@ -204,13 +204,16 @@ export default function UiGuideIndexPage() {
             شمسی · تب+ثبت موقت · DOM ثابت
           </li>
           <li>
-            UI-05: انتخاب ستون (سقف عرض) · جزئیات با اولویت DB · مالی با جداکننده/اعشار ·
-            page-size · Empty ≠ جستجوی خالی · Stripe ملایم · hover از توکن · stale+refresh ·
-            Card/List چنددامنه
+            UI-05: انتخاب ستون · جزئیات اولویت DB · مالی · page-size · Empty ≠ جستجو · Stripe ·
+            stale · Card/List
           </li>
           <li>
-            UI-06: خطای فیلد ≠ Toast · Alert ماندگار · Toast کوتاه · Status از پالت · Overlay
-            فقط مسدودکننده · دکمه loading + Skeleton
+            UI-06: فیلد≠Toast · Alert ماندگار · Toast کوتاه · Status پالت · Overlay مسدودکننده ·
+            لودینگ جزئی · بازخورد همدلانه
+          </li>
+          <li>
+            UI-07: Modal تأیید/فرم کوتاه · Drawer فیلتر/جزئیات · Popover منو/فیلتر · Tooltip کوتاه ·
+            یک لایه مسدود · Escape+backdrop · بدون reload
           </li>
           <li>
             Package manager: <strong className="text-foreground">pnpm</strong>
