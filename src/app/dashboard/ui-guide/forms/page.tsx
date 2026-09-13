@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ComponentProps } from "react";
 import {
   GuidePageHeader,
   GuideRulesBox,
@@ -96,9 +96,7 @@ export default function FormsGuidePage() {
             عرض فرم استاندارد داخل <code className="rounded bg-muted px-1">max-w-3xl</code> تا{" "}
             <code className="rounded bg-muted px-1">max-w-5xl</code> (UI-02).
           </li>
-          <li>
-            ثبت: بدون رفرش صفحه · دکمه در حالت Saving غیرفعال · double-submit ممنوع.
-          </li>
+          <li>ثبت: بدون رفرش صفحه · دکمه در حالت Saving غیرفعال · double-submit ممنوع.</li>
           <li>
             در Overlay (UI-02): فرم تمیز → بستن آزاد · فرم تغییرکرده → فقط ثبت/انصراف · انصراف بدون
             سؤال.
@@ -194,22 +192,28 @@ export default function FormsGuidePage() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {(
             [
-              { label: "پیش‌فرض", props: { placeholder: "عادی" } },
-              { label: "Disabled", props: { disabled: true, value: "غیرفعال" } },
-              { label: "Readonly", props: { readOnly: true, value: "فقط خواندنی" } },
+              { label: "پیش‌فرض", props: { placeholder: "عادی" } as ComponentProps<typeof Input> },
+              {
+                label: "Disabled",
+                props: { disabled: true, value: "غیرفعال" } as ComponentProps<typeof Input>,
+              },
+              {
+                label: "Readonly",
+                props: { readOnly: true, value: "فقط خواندنی" } as ComponentProps<typeof Input>,
+              },
               {
                 label: "خطا",
                 props: {
                   "aria-invalid": true,
                   className: "border-destructive",
                   placeholder: "خطا",
-                },
+                } as ComponentProps<typeof Input>,
               },
             ] as const
           ).map((s) => (
             <div key={s.label} className="space-y-1.5 rounded-xl border border-border/60 p-3">
               <div className="text-[11px] text-muted-foreground">{s.label}</div>
-              <Input {...(s.props as React.ComponentProps<typeof Input>)} />
+              <Input {...s.props} />
             </div>
           ))}
         </div>
@@ -217,7 +221,7 @@ export default function FormsGuidePage() {
 
       <GuideSection
         title="۴) چیدمان فرم"
-        description="یک ستونه برای فرم باریک · دو ستونه از md به بالا برای فیلدهای هم‌تراز. بخش‌ها با عنوان جدا شوند."
+        description="یک ستونه برای فرم باریک · دو ستونه از md به بالا. بخش‌ها با عنوان جدا شوند."
       >
         <div className="max-w-3xl space-y-4 rounded-xl border border-border/70 bg-card p-4">
           <div className="text-xs font-medium text-foreground">اطلاعات اصلی</div>
@@ -247,10 +251,6 @@ export default function FormsGuidePage() {
           <div className="text-xs font-medium text-foreground">توضیحات</div>
           <Textarea rows={2} placeholder="اختیاری" />
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          فیلد تمام‌عرض با <code className="rounded bg-muted px-1">sm:col-span-2</code>. از فشردن بیش
-          از ۳ ستون در یک ردیف خودداری کن.
-        </p>
       </GuideSection>
 
       <GuideSection title="۵) دموی زنده — اعتبارسنجی و ثبت">
@@ -265,9 +265,7 @@ export default function FormsGuidePage() {
               onChange={(e) => setCode(e.target.value)}
               className={cn(codeError && "border-destructive focus-visible:ring-destructive/30")}
             />
-            {codeError ? (
-              <p className="text-[11px] text-destructive">کد الزامی است</p>
-            ) : null}
+            {codeError ? <p className="text-[11px] text-destructive">کد الزامی است</p> : null}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="live-name">
@@ -279,9 +277,7 @@ export default function FormsGuidePage() {
               onChange={(e) => setName(e.target.value)}
               className={cn(nameError && "border-destructive focus-visible:ring-destructive/30")}
             />
-            {nameError ? (
-              <p className="text-[11px] text-destructive">نام الزامی است</p>
-            ) : null}
+            {nameError ? <p className="text-[11px] text-destructive">نام الزامی است</p> : null}
           </div>
           <div className="space-y-1.5">
             <Label>انبار</Label>
@@ -326,12 +322,7 @@ export default function FormsGuidePage() {
             <Button disabled={saving} onClick={handleSubmit}>
               {saving ? "در حال ذخیره…" : "ثبت"}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={saving}
-              onClick={resetDemo}
-            >
+            <Button type="button" variant="outline" disabled={saving} onClick={resetDemo}>
               انصراف
             </Button>
             {isDirty ? (
@@ -339,10 +330,6 @@ export default function FormsGuidePage() {
             ) : null}
           </div>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          ثبت بدون کد/نام → خطا زیر فیلد. با داده معتبر → Saving کوتاه و پاک شدن فرم (شبیه‌سازی موفقیت
-          بدون رفرش).
-        </p>
       </GuideSection>
 
       <GuideSection title="۶) دکمه‌های فرم">
@@ -354,27 +341,21 @@ export default function FormsGuidePage() {
           <Button disabled>Disabled</Button>
           <Button disabled>در حال ذخیره…</Button>
         </div>
-        <ul className="mt-3 list-disc space-y-1 pr-5 text-xs text-muted-foreground">
-          <li>ثبت = variant پیش‌فرض (primary)</li>
-          <li>انصراف = outline · بدون تأیید اضافه</li>
-          <li>حذف مخرب = destructive · معمولاً با تأیید در UI-07</li>
-          <li>هنگام Saving همه اکشن‌های همان فرم disabled</li>
-        </ul>
       </GuideSection>
 
-      <GuideSection title="۷) ارتباط با چیدمان صفحه (یادآوری UI-02)">
+      <GuideSection title="۷) یادآوری چیدمان UI-02">
         <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
-          <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+          <div className="rounded-lg border bg-muted/20 p-3">
             <strong className="text-foreground">A عمودی</strong>
             <p className="mt-1">فرم متوسط بالا · جدول پایین</p>
           </div>
-          <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+          <div className="rounded-lg border bg-muted/20 p-3">
             <strong className="text-foreground">B کنار هم</strong>
-            <p className="mt-1">فقط ≤۴ فیلد + لیست با اسکرول مستقل</p>
+            <p className="mt-1">فقط ≤۴ فیلد</p>
           </div>
-          <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+          <div className="rounded-lg border bg-muted/20 p-3">
             <strong className="text-foreground">C Overlay</strong>
-            <p className="mt-1">جدول کامل · فرم در Modal/Drawer</p>
+            <p className="mt-1">جدول کامل · Modal/Drawer</p>
           </div>
         </div>
       </GuideSection>
@@ -387,16 +368,16 @@ export default function FormsGuidePage() {
               <li>خطا کنار همان فیلد</li>
               <li>الزامی با * روی برچسب</li>
               <li>ثبت بدون reload</li>
-              <li>چیدمان ۱–۲ ستونه خوانا</li>
+              <li>چیدمان ۱–۲ ستونه</li>
             </ul>
           </div>
-          <div className="rounded-xl border border-border/70 bg-muted/25 p-4 text-sm">
+          <div className="rounded-xl border bg-muted/25 p-4 text-sm">
             <div className="mb-2 font-medium">انجام نده</div>
             <ul className="list-disc space-y-1 pr-5 text-xs text-muted-foreground">
               <li>فقط Toast به‌جای خطای فیلد</li>
               <li>placeholder به‌جای Label</li>
-              <li>بیش از ۳ ستون فیلد در یک ردیف</li>
-              <li>submit کلاسیک که کل صفحه را رفرش کند</li>
+              <li>بیش از ۳ ستون در یک ردیف</li>
+              <li>submit کلاسیک با رفرش صفحه</li>
             </ul>
           </div>
         </div>
@@ -406,10 +387,7 @@ export default function FormsGuidePage() {
 
       <div className="flex flex-wrap gap-2">
         <Button asChild variant="outline" size="sm">
-          <a href="/dashboard/ui-guide/layout">UI-02 Layout</a>
-        </Button>
-        <Button asChild variant="outline" size="sm">
-          <a href="/dashboard/ui-guide/navigation">UI-03</a>
+          <a href="/dashboard/ui-guide/layout">UI-02</a>
         </Button>
         <Button asChild variant="outline" size="sm">
           <a href="/dashboard/ui-guide">فهرست</a>
