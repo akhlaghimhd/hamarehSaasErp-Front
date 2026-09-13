@@ -92,7 +92,7 @@ const guides: GuideItem[] = [
     title: "Forms & Data Entry",
     description: "انواع ورودی، اعتبارسنجی، چیدمان فرم و حالت‌های خطا",
     phase: "فاز ۲",
-    status: "planned",
+    status: "ready",
     icon: FormInput,
   },
   {
@@ -195,17 +195,14 @@ export default function UiGuideIndexPage() {
         <div className="mb-2 font-medium text-primary">تصمیم‌های قفل‌شده تا اینجا</div>
         <ul className="list-disc space-y-1 pr-5 text-muted-foreground">
           <li>UI-00: توکن رنگ مستأجر + اسلات لوگو/شعار + Dark/Light</li>
-          <li>UI-01: تایپ، فاصله ۸pt، شعاع، Elevation+hover، الگوی CSS، Density</li>
+          <li>UI-01: تایپ، فاصله، شعاع، Elevation+hover، الگو، Density · آیکون B+D</li>
+          <li>UI-02: Shell، max-width، Sticky، A/B/C فرم+جدول، بدون reload، قواعد Overlay</li>
+          <li>UI-03: Sidebar، Header، Breadcrumb، Tabs، Command</li>
           <li>
-            آیکون <strong className="text-foreground">B+D</strong>: Lucide پایه · Chip/Brand تأکید ·
-            Phosphor Duotone فقط Empty/Hero · Tabler ممنوع
-          </li>
-          <li>UI-02: App Shell، max-width محتوا، Split، Sticky محدود، Density روی چیدمان</li>
-          <li>
-            UI-03: Sidebar Active/زیرمنو، Header+⌘K، Breadcrumb کوتاه، Tabs فقط برای نمای هم‌سطح
+            UI-04: Label+* · خطا زیر فیلد · چیدمان ۱–۲ ستون · ثبت بدون reload · انصراف آزاد
           </li>
           <li>
-            Package manager فرانت: <strong className="text-foreground">pnpm</strong> (نه npm)
+            Package manager: <strong className="text-foreground">pnpm</strong>
           </li>
         </ul>
       </div>
