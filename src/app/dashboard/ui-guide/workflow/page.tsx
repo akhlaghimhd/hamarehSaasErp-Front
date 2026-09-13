@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   GuidePageHeader,
   GuideRulesBox,
@@ -246,6 +246,24 @@ export default function WorkflowGuidePage() {
 
   const maxTimelineStep = Math.max(...timeline.map((t) => t.stepId));
 
+  useEffect(() => {
+    function clearDrag() {
+      setDraggingId(null);
+      setDropTarget(null);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") clearDrag();
+    }
+    window.addEventListener("dragend", clearDrag);
+    window.addEventListener("mouseup", clearDrag);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("dragend", clearDrag);
+      window.removeEventListener("mouseup", clearDrag);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
   function resetApproveForm() {
     setNote("");
     setDecision(null);
@@ -298,8 +316,16 @@ export default function WorkflowGuidePage() {
   }
 
   function onDragStart(e: React.DragEvent, id: string) {
+    const target = e.target as HTMLElement;
+    if (target.closest("button, a, input, textarea, select")) {
+      e.preventDefault();
+      return;
+    }
     e.dataTransfer.setData("text/plain", id);
     e.dataTransfer.effectAllowed = "move";
+    if (e.currentTarget instanceof HTMLElement) {
+      e.dataTransfer.setDragImage(e.currentTarget, 20, 20);
+    }
     setDraggingId(id);
   }
 
@@ -310,13 +336,15 @@ export default function WorkflowGuidePage() {
 
   function onDragOver(e: React.DragEvent, col: ColumnKey) {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = "move";
-    setDropTarget(col);
+    if (dropTarget !== col) setDropTarget(col);
   }
 
   function onDrop(e: React.DragEvent, col: ColumnKey) {
     e.preventDefault();
-    const id = e.dataTransfer.getData("text/plain");
+    e.stopPropagation();
+    const id = e.dataTransfer.getData("text/plain") || draggingId;
     if (id) moveCard(id, col);
     setDraggingId(null);
     setDropTarget(null);
@@ -540,7 +568,7 @@ export default function WorkflowGuidePage() {
 
       <GuideSection
         title="۳) Kanban — جابه‌جایی بین ستون‌ها"
-        description="کارت را بکشید یا از میانبر استفاده کنید · هر کارت واحد و مسئول دارد."
+        description="کارت را از ناحیهٔ خالی یا آیکون ≡ بکشید · دکمه‌های میانبر جدا کار می‌کنند."
       >
         {moveMsg ? (
           <div className="mb-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-1.5 text-xs text-primary">
@@ -561,9 +589,15 @@ export default function WorkflowGuidePage() {
                   isTarget && "border-primary ring-2 ring-primary/30"
                 )}
                 onDragOver={(e) => onDragOver(e, col.key)}
-                onDragLeave={() =>
-                  setDropTarget((t) => (t === col.key ? null : t))
-                }
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  setDropTarget(col.key);
+                }}
+                onDragLeave={(e) => {
+                  const related = e.relatedTarget as Node | null;
+                  if (related && e.currentTarget.contains(related)) return;
+                  setDropTarget((t) => (t === col.key ? null : t));
+                }}
                 onDrop={(e) => onDrop(e, col.key)}
               >
                 <div className="mb-2 flex items-center justify-between px-1">
@@ -580,13 +614,20 @@ export default function WorkflowGuidePage() {
                       onDragStart={(e) => onDragStart(e, card.id)}
                       onDragEnd={onDragEnd}
                       className={cn(
-                        "cursor-grab rounded-lg border border-border/60 bg-card p-2.5 shadow-sm active:cursor-grabbing",
-                        draggingId === card.id &&
-                          "opacity-50 ring-2 ring-primary/40"
+                        "rounded-lg border border-border/60 bg-card p-2.5 shadow-sm",
+                        draggingId === card.id
+                          ? "opacity-40 ring-2 ring-primary/40"
+                          : "hover:border-primary/30"
                       )}
                     >
                       <div className="flex items-start gap-1.5">
-                        <GripVertical className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <span
+                          aria-hidden
+                          title="بکشید"
+                          className="mt-0.5 flex h-6 w-5 shrink-0 cursor-grab items-center justify-center rounded text-muted-foreground hover:bg-muted active:cursor-grabbing"
+                        >
+                          <GripVertical className="h-3.5 w-3.5 pointer-events-none" />
+                        </span>
                         <div className="min-w-0 flex-1">
                           <div className="font-mono text-xs text-primary">
                             {card.title}
@@ -613,8 +654,13 @@ export default function WorkflowGuidePage() {
                               <button
                                 key={k}
                                 type="button"
+                                draggable={false}
                                 className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-primary hover:bg-primary/5 hover:text-primary"
-                                onClick={() => moveCard(card.id, k)}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  moveCard(card.id, k);
+                                }}
                               >
                                 → {columns.find((c) => c.key === k)?.label}
                               </button>
@@ -635,7 +681,7 @@ export default function WorkflowGuidePage() {
           })}
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">
-          دمو: drag + میانبر · ماتریس transition · در محصول + permission.
+          کارت را از ناحیهٔ خالی یا آیکون ≡ بکشید (نه از دکمه‌های میانبر). میانبرها همچنان کار می‌کنند.
         </p>
       </GuideSection>
 
