@@ -1,12 +1,12 @@
 /**
- * Login — compact card, collapsing error slots, Enter-submit,
- * OTP same-number resume + timer, segmented 6-digit code,
- * soft bot check: OTP 2nd attempt / password 3rd fail.
+ * Login — OTP UX: mobile chip, resend cooldown ring (2m), code validity (5m),
+ * segmented code + auto-submit on complete, SoftRing hydrate (UI-06).
  */
 
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -23,6 +23,7 @@ import {
   Building2,
   ArrowLeft,
   ShieldCheck,
+  Pencil,
 } from "lucide-react";
 
 import { Button } from "@/shared/components/ui/button";
@@ -40,6 +41,14 @@ import { LoginBackground } from "./login-background";
 
 const IR_MOBILE_RE = /^09\d{9}$/;
 const OTP_LENGTH = 6;
+/** Server accepts code for this long after send */
+const OTP_VALIDITY_SEC = 300;
+/** Client resend cooldown */
+const OTP_RESEND_SEC = 120;
+
+function toFa(value: string | number): string {
+  return String(value).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
+}
 
 function normalizeMobile(raw: string): string {
   let t = raw.trim().replace(/[\s\-]/g, "");
@@ -57,6 +66,12 @@ function sanitizeIdentifierInput(raw: string): string {
   const hasLetterOrAt = /[a-zA-Z@]/.test(raw);
   if (hasLetterOrAt) return raw.slice(0, 120);
   return raw.replace(/\D/g, "").slice(0, 11);
+}
+
+function formatMmSs(totalSec: number): string {
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${toFa(m)}:${toFa(String(s).padStart(2, "0"))}`;
 }
 
 const passwordSchema = z.object({
@@ -114,33 +129,45 @@ function friendlyError(
   return raw || "عملیات ناموفق بود.";
 }
 
+/** UI-06 SoftRingLoader */
+function SoftRingLoader({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
+  const s = size === "sm" ? "h-8 w-8" : size === "lg" ? "h-14 w-14" : "h-11 w-11";
+  return (
+    <span className={cn("relative inline-flex items-center justify-center", s)}>
+      <span className="absolute inset-0 rounded-full border-2 border-primary/15" />
+      <span
+        className="absolute inset-0 rounded-full border-2 border-transparent border-t-primary/80"
+        style={{ animation: "login-spin 0.9s linear infinite" }}
+      />
+      <span
+        className="absolute inset-1 rounded-full bg-primary/10"
+        style={{ animation: "login-breathe 2s ease-in-out infinite" }}
+      />
+    </span>
+  );
+}
+
+function BreathingDots({ className }: { className?: string }) {
+  return (
+    <span className={cn("inline-flex items-center gap-1", className)} aria-hidden>
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className="h-1.5 w-1.5 rounded-full bg-primary/70"
+          style={{
+            animation: "login-breathe 1.4s ease-in-out infinite",
+            animationDelay: `${i * 0.18}s`,
+          }}
+        />
+      ))}
+    </span>
+  );
+}
+
 function StoryLoader({ label }: { label: string }) {
   return (
     <span className="inline-flex items-center gap-2">
-      <svg width="18" height="18" viewBox="0 0 32 32" className="shrink-0" aria-hidden>
-        <circle cx="16" cy="16" r="3.5" fill="currentColor" className="opacity-90">
-          <animate attributeName="r" values="3;4.2;3" dur="1.1s" repeatCount="indefinite" />
-        </circle>
-        <circle
-          cx="16"
-          cy="16"
-          r="8"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeDasharray="12 20"
-          className="opacity-70"
-        >
-          <animateTransform
-            attributeName="transform"
-            type="rotate"
-            from="0 16 16"
-            to="360 16 16"
-            dur="1.4s"
-            repeatCount="indefinite"
-          />
-        </circle>
-      </svg>
+      <SoftRingLoader size="sm" />
       <span className="text-sm">{label}</span>
     </span>
   );
@@ -190,7 +217,6 @@ function SoftHumanCheck({ onPass }: { onPass: () => void }) {
   );
 }
 
-/** Only takes space when there is a message */
 function ErrorSlot({ message }: { message: string | null }) {
   if (!message) return null;
   return (
@@ -204,22 +230,98 @@ function ErrorSlot({ message }: { message: string | null }) {
   );
 }
 
-/** 6-digit OTP with visual separators: □ - □ - □ - □ - □ - □ */
+/** Resend button with circular progress ring + countdown label */
+function ResendButton({
+  cooldownSec,
+  totalSec,
+  disabled,
+  busy,
+  onClick,
+}: {
+  cooldownSec: number;
+  totalSec: number;
+  disabled?: boolean;
+  busy?: boolean;
+  onClick: () => void;
+}) {
+  const locked = cooldownSec > 0;
+  const progress = locked ? 1 - cooldownSec / totalSec : 1;
+  const r = 18;
+  const c = 2 * Math.PI * r;
+  const offset = c * (1 - progress);
+
+  return (
+    <button
+      type="button"
+      disabled={disabled || locked || busy}
+      onClick={onClick}
+      className={cn(
+        "relative inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-input bg-background text-sm font-medium transition-colors",
+        "hover:bg-accent hover:text-accent-foreground",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "disabled:pointer-events-none disabled:opacity-60"
+      )}
+    >
+      <svg
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        viewBox="0 0 40 40"
+        preserveAspectRatio="none"
+        aria-hidden
+      >
+        {/* decorative ring uses percent via stroke on a circle centered */}
+      </svg>
+      <span className="relative flex h-8 w-8 shrink-0 items-center justify-center">
+        <svg className="absolute h-8 w-8 -rotate-90" viewBox="0 0 40 40" aria-hidden>
+          <circle
+            cx="20"
+            cy="20"
+            r={r}
+            fill="none"
+            stroke="hsl(var(--border))"
+            strokeWidth="2.5"
+          />
+          <circle
+            cx="20"
+            cy="20"
+            r={r}
+            fill="none"
+            stroke="hsl(var(--primary))"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeDasharray={c}
+            strokeDashoffset={offset}
+            className="transition-[stroke-dashoffset] duration-1000 linear"
+          />
+        </svg>
+      </span>
+      <span className="tabular-nums">
+        {locked
+          ? `ارسال مجدد · ${formatMmSs(cooldownSec)}`
+          : busy
+            ? "در حال ارسال…"
+            : "ارسال مجدد"}
+      </span>
+    </button>
+  );
+}
+
 function OtpCodeInput({
   value,
   onChange,
   disabled,
+  onComplete,
 }: {
   value: string;
   onChange: (v: string) => void;
   disabled?: boolean;
+  onComplete?: (code: string) => void;
 }) {
   const refs = useRef<(HTMLInputElement | null)[]>([]);
   const digits = value.padEnd(OTP_LENGTH, " ").slice(0, OTP_LENGTH).split("");
+  const completedRef = useRef(false);
 
   const focusAt = (i: number) => {
-    const el = refs.current[i];
-    if (el) el.focus();
+    refs.current[i]?.focus();
   };
 
   const setDigit = (index: number, char: string) => {
@@ -229,30 +331,39 @@ function OtpCodeInput({
     const joined = next.join("").replace(/\s/g, "").slice(0, OTP_LENGTH);
     onChange(joined);
     if (char && index < OTP_LENGTH - 1) focusAt(index + 1);
+    if (joined.length === OTP_LENGTH && onComplete && !completedRef.current) {
+      completedRef.current = true;
+      onComplete(joined);
+    }
+    if (joined.length < OTP_LENGTH) completedRef.current = false;
   };
 
   const onKeyDown = (index: number, e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Backspace") {
       e.preventDefault();
-      if (value[index]) {
-        setDigit(index, "");
-      } else if (index > 0) {
+      completedRef.current = false;
+      if (value[index]) setDigit(index, "");
+      else if (index > 0) {
         setDigit(index - 1, "");
         focusAt(index - 1);
       }
-    } else if (e.key === "ArrowLeft" && index > 0) {
-      focusAt(index - 1);
-    } else if (e.key === "ArrowRight" && index < OTP_LENGTH - 1) {
-      focusAt(index + 1);
-    }
+    } else if (e.key === "ArrowLeft" && index > 0) focusAt(index - 1);
+    else if (e.key === "ArrowRight" && index < OTP_LENGTH - 1) focusAt(index + 1);
   };
 
   const onPaste = (e: ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, OTP_LENGTH);
+    const pasted = e.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, OTP_LENGTH);
     if (!pasted) return;
     onChange(pasted);
     focusAt(Math.min(pasted.length, OTP_LENGTH - 1));
+    if (pasted.length === OTP_LENGTH && onComplete) {
+      completedRef.current = true;
+      onComplete(pasted);
+    }
   };
 
   return (
@@ -302,6 +413,19 @@ function LoginShell({
 }) {
   return (
     <main className="relative flex min-h-screen flex-col items-center justify-center gap-4 p-3 sm:p-5">
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            @keyframes login-breathe {
+              0%, 100% { opacity: 0.35; transform: scale(0.85); }
+              50% { opacity: 1; transform: scale(1); }
+            }
+            @keyframes login-spin {
+              to { transform: rotate(360deg); }
+            }
+          `,
+        }}
+      />
       <LoginBackground />
 
       <div
@@ -349,19 +473,22 @@ export default function LoginPage() {
   const [otpMobileError, setOtpMobileError] = useState<string | null>(null);
   const [otpCode, setOtpCode] = useState("");
   const [otpBusy, setOtpBusy] = useState(false);
-  const [otpSeconds, setOtpSeconds] = useState(0);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [codeValidityLeft, setCodeValidityLeft] = useState(0);
   const [debugCode, setDebugCode] = useState<string | null>(null);
   const [otpSendCount, setOtpSendCount] = useState(0);
-  /** Last successfully requested mobile + absolute expiry (ms) */
   const [lastOtpSession, setLastOtpSession] = useState<{
     mobile: string;
-    expiresAt: number;
+    validUntil: number;
+    resendUntil: number;
     debugCode?: string;
   } | null>(null);
 
   const [orgs, setOrgs] = useState<OrganizationOption[] | null>(null);
   const [preAuth, setPreAuth] = useState<string | null>(null);
   const [orgBusy, setOrgBusy] = useState(false);
+
+  const autoSubmitLock = useRef(false);
 
   const {
     register,
@@ -384,19 +511,26 @@ export default function LoginPage() {
     if (isHydrated && isAuthenticated && !orgs) goToDashboard();
   }, [isHydrated, isAuthenticated, orgs]);
 
+  // Tick resend + validity from session timestamps
   useEffect(() => {
-    if (otpSeconds <= 0) return;
-    const t = window.setInterval(
-      () => setOtpSeconds((s) => Math.max(0, s - 1)),
-      1000
-    );
+    if (!lastOtpSession) {
+      setResendCooldown(0);
+      setCodeValidityLeft(0);
+      return;
+    }
+    const tick = () => {
+      const now = Date.now();
+      setResendCooldown(
+        Math.max(0, Math.ceil((lastOtpSession.resendUntil - now) / 1000))
+      );
+      setCodeValidityLeft(
+        Math.max(0, Math.ceil((lastOtpSession.validUntil - now) / 1000))
+      );
+    };
+    tick();
+    const t = window.setInterval(tick, 1000);
     return () => window.clearInterval(t);
-  }, [otpSeconds]);
-
-  const remainingFor = (mobile: string): number => {
-    if (!lastOtpSession || lastOtpSession.mobile !== mobile) return 0;
-    return Math.max(0, Math.floor((lastOtpSession.expiresAt - Date.now()) / 1000));
-  };
+  }, [lastOtpSession]);
 
   const handleLoginResult = async (
     result: Awaited<ReturnType<typeof authService.loginWithPassword>>
@@ -428,7 +562,6 @@ export default function LoginPage() {
       toast.error(message);
       const next = passwordFails + 1;
       setPasswordFails(next);
-      // Bot check on 3rd failed password attempt
       if (next >= 3) {
         setPendingAfterCheck("password");
         setNeedHumanCheck(true);
@@ -446,26 +579,30 @@ export default function LoginPage() {
     await runPasswordLogin(values);
   };
 
-  const doRequestOtp = async (forceNew: boolean) => {
+  const doRequestOtp = async () => {
     const normalized = normalizeMobile(otpMobile);
     setFormError(null);
     setOtpBusy(true);
     setDebugCode(null);
     try {
       const data = await authService.requestOtp(normalized);
-      const expiresIn = data.expires_in ?? 180;
+      const now = Date.now();
+      // Prefer server expires for validity, but enforce min OTP_VALIDITY_SEC display
+      const serverExp = data.expires_in ?? OTP_VALIDITY_SEC;
+      const validSec = Math.max(serverExp, OTP_VALIDITY_SEC);
       setOtpMobile(normalized);
       setOtpStep("code");
-      setOtpSeconds(expiresIn);
       setOtpCode("");
+      autoSubmitLock.current = false;
       if (data.debug_code) setDebugCode(data.debug_code);
       setLastOtpSession({
         mobile: normalized,
-        expiresAt: Date.now() + expiresIn * 1000,
+        validUntil: now + validSec * 1000,
+        resendUntil: now + OTP_RESEND_SEC * 1000,
         debugCode: data.debug_code,
       });
       setOtpSendCount((c) => c + 1);
-      toast.success(forceNew ? "کد جدید ارسال شد" : "کد تأیید ارسال شد");
+      toast.success("کد تأیید ارسال شد");
     } catch (err) {
       const raw =
         err instanceof ApiClientError ? err.message : "ارسال کد ناموفق بود.";
@@ -491,14 +628,18 @@ export default function LoginPage() {
     }
 
     const normalized = normalizeMobile(otpMobile);
-    const left = remainingFor(normalized);
+    const now = Date.now();
 
-    // Same number + still valid token → resume without SMS
-    if (left > 0) {
+    // Same number + still valid → resume without SMS
+    if (
+      lastOtpSession &&
+      lastOtpSession.mobile === normalized &&
+      lastOtpSession.validUntil > now
+    ) {
       setOtpMobile(normalized);
       setOtpStep("code");
-      setOtpSeconds(left);
-      setDebugCode(lastOtpSession?.debugCode ?? null);
+      setDebugCode(lastOtpSession.debugCode ?? null);
+      autoSubmitLock.current = false;
       toast.message("کد قبلی هنوز معتبر است");
       return;
     }
@@ -506,53 +647,48 @@ export default function LoginPage() {
     const isNewNumber =
       !lastOtpSession || lastOtpSession.mobile !== normalized;
 
-    // Bot: 2nd OTP send attempt, or changing number after a prior send
-    if (
-      (otpSendCount >= 1 || isNewNumber && otpSendCount >= 1) &&
-      !needHumanCheck
-    ) {
-      // On 2nd attempt (otpSendCount will be >=1 after first success)
-      if (otpSendCount >= 1) {
-        setPendingAfterCheck("otp");
-        setNeedHumanCheck(true);
-        return;
-      }
+    if (otpSendCount >= 1 && !needHumanCheck) {
+      setPendingAfterCheck("otp");
+      setNeedHumanCheck(true);
+      return;
     }
 
-    // Changing number after previous send → reset timer context (force new)
     if (isNewNumber && lastOtpSession) {
       setLastOtpSession(null);
-      setOtpSeconds(0);
-      // Changing number counts toward bot sensitivity
-      if (otpSendCount >= 1) {
-        setPendingAfterCheck("otp");
-        setNeedHumanCheck(true);
-        return;
+    }
+
+    await doRequestOtp();
+  };
+
+  const onVerifyOtp = useCallback(
+    async (codeOverride?: string) => {
+      const code = (codeOverride ?? otpCode).trim();
+      if (code.length < OTP_LENGTH) return;
+      if (autoSubmitLock.current && !codeOverride) return;
+
+      setFormError(null);
+      setOtpBusy(true);
+      autoSubmitLock.current = true;
+      try {
+        const result = await authService.verifyOtp(
+          normalizeMobile(otpMobile),
+          code
+        );
+        await handleLoginResult(result);
+      } catch (err) {
+        const raw =
+          err instanceof ApiClientError ? err.message : "تأیید کد ناموفق بود.";
+        const message = friendlyError(raw, "otp-code");
+        setFormError(message);
+        toast.error(message);
+        autoSubmitLock.current = false;
+      } finally {
+        setOtpBusy(false);
       }
-    }
-
-    await doRequestOtp(false);
-  };
-
-  const onVerifyOtp = async () => {
-    setFormError(null);
-    setOtpBusy(true);
-    try {
-      const result = await authService.verifyOtp(
-        normalizeMobile(otpMobile),
-        otpCode
-      );
-      await handleLoginResult(result);
-    } catch (err) {
-      const raw =
-        err instanceof ApiClientError ? err.message : "تأیید کد ناموفق بود.";
-      const message = friendlyError(raw, "otp-code");
-      setFormError(message);
-      toast.error(message);
-    } finally {
-      setOtpBusy(false);
-    }
-  };
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [otpCode, otpMobile]
+  );
 
   const onSelectOrg = async (tenantId: string) => {
     if (!preAuth) return;
@@ -579,18 +715,29 @@ export default function LoginPage() {
     setNeedHumanCheck(false);
     const pending = pendingAfterCheck;
     setPendingAfterCheck(null);
-    if (pending === "otp") {
-      void doRequestOtp(true);
-    } else if (pending === "password") {
-      const values = getValues();
-      void runPasswordLogin(values);
-    }
+    if (pending === "otp") void doRequestOtp();
+    else if (pending === "password") void runPasswordLogin(getValues());
   };
 
   if (!isHydrated) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-4">
-        <StoryLoader label="در حال آماده‌سازی..." />
+      <main className="relative flex min-h-screen flex-col items-center justify-center gap-3 p-6">
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              @keyframes login-breathe {
+                0%, 100% { opacity: 0.35; transform: scale(0.85); }
+                50% { opacity: 1; transform: scale(1); }
+              }
+              @keyframes login-spin {
+                to { transform: rotate(360deg); }
+              }
+            `,
+          }}
+        />
+        <SoftRingLoader size="lg" />
+        <p className="text-sm text-muted-foreground">در حال آماده‌سازی</p>
+        <BreathingDots />
       </main>
     );
   }
@@ -643,7 +790,7 @@ export default function LoginPage() {
             </div>
           )}
           {orgBusy && (
-            <div className="mt-2 flex justify-center text-muted-foreground">
+            <div className="mt-3 flex justify-center text-muted-foreground">
               <StoryLoader label="در حال ورود..." />
             </div>
           )}
@@ -654,7 +801,7 @@ export default function LoginPage() {
 
   return (
     <LoginShell>
-      <div className="flex w-full flex-col justify-center px-5 pb-7 pt-5 sm:px-6 lg:w-[54%]">
+      <div className="flex w-full flex-col justify-center px-5 py-6 sm:px-6 lg:w-[54%]">
         <div className="mb-4">
           <div className="mb-2.5 inline-flex h-9 w-9 items-center justify-center rounded-lg brand-mark text-sm font-bold text-white shadow-[var(--shadow-primary)]">
             ه
@@ -717,7 +864,7 @@ export default function LoginPage() {
         ) : mode === "password" ? (
           <form
             onSubmit={handleSubmit(onPasswordSubmit)}
-            className="flex flex-col gap-3"
+            className="flex flex-col gap-3.5"
             noValidate
           >
             <div className="space-y-1.5">
@@ -780,13 +927,15 @@ export default function LoginPage() {
 
             <ErrorSlot message={formError} />
 
-            <Button type="submit" className="h-9 w-full text-sm" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <StoryLoader label="در حال بررسی..." />
-              ) : (
-                "ورود به سیستم"
-              )}
-            </Button>
+            <div className="pt-2">
+              <Button type="submit" className="h-9 w-full text-sm" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <StoryLoader label="در حال بررسی..." />
+                ) : (
+                  "ورود به سیستم"
+                )}
+              </Button>
+            </div>
           </form>
         ) : otpStep === "mobile" ? (
           <form
@@ -794,7 +943,7 @@ export default function LoginPage() {
               e.preventDefault();
               void onRequestOtp();
             }}
-            className="flex flex-col gap-3"
+            className="flex flex-col gap-3.5"
             noValidate
           >
             <div className="space-y-1.5">
@@ -828,53 +977,77 @@ export default function LoginPage() {
 
             <ErrorSlot message={formError} />
 
-            <Button
-              type="submit"
-              className="h-9 w-full text-sm"
-              disabled={otpBusy || !otpMobile.trim()}
-            >
-              {otpBusy ? (
-                <StoryLoader label="در حال ارسال..." />
-              ) : (
-                "دریافت کد تأیید"
-              )}
-            </Button>
+            <div className="pt-2">
+              <Button
+                type="submit"
+                className="h-9 w-full text-sm"
+                disabled={otpBusy || !otpMobile.trim()}
+              >
+                {otpBusy ? (
+                  <StoryLoader label="در حال ارسال..." />
+                ) : (
+                  "دریافت کد تأیید"
+                )}
+              </Button>
+            </div>
           </form>
         ) : (
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (!otpBusy && otpCode.trim().length >= 4) void onVerifyOtp();
+              void onVerifyOtp();
             }}
-            className="flex flex-col gap-3"
+            className="flex flex-col gap-3.5"
             noValidate
           >
-            <div className="rounded-md border border-border bg-muted/30 px-2.5 py-2 text-xs">
-              کد به{" "}
-              <span dir="ltr" className="font-medium tracking-wide">
-                {otpMobile}
-              </span>{" "}
-              ارسال شد.{" "}
+            {/* Attractive mobile + edit chip */}
+            <div className="flex items-center gap-2 rounded-xl border border-primary/15 bg-primary/5 px-3 py-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                <Smartphone className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] text-muted-foreground">کد ارسال شد به</p>
+                <p className="truncate text-sm font-semibold tracking-wide" dir="ltr">
+                  {toFa(otpMobile)}
+                </p>
+              </div>
               <button
                 type="button"
-                className="text-primary underline-offset-2 hover:underline"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-[11px] font-medium text-foreground transition hover:bg-accent"
                 onClick={() => {
                   setOtpStep("mobile");
                   setOtpCode("");
                   setFormError(null);
-                  // keep lastOtpSession + otpSeconds so same number can resume
+                  autoSubmitLock.current = false;
                 }}
               >
-                اصلاح شماره
+                <Pencil className="h-3 w-3" />
+                اصلاح
               </button>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-medium">کد یک‌بارمصرف</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs font-medium">کد یک‌بارمصرف</Label>
+                {codeValidityLeft > 0 ? (
+                  <span className="text-[11px] text-muted-foreground tabular-nums">
+                    اعتبار کد · {formatMmSs(codeValidityLeft)}
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-destructive">کد منقضی شده</span>
+                )}
+              </div>
               <OtpCodeInput
                 value={otpCode}
-                onChange={setOtpCode}
+                onChange={(v) => {
+                  setOtpCode(v);
+                  setFormError(null);
+                  autoSubmitLock.current = false;
+                }}
                 disabled={otpBusy}
+                onComplete={(code) => {
+                  void onVerifyOtp(code);
+                }}
               />
             </div>
 
@@ -884,27 +1057,18 @@ export default function LoginPage() {
               </p>
             )}
 
-            <p className="text-[11px] text-muted-foreground">
-              {otpSeconds > 0
-                ? `کد تا ${otpSeconds} ثانیه دیگر معتبر است`
-                : "کد منقضی شده — می‌توانید دوباره درخواست کنید."}
-            </p>
-
             <ErrorSlot message={formError} />
 
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-9 flex-1 text-sm"
-                disabled={otpBusy || otpSeconds > 0}
+            <div className="flex gap-2 pt-2">
+              <ResendButton
+                cooldownSec={resendCooldown}
+                totalSec={OTP_RESEND_SEC}
+                busy={otpBusy}
                 onClick={() => void onRequestOtp()}
-              >
-                ارسال مجدد
-              </Button>
+              />
               <Button
                 type="submit"
-                className="h-9 flex-1 text-sm"
+                className="h-10 flex-1 text-sm"
                 disabled={otpBusy || otpCode.trim().length < OTP_LENGTH}
               >
                 {otpBusy ? <StoryLoader label="تأیید..." /> : "تأیید و ورود"}
