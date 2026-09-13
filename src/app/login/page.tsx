@@ -1,6 +1,7 @@
 /**
  * FE-P0-T04 — Login page (RTL, Persian, RHF + Zod)
- * Field errors under inputs (UI-04). No full page reload after submit.
+ * Field errors under inputs (UI-04).
+ * After successful login: full navigation to /dashboard (reliable vs soft router race).
  */
 
 "use client";
@@ -37,6 +38,13 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
+function goToDashboard() {
+  // Full navigation avoids soft-nav races with AuthGuard hydration on first login.
+  if (typeof window !== "undefined") {
+    window.location.assign("/dashboard");
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -64,9 +72,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isHydrated && isAuthenticated) {
-      router.replace("/dashboard");
+      goToDashboard();
     }
-  }, [isHydrated, isAuthenticated, router]);
+  }, [isHydrated, isAuthenticated]);
 
   const onSubmit = async (values: LoginFormValues) => {
     setFormError(null);
@@ -77,7 +85,7 @@ export default function LoginPage() {
         tenant_id: values.tenant_id.trim(),
       });
       toast.success("ورود با موفقیت انجام شد");
-      router.replace("/dashboard");
+      goToDashboard();
     } catch (err) {
       if (err instanceof ApiClientError) {
         if (err.isValidationError && err.errors) {
@@ -102,6 +110,15 @@ export default function LoginPage() {
     return (
       <main className="flex min-h-screen items-center justify-center p-6">
         <p className="text-sm text-muted-foreground">در حال آماده‌سازی...</p>
+      </main>
+    );
+  }
+
+  // Already logged in — brief placeholder while hard-redirect runs
+  if (isAuthenticated) {
+    return (
+      <main className="flex min-h-screen items-center justify-center p-6">
+        <p className="text-sm text-muted-foreground">در حال ورود به داشبورد...</p>
       </main>
     );
   }
