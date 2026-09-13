@@ -1,7 +1,7 @@
 /**
- * Login — centered bordered card (form + static visual),
- * client-side mobile validation, redesigned method tabs,
- * soft anti-bot, conceptual loading, forgot-password entry.
+ * Login — compact centered card, visible icon background,
+ * fixed error slot (no layout jump), mobile maxLength,
+ * legal footer, room for future links.
  */
 
 "use client";
@@ -54,12 +54,10 @@ const passwordSchema = z.object({
       (v) => {
         const t = v.trim();
         const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
-        const isMobile = isValidIranMobile(t);
-        return isEmail || isMobile;
+        return isEmail || isValidIranMobile(t);
       },
       {
-        message:
-          "فرمت ایمیل یا موبایل معتبر نیست (مثال: ۰۹۱۲xxxxxxxx یا name@domain.com)",
+        message: "فرمت ایمیل یا موبایل معتبر نیست",
       }
     ),
   password: z.string().min(6, "رمز عبور حداقل ۶ کاراکتر باشد"),
@@ -84,44 +82,33 @@ function friendlyError(
     m.includes("unauthorized")
   ) {
     return context === "password"
-      ? "ایمیل/موبایل یا رمز عبور اشتباه است. دوباره بررسی کنید."
+      ? "ایمیل/موبایل یا رمز عبور اشتباه است."
       : "اطلاعات واردشده صحیح نیست.";
   }
   if (m.includes("not found") || (m.includes("user") && m.includes("exist"))) {
-    return "حسابی با این مشخصات پیدا نشد. شماره یا ایمیل را دوباره چک کنید.";
+    return "حسابی با این مشخصات پیدا نشد.";
   }
   if (m.includes("mobile") || m.includes("phone") || m.includes("شماره")) {
-    return "شماره موبایل نامعتبر است. لطفاً با فرمت ۰۹۱۲xxxxxxxx وارد کنید.";
+    return "شماره موبایل نامعتبر است (۰۹۱۲xxxxxxxx).";
   }
   if (m.includes("too many") || m.includes("rate") || m.includes("throttle")) {
-    return "تعداد درخواست‌ها زیاد شده. کمی صبر کنید و دوباره تلاش کنید.";
+    return "تعداد درخواست‌ها زیاد است. کمی صبر کنید.";
   }
   if (m.includes("expired") || m.includes("expire")) {
-    return "کد منقضی شده. یک کد جدید درخواست کنید.";
+    return "کد منقضی شده. کد جدید درخواست کنید.";
   }
   if (m.includes("code") && (m.includes("invalid") || m.includes("wrong"))) {
-    return "کد واردشده نادرست است. دوباره امتحان کنید.";
+    return "کد واردشده نادرست است.";
   }
-  return raw || "عملیات ناموفق بود. لطفاً دوباره تلاش کنید.";
+  return raw || "عملیات ناموفق بود.";
 }
 
 function StoryLoader({ label }: { label: string }) {
   return (
-    <span className="inline-flex items-center gap-2.5">
-      <svg
-        width="22"
-        height="22"
-        viewBox="0 0 32 32"
-        className="shrink-0"
-        aria-hidden
-      >
+    <span className="inline-flex items-center gap-2">
+      <svg width="18" height="18" viewBox="0 0 32 32" className="shrink-0" aria-hidden>
         <circle cx="16" cy="16" r="3.5" fill="currentColor" className="opacity-90">
-          <animate
-            attributeName="r"
-            values="3;4.2;3"
-            dur="1.1s"
-            repeatCount="indefinite"
-          />
+          <animate attributeName="r" values="3;4.2;3" dur="1.1s" repeatCount="indefinite" />
         </circle>
         <circle
           cx="16"
@@ -142,25 +129,6 @@ function StoryLoader({ label }: { label: string }) {
             repeatCount="indefinite"
           />
         </circle>
-        <circle
-          cx="16"
-          cy="16"
-          r="12"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1"
-          strokeDasharray="8 28"
-          className="opacity-40"
-        >
-          <animateTransform
-            attributeName="transform"
-            type="rotate"
-            from="360 16 16"
-            to="0 16 16"
-            dur="2.2s"
-            repeatCount="indefinite"
-          />
-        </circle>
       </svg>
       <span className="text-sm">{label}</span>
     </span>
@@ -176,34 +144,31 @@ function SoftHumanCheck({ onPass }: { onPass: () => void }) {
   ];
 
   return (
-    <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+    <div className="space-y-2.5 rounded-lg border border-primary/20 bg-primary/5 p-3">
       <div className="flex items-start gap-2">
-        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
         <div>
-          <p className="text-sm font-medium">یک لحظه صبر کنید</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            برای محافظت از حساب‌ها، کدام مورد بخشی از یک سیستم ERP عملیاتی است؟
+          <p className="text-xs font-medium">یک لحظه صبر کنید</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            کدام مورد بخشی از سیستم ERP است؟
           </p>
         </div>
       </div>
-      <div className="grid gap-2">
+      <div className="grid gap-1.5">
         {options.map((o) => (
           <button
             key={o.id}
             type="button"
             onClick={() => {
               setPicked(o.id);
-              if (o.correct) {
-                setTimeout(onPass, 280);
-              } else {
-                toast.error("گزینهٔ درست را انتخاب کنید");
-              }
+              if (o.correct) setTimeout(onPass, 250);
+              else toast.error("گزینهٔ درست را انتخاب کنید");
             }}
             className={cn(
-              "rounded-lg border px-3 py-2.5 text-right text-sm transition-all",
+              "rounded-md border px-2.5 py-2 text-right text-xs transition-all",
               picked === o.id && o.correct
                 ? "border-primary bg-primary/10 text-primary"
-                : "border-border bg-background hover:border-primary/40 hover:bg-accent/50"
+                : "border-border bg-background hover:border-primary/40"
             )}
           >
             {o.label}
@@ -214,7 +179,22 @@ function SoftHumanCheck({ onPass }: { onPass: () => void }) {
   );
 }
 
-/** Shell: background icons + centered bordered card */
+/** Fixed-height error slot — prevents layout jump when messages appear */
+function ErrorSlot({ message }: { message: string | null }) {
+  return (
+    <div className="min-h-[2.25rem]" aria-live="polite">
+      {message ? (
+        <div
+          className="rounded-md border border-destructive/25 bg-destructive/5 px-2.5 py-1.5 text-xs text-destructive"
+          role="alert"
+        >
+          {message}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function LoginShell({
   children,
   showVisual = true,
@@ -223,18 +203,33 @@ function LoginShell({
   showVisual?: boolean;
 }) {
   return (
-    <main className="relative flex min-h-screen items-center justify-center p-4 sm:p-6 lg:p-10">
+    <main className="relative flex min-h-screen flex-col items-center justify-center gap-4 p-3 sm:p-5">
       <LoginBackground />
+
       <div
         className={cn(
-          "relative z-10 w-full overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-lg)]",
-          showVisual ? "max-w-[920px]" : "max-w-md"
+          "relative z-10 w-full overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-md)]",
+          showVisual ? "max-w-[720px]" : "max-w-sm"
         )}
       >
-        <div className={cn("flex", showVisual && "lg:min-h-[520px]")}>
+        <div className={cn("flex", showVisual && "lg:min-h-[400px]")}>
           {children}
         </div>
       </div>
+
+      {/* Legal + future links area */}
+      <footer className="relative z-10 flex max-w-[720px] flex-col items-center gap-1.5 px-4 text-center">
+        <nav className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+          <span className="cursor-default opacity-60">تعرفه</span>
+          <span className="text-border">·</span>
+          <span className="cursor-default opacity-60">راهنما</span>
+          <span className="text-border">·</span>
+          <span className="cursor-default opacity-60">حریم خصوصی</span>
+        </nav>
+        <p className="text-[10px] text-muted-foreground/80">
+          قدرت‌گرفته از هماره · تمامی حقوق محفوظ است © {new Date().getFullYear()}
+        </p>
+      </footer>
     </main>
   );
 }
@@ -275,9 +270,7 @@ export default function LoginPage() {
   }, [isHydrated, hydrate]);
 
   useEffect(() => {
-    if (isHydrated && isAuthenticated && !orgs) {
-      goToDashboard();
-    }
+    if (isHydrated && isAuthenticated && !orgs) goToDashboard();
   }, [isHydrated, isAuthenticated, orgs]);
 
   useEffect(() => {
@@ -352,9 +345,7 @@ export default function LoginPage() {
       return;
     }
     if (!isValidIranMobile(otpMobile)) {
-      setOtpMobileError(
-        "شماره موبایل معتبر نیست. فرمت صحیح: ۰۹۱۲xxxxxxxx"
-      );
+      setOtpMobileError("فرمت صحیح: ۰۹۱۲xxxxxxxx");
       return;
     }
 
@@ -408,30 +399,27 @@ export default function LoginPage() {
 
   if (!isHydrated) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-6">
+      <main className="flex min-h-screen items-center justify-center p-4">
         <StoryLoader label="در حال آماده‌سازی..." />
       </main>
     );
   }
 
-  // ── Organization picker ──────────────────────────────────────────
   if (orgs && orgs.length > 0) {
     return (
       <LoginShell showVisual={false}>
-        <div className="flex w-full flex-col justify-center px-6 py-10 sm:px-8">
-          <div className="mb-8">
-            <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl brand-mark text-sm font-bold text-white">
+        <div className="flex w-full flex-col justify-center px-5 py-6 sm:px-6">
+          <div className="mb-5">
+            <div className="mb-2.5 inline-flex h-9 w-9 items-center justify-center rounded-lg brand-mark text-sm font-bold text-white">
               ه
             </div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              انتخاب سازمان
-            </h1>
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              بیش از یک سازمان برای شما فعال است. یکی را انتخاب کنید.
+            <h1 className="text-lg font-semibold tracking-tight">انتخاب سازمان</h1>
+            <p className="mt-1 text-xs text-muted-foreground">
+              بیش از یک سازمان فعال است. یکی را انتخاب کنید.
             </p>
           </div>
 
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {orgs.map((o) => (
               <button
                 key={o.tenant_id}
@@ -439,37 +427,32 @@ export default function LoginPage() {
                 disabled={orgBusy}
                 onClick={() => void onSelectOrg(o.tenant_id)}
                 className={cn(
-                  "group flex w-full items-center gap-3 rounded-xl border border-border bg-background px-4 py-3.5 text-right transition-all",
-                  "hover:border-primary/35 hover:bg-accent/40 hover:shadow-[var(--shadow-sm)]",
+                  "group flex w-full items-center gap-2.5 rounded-lg border border-border bg-background px-3 py-2.5 text-right transition-all",
+                  "hover:border-primary/35 hover:bg-accent/40",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   "disabled:opacity-60"
                 )}
               >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Building2 className="h-4 w-4" />
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <Building2 className="h-3.5 w-3.5" />
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="truncate font-medium">{o.tenant_name}</span>
-                  <span
-                    className="truncate text-xs text-muted-foreground"
-                    dir="ltr"
-                  >
+                  <span className="truncate text-sm font-medium">{o.tenant_name}</span>
+                  <span className="truncate text-[11px] text-muted-foreground" dir="ltr">
                     {o.tenant_code}
                   </span>
                 </span>
-                <ArrowLeft className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
+                <ArrowLeft className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
               </button>
             ))}
           </div>
 
-          {formError && (
-            <p className="mt-4 text-sm text-destructive" role="alert">
-              {formError}
-            </p>
-          )}
+          <div className="mt-3">
+            <ErrorSlot message={formError} />
+          </div>
           {orgBusy && (
-            <div className="mt-4 flex justify-center text-muted-foreground">
-              <StoryLoader label="در حال ورود به سازمان..." />
+            <div className="mt-2 flex justify-center text-muted-foreground">
+              <StoryLoader label="در حال ورود..." />
             </div>
           )}
         </div>
@@ -477,25 +460,22 @@ export default function LoginPage() {
     );
   }
 
-  // ── Main login ───────────────────────────────────────────────────
   return (
     <LoginShell>
-      {/* Form column — left in LTR / start */}
-      <div className="flex w-full flex-col justify-center px-6 py-8 sm:px-9 lg:w-[52%]">
-        <div className="mb-7">
-          <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-xl brand-mark text-base font-bold text-white shadow-[var(--shadow-primary)]">
+      {/* Form */}
+      <div className="flex w-full flex-col justify-center px-5 py-5 sm:px-6 lg:w-[54%]">
+        <div className="mb-4">
+          <div className="mb-2.5 inline-flex h-9 w-9 items-center justify-center rounded-lg brand-mark text-sm font-bold text-white shadow-[var(--shadow-primary)]">
             ه
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            ورود به هماره
-          </h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            به فضای یکپارچه مدیریت سازمان خوش آمدید.
+          <h1 className="text-lg font-semibold tracking-tight">ورود به هماره</h1>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            فضای یکپارچه مدیریت سازمان
           </p>
         </div>
 
-        {/* Method tabs — underline style */}
-        <div className="mb-6 flex gap-1 border-b border-border">
+        {/* Tabs */}
+        <div className="mb-4 flex gap-0.5 border-b border-border">
           <button
             type="button"
             onClick={() => {
@@ -504,16 +484,16 @@ export default function LoginPage() {
               setOtpMobileError(null);
             }}
             className={cn(
-              "relative flex flex-1 items-center justify-center gap-2 pb-3 pt-1 text-sm font-medium transition-colors",
+              "relative flex flex-1 items-center justify-center gap-1.5 pb-2.5 pt-0.5 text-xs font-medium transition-colors",
               mode === "password"
                 ? "text-primary"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <KeyRound className="h-4 w-4" />
+            <KeyRound className="h-3.5 w-3.5" />
             رمز ثابت
             {mode === "password" && (
-              <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary" />
+              <span className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-primary" />
             )}
           </button>
           <button
@@ -524,65 +504,56 @@ export default function LoginPage() {
               setOtpMobileError(null);
             }}
             className={cn(
-              "relative flex flex-1 items-center justify-center gap-2 pb-3 pt-1 text-sm font-medium transition-colors",
+              "relative flex flex-1 items-center justify-center gap-1.5 pb-2.5 pt-0.5 text-xs font-medium transition-colors",
               mode === "otp"
                 ? "text-primary"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <Smartphone className="h-4 w-4" />
+            <Smartphone className="h-3.5 w-3.5" />
             رمز یک‌بارمصرف
             {mode === "otp" && (
-              <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary" />
+              <span className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-primary" />
             )}
           </button>
         </div>
 
-        {/* Password form */}
         {mode === "password" && (
           <form
             onSubmit={handleSubmit(onPasswordSubmit)}
-            className="space-y-5"
+            className="space-y-3"
             noValidate
           >
-            <div className="space-y-2">
-              <Label htmlFor="identifier" className="text-sm font-medium">
-                ایمیل یا موبایل{" "}
-                <span className="text-destructive" aria-hidden>
-                  *
-                </span>
+            <div className="space-y-1.5">
+              <Label htmlFor="identifier" className="text-xs font-medium">
+                ایمیل یا موبایل <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="identifier"
                 dir="ltr"
                 autoComplete="username"
-                className="h-11 text-left text-[15px]"
+                className="h-9 text-left text-sm"
                 placeholder="0912... یا user@company.com"
                 {...register("identifier")}
               />
-              {errors.identifier && (
-                <p className="text-xs text-destructive" role="alert">
-                  {errors.identifier.message}
-                </p>
-              )}
+              <p className="min-h-[1rem] text-[11px] text-destructive">
+                {errors.identifier?.message ?? "\u00a0"}
+              </p>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="password" className="text-sm font-medium">
-                  رمز عبور{" "}
-                  <span className="text-destructive" aria-hidden>
-                    *
-                  </span>
+                <Label htmlFor="password" className="text-xs font-medium">
+                  رمز عبور <span className="text-destructive">*</span>
                 </Label>
                 <button
                   type="button"
-                  className="text-xs text-primary hover:underline"
+                  className="text-[11px] text-primary hover:underline"
                   onClick={() =>
                     toast.message("بازیابی رمز عبور به زودی فعال می‌شود")
                   }
                 >
-                  فراموشی رمز عبور؟
+                  فراموشی رمز؟
                 </button>
               </div>
               <Input
@@ -590,33 +561,20 @@ export default function LoginPage() {
                 type="password"
                 autoComplete="current-password"
                 dir="ltr"
-                className="h-11 text-left text-[15px]"
+                className="h-9 text-left text-sm"
                 placeholder="••••••••"
                 {...register("password")}
               />
-              {errors.password && (
-                <p className="text-xs text-destructive" role="alert">
-                  {errors.password.message}
-                </p>
-              )}
+              <p className="min-h-[1rem] text-[11px] text-destructive">
+                {errors.password?.message ?? "\u00a0"}
+              </p>
             </div>
 
-            {formError && (
-              <div
-                className="rounded-lg border border-destructive/25 bg-destructive/5 px-3.5 py-2.5 text-sm text-destructive"
-                role="alert"
-              >
-                {formError}
-              </div>
-            )}
+            <ErrorSlot message={formError} />
 
-            <Button
-              type="submit"
-              className="h-11 w-full text-[15px]"
-              disabled={isSubmitting}
-            >
+            <Button type="submit" className="h-9 w-full text-sm" disabled={isSubmitting}>
               {isSubmitting ? (
-                <StoryLoader label="در حال بررسی اطلاعات..." />
+                <StoryLoader label="در حال بررسی..." />
               ) : (
                 "ورود به سیستم"
               )}
@@ -624,9 +582,8 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* OTP flow */}
         {mode === "otp" && (
-          <div className="space-y-5">
+          <div className="space-y-3">
             {needHumanCheck ? (
               <SoftHumanCheck
                 onPass={() => {
@@ -637,60 +594,45 @@ export default function LoginPage() {
               />
             ) : otpStep === "mobile" ? (
               <>
-                <div className="space-y-2">
-                  <Label htmlFor="otp-mobile" className="text-sm font-medium">
-                    شماره موبایل{" "}
-                    <span className="text-destructive" aria-hidden>
-                      *
-                    </span>
+                <div className="space-y-1.5">
+                  <Label htmlFor="otp-mobile" className="text-xs font-medium">
+                    شماره موبایل <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="otp-mobile"
                     dir="ltr"
                     inputMode="numeric"
                     autoComplete="tel"
-                    className="h-11 text-left text-[15px] tracking-wide"
+                    maxLength={11}
+                    className="h-9 text-left text-sm tracking-wide"
                     placeholder="0912xxxxxxxx"
                     value={otpMobile}
                     onChange={(e) => {
-                      setOtpMobile(e.target.value);
+                      const digits = e.target.value.replace(/\D/g, "").slice(0, 11);
+                      setOtpMobile(digits);
                       setOtpMobileError(null);
                     }}
                     onBlur={() => {
                       if (otpMobile.trim() && !isValidIranMobile(otpMobile)) {
-                        setOtpMobileError(
-                          "شماره موبایل معتبر نیست. فرمت صحیح: ۰۹۱۲xxxxxxxx"
-                        );
+                        setOtpMobileError("فرمت صحیح: ۰۹۱۲xxxxxxxx");
                       }
                     }}
                   />
-                  {otpMobileError && (
-                    <p className="text-xs text-destructive" role="alert">
-                      {otpMobileError}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    کد تأیید فقط به شمارهٔ ثبت‌شده در سیستم ارسال می‌شود.
+                  <p className="min-h-[1rem] text-[11px] text-destructive">
+                    {otpMobileError ?? "\u00a0"}
                   </p>
                 </div>
 
-                {formError && (
-                  <div
-                    className="rounded-lg border border-destructive/25 bg-destructive/5 px-3.5 py-2.5 text-sm text-destructive"
-                    role="alert"
-                  >
-                    {formError}
-                  </div>
-                )}
+                <ErrorSlot message={formError} />
 
                 <Button
                   type="button"
-                  className="h-11 w-full text-[15px]"
+                  className="h-9 w-full text-sm"
                   disabled={otpBusy || !otpMobile.trim()}
                   onClick={() => void onRequestOtp()}
                 >
                   {otpBusy ? (
-                    <StoryLoader label="در حال ارسال کد..." />
+                    <StoryLoader label="در حال ارسال..." />
                   ) : (
                     "دریافت کد تأیید"
                   )}
@@ -698,7 +640,7 @@ export default function LoginPage() {
               </>
             ) : (
               <>
-                <div className="rounded-lg border border-border bg-muted/30 px-3.5 py-2.5 text-sm">
+                <div className="rounded-md border border-border bg-muted/30 px-2.5 py-2 text-xs">
                   کد به{" "}
                   <span dir="ltr" className="font-medium tracking-wide">
                     {otpMobile}
@@ -714,12 +656,12 @@ export default function LoginPage() {
                       setFormError(null);
                     }}
                   >
-                    اصلاح شماره
+                    اصلاح
                   </button>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="otp-code" className="text-sm font-medium">
+                <div className="space-y-1.5">
+                  <Label htmlFor="otp-code" className="text-xs font-medium">
                     کد یک‌بارمصرف
                   </Label>
                   <Input
@@ -727,41 +669,34 @@ export default function LoginPage() {
                     dir="ltr"
                     inputMode="numeric"
                     autoComplete="one-time-code"
-                    className="h-11 text-center text-lg tracking-[0.35em]"
-                    maxLength={8}
+                    maxLength={6}
+                    className="h-9 text-center text-base tracking-[0.3em]"
                     value={otpCode}
                     onChange={(e) =>
-                      setOtpCode(e.target.value.replace(/\D/g, ""))
+                      setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))
                     }
                   />
                 </div>
 
                 {debugCode && (
-                  <p className="text-xs text-muted-foreground" dir="ltr">
-                    debug (local): {debugCode}
+                  <p className="text-[11px] text-muted-foreground" dir="ltr">
+                    debug: {debugCode}
                   </p>
                 )}
 
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[11px] text-muted-foreground">
                   {otpSeconds > 0
-                    ? `ارسال مجدد تا ${otpSeconds} ثانیه دیگر امکان‌پذیر نیست.`
-                    : "می‌توانید دوباره کد درخواست کنید."}
+                    ? `ارسال مجدد تا ${otpSeconds} ثانیه`
+                    : "می‌توانید دوباره کد بخواهید."}
                 </p>
 
-                {formError && (
-                  <div
-                    className="rounded-lg border border-destructive/25 bg-destructive/5 px-3.5 py-2.5 text-sm text-destructive"
-                    role="alert"
-                  >
-                    {formError}
-                  </div>
-                )}
+                <ErrorSlot message={formError} />
 
-                <div className="flex gap-2.5">
+                <div className="flex gap-2">
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-11 flex-1"
+                    className="h-9 flex-1 text-sm"
                     disabled={otpBusy || otpSeconds > 0}
                     onClick={() => void onRequestOtp()}
                   >
@@ -769,30 +704,22 @@ export default function LoginPage() {
                   </Button>
                   <Button
                     type="button"
-                    className="h-11 flex-1"
+                    className="h-9 flex-1 text-sm"
                     disabled={otpBusy || otpCode.trim().length < 4}
                     onClick={() => void onVerifyOtp()}
                   >
-                    {otpBusy ? (
-                      <StoryLoader label="در حال تأیید..." />
-                    ) : (
-                      "تأیید و ورود"
-                    )}
+                    {otpBusy ? <StoryLoader label="تأیید..." /> : "تأیید و ورود"}
                   </Button>
                 </div>
               </>
             )}
           </div>
         )}
-
-        <p className="mt-8 text-center text-xs text-muted-foreground">
-          با ورود، شرایط استفاده و حریم خصوصی هماره را می‌پذیرید.
-        </p>
       </div>
 
-      {/* Visual column — right */}
-      <div className="hidden lg:block lg:w-[48%]">
-        <LoginVisual className="h-full min-h-[520px] rounded-none rounded-s-none" />
+      {/* Visual */}
+      <div className="hidden lg:block lg:w-[46%]">
+        <LoginVisual className="h-full min-h-[400px]" />
       </div>
     </LoginShell>
   );
