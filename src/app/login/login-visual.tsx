@@ -1,193 +1,117 @@
 /**
- * Login visual panel — pure CSS/SVG living data network (ERP concept).
- * Lightweight, fun, responsive. Reacts subtly when form is active.
+ * Login visual — static conceptual illustration (secure access / ERP portal).
+ * No continuous animation; calm and professional.
  */
 
 "use client";
 
-import { useEffect, useState } from "react";
 import { cn } from "@/shared/lib/utils";
 
 interface LoginVisualProps {
-  active?: boolean;
   className?: string;
 }
 
-const NODES = [
-  { id: 1, x: 22, y: 28, label: "فروش", delay: "0s" },
-  { id: 2, x: 78, y: 22, label: "انبار", delay: "0.4s" },
-  { id: 3, x: 18, y: 68, label: "مالی", delay: "0.8s" },
-  { id: 4, x: 82, y: 72, label: "منابع", delay: "1.2s" },
-  { id: 5, x: 50, y: 48, label: "هسته", delay: "0.2s", core: true },
-];
-
-const LINKS: [number, number][] = [
-  [1, 5],
-  [2, 5],
-  [3, 5],
-  [4, 5],
-  [1, 2],
-  [3, 4],
-];
-
-export function LoginVisual({ active = false, className }: LoginVisualProps) {
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    const t = window.setInterval(() => setTick((p) => p + 1), 2800);
-    return () => window.clearInterval(t);
-  }, []);
-
+export function LoginVisual({ className }: LoginVisualProps) {
   return (
     <div
       className={cn(
-        "relative hidden h-full min-h-[420px] overflow-hidden rounded-2xl lg:flex lg:flex-col",
-        "bg-[hsl(150_28%_9%)] text-white",
+        "relative hidden h-full min-h-[480px] overflow-hidden rounded-s-2xl lg:flex lg:flex-col",
+        "bg-[hsl(150_28%_10%)] text-white",
         className
       )}
     >
-      {/* ambient glow */}
+      {/* soft gradient */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-80"
+        className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 80% 60% at 50% 40%, hsl(142 55% 28% / 0.35), transparent 70%), radial-gradient(ellipse 50% 40% at 80% 80%, hsl(95 40% 30% / 0.2), transparent 60%)",
+            "radial-gradient(ellipse 90% 70% at 60% 30%, hsl(142 50% 28% / 0.45), transparent 65%), radial-gradient(ellipse 50% 40% at 20% 80%, hsl(95 35% 25% / 0.25), transparent 55%)",
         }}
       />
 
-      {/* subtle grid */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.07]"
-        style={{
-          backgroundImage:
-            "linear-gradient(hsl(0 0% 100% / 0.5) 1px, transparent 1px), linear-gradient(90deg, hsl(0 0% 100% / 0.5) 1px, transparent 1px)",
-          backgroundSize: "32px 32px",
-        }}
-      />
+      {/* static illustration — portal + key + modules */}
+      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-8 pt-10">
+        <svg
+          viewBox="0 0 280 220"
+          className="h-auto w-full max-w-[280px]"
+          fill="none"
+          aria-hidden
+        >
+          {/* outer frame */}
+          <rect
+            x="40"
+            y="28"
+            width="200"
+            height="150"
+            rx="16"
+            stroke="hsl(142 40% 55% / 0.35)"
+            strokeWidth="1.5"
+          />
+          <rect
+            x="52"
+            y="42"
+            width="176"
+            height="122"
+            rx="10"
+            fill="hsl(150 25% 14% / 0.6)"
+            stroke="hsl(142 50% 45% / 0.25)"
+            strokeWidth="1"
+          />
 
-      <svg
-        className="absolute inset-0 h-full w-full"
-        viewBox="0 0 100 100"
-        preserveAspectRatio="xMidYMid slice"
-        aria-hidden
-      >
-        <defs>
-          <linearGradient id="loginLinkGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="hsl(142 70% 55%)" stopOpacity="0.15" />
-            <stop offset="50%" stopColor="hsl(142 70% 60%)" stopOpacity="0.55" />
-            <stop offset="100%" stopColor="hsl(95 60% 50%)" stopOpacity="0.15" />
-          </linearGradient>
-          <filter id="loginGlow">
-            <feGaussianBlur stdDeviation="1.2" result="coloredBlur" />
-            <feMerge>
-              <feMergeNode in="coloredBlur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
+          {/* header bar inside */}
+          <rect
+            x="60"
+            y="50"
+            width="160"
+            height="18"
+            rx="4"
+            fill="hsl(142 45% 35% / 0.35)"
+          />
+          <circle cx="70" cy="59" r="3" fill="hsl(142 60% 55% / 0.7)" />
+          <circle cx="82" cy="59" r="3" fill="hsl(95 50% 50% / 0.5)" />
+          <circle cx="94" cy="59" r="3" fill="hsl(0 0% 100% / 0.25)" />
 
-        {LINKS.map(([a, b], i) => {
-          const na = NODES.find((n) => n.id === a)!;
-          const nb = NODES.find((n) => n.id === b)!;
-          return (
-            <line
-              key={`l-${i}`}
-              x1={na.x}
-              y1={na.y}
-              x2={nb.x}
-              y2={nb.y}
-              stroke="url(#loginLinkGrad)"
-              strokeWidth={0.35}
-              className={cn(
-                "transition-opacity duration-700",
-                active ? "opacity-100" : "opacity-70"
-              )}
-              style={{
-                animation: `loginLinkPulse 3.6s ease-in-out ${i * 0.35}s infinite`,
-              }}
-            />
-          );
-        })}
+          {/* content rows */}
+          <rect x="60" y="80" width="70" height="8" rx="2" fill="hsl(0 0% 100% / 0.12)" />
+          <rect x="60" y="94" width="100" height="6" rx="2" fill="hsl(0 0% 100% / 0.08)" />
+          <rect x="60" y="108" width="88" height="6" rx="2" fill="hsl(0 0% 100% / 0.08)" />
 
-        {NODES.map((n) => (
-          <g key={n.id}>
-            {n.core && (
-              <circle
-                cx={n.x}
-                cy={n.y}
-                r={8}
-                fill="none"
-                stroke="hsl(142 70% 55% / 0.35)"
-                strokeWidth={0.4}
-                style={{ animation: "loginCoreRing 2.8s ease-out infinite" }}
-              />
-            )}
-            <circle
-              cx={n.x}
-              cy={n.y}
-              r={n.core ? 4.2 : 2.6}
-              fill={n.core ? "hsl(142 70% 52%)" : "hsl(142 50% 42%)"}
-              filter="url(#loginGlow)"
-              style={{
-                animation: n.core
-                  ? "loginCorePulse 2.4s ease-in-out infinite"
-                  : `loginNodeFloat 4s ease-in-out ${n.delay} infinite`,
-                transformOrigin: `${n.x}px ${n.y}px`,
-              }}
-            />
-            {n.core &&
-              [0, 1, 2].map((p) => {
-                const angle = (tick + p * 2.1) * 0.9;
-                return (
-                  <circle
-                    key={p}
-                    cx={n.x + Math.cos(angle) * 7}
-                    cy={n.y + Math.sin(angle) * 7}
-                    r={0.7}
-                    fill="hsl(95 70% 65% / 0.85)"
-                  />
-                );
-              })}
+          {/* side modules */}
+          <rect x="175" y="80" width="37" height="28" rx="4" fill="hsl(142 50% 40% / 0.3)" />
+          <rect x="175" y="114" width="37" height="28" rx="4" fill="hsl(95 40% 40% / 0.25)" />
+
+          {/* key / lock accent */}
+          <g transform="translate(118, 145)">
+            <circle cx="12" cy="8" r="10" stroke="hsl(142 60% 55%)" strokeWidth="2" fill="hsl(142 50% 30% / 0.4)" />
+            <rect x="9" y="14" width="6" height="14" rx="2" fill="hsl(142 60% 55%)" />
+            <circle cx="12" cy="8" r="3" fill="hsl(150 20% 12%)" />
           </g>
-        ))}
-      </svg>
 
-      <div className="pointer-events-none absolute inset-0">
-        {NODES.filter((n) => !n.core).map((n) => (
-          <span
-            key={n.id}
-            className="absolute text-[10px] font-medium tracking-wide text-white/55"
-            style={{
-              left: `${n.x}%`,
-              top: `${n.y + 6}%`,
-              transform: "translateX(-50%)",
-              animation: `loginLabelFade 5s ease-in-out ${n.delay} infinite`,
-            }}
-          >
-            {n.label}
-          </span>
-        ))}
+          {/* floating dots (static) */}
+          <circle cx="28" cy="60" r="2.5" fill="hsl(142 60% 55% / 0.35)" />
+          <circle cx="252" cy="90" r="2" fill="hsl(95 50% 55% / 0.3)" />
+          <circle cx="35" cy="160" r="1.5" fill="hsl(0 0% 100% / 0.2)" />
+          <circle cx="248" cy="50" r="1.8" fill="hsl(142 50% 50% / 0.25)" />
+        </svg>
+
+        <div className="mt-6 text-center">
+          <p className="text-base font-semibold tracking-tight">ورود امن</p>
+          <p className="mt-1.5 max-w-[200px] text-xs leading-relaxed text-white/55">
+            دسترسی یکپارچه به ماژول‌های سازمان با کنترل هویت و محدوده.
+          </p>
+        </div>
       </div>
 
-      <div className="relative z-10 mt-auto flex flex-col gap-2 p-8 pb-10">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-sm font-bold backdrop-blur">
+      {/* bottom brand strip */}
+      <div className="relative z-10 border-t border-white/10 px-8 py-5">
+        <div className="flex items-center gap-2.5">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-sm font-bold">
             ه
           </span>
-          <span className="text-lg font-semibold tracking-tight">هماره ERP</span>
-        </div>
-        <p className="max-w-[240px] text-sm leading-relaxed text-white/70">
-          یکپارچگی ماژول‌ها، شفافیت داده و کنترل هوشمند — همه در یک نقطه ورود.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {["فروش", "انبار", "مالی", "منابع"].map((t) => (
-            <span
-              key={t}
-              className="rounded-full border border-white/15 bg-white/5 px-2.5 py-0.5 text-[10px] text-white/60"
-            >
-              {t}
-            </span>
-          ))}
+          <div>
+            <p className="text-sm font-medium">هماره ERP</p>
+            <p className="text-[11px] text-white/45">یکپارچگی · شفافیت · کنترل</p>
+          </div>
         </div>
       </div>
     </div>

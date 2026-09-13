@@ -1,7 +1,7 @@
 /**
- * Login — split layout (form + living ERP visual), password + OTP,
- * improved hierarchy, creative method switch, conceptual loading,
- * soft anti-bot after repeated OTP, forgot-password entry.
+ * Login — centered bordered card (form + static visual),
+ * client-side mobile validation, redesigned method tabs,
+ * soft anti-bot, conceptual loading, forgot-password entry.
  */
 
 "use client";
@@ -30,6 +30,21 @@ import {
 import { ApiClientError } from "@/api";
 import { cn } from "@/shared/lib/utils";
 import { LoginVisual } from "./login-visual";
+import { LoginBackground } from "./login-background";
+
+const IR_MOBILE_RE = /^09\d{9}$/;
+
+function normalizeMobile(raw: string): string {
+  let t = raw.trim().replace(/[\s\-]/g, "");
+  if (t.startsWith("+98")) t = "0" + t.slice(3);
+  if (t.startsWith("98") && t.length === 12) t = "0" + t.slice(2);
+  if (/^9\d{9}$/.test(t)) t = "0" + t;
+  return t;
+}
+
+function isValidIranMobile(raw: string): boolean {
+  return IR_MOBILE_RE.test(normalizeMobile(raw));
+}
 
 const passwordSchema = z.object({
   identifier: z
@@ -39,12 +54,12 @@ const passwordSchema = z.object({
       (v) => {
         const t = v.trim();
         const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
-        const isMobile = /^0?9\d{9}$/.test(t.replace(/[\s-]/g, ""));
+        const isMobile = isValidIranMobile(t);
         return isEmail || isMobile;
       },
       {
         message:
-          "فرمت ایمیل یا موبایل معتبر نیست (مثال: 0912... یا name@domain.com)",
+          "فرمت ایمیل یا موبایل معتبر نیست (مثال: ۰۹۱۲xxxxxxxx یا name@domain.com)",
       }
     ),
   password: z.string().min(6, "رمز عبور حداقل ۶ کاراکتر باشد"),
@@ -199,6 +214,31 @@ function SoftHumanCheck({ onPass }: { onPass: () => void }) {
   );
 }
 
+/** Shell: background icons + centered bordered card */
+function LoginShell({
+  children,
+  showVisual = true,
+}: {
+  children: React.ReactNode;
+  showVisual?: boolean;
+}) {
+  return (
+    <main className="relative flex min-h-screen items-center justify-center p-4 sm:p-6 lg:p-10">
+      <LoginBackground />
+      <div
+        className={cn(
+          "relative z-10 w-full overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-lg)]",
+          showVisual ? "max-w-[920px]" : "max-w-md"
+        )}
+      >
+        <div className={cn("flex", showVisual && "lg:min-h-[520px]")}>
+          {children}
+        </div>
+      </div>
+    </main>
+  );
+}
+
 export default function LoginPage() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isHydrated = useAuthStore((s) => s.isHydrated);
@@ -206,10 +246,10 @@ export default function LoginPage() {
 
   const [mode, setMode] = useState<"password" | "otp">("password");
   const [formError, setFormError] = useState<string | null>(null);
-  const [formFocused, setFormFocused] = useState(false);
 
   const [otpStep, setOtpStep] = useState<"mobile" | "code">("mobile");
   const [otpMobile, setOtpMobile] = useState("");
+  const [otpMobileError, setOtpMobileError] = useState<string | null>(null);
   const [otpCode, setOtpCode] = useState("");
   const [otpBusy, setOtpBusy] = useState(false);
   const [otpSeconds, setOtpSeconds] = useState(0);
@@ -280,11 +320,13 @@ export default function LoginPage() {
   };
 
   const doRequestOtp = async () => {
+    const normalized = normalizeMobile(otpMobile);
     setFormError(null);
     setOtpBusy(true);
     setDebugCode(null);
     try {
-      const data = await authService.requestOtp(otpMobile);
+      const data = await authService.requestOtp(normalized);
+      setOtpMobile(normalized);
       setOtpStep("code");
       setOtpSeconds(data.expires_in ?? 180);
       if (data.debug_code) setDebugCode(data.debug_code);
@@ -302,6 +344,20 @@ export default function LoginPage() {
   };
 
   const onRequestOtp = async () => {
+    setOtpMobileError(null);
+    setFormError(null);
+
+    if (!otpMobile.trim()) {
+      setOtpMobileError("شماره موبایل الزامی است");
+      return;
+    }
+    if (!isValidIranMobile(otpMobile)) {
+      setOtpMobileError(
+        "شماره موبایل معتبر نیست. فرمت صحیح: ۰۹۱۲xxxxxxxx"
+      );
+      return;
+    }
+
     if (otpAttempts >= 3 && !needHumanCheck) {
       setNeedHumanCheck(true);
       return;
@@ -313,7 +369,10 @@ export default function LoginPage() {
     setFormError(null);
     setOtpBusy(true);
     try {
-      const result = await authService.verifyOtp(otpMobile, otpCode);
+      const result = await authService.verifyOtp(
+        normalizeMobile(otpMobile),
+        otpCode
+      );
       await handleLoginResult(result);
     } catch (err) {
       const raw =
@@ -355,381 +414,386 @@ export default function LoginPage() {
     );
   }
 
+  // ── Organization picker ──────────────────────────────────────────
   if (orgs && orgs.length > 0) {
     return (
-      <main className="flex min-h-screen">
-        <div className="flex w-full flex-col lg:w-[48%] lg:max-w-xl">
-          <div className="flex flex-1 flex-col justify-center px-6 py-10 sm:px-10">
-            <div className="mb-8">
-              <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl brand-mark text-sm font-bold text-white">
-                ه
-              </div>
-              <h1 className="text-2xl font-semibold tracking-tight">
-                انتخاب سازمان
-              </h1>
-              <p className="mt-1.5 text-sm text-muted-foreground">
-                بیش از یک سازمان برای شما فعال است. یکی را انتخاب کنید تا ادامه
-                دهید.
-              </p>
-            </div>
-
-            <div className="space-y-2.5">
-              {orgs.map((o) => (
-                <button
-                  key={o.tenant_id}
-                  type="button"
-                  disabled={orgBusy}
-                  onClick={() => void onSelectOrg(o.tenant_id)}
-                  className={cn(
-                    "group flex w-full items-center gap-3 rounded-xl border border-border bg-card px-4 py-3.5 text-right transition-all",
-                    "hover:border-primary/35 hover:bg-accent/40 hover:shadow-[var(--shadow-sm)]",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    "disabled:opacity-60"
-                  )}
-                >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Building2 className="h-4 w-4" />
-                  </span>
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="truncate font-medium">{o.tenant_name}</span>
-                    <span
-                      className="truncate text-xs text-muted-foreground"
-                      dir="ltr"
-                    >
-                      {o.tenant_code}
-                    </span>
-                  </span>
-                  <ArrowLeft className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
-                </button>
-              ))}
-            </div>
-
-            {formError && (
-              <p className="mt-4 text-sm text-destructive" role="alert">
-                {formError}
-              </p>
-            )}
-            {orgBusy && (
-              <div className="mt-4 flex justify-center text-muted-foreground">
-                <StoryLoader label="در حال ورود به سازمان..." />
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="hidden flex-1 p-5 lg:block">
-          <LoginVisual active className="h-full min-h-[calc(100vh-2.5rem)]" />
-        </div>
-      </main>
-    );
-  }
-
-  return (
-    <main className="flex min-h-screen">
-      <div className="flex w-full flex-col lg:w-[48%] lg:max-w-xl">
-        <div className="flex flex-1 flex-col justify-center px-6 py-10 sm:px-10">
+      <LoginShell showVisual={false}>
+        <div className="flex w-full flex-col justify-center px-6 py-10 sm:px-8">
           <div className="mb-8">
-            <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-xl brand-mark text-base font-bold text-white shadow-[var(--shadow-primary)]">
+            <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl brand-mark text-sm font-bold text-white">
               ه
             </div>
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-[1.65rem]">
-              ورود به هماره
+            <h1 className="text-2xl font-semibold tracking-tight">
+              انتخاب سازمان
             </h1>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              به فضای یکپارچه مدیریت سازمان خوش آمدید.
+              بیش از یک سازمان برای شما فعال است. یکی را انتخاب کنید.
             </p>
           </div>
 
-          <div className="mb-6 grid grid-cols-2 gap-2 rounded-xl border border-border bg-muted/40 p-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                setMode("password");
-                setFormError(null);
-              }}
-              className={cn(
-                "flex flex-col items-center gap-1 rounded-lg px-3 py-2.5 text-center transition-all",
-                mode === "password"
-                  ? "bg-card text-foreground shadow-[var(--shadow-sm)]"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <KeyRound className="h-4 w-4" />
-              <span className="text-xs font-medium">رمز ثابت</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode("otp");
-                setFormError(null);
-              }}
-              className={cn(
-                "flex flex-col items-center gap-1 rounded-lg px-3 py-2.5 text-center transition-all",
-                mode === "otp"
-                  ? "bg-card text-foreground shadow-[var(--shadow-sm)]"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Smartphone className="h-4 w-4" />
-              <span className="text-xs font-medium">رمز یک‌بارمصرف</span>
-            </button>
+          <div className="space-y-2.5">
+            {orgs.map((o) => (
+              <button
+                key={o.tenant_id}
+                type="button"
+                disabled={orgBusy}
+                onClick={() => void onSelectOrg(o.tenant_id)}
+                className={cn(
+                  "group flex w-full items-center gap-3 rounded-xl border border-border bg-background px-4 py-3.5 text-right transition-all",
+                  "hover:border-primary/35 hover:bg-accent/40 hover:shadow-[var(--shadow-sm)]",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "disabled:opacity-60"
+                )}
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Building2 className="h-4 w-4" />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate font-medium">{o.tenant_name}</span>
+                  <span
+                    className="truncate text-xs text-muted-foreground"
+                    dir="ltr"
+                  >
+                    {o.tenant_code}
+                  </span>
+                </span>
+                <ArrowLeft className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
+              </button>
+            ))}
           </div>
 
-          {mode === "password" && (
-            <form
-              onSubmit={handleSubmit(onPasswordSubmit)}
-              className="space-y-5"
-              noValidate
-              onFocus={() => setFormFocused(true)}
-              onBlur={(e) => {
-                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                  setFormFocused(false);
-                }
-              }}
-            >
-              <div className="space-y-2">
-                <Label htmlFor="identifier" className="text-sm font-medium">
-                  ایمیل یا موبایل{" "}
+          {formError && (
+            <p className="mt-4 text-sm text-destructive" role="alert">
+              {formError}
+            </p>
+          )}
+          {orgBusy && (
+            <div className="mt-4 flex justify-center text-muted-foreground">
+              <StoryLoader label="در حال ورود به سازمان..." />
+            </div>
+          )}
+        </div>
+      </LoginShell>
+    );
+  }
+
+  // ── Main login ───────────────────────────────────────────────────
+  return (
+    <LoginShell>
+      {/* Form column — left in LTR / start */}
+      <div className="flex w-full flex-col justify-center px-6 py-8 sm:px-9 lg:w-[52%]">
+        <div className="mb-7">
+          <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-xl brand-mark text-base font-bold text-white shadow-[var(--shadow-primary)]">
+            ه
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            ورود به هماره
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            به فضای یکپارچه مدیریت سازمان خوش آمدید.
+          </p>
+        </div>
+
+        {/* Method tabs — underline style */}
+        <div className="mb-6 flex gap-1 border-b border-border">
+          <button
+            type="button"
+            onClick={() => {
+              setMode("password");
+              setFormError(null);
+              setOtpMobileError(null);
+            }}
+            className={cn(
+              "relative flex flex-1 items-center justify-center gap-2 pb-3 pt-1 text-sm font-medium transition-colors",
+              mode === "password"
+                ? "text-primary"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <KeyRound className="h-4 w-4" />
+            رمز ثابت
+            {mode === "password" && (
+              <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("otp");
+              setFormError(null);
+              setOtpMobileError(null);
+            }}
+            className={cn(
+              "relative flex flex-1 items-center justify-center gap-2 pb-3 pt-1 text-sm font-medium transition-colors",
+              mode === "otp"
+                ? "text-primary"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Smartphone className="h-4 w-4" />
+            رمز یک‌بارمصرف
+            {mode === "otp" && (
+              <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary" />
+            )}
+          </button>
+        </div>
+
+        {/* Password form */}
+        {mode === "password" && (
+          <form
+            onSubmit={handleSubmit(onPasswordSubmit)}
+            className="space-y-5"
+            noValidate
+          >
+            <div className="space-y-2">
+              <Label htmlFor="identifier" className="text-sm font-medium">
+                ایمیل یا موبایل{" "}
+                <span className="text-destructive" aria-hidden>
+                  *
+                </span>
+              </Label>
+              <Input
+                id="identifier"
+                dir="ltr"
+                autoComplete="username"
+                className="h-11 text-left text-[15px]"
+                placeholder="0912... یا user@company.com"
+                {...register("identifier")}
+              />
+              {errors.identifier && (
+                <p className="text-xs text-destructive" role="alert">
+                  {errors.identifier.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="password" className="text-sm font-medium">
+                  رمز عبور{" "}
                   <span className="text-destructive" aria-hidden>
                     *
                   </span>
                 </Label>
-                <Input
-                  id="identifier"
-                  dir="ltr"
-                  autoComplete="username"
-                  className="h-11 text-left text-[15px]"
-                  placeholder="0912... یا user@company.com"
-                  {...register("identifier")}
-                />
-                {errors.identifier && (
-                  <p className="text-xs text-destructive" role="alert">
-                    {errors.identifier.message}
-                  </p>
-                )}
+                <button
+                  type="button"
+                  className="text-xs text-primary hover:underline"
+                  onClick={() =>
+                    toast.message("بازیابی رمز عبور به زودی فعال می‌شود")
+                  }
+                >
+                  فراموشی رمز عبور؟
+                </button>
               </div>
+              <Input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                dir="ltr"
+                className="h-11 text-left text-[15px]"
+                placeholder="••••••••"
+                {...register("password")}
+              />
+              {errors.password && (
+                <p className="text-xs text-destructive" role="alert">
+                  {errors.password.message}
+                </p>
+              )}
+            </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <Label htmlFor="password" className="text-sm font-medium">
-                    رمز عبور{" "}
+            {formError && (
+              <div
+                className="rounded-lg border border-destructive/25 bg-destructive/5 px-3.5 py-2.5 text-sm text-destructive"
+                role="alert"
+              >
+                {formError}
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              className="h-11 w-full text-[15px]"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <StoryLoader label="در حال بررسی اطلاعات..." />
+              ) : (
+                "ورود به سیستم"
+              )}
+            </Button>
+          </form>
+        )}
+
+        {/* OTP flow */}
+        {mode === "otp" && (
+          <div className="space-y-5">
+            {needHumanCheck ? (
+              <SoftHumanCheck
+                onPass={() => {
+                  setNeedHumanCheck(false);
+                  setOtpAttempts(0);
+                  void doRequestOtp();
+                }}
+              />
+            ) : otpStep === "mobile" ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="otp-mobile" className="text-sm font-medium">
+                    شماره موبایل{" "}
                     <span className="text-destructive" aria-hidden>
                       *
                     </span>
                   </Label>
+                  <Input
+                    id="otp-mobile"
+                    dir="ltr"
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    className="h-11 text-left text-[15px] tracking-wide"
+                    placeholder="0912xxxxxxxx"
+                    value={otpMobile}
+                    onChange={(e) => {
+                      setOtpMobile(e.target.value);
+                      setOtpMobileError(null);
+                    }}
+                    onBlur={() => {
+                      if (otpMobile.trim() && !isValidIranMobile(otpMobile)) {
+                        setOtpMobileError(
+                          "شماره موبایل معتبر نیست. فرمت صحیح: ۰۹۱۲xxxxxxxx"
+                        );
+                      }
+                    }}
+                  />
+                  {otpMobileError && (
+                    <p className="text-xs text-destructive" role="alert">
+                      {otpMobileError}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    کد تأیید فقط به شمارهٔ ثبت‌شده در سیستم ارسال می‌شود.
+                  </p>
+                </div>
+
+                {formError && (
+                  <div
+                    className="rounded-lg border border-destructive/25 bg-destructive/5 px-3.5 py-2.5 text-sm text-destructive"
+                    role="alert"
+                  >
+                    {formError}
+                  </div>
+                )}
+
+                <Button
+                  type="button"
+                  className="h-11 w-full text-[15px]"
+                  disabled={otpBusy || !otpMobile.trim()}
+                  onClick={() => void onRequestOtp()}
+                >
+                  {otpBusy ? (
+                    <StoryLoader label="در حال ارسال کد..." />
+                  ) : (
+                    "دریافت کد تأیید"
+                  )}
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="rounded-lg border border-border bg-muted/30 px-3.5 py-2.5 text-sm">
+                  کد به{" "}
+                  <span dir="ltr" className="font-medium tracking-wide">
+                    {otpMobile}
+                  </span>{" "}
+                  ارسال شد.{" "}
                   <button
                     type="button"
-                    className="text-xs text-primary hover:underline"
-                    onClick={() =>
-                      toast.message("بازیابی رمز عبور به زودی فعال می‌شود")
-                    }
+                    className="text-primary underline-offset-2 hover:underline"
+                    onClick={() => {
+                      setOtpStep("mobile");
+                      setOtpCode("");
+                      setOtpSeconds(0);
+                      setFormError(null);
+                    }}
                   >
-                    فراموشی رمز عبور؟
+                    اصلاح شماره
                   </button>
                 </div>
-                <Input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  dir="ltr"
-                  className="h-11 text-left text-[15px]"
-                  placeholder="••••••••"
-                  {...register("password")}
-                />
-                {errors.password && (
-                  <p className="text-xs text-destructive" role="alert">
-                    {errors.password.message}
+
+                <div className="space-y-2">
+                  <Label htmlFor="otp-code" className="text-sm font-medium">
+                    کد یک‌بارمصرف
+                  </Label>
+                  <Input
+                    id="otp-code"
+                    dir="ltr"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    className="h-11 text-center text-lg tracking-[0.35em]"
+                    maxLength={8}
+                    value={otpCode}
+                    onChange={(e) =>
+                      setOtpCode(e.target.value.replace(/\D/g, ""))
+                    }
+                  />
+                </div>
+
+                {debugCode && (
+                  <p className="text-xs text-muted-foreground" dir="ltr">
+                    debug (local): {debugCode}
                   </p>
                 )}
-              </div>
 
-              {formError && (
-                <div
-                  className="rounded-lg border border-destructive/25 bg-destructive/5 px-3.5 py-2.5 text-sm text-destructive"
-                  role="alert"
-                >
-                  {formError}
-                </div>
-              )}
+                <p className="text-xs text-muted-foreground">
+                  {otpSeconds > 0
+                    ? `ارسال مجدد تا ${otpSeconds} ثانیه دیگر امکان‌پذیر نیست.`
+                    : "می‌توانید دوباره کد درخواست کنید."}
+                </p>
 
-              <Button
-                type="submit"
-                className="h-11 w-full text-[15px]"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <StoryLoader label="در حال بررسی اطلاعات..." />
-                ) : (
-                  "ورود به سیستم"
-                )}
-              </Button>
-            </form>
-          )}
-
-          {mode === "otp" && (
-            <div
-              className="space-y-5"
-              onFocus={() => setFormFocused(true)}
-              onBlur={(e) => {
-                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                  setFormFocused(false);
-                }
-              }}
-            >
-              {needHumanCheck ? (
-                <SoftHumanCheck
-                  onPass={() => {
-                    setNeedHumanCheck(false);
-                    setOtpAttempts(0);
-                    void doRequestOtp();
-                  }}
-                />
-              ) : otpStep === "mobile" ? (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="otp-mobile" className="text-sm font-medium">
-                      شماره موبایل{" "}
-                      <span className="text-destructive" aria-hidden>
-                        *
-                      </span>
-                    </Label>
-                    <Input
-                      id="otp-mobile"
-                      dir="ltr"
-                      inputMode="numeric"
-                      autoComplete="tel"
-                      className="h-11 text-left text-[15px] tracking-wide"
-                      placeholder="0912xxxxxxxx"
-                      value={otpMobile}
-                      onChange={(e) => setOtpMobile(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      کد تأیید فقط به شمارهٔ ثبت‌شده در سیستم ارسال می‌شود.
-                    </p>
+                {formError && (
+                  <div
+                    className="rounded-lg border border-destructive/25 bg-destructive/5 px-3.5 py-2.5 text-sm text-destructive"
+                    role="alert"
+                  >
+                    {formError}
                   </div>
+                )}
 
-                  {formError && (
-                    <div
-                      className="rounded-lg border border-destructive/25 bg-destructive/5 px-3.5 py-2.5 text-sm text-destructive"
-                      role="alert"
-                    >
-                      {formError}
-                    </div>
-                  )}
-
+                <div className="flex gap-2.5">
                   <Button
                     type="button"
-                    className="h-11 w-full text-[15px]"
-                    disabled={otpBusy || otpMobile.trim().length < 10}
+                    variant="outline"
+                    className="h-11 flex-1"
+                    disabled={otpBusy || otpSeconds > 0}
                     onClick={() => void onRequestOtp()}
                   >
+                    ارسال مجدد
+                  </Button>
+                  <Button
+                    type="button"
+                    className="h-11 flex-1"
+                    disabled={otpBusy || otpCode.trim().length < 4}
+                    onClick={() => void onVerifyOtp()}
+                  >
                     {otpBusy ? (
-                      <StoryLoader label="در حال ارسال کد..." />
+                      <StoryLoader label="در حال تأیید..." />
                     ) : (
-                      "دریافت کد تأیید"
+                      "تأیید و ورود"
                     )}
                   </Button>
-                </>
-              ) : (
-                <>
-                  <div className="rounded-lg border border-border bg-muted/30 px-3.5 py-2.5 text-sm">
-                    کد به{" "}
-                    <span dir="ltr" className="font-medium tracking-wide">
-                      {otpMobile}
-                    </span>{" "}
-                    ارسال شد.{" "}
-                    <button
-                      type="button"
-                      className="text-primary underline-offset-2 hover:underline"
-                      onClick={() => {
-                        setOtpStep("mobile");
-                        setOtpCode("");
-                        setOtpSeconds(0);
-                        setFormError(null);
-                      }}
-                    >
-                      اصلاح شماره
-                    </button>
-                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="otp-code" className="text-sm font-medium">
-                      کد یک‌بارمصرف
-                    </Label>
-                    <Input
-                      id="otp-code"
-                      dir="ltr"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      className="h-11 text-center text-lg tracking-[0.35em]"
-                      maxLength={8}
-                      value={otpCode}
-                      onChange={(e) =>
-                        setOtpCode(e.target.value.replace(/\D/g, ""))
-                      }
-                    />
-                  </div>
-
-                  {debugCode && (
-                    <p className="text-xs text-muted-foreground" dir="ltr">
-                      debug (local): {debugCode}
-                    </p>
-                  )}
-
-                  <p className="text-xs text-muted-foreground">
-                    {otpSeconds > 0
-                      ? `ارسال مجدد تا ${otpSeconds} ثانیه دیگر امکان‌پذیر نیست.`
-                      : "می‌توانید دوباره کد درخواست کنید."}
-                  </p>
-
-                  {formError && (
-                    <div
-                      className="rounded-lg border border-destructive/25 bg-destructive/5 px-3.5 py-2.5 text-sm text-destructive"
-                      role="alert"
-                    >
-                      {formError}
-                    </div>
-                  )}
-
-                  <div className="flex gap-2.5">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-11 flex-1"
-                      disabled={otpBusy || otpSeconds > 0}
-                      onClick={() => void onRequestOtp()}
-                    >
-                      ارسال مجدد
-                    </Button>
-                    <Button
-                      type="button"
-                      className="h-11 flex-1"
-                      disabled={otpBusy || otpCode.trim().length < 4}
-                      onClick={() => void onVerifyOtp()}
-                    >
-                      {otpBusy ? (
-                        <StoryLoader label="در حال تأیید..." />
-                      ) : (
-                        "تأیید و ورود"
-                      )}
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          <p className="mt-8 text-center text-xs text-muted-foreground">
-            با ورود، شرایط استفاده و حریم خصوصی هماره را می‌پذیرید.
-          </p>
-        </div>
+        <p className="mt-8 text-center text-xs text-muted-foreground">
+          با ورود، شرایط استفاده و حریم خصوصی هماره را می‌پذیرید.
+        </p>
       </div>
 
-      <div className="hidden flex-1 p-5 lg:block">
-        <LoginVisual
-          active={formFocused || isSubmitting || otpBusy}
-          className="h-full min-h-[calc(100vh-2.5rem)]"
-        />
+      {/* Visual column — right */}
+      <div className="hidden lg:block lg:w-[48%]">
+        <LoginVisual className="h-full min-h-[520px] rounded-none rounded-s-none" />
       </div>
-    </main>
+    </LoginShell>
   );
 }
