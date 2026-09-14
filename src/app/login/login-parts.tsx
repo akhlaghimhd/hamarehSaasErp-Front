@@ -87,10 +87,22 @@ export function ResendButton({ cooldownSec, totalSec, disabled, busy, onClick }:
           <circle cx="20" cy="20" r={r} fill="none" stroke="hsl(var(--primary))" strokeWidth="2.5" strokeLinecap="round"
             strokeDasharray={c} strokeDashoffset={offset}
             className="transition-[stroke-dashoffset] duration-1000 linear"
-            style={locked ? { filter: "drop-shadow(0 0 3px hsl(var(--primary) / 0.45))", animation: "login-ring-pulse 2s ease-in-out infinite" } : undefined}
+            style={locked ? {
+              filter: "drop-shadow(0 0 4px hsl(var(--primary) / 0.55))",
+              animation: "login-ring-pulse 1.6s ease-in-out infinite",
+            } : undefined}
           />
         </svg>
-        {!locked && !busy && <span className="absolute inset-0 rounded-full bg-primary/10" style={{ animation: "login-breathe 2s ease-in-out infinite" }} />}
+        {busy ? (
+          <Loader2 className="relative h-3.5 w-3.5 animate-spin text-primary" />
+        ) : locked ? (
+          <span
+            className="relative h-2 w-2 rounded-full bg-primary"
+            style={{ animation: "login-breathe 1.2s ease-in-out infinite, login-ring-pulse 1.6s ease-in-out infinite" }}
+          />
+        ) : (
+          <span className="absolute inset-0 rounded-full bg-primary/10" style={{ animation: "login-breathe 2s ease-in-out infinite" }} />
+        )}
       </span>
       <span className="tabular-nums">{locked ? `ارسال مجدد · ${formatMmSs(cooldownSec)}` : busy ? "در حال ارسال…" : "ارسال مجدد"}</span>
     </button>
@@ -166,6 +178,7 @@ export function LoginShell({ children, showVisual = true }: { children: React.Re
         @keyframes login-spin { to { transform: rotate(360deg); } }
         @keyframes login-shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
         @keyframes login-ring-pulse { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+        @keyframes login-ring-rotate { to { transform: rotate(360deg); } }
         @keyframes login-card-in { from { opacity: 0; transform: translateY(10px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
         @keyframes login-glow {
           0%, 100% { box-shadow: 0 0 0 1px hsl(var(--border)), 0 12px 40px -12px hsl(var(--primary) / 0.18); }
