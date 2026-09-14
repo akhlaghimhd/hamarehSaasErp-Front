@@ -206,7 +206,7 @@ export function LoginShell({ children, showVisual = true }: { children: React.Re
           <span className="text-border">·</span>
           <span className="opacity-70">حریم خصوصی <span className="text-[9px] opacity-60">(به‌زودی)</span></span>
         </nav>
-        <p className="text-[10px] text-muted-foreground/80">قدرت‌گرفته از هماره · تمامی حقوق محفوظ است © {new Date().getFullYear()}</p>
+        <p className="text-[10px] text-muted-foreground/80">قدرت‌گرفته از هماره · تمامی حقوق محفوظ است © {toFa(new Date().getFullYear())}</p>
       </footer>
     </main>
   );
