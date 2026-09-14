@@ -1,5 +1,5 @@
 /**
- * Login visual — compact static illustration (secure access / ERP portal).
+ * Login visual — compact illustration with soft ambient glow (secure access / ERP portal).
  */
 
 "use client";
@@ -26,11 +26,31 @@ export function LoginVisual({ className }: LoginVisualProps) {
             "radial-gradient(ellipse 90% 70% at 60% 30%, hsl(142 50% 28% / 0.45), transparent 65%), radial-gradient(ellipse 50% 40% at 20% 80%, hsl(95 35% 25% / 0.25), transparent 55%)",
         }}
       />
+      <div
+        className="pointer-events-none absolute -left-8 top-16 h-32 w-32 rounded-full bg-emerald-400/10 blur-2xl"
+        style={{ animation: "login-orb 8s ease-in-out infinite" }}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -right-6 bottom-20 h-40 w-40 rounded-full bg-lime-300/10 blur-3xl"
+        style={{ animation: "login-orb 10s ease-in-out infinite reverse" }}
+        aria-hidden
+      />
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            @keyframes login-orb {
+              0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.55; }
+              50% { transform: translate(12px, -16px) scale(1.08); opacity: 0.9; }
+            }
+          `,
+        }}
+      />
 
       <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-6">
         <svg
           viewBox="0 0 280 200"
-          className="h-auto w-full max-w-[200px]"
+          className="h-auto w-full max-w-[200px] drop-shadow-[0_8px_24px_rgba(0,0,0,0.25)]"
           fill="none"
           aria-hidden
         >

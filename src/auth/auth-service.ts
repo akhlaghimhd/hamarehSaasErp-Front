@@ -6,6 +6,7 @@
 import { apiPost, ApiClientError } from "@/api";
 import type { ApiSuccessResponse, LoginResponseData } from "@/api/types";
 import { useAuthStore } from "./auth-store";
+import { tokenStorage } from "@/api/token-storage";
 
 const LOGIN_PATH = "/identity-core/identity/auth/login";
 const LOGOUT_PATH = "/identity-core/identity/auth/logout";
@@ -96,26 +97,16 @@ export const authService = {
   },
 
   async selectOrganization(preAuthToken: string, tenantId: string): Promise<void> {
-    // Temporarily put pre-auth token for this single call
-    const prev = useAuthStore.getState().accessToken;
-    useAuthStore.getState().setSession({
+    const store = useAuthStore.getState();
+    const prevToken = store.accessToken;
+    const prevUser = store.user;
+    const prevCtx = store.securityContext;
+    const prevTenant = store.activeTenantId;
+
+    // Temporarily put pre-auth token for this single call (do not persist snapshot)
+    tokenStorage.setAccessToken(preAuthToken);
+    useAuthStore.setState({
       accessToken: preAuthToken,
-      user: useAuthStore.getState().user ?? {
-        user_id: "",
-        tenant_user_id: null,
-        first_name: "",
-        last_name: "",
-        email: "",
-      },
-      securityContext: useAuthStore.getState().securityContext ?? {
-        user_id: "",
-        tenant_id: null,
-        tenant_user_id: null,
-        roles: [],
-        permissions: [],
-        scopes: [],
-        is_owner: false,
-      },
       activeTenantId: null,
     });
 
@@ -130,8 +121,21 @@ export const authService = {
         });
       }
     } catch (e) {
-      if (prev) {
-        // leave store; caller handles
+      // Restore previous session state fully on failure
+      if (prevToken) {
+        tokenStorage.setAccessToken(prevToken);
+        tokenStorage.setTenantId(prevTenant);
+        useAuthStore.setState({
+          accessToken: prevToken,
+          user: prevUser,
+          securityContext: prevCtx,
+          activeTenantId: prevTenant,
+          isAuthenticated: true,
+          isHydrated: true,
+        });
+      } else {
+        tokenStorage.clearAuth();
+        useAuthStore.getState().clearSession();
       }
       throw e;
     }
