@@ -10,7 +10,7 @@ import { cn } from "@/shared/lib/utils";
 import { LoginBackground } from "./login-background";
 
 export const OTP_LENGTH = 6;
-export const OTP_TIMER_SEC = 120;
+export const OTP_TIMER_SEC = 180;
 
 export function toFa(v: string | number) {
   return String(v).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
