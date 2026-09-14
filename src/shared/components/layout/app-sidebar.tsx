@@ -16,6 +16,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   X,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { useSidebar } from "@/shared/components/layout/sidebar-context";
@@ -23,10 +24,11 @@ import { Button } from "@/shared/components/ui/button";
 
 const navItems = [
   { href: "/dashboard", label: "داشبورد", icon: LayoutDashboard },
+  { href: "/dashboard/identity", label: "هویت و دسترسی", icon: Shield },
+  { href: "/dashboard/organization", label: "سازمان", icon: Building2 },
   { href: "/dashboard/ui-guide", label: "راهنمای UI", icon: BookOpen },
   { href: "/dashboard/showcase", label: "نمایشگاه UI", icon: Component },
   { href: "/themes", label: "پالت رنگ", icon: Palette },
-  { href: "/dashboard/organization", label: "سازمان", icon: Building2 },
   { href: "/dashboard/inventory", label: "انبار و کالا", icon: Warehouse },
   { href: "/dashboard/sales", label: "خرید و فروش", icon: ShoppingCart },
   { href: "/dashboard/items", label: "کالاها", icon: Package },

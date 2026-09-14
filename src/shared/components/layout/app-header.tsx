@@ -11,6 +11,7 @@ import {
   PanelRightOpen,
   Menu,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/shared/components/ui/button";
@@ -123,13 +124,17 @@ export function AppHeader() {
               )}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <User className="h-4 w-4" />
-              پروفایل من
+            <DropdownMenuItem asChild>
+              <Link href="/dashboard/identity/me">
+                <User className="h-4 w-4" />
+                پروفایل من
+              </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Building2 className="h-4 w-4" />
-              سازمان فعال
+            <DropdownMenuItem asChild>
+              <Link href="/dashboard/identity">
+                <Building2 className="h-4 w-4" />
+                هویت و دسترسی
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem>
               <Settings className="h-4 w-4" />
