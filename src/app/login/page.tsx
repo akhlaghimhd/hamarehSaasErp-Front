@@ -140,7 +140,15 @@ export default function LoginPage() {
   useEffect(() => { if (isHydrated && isAuthenticated && !orgs) goToDashboard(); }, [isHydrated, isAuthenticated, orgs, goToDashboard]);
   useEffect(() => {
     if (!lastOtpSession) { setTimerLeft(0); return; }
-    const tick = () => setTimerLeft(Math.max(0, Math.ceil((lastOtpSession.endsAt - Date.now()) / 1000)));
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((lastOtpSession.endsAt - Date.now()) / 1000));
+      setTimerLeft(left);
+      // When cooldown ends, unlock resend (do not keep form blocked)
+      if (left === 0) {
+        setBlockedUntilEdit(false);
+        autoSubmitLock.current = false;
+      }
+    };
     tick();
     const t = window.setInterval(tick, 1000);
     return () => window.clearInterval(t);
@@ -195,6 +203,7 @@ export default function LoginPage() {
     setDebugCode(debug ?? null);
     setOtpCode("");
     autoSubmitLock.current = false;
+    setBlockedUntilEdit(false);
     try {
       sessionStorage.setItem(OTP_SESSION_KEY, JSON.stringify(session));
     } catch { /* ignore */ }
@@ -205,23 +214,30 @@ export default function LoginPage() {
     try {
       const res = await authService.requestOtp(mobile);
       const debug = typeof res.debug_code === "string" ? res.debug_code : undefined;
-      startOtpSession(mobile, debug);
-      setOtpStep("code"); setBlockedUntilEdit(false);
+      const ttlSec =
+        typeof res.expires_in === "number" && res.expires_in > 0
+          ? res.expires_in
+          : OTP_TIMER_SEC;
+      startOtpSession(mobile, debug, Date.now() + ttlSec * 1000);
+      setOtpStep("code");
+      setBlockedUntilEdit(false);
     } catch (err) {
       const raw = err instanceof ApiClientError ? err.message : "ارسال کد ناموفق بود.";
       const lower = raw.toLowerCase();
-      // Backend still has an active OTP (e.g. after page refresh) — resume code step without new send
+      // Backend still has an active OTP — stay on code step; do NOT invent a new timer/debug as if resent
       if (
         (err instanceof ApiClientError && err.statusCode === 429) ||
         lower.includes("قبلی") || lower.includes("معتبر") || lower.includes("resend") || lower.includes("retry")
       ) {
-        const existing = lastOtpSession && lastOtpSession.mobile === mobile && lastOtpSession.endsAt > Date.now()
-          ? lastOtpSession
-          : { mobile, endsAt: Date.now() + OTP_TIMER_SEC * 1000, debugCode: lastOtpSession?.debugCode };
-        startOtpSession(existing.mobile, existing.debugCode, existing.endsAt);
         setOtpStep("code");
         setBlockedUntilEdit(false);
-        setFormError(null);
+        if (lastOtpSession && lastOtpSession.mobile === mobile && lastOtpSession.endsAt > Date.now()) {
+          setDebugCode(lastOtpSession.debugCode ?? null);
+          setFormError("کد قبلی هنوز معتبر است؛ همان کد را وارد کنید.");
+        } else {
+          // Frontend timer ended but backend may still hold the OTP briefly — do not show stale debug as a new code
+          setFormError("کد قبلی هنوز از سمت سرور فعال است. چند لحظه صبر کنید و دوباره «ارسال مجدد» را بزنید.");
+        }
       } else {
         setFormError(friendlyError(raw, "otp-mobile"));
         setBlockedUntilEdit(true);
@@ -232,7 +248,13 @@ export default function LoginPage() {
   };
 
   const onRequestOtp = async (opts?: { force?: boolean }) => {
-    if (needHumanCheck || blockedUntilEdit) return;
+    if (needHumanCheck) return;
+    // force (resend) must work even if form was blocked after a failed verify / expired attempt
+    if (blockedUntilEdit && !opts?.force) return;
+    if (opts?.force) {
+      setBlockedUntilEdit(false);
+      autoSubmitLock.current = false;
+    }
     setFormError(null); setOtpMobileError(null);
     const mobile = normalizeMobile(otpMobile);
     if (!isValidIranMobile(mobile)) { setOtpMobileError("فرمت صحیح: ۰۹۱۲xxxxxxxx"); setBlockedUntilEdit(true); return; }
@@ -428,7 +450,11 @@ export default function LoginPage() {
           <form onSubmit={(e) => { e.preventDefault(); void onVerifyOtp(); }} className="flex flex-col gap-3.5" noValidate>
             <div className="flex h-11 items-center gap-2 rounded-xl border border-border/80 bg-gradient-to-l from-muted/40 to-muted/10 px-3">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Smartphone className="h-4 w-4" /></span>
-              <p className="min-w-0 flex-1 truncate text-sm font-semibold tabular-nums tracking-wide" dir="ltr">{otpMobile}</p>
+              <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+                کد به{" "}
+                <span className="font-semibold tabular-nums tracking-wide text-foreground" dir="ltr">{otpMobile}</span>
+                {" "}ارسال شد
+              </p>
               <button type="button" aria-label="ویرایش شماره"
                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-primary/10 hover:text-primary"
                 onClick={() => { setOtpStep("mobile"); setOtpCode(""); setFormError(null); setBlockedUntilEdit(false); autoSubmitLock.current = false; }}>
@@ -448,7 +474,7 @@ export default function LoginPage() {
             <ErrorSlot message={formError} />
             <div className="flex items-center gap-2 pt-1">
               <ActionButton type="submit" loading={otpVerifyBusy} loadingLabel="در حال تأیید…" disabled={blockedUntilEdit || otpRequestBusy || otpCode.replace(/\D/g, "").length !== OTP_LENGTH} className="flex-1">تأیید و ورود</ActionButton>
-              <ResendButton cooldownSec={timerLeft} totalSec={OTP_TIMER_SEC} busy={otpRequestBusy} disabled={blockedUntilEdit || otpVerifyBusy} onClick={() => void onRequestOtp({ force: true })} />
+              <ResendButton cooldownSec={timerLeft} totalSec={OTP_TIMER_SEC} busy={otpRequestBusy} disabled={otpVerifyBusy} onClick={() => void onRequestOtp({ force: true })} />
             </div>
           </form>
         ) : null}
