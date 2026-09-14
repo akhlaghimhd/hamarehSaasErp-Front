@@ -15,6 +15,12 @@ export const OTP_TIMER_SEC = 180;
 export function toFa(v: string | number) {
   return String(v).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
 }
+/** Convert Persian/Arabic-Indic digits back to ASCII 0-9 (for API payloads). */
+export function fromFa(v: string) {
+  return String(v)
+    .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
+    .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
+}
 export function formatMmSs(totalSec: number) {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
@@ -140,7 +146,7 @@ export function OtpCodeInput({ value, onChange, disabled, onComplete }: {
   };
   const onPaste = (e: ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, OTP_LENGTH);
+    const pasted = fromFa(e.clipboardData.getData("text")).replace(/\D/g, "").slice(0, OTP_LENGTH);
     if (!pasted) return;
     onChange(pasted);
     focusAt(Math.min(pasted.length, OTP_LENGTH - 1));
@@ -159,8 +165,8 @@ export function OtpCodeInput({ value, onChange, disabled, onComplete }: {
               "h-10 w-9 rounded-md border border-input bg-background text-center text-base font-semibold shadow-[var(--shadow-xs)]",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
             )}
-            value={digits[i]?.trim() ?? ""}
-            onChange={(e) => setDigit(i, e.target.value.replace(/\D/g, "").slice(-1))}
+            value={digits[i]?.trim() ? toFa(digits[i].trim()) : ""}
+            onChange={(e) => setDigit(i, fromFa(e.target.value).replace(/\D/g, "").slice(-1))}
             onKeyDown={(e) => onKeyDown(i, e)}
             onFocus={(e) => e.target.select()}
           />
