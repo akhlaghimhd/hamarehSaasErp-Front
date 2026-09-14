@@ -21,10 +21,11 @@ import { LoginVisual } from "./login-visual";
 import { HumanSlideCheck } from "./login-human-slide";
 import {
   SoftRingLoader, BreathingDots, ErrorSlot, ActionButton, ResendButton, OtpCodeInput, LoginShell,
-  OTP_LENGTH, OTP_TIMER_SEC, formatMmSs,
+  OTP_LENGTH, OTP_TIMER_SEC,
 } from "./login-parts";
 
 const IR_MOBILE_RE = /^09\d{9}$/;
+const OTP_SESSION_KEY = "hamareh.login.otp_session";
 
 function normalizeMobile(raw: string) {
   let t = raw.trim().replace(/[\s\-]/g, "");
@@ -87,7 +88,8 @@ export default function LoginPage() {
   const [otpMobile, setOtpMobile] = useState("");
   const [otpMobileError, setOtpMobileError] = useState<string | null>(null);
   const [otpCode, setOtpCode] = useState("");
-  const [otpBusy, setOtpBusy] = useState(false);
+  const [otpRequestBusy, setOtpRequestBusy] = useState(false);
+  const [otpVerifyBusy, setOtpVerifyBusy] = useState(false);
   const [timerLeft, setTimerLeft] = useState(0);
   const [debugCode, setDebugCode] = useState<string | null>(null);
   const [lastOtpSession, setLastOtpSession] = useState<{ mobile: string; endsAt: number; debugCode?: string } | null>(null);
@@ -108,6 +110,33 @@ export default function LoginPage() {
   const goToDashboard = useCallback(() => { router.replace("/dashboard"); }, [router]);
 
   useEffect(() => { if (!isHydrated) hydrate(); }, [isHydrated, hydrate]);
+
+  // Restore OTP session after refresh (allow code step without re-send while timer alive)
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(OTP_SESSION_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { mobile?: string; endsAt?: number; debugCode?: string };
+      if (!parsed?.mobile || !parsed?.endsAt || parsed.endsAt <= Date.now()) {
+        sessionStorage.removeItem(OTP_SESSION_KEY);
+        return;
+      }
+      setOtpMobile(parsed.mobile);
+      setLastOtpSession({ mobile: parsed.mobile, endsAt: parsed.endsAt, debugCode: parsed.debugCode });
+      setDebugCode(parsed.debugCode ?? null);
+      setOtpStep("code");
+      setMode("otp");
+    } catch { /* ignore */ }
+  }, []);
+
+  // Keep sessionStorage in sync when timer dies
+  useEffect(() => {
+    if (!lastOtpSession) return;
+    if (lastOtpSession.endsAt <= Date.now()) {
+      try { sessionStorage.removeItem(OTP_SESSION_KEY); } catch { /* ignore */ }
+    }
+  }, [lastOtpSession, timerLeft]);
+
   useEffect(() => { if (isHydrated && isAuthenticated && !orgs) goToDashboard(); }, [isHydrated, isAuthenticated, orgs, goToDashboard]);
   useEffect(() => {
     if (!lastOtpSession) { setTimerLeft(0); return; }
@@ -159,15 +188,20 @@ export default function LoginPage() {
     await runPasswordLogin(values);
   };
 
-  const startOtpSession = (mobile: string, debug?: string) => {
-    setLastOtpSession({ mobile, endsAt: Date.now() + OTP_TIMER_SEC * 1000, debugCode: debug });
+  const startOtpSession = (mobile: string, debug?: string, endsAtOverride?: number) => {
+    const endsAt = endsAtOverride ?? (Date.now() + OTP_TIMER_SEC * 1000);
+    const session = { mobile, endsAt, debugCode: debug };
+    setLastOtpSession(session);
     setDebugCode(debug ?? null);
     setOtpCode("");
     autoSubmitLock.current = false;
+    try {
+      sessionStorage.setItem(OTP_SESSION_KEY, JSON.stringify(session));
+    } catch { /* ignore */ }
   };
 
   const doRequestOtpNetwork = async (mobile: string) => {
-    setOtpBusy(true); setFormError(null);
+    setOtpRequestBusy(true); setFormError(null);
     try {
       const res = await authService.requestOtp(mobile);
       const debug = typeof res.debug_code === "string" ? res.debug_code : undefined;
@@ -175,11 +209,26 @@ export default function LoginPage() {
       setOtpStep("code"); setBlockedUntilEdit(false);
     } catch (err) {
       const raw = err instanceof ApiClientError ? err.message : "ارسال کد ناموفق بود.";
-      setFormError(friendlyError(raw, "otp-mobile"));
-      setBlockedUntilEdit(true);
-      humanPassOnceRef.current = false;
-      setOtpFails((prev) => { const next = prev + 1; if (next >= 1) setHumanGateArmed(true); return next; });
-    } finally { setOtpBusy(false); }
+      const lower = raw.toLowerCase();
+      // Backend still has an active OTP (e.g. after page refresh) — resume code step without new send
+      if (
+        (err instanceof ApiClientError && err.statusCode === 429) ||
+        lower.includes("قبلی") || lower.includes("معتبر") || lower.includes("resend") || lower.includes("retry")
+      ) {
+        const existing = lastOtpSession && lastOtpSession.mobile === mobile && lastOtpSession.endsAt > Date.now()
+          ? lastOtpSession
+          : { mobile, endsAt: Date.now() + OTP_TIMER_SEC * 1000, debugCode: lastOtpSession?.debugCode };
+        startOtpSession(existing.mobile, existing.debugCode, existing.endsAt);
+        setOtpStep("code");
+        setBlockedUntilEdit(false);
+        setFormError(null);
+      } else {
+        setFormError(friendlyError(raw, "otp-mobile"));
+        setBlockedUntilEdit(true);
+        humanPassOnceRef.current = false;
+        setOtpFails((prev) => { const next = prev + 1; if (next >= 1) setHumanGateArmed(true); return next; });
+      }
+    } finally { setOtpRequestBusy(false); }
   };
 
   const onRequestOtp = async (opts?: { force?: boolean }) => {
@@ -207,7 +256,7 @@ export default function LoginPage() {
     const code = (codeOverride ?? otpCode).replace(/\D/g, "");
     if (code.length !== OTP_LENGTH) return;
     if (timerLeft <= 0) { setFormError("کد منقضی شده. کد جدید درخواست کنید."); setBlockedUntilEdit(true); return; }
-    autoSubmitLock.current = true; setOtpBusy(true); setFormError(null);
+    autoSubmitLock.current = true; setOtpVerifyBusy(true); setFormError(null);
     try {
       const result = await authService.verifyOtp(normalizeMobile(otpMobile), code);
       setBlockedUntilEdit(false);
@@ -219,7 +268,7 @@ export default function LoginPage() {
       autoSubmitLock.current = false;
       humanPassOnceRef.current = false;
       setOtpFails((prev) => { const next = prev + 1; if (next >= 1) setHumanGateArmed(true); return next; });
-    } finally { setOtpBusy(false); }
+    } finally { setOtpVerifyBusy(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [otpCode, otpMobile, timerLeft, blockedUntilEdit, humanGateArmed, otpFails, needHumanCheck]);
 
@@ -314,18 +363,18 @@ export default function LoginPage() {
           <p className="text-xs text-muted-foreground">با رمز عبور یا کد یک‌بارمصرف وارد شوید</p>
         </div>
 
-        <div className="relative grid grid-cols-2 rounded-xl border border-border bg-muted/50 p-1" role="tablist" aria-label="روش ورود">
-          <span className="pointer-events-none absolute inset-y-1 w-[calc(50%-4px)] rounded-lg bg-background shadow-sm transition-transform duration-300 ease-out"
+        <div className="relative grid grid-cols-2 rounded-xl border border-border bg-muted/40 p-1 shadow-inner" role="tablist" aria-label="روش ورود">
+          <span className="pointer-events-none absolute inset-y-1 w-[calc(50%-4px)] rounded-lg bg-background shadow-md ring-1 ring-primary/20 transition-transform duration-300 ease-out"
             style={{ transform: mode === "password" ? "translateX(0)" : "translateX(calc(-100% - 0px))", right: 4 }} aria-hidden />
           <button type="button" role="tab" aria-selected={mode === "password"} onClick={() => switchMode("password")}
-            className={cn("relative z-10 flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium transition-colors",
-              mode === "password" ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-            <KeyRound className="h-3.5 w-3.5" />رمز عبور
+            className={cn("relative z-10 flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs transition-colors",
+              mode === "password" ? "font-semibold text-primary" : "font-medium text-muted-foreground hover:text-foreground")}>
+            <KeyRound className={cn("h-3.5 w-3.5", mode === "password" ? "text-primary" : "opacity-70")} />رمز عبور
           </button>
           <button type="button" role="tab" aria-selected={mode === "otp"} onClick={() => switchMode("otp")}
-            className={cn("relative z-10 flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium transition-colors",
-              mode === "otp" ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-            <Smartphone className="h-3.5 w-3.5" />کد یک‌بارمصرف
+            className={cn("relative z-10 flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs transition-colors",
+              mode === "otp" ? "font-semibold text-primary" : "font-medium text-muted-foreground hover:text-foreground")}>
+            <Smartphone className={cn("h-3.5 w-3.5", mode === "otp" ? "text-primary" : "opacity-70")} />کد یک‌بارمصرف
           </button>
         </div>
 
@@ -372,45 +421,34 @@ export default function LoginPage() {
             </div>
             <ErrorSlot message={formError} />
             <div className="pt-1">
-              <ActionButton loading={otpBusy} loadingLabel="در حال ارسال…" disabled={blockedUntilEdit || !otpMobile.trim()}>دریافت کد تأیید</ActionButton>
+              <ActionButton loading={otpRequestBusy} loadingLabel="در حال ارسال…" disabled={blockedUntilEdit || !otpMobile.trim()}>دریافت کد تأیید</ActionButton>
             </div>
           </form>
         ) : !needHumanCheck ? (
           <form onSubmit={(e) => { e.preventDefault(); void onVerifyOtp(); }} className="flex flex-col gap-3.5" noValidate>
-            <div className="flex items-center gap-2 rounded-xl border border-border/80 bg-gradient-to-l from-muted/40 to-muted/10 px-3 py-2.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary shadow-sm"><Smartphone className="h-4 w-4" /></span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] text-muted-foreground">کد به این شماره ارسال شد</p>
-                <p className="truncate text-sm font-semibold tabular-nums tracking-wide" dir="ltr">{otpMobile}</p>
-              </div>
-              <button type="button"
-                className="inline-flex h-8 items-center gap-1 rounded-lg border border-border bg-background px-2.5 text-[11px] font-medium text-foreground shadow-sm transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+            <div className="flex h-11 items-center gap-2 rounded-xl border border-border/80 bg-gradient-to-l from-muted/40 to-muted/10 px-3">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Smartphone className="h-4 w-4" /></span>
+              <p className="min-w-0 flex-1 truncate text-sm font-semibold tabular-nums tracking-wide" dir="ltr">{otpMobile}</p>
+              <button type="button" aria-label="ویرایش شماره"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-primary/10 hover:text-primary"
                 onClick={() => { setOtpStep("mobile"); setOtpCode(""); setFormError(null); setBlockedUntilEdit(false); autoSubmitLock.current = false; }}>
-                <Pencil className="h-3 w-3" />اصلاح
+                <Pencil className="h-3.5 w-3.5" />
               </button>
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-medium">کد تأیید</Label>
-                {timerLeft > 0 ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium tabular-nums text-primary">
-                    <span className="h-1.5 w-1.5 rounded-full bg-primary" style={{ animation: "login-breathe 1.2s ease-in-out infinite" }} />
-                    {formatMmSs(timerLeft)}
-                  </span>
-                ) : <span className="text-[11px] text-destructive">کد منقضی شده</span>}
-              </div>
+              <Label className="text-xs font-medium">کد تأیید</Label>
               <OtpCodeInput value={otpCode}
                 onChange={(v) => { setOtpCode(v); setFormError(null); autoSubmitLock.current = false; markEdited(); }}
-                disabled={otpBusy}
-                onComplete={(code) => { if (!blockedUntilEdit && !needHumanCheck) void onVerifyOtp(code); }} />
+                disabled={otpVerifyBusy}
+                onComplete={(code) => { if (!blockedUntilEdit && !needHumanCheck && !otpVerifyBusy) void onVerifyOtp(code); }} />
             </div>
             {process.env.NODE_ENV === "development" && debugCode && (
               <p className="text-[11px] text-muted-foreground" dir="ltr">debug: {debugCode}</p>
             )}
             <ErrorSlot message={formError} />
             <div className="flex items-center gap-2 pt-1">
-              <ActionButton loading={otpBusy} loadingLabel="در حال تأیید…" disabled={blockedUntilEdit || otpCode.replace(/\D/g, "").length !== OTP_LENGTH} className="flex-1">تأیید و ورود</ActionButton>
-              <ResendButton cooldownSec={timerLeft} totalSec={OTP_TIMER_SEC} busy={otpBusy} disabled={blockedUntilEdit} onClick={() => void onRequestOtp({ force: true })} />
+              <ActionButton type="submit" loading={otpVerifyBusy} loadingLabel="در حال تأیید…" disabled={blockedUntilEdit || otpRequestBusy || otpCode.replace(/\D/g, "").length !== OTP_LENGTH} className="flex-1">تأیید و ورود</ActionButton>
+              <ResendButton cooldownSec={timerLeft} totalSec={OTP_TIMER_SEC} busy={otpRequestBusy} disabled={blockedUntilEdit || otpVerifyBusy} onClick={() => void onRequestOtp({ force: true })} />
             </div>
           </form>
         ) : null}
