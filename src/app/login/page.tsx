@@ -21,14 +21,19 @@ import { LoginVisual } from "./login-visual";
 import { HumanSlideCheck } from "./login-human-slide";
 import {
   SoftRingLoader, BreathingDots, ErrorSlot, ActionButton, ResendButton, OtpCodeInput, LoginShell,
-  OTP_LENGTH, OTP_TIMER_SEC,
+  OTP_LENGTH, OTP_TIMER_SEC, toFa, fromFa,
 } from "./login-parts";
 
 const IR_MOBILE_RE = /^09\d{9}$/;
 const OTP_SESSION_KEY = "hamareh.login.otp_session";
 
+function toAsciiDigits(raw: string) {
+  return raw
+    .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
+    .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
+}
 function normalizeMobile(raw: string) {
-  let t = raw.trim().replace(/[\s\-]/g, "");
+  let t = toAsciiDigits(raw).trim().replace(/[\s\-]/g, "");
   if (t.startsWith("+98")) t = "0" + t.slice(3);
   if (t.startsWith("98") && t.length === 12) t = "0" + t.slice(2);
   if (/^9\d{9}$/.test(t)) t = "0" + t;
@@ -38,10 +43,15 @@ function isValidIranMobile(raw: string) {
   return IR_MOBILE_RE.test(normalizeMobile(raw));
 }
 function sanitizeIdentifierInput(raw: string) {
-  if (/[a-zA-Z@]/.test(raw)) return raw.slice(0, 120);
-  const digits = raw.replace(/\D/g, "");
-  if (raw.trim().startsWith("+") && digits.length <= 12) return ("+" + digits).slice(0, 13);
+  const normalized = toAsciiDigits(raw);
+  if (/[a-zA-Z@]/.test(normalized)) return normalized.slice(0, 120);
+  const digits = normalized.replace(/\D/g, "");
+  if (normalized.trim().startsWith("+") && digits.length <= 12) return ("+" + digits).slice(0, 13);
   return digits.slice(0, 11);
+}
+function displayIdentifier(raw: string) {
+  if (/[a-zA-Z@]/.test(raw)) return raw;
+  return toFa(raw);
 }
 
 const passwordSchema = z.object({
@@ -411,8 +421,8 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit(onPasswordSubmit)} className="flex flex-col gap-3.5" noValidate>
             <div className="space-y-1.5">
               <Label htmlFor="identifier" className="text-xs font-medium">ایمیل یا موبایل <span className="text-destructive">*</span></Label>
-              <Input id="identifier" dir="ltr" autoComplete="username" className="h-10 text-left text-sm" placeholder="0912... یا user@company.com"
-                name={identifierReg.name} ref={identifierReg.ref} onBlur={identifierReg.onBlur} value={identifierValue}
+              <Input id="identifier" dir="ltr" autoComplete="username" className="h-10 text-left text-sm" placeholder={`${toFa("0912")}... یا user@company.com`}
+                name={identifierReg.name} ref={identifierReg.ref} onBlur={identifierReg.onBlur} value={displayIdentifier(identifierValue)}
                 onChange={(e) => { setValue("identifier", sanitizeIdentifierInput(e.target.value), { shouldValidate: false, shouldDirty: true }); markEdited(); }} />
               {errors.identifier && <p className="text-[11px] text-destructive">{errors.identifier.message}</p>}
             </div>
@@ -435,9 +445,9 @@ export default function LoginPage() {
           <form onSubmit={(e) => { e.preventDefault(); void onRequestOtp(); }} className="flex flex-col gap-3.5" noValidate>
             <div className="space-y-1.5">
               <Label htmlFor="otp-mobile" className="text-xs font-medium">شماره موبایل <span className="text-destructive">*</span></Label>
-              <Input id="otp-mobile" dir="ltr" inputMode="numeric" autoComplete="tel" maxLength={11} className="h-10 text-left text-sm tracking-wide" placeholder="0912xxxxxxxx"
-                value={otpMobile}
-                onChange={(e) => { setOtpMobile(e.target.value.replace(/\D/g, "").slice(0, 11)); setOtpMobileError(null); markEdited(); }}
+              <Input id="otp-mobile" dir="ltr" inputMode="numeric" autoComplete="tel" maxLength={11} className="h-10 text-left text-sm tracking-wide" placeholder={toFa("0912xxxxxxxx")}
+                value={toFa(otpMobile)}
+                onChange={(e) => { setOtpMobile(fromFa(e.target.value).replace(/\D/g, "").slice(0, 11)); setOtpMobileError(null); markEdited(); }}
                 onBlur={() => { if (otpMobile.trim() && !isValidIranMobile(otpMobile)) { setOtpMobileError("فرمت صحیح: ۰۹۱۲xxxxxxxx"); setBlockedUntilEdit(true); } }} />
               {otpMobileError && <p className="text-[11px] text-destructive">{otpMobileError}</p>}
             </div>
@@ -452,7 +462,7 @@ export default function LoginPage() {
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Smartphone className="h-4 w-4" /></span>
               <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
                 کد به{" "}
-                <span className="font-semibold tabular-nums tracking-wide text-foreground" dir="ltr">{otpMobile}</span>
+                <span className="font-semibold tabular-nums tracking-wide text-foreground" dir="ltr">{toFa(otpMobile)}</span>
                 {" "}ارسال شد
               </p>
               <button type="button" aria-label="ویرایش شماره"
@@ -469,7 +479,7 @@ export default function LoginPage() {
                 onComplete={(code) => { if (!blockedUntilEdit && !needHumanCheck && !otpVerifyBusy) void onVerifyOtp(code); }} />
             </div>
             {process.env.NODE_ENV === "development" && debugCode && (
-              <p className="text-[11px] text-muted-foreground" dir="ltr">debug: {debugCode}</p>
+              <p className="text-[11px] text-muted-foreground" dir="ltr">debug: {toFa(debugCode)}</p>
             )}
             <ErrorSlot message={formError} />
             <div className="flex items-center gap-2 pt-1">
