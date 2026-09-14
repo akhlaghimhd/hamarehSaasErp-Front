@@ -3,16 +3,18 @@
  * Tenant id is never typed by the user; resolved by Backend / org picker.
  */
 
-import { apiPost, ApiClientError } from "@/api";
+import { apiGet, apiPost, ApiClientError } from "@/api";
 import type { ApiSuccessResponse, LoginResponseData } from "@/api/types";
 import { useAuthStore } from "./auth-store";
 import { tokenStorage } from "@/api/token-storage";
+import type { ActiveOrganization, UserProfile } from "./types";
 
 const LOGIN_PATH = "/identity-core/identity/auth/login";
 const LOGOUT_PATH = "/identity-core/identity/auth/logout";
 const OTP_REQUEST_PATH = "/identity-core/identity/auth/otp/request";
 const OTP_VERIFY_PATH = "/identity-core/identity/auth/otp/verify";
 const SELECT_TENANT_PATH = "/identity-core/identity/auth/select-tenant";
+const PROFILE_ME_PATH = "/identity-core/identity/profiles/me";
 
 export interface OrganizationOption {
   tenant_id: string;
@@ -37,6 +39,25 @@ function unwrapData<T extends Record<string, unknown>>(envelope: unknown): T {
   return envelope as T;
 }
 
+function organizationFromLogin(data: LoginResponseData): ActiveOrganization | null {
+  const org = data.organization;
+  if (org?.tenant_id) {
+    return {
+      tenant_id: org.tenant_id,
+      tenant_name: org.tenant_name ?? null,
+      tenant_code: org.tenant_code ?? null,
+    };
+  }
+  if (data.active_tenant_id) {
+    return {
+      tenant_id: data.active_tenant_id,
+      tenant_name: null,
+      tenant_code: null,
+    };
+  }
+  return null;
+}
+
 function applySession(data: LoginResponseData) {
   if (!data?.access_token) {
     throw new ApiClientError({
@@ -50,6 +71,7 @@ function applySession(data: LoginResponseData) {
     user: data.user,
     securityContext: data.security_context,
     activeTenantId: data.active_tenant_id,
+    organization: organizationFromLogin(data),
   });
 }
 
@@ -102,8 +124,8 @@ export const authService = {
     const prevUser = store.user;
     const prevCtx = store.securityContext;
     const prevTenant = store.activeTenantId;
+    const prevOrg = store.organization;
 
-    // Temporarily put pre-auth token for this single call (do not persist snapshot)
     tokenStorage.setAccessToken(preAuthToken);
     useAuthStore.setState({
       accessToken: preAuthToken,
@@ -121,7 +143,6 @@ export const authService = {
         });
       }
     } catch (e) {
-      // Restore previous session state fully on failure
       if (prevToken) {
         tokenStorage.setAccessToken(prevToken);
         tokenStorage.setTenantId(prevTenant);
@@ -130,6 +151,7 @@ export const authService = {
           user: prevUser,
           securityContext: prevCtx,
           activeTenantId: prevTenant,
+          organization: prevOrg,
           isAuthenticated: true,
           isHydrated: true,
         });
@@ -141,11 +163,20 @@ export const authService = {
     }
   },
 
+  /**
+   * Platform profile for current user (requires auth + tenant header).
+   * Backend: GET identity-core/identity/profiles/me
+   */
+  async getProfile(): Promise<UserProfile> {
+    const envelope = await apiGet(PROFILE_ME_PATH);
+    return unwrapData<UserProfile>(envelope as unknown);
+  },
+
   async logout(): Promise<void> {
     try {
       await apiPost(LOGOUT_PATH, {});
     } catch {
-      // ignore
+      // ignore network/session errors on logout
     } finally {
       useAuthStore.getState().clearSession();
     }

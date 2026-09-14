@@ -8,6 +8,7 @@ export interface AuthUser {
   first_name: string;
   last_name: string;
   email: string;
+  mobile?: string | null;
 }
 
 export interface AuthRole {
@@ -34,6 +35,13 @@ export interface SecurityContext {
   is_owner: boolean;
 }
 
+/** Active organization returned by Backend on full session login. */
+export interface ActiveOrganization {
+  tenant_id: string;
+  tenant_name: string | null;
+  tenant_code: string | null;
+}
+
 export interface LoginCredentials {
   email: string;
   password: string;
@@ -45,4 +53,18 @@ export interface AuthSessionSnapshot {
   user: AuthUser;
   security_context: SecurityContext;
   active_tenant_id: string | null;
+  organization?: ActiveOrganization | null;
+}
+
+/** Platform user profile (identity.profiles/me) — optional fields. */
+export interface UserProfile {
+  profile_id?: string;
+  user_id: string;
+  national_id?: string | null;
+  birth_date?: string | null;
+  avatar_url?: string | null;
+  gender?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  description?: string | null;
 }

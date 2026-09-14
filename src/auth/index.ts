@@ -13,4 +13,6 @@ export type {
   SecurityContext,
   LoginCredentials,
   AuthSessionSnapshot,
+  ActiveOrganization,
+  UserProfile,
 } from "./types";

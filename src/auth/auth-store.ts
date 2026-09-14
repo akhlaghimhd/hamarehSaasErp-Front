@@ -9,7 +9,12 @@
 
 import { create } from "zustand";
 import { tokenStorage } from "@/api/token-storage";
-import type { AuthSessionSnapshot, AuthUser, SecurityContext } from "./types";
+import type {
+  ActiveOrganization,
+  AuthSessionSnapshot,
+  AuthUser,
+  SecurityContext,
+} from "./types";
 
 const SESSION_SNAPSHOT_KEY = "auth_session_snapshot";
 
@@ -42,6 +47,7 @@ interface AuthState {
   user: AuthUser | null;
   securityContext: SecurityContext | null;
   activeTenantId: string | null;
+  organization: ActiveOrganization | null;
   isHydrated: boolean;
   isAuthenticated: boolean;
 
@@ -51,9 +57,11 @@ interface AuthState {
     user: AuthUser;
     securityContext: SecurityContext;
     activeTenantId: string | null;
+    organization?: ActiveOrganization | null;
   }) => void;
   clearSession: () => void;
   setActiveTenantId: (tenantId: string | null) => void;
+  setOrganization: (org: ActiveOrganization | null) => void;
   hasPermission: (code: string) => boolean;
 }
 
@@ -62,6 +70,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   securityContext: null,
   activeTenantId: null,
+  organization: null,
   isHydrated: false,
   isAuthenticated: false,
 
@@ -77,6 +86,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         user: null,
         securityContext: null,
         activeTenantId: null,
+        organization: null,
         isHydrated: true,
         isAuthenticated: false,
       });
@@ -88,24 +98,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user: snapshot?.user ?? null,
       securityContext: snapshot?.security_context ?? null,
       activeTenantId: tenantId ?? snapshot?.active_tenant_id ?? null,
+      organization: snapshot?.organization ?? null,
       isHydrated: true,
       isAuthenticated: true,
     });
   },
 
-  setSession: ({ accessToken, user, securityContext, activeTenantId }) => {
+  setSession: ({ accessToken, user, securityContext, activeTenantId, organization }) => {
     tokenStorage.setAccessToken(accessToken);
     tokenStorage.setTenantId(activeTenantId);
+    const org = organization ?? null;
     writeSnapshot({
       user,
       security_context: securityContext,
       active_tenant_id: activeTenantId,
+      organization: org,
     });
     set({
       accessToken,
       user,
       securityContext,
       activeTenantId,
+      organization: org,
       isHydrated: true,
       isAuthenticated: true,
     });
@@ -119,6 +133,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user: null,
       securityContext: null,
       activeTenantId: null,
+      organization: null,
       isHydrated: true,
       isAuthenticated: false,
     });
@@ -126,7 +141,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setActiveTenantId: (tenantId) => {
     tokenStorage.setTenantId(tenantId);
-    const { user, securityContext } = get();
+    const { user, securityContext, organization } = get();
     if (user && securityContext) {
       writeSnapshot({
         user,
@@ -135,9 +150,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           tenant_id: tenantId,
         },
         active_tenant_id: tenantId,
+        organization,
       });
     }
     set({ activeTenantId: tenantId });
+  },
+
+  setOrganization: (org) => {
+    const { user, securityContext, activeTenantId } = get();
+    if (user && securityContext) {
+      writeSnapshot({
+        user,
+        security_context: securityContext,
+        active_tenant_id: activeTenantId,
+        organization: org,
+      });
+    }
+    set({ organization: org });
   },
 
   hasPermission: (code) => {

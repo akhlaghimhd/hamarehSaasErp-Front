@@ -14,10 +14,14 @@ import {
   type ReactNode,
 } from "react";
 import { useAuthStore } from "./auth-store";
-import type { AuthScope, AuthUser, SecurityContext } from "./types";
+import type { ActiveOrganization, AuthScope, AuthUser, SecurityContext } from "./types";
 
 interface TenantContextValue {
   tenantId: string | null;
+  /** Display name when Backend returned organization on login. */
+  tenantName: string | null;
+  tenantCode: string | null;
+  organization: ActiveOrganization | null;
   user: AuthUser | null;
   securityContext: SecurityContext | null;
   scopes: AuthScope[];
@@ -35,6 +39,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const isHydrated = useAuthStore((s) => s.isHydrated);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const activeTenantId = useAuthStore((s) => s.activeTenantId);
+  const organization = useAuthStore((s) => s.organization);
   const user = useAuthStore((s) => s.user);
   const securityContext = useAuthStore((s) => s.securityContext);
   const hasPermission = useAuthStore((s) => s.hasPermission);
@@ -46,6 +51,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const value = useMemo<TenantContextValue>(
     () => ({
       tenantId: activeTenantId,
+      tenantName: organization?.tenant_name ?? null,
+      tenantCode: organization?.tenant_code ?? null,
+      organization,
       user,
       securityContext,
       scopes: securityContext?.scopes ?? [],
@@ -57,6 +65,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }),
     [
       activeTenantId,
+      organization,
       user,
       securityContext,
       isAuthenticated,
