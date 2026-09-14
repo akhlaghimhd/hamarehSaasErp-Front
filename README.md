@@ -51,3 +51,22 @@ src/
 ## فاز فعلی
 
 Phase 0: اسکلت + قالب Admin + RTL + فونت + کامپوننت‌های پایه (دکمه، ورودی، کارت، نشان، هشدار)
+
+## FE-P0 — Foundation status
+
+Critical path implemented:
+
+- API client: Bearer + `X-Tenant-ID`, timeout, limited retry, `ApiClientError`
+- Auth store (Zustand) + session snapshot in `localStorage`
+- Auth service: password / OTP / select-tenant / logout / `profiles/me`
+- Login page (RTL), AuthGuard / GuestGuard, TenantProvider
+- App shell: Header (user + organization name) + collapsible Sidebar
+- Shared form / table / dirty dialog / feedback primitives + UI Guide
+
+### Known deferred debts
+
+- Refresh-token queue: Backend has no refresh endpoint yet (401 clears session)
+- httpOnly cookie storage for tokens (currently `localStorage`)
+- Full tenant module catalog from a dedicated API (not required for shell)
+
+See `docs/FE-P0-CLOSEOUT.md` for the phase checklist.

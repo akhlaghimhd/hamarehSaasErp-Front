@@ -37,6 +37,7 @@ export function AppHeader() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const activeTenantId = useAuthStore((s) => s.activeTenantId);
+  const organization = useAuthStore((s) => s.organization);
   const securityContext = useAuthStore((s) => s.securityContext);
 
   const displayName = user
@@ -46,6 +47,10 @@ export function AppHeader() {
   const roleLabel =
     securityContext?.roles?.[0]?.name ||
     securityContext?.roles?.[0]?.code ||
+    null;
+  const tenantLabel =
+    organization?.tenant_name ||
+    organization?.tenant_code ||
     null;
 
   const handleLogout = async () => {
@@ -111,9 +116,9 @@ export function AppHeader() {
               {roleLabel && (
                 <div className="text-[11px] font-normal text-muted-foreground">{roleLabel}</div>
               )}
-              {activeTenantId && (
-                <div className="truncate text-[11px] font-normal text-muted-foreground" dir="ltr">
-                  Tenant: {activeTenantId}
+              {(tenantLabel || activeTenantId) && (
+                <div className="truncate text-[11px] font-normal text-muted-foreground">
+                  سازمان: {tenantLabel ?? activeTenantId}
                 </div>
               )}
             </DropdownMenuLabel>
