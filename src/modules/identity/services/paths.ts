@@ -1,0 +1,26 @@
+/**
+ * FE-P1-T02 — IdentityCore API path constants (versioned under /api/v1).
+ */
+
+export const IDENTITY_BASE = "/identity-core/identity";
+
+export const identityPaths = {
+  profileMe: `${IDENTITY_BASE}/profiles/me`,
+  profileByUser: (userId: string) => `${IDENTITY_BASE}/profiles/${userId}`,
+  users: `${IDENTITY_BASE}/users`,
+  user: (id: string) => `${IDENTITY_BASE}/users/${id}`,
+  roles: `${IDENTITY_BASE}/roles`,
+  role: (id: string) => `${IDENTITY_BASE}/roles/${id}`,
+  roleAssign: `${IDENTITY_BASE}/roles/assign`,
+  roleAssignPermissions: `${IDENTITY_BASE}/roles/assign-permissions`,
+  permissions: `${IDENTITY_BASE}/permissions`,
+  permission: (id: string) => `${IDENTITY_BASE}/permissions/${id}`,
+  scopes: `${IDENTITY_BASE}/scopes`,
+  scope: (id: string) => `${IDENTITY_BASE}/scopes/${id}`,
+  scopeAssign: `${IDENTITY_BASE}/scopes/assign`,
+  scopeUnassign: `${IDENTITY_BASE}/scopes/unassign`,
+  scopeUser: (tenantUserId: string) => `${IDENTITY_BASE}/scopes/user/${tenantUserId}`,
+  membershipHistories: `${IDENTITY_BASE}/membership-histories`,
+  membershipHistoryByUser: (tenantUserId: string) =>
+    `${IDENTITY_BASE}/membership-histories/user/${tenantUserId}`,
+} as const;
