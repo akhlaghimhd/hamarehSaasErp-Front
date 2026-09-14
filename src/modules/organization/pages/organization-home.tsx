@@ -1,5 +1,6 @@
 /**
  * FE-P0 — Organization module placeholder (next priority after Foundation).
+ * Demonstrates PageHeader + Breadcrumb + EmptyState + Can patterns.
  */
 
 "use client";
@@ -15,6 +16,10 @@ export function OrganizationHome() {
       <PageHeader
         title="سازمان"
         description="شرکت، شعبه و واحد سازمانی — اسکلت ماژول برای توسعه بعدی"
+        breadcrumbs={[
+          { label: "داشبورد", href: "/dashboard" },
+          { label: "سازمان" },
+        ]}
       />
       <Can
         permission="organization.view"

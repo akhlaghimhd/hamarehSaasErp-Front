@@ -7,6 +7,7 @@
  * - Inject X-Tenant-ID (required by TenantContextMiddleware)
  * - Normalize Backend error shapes into ApiClientError
  * - Clear auth storage on 401 (session invalid)
+ * - Limited retry for idempotent network/5xx failures
  * - No business logic; pure transport + contract
  *
  * Backend contracts observed:
@@ -14,6 +15,8 @@
  * - Auth: Laravel Sanctum personal access token (no refresh endpoint yet)
  * - Success envelope: { status: "success", message?, data }
  * - Error envelope: { status: "error" | success: false, message, errors? }
+ *
+ * Known debt: Refresh-token queue — Backend has no refresh endpoint; 401 clears session only.
  */
 
 import axios, {
@@ -31,6 +34,11 @@ const API_BASE_URL =
 /** Header name locked by Backend TenantContextMiddleware. */
 export const TENANT_HEADER = "X-Tenant-ID";
 
+/** Max automatic retries for transient failures (GET-like / network / 502–504). */
+const MAX_RETRIES = 2;
+
+type RetriableConfig = InternalAxiosRequestConfig & { __retryCount?: number };
+
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -39,6 +47,27 @@ export const apiClient: AxiosInstance = axios.create({
   },
   timeout: 30_000,
 });
+
+function isIdempotentMethod(method?: string): boolean {
+  const m = (method ?? "get").toLowerCase();
+  return m === "get" || m === "head" || m === "options";
+}
+
+function shouldRetry(error: AxiosError, config?: RetriableConfig): boolean {
+  if (!config) return false;
+  const count = config.__retryCount ?? 0;
+  if (count >= MAX_RETRIES) return false;
+
+  // Network / timeout
+  if (!error.response) return true;
+
+  const status = error.response.status;
+  // Retry only safe methods on gateway errors
+  if (isIdempotentMethod(config.method) && [502, 503, 504].includes(status)) {
+    return true;
+  }
+  return false;
+}
 
 // ---------------------------------------------------------------------------
 // Request: inject token + tenant
@@ -50,7 +79,6 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Allow per-request override via config.headers[TENANT_HEADER]
     const existingTenant = config.headers[TENANT_HEADER];
     if (!existingTenant) {
       const tenantId = tokenStorage.getTenantId();
@@ -65,12 +93,20 @@ apiClient.interceptors.request.use(
 );
 
 // ---------------------------------------------------------------------------
-// Response: normalize errors + handle 401
+// Response: limited retry + normalize errors + handle 401
 // ---------------------------------------------------------------------------
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: AxiosError<ApiErrorResponse>) => {
-    // Network / timeout / no response
+  async (error: AxiosError<ApiErrorResponse>) => {
+    const config = error.config as RetriableConfig | undefined;
+
+    if (shouldRetry(error, config) && config) {
+      config.__retryCount = (config.__retryCount ?? 0) + 1;
+      const delayMs = 300 * config.__retryCount;
+      await new Promise((r) => setTimeout(r, delayMs));
+      return apiClient.request(config);
+    }
+
     if (!error.response) {
       const isTimeout = error.code === "ECONNABORTED";
       return Promise.reject(
@@ -87,7 +123,8 @@ apiClient.interceptors.response.use(
     const { status, data } = error.response;
 
     if (status === 401) {
-      // Session invalid — clear local auth; Auth Guard (T05) will redirect.
+      // Session invalid — clear local auth; Auth Guard will redirect.
+      // Refresh queue deferred until Backend exposes refresh endpoint.
       tokenStorage.clearAuth();
     }
 
@@ -132,10 +169,6 @@ function defaultMessageForStatus(status: number): string {
       return "خطای غیرمنتظره رخ داد.";
   }
 }
-
-// ---------------------------------------------------------------------------
-// Typed helpers (optional convenience for services)
-// ---------------------------------------------------------------------------
 
 export async function apiGet<T>(
   url: string,

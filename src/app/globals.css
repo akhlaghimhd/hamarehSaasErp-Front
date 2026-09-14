@@ -106,6 +106,24 @@
     min-height: 100vh;
   }
 
+  /* FE-P0-T14 — visible keyboard focus; never remove without replacement */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* FE-P0-T14 — respect reduced motion (UI-11) */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
   /* Sonner toast font */
   [data-sonner-toaster],
   [data-sonner-toast],
@@ -173,7 +191,6 @@
     backdrop-filter: blur(12px) saturate(1.15);
   }
 
-  /* CSS-only surface patterns (no images) — use sparingly for atmosphere */
   .pattern-dots {
     background-color: hsl(var(--card));
     background-image: radial-gradient(hsl(var(--primary) / 0.09) 1px, transparent 1px);
@@ -217,7 +234,6 @@
   }
 }
 
-/* Login visual keyframes (pure CSS, no styled-jsx) */
 @keyframes loginLinkPulse {
   0%,
   100% {
