@@ -1,5 +1,5 @@
 /**
- * FE-P1 — Identity module landing hub (all phase features open).
+ * FE-P1 — صفحه اصلی هویت و دسترسی
  */
 
 "use client";
@@ -16,47 +16,42 @@ type HubCard = {
   description: string;
   icon: typeof UserRound;
   open: boolean;
-  permission?: string;
 };
 
 const cards: HubCard[] = [
   {
     href: "/dashboard/identity/me",
     title: "پروفایل من",
-    description: "ویرایش اطلاعات تکمیلی حساب",
+    description: "مشاهده و ویرایش اطلاعات حساب کاربری",
     icon: UserRound,
     open: true,
   },
   {
     href: "/dashboard/identity/members",
-    title: "اعضای مستأجر",
-    description: "لیست و مدیریت اعضای مستأجر",
+    title: "کاربران سازمان",
+    description: "افزودن و مدیریت اعضای سازمان",
     icon: Users,
-    permission: IdentityPermissions.userView,
     open: true,
   },
   {
     href: "/dashboard/identity/roles",
     title: "نقش‌ها",
-    description: "نقش و تخصیص مجوز",
+    description: "تعریف نقش و تعیین سطح دسترسی",
     icon: Shield,
-    permission: IdentityPermissions.roleView,
     open: true,
   },
   {
     href: "/dashboard/identity/permissions",
     title: "مجوزها",
-    description: "فهرست و تعریف مجوز مستأجر",
+    description: "فهرست دسترسی‌های قابل تخصیص در سازمان",
     icon: KeyRound,
-    permission: IdentityPermissions.permissionView,
     open: true,
   },
   {
     href: "/dashboard/identity/scopes",
-    title: "Scope",
-    description: "محدوده دسترسی سازمانی",
+    title: "محدوده دسترسی",
+    description: "تعیین محدوده کار مثل شعبه یا واحد سازمانی",
     icon: Scan,
-    permission: IdentityPermissions.scopeView,
     open: true,
   },
 ];
@@ -90,7 +85,7 @@ function HubCardView({
         <span className="mt-auto text-[10px] text-muted-foreground">به‌زودی</span>
       ) : !allowed ? (
         <span className="mt-auto text-[10px] text-amber-700 dark:text-amber-400">
-          نیاز به مجوز: {card.permission}
+          برای ورود به این بخش مجوز لازم را ندارید
         </span>
       ) : null}
     </div>
@@ -125,7 +120,7 @@ export function IdentityHome() {
     <div className="space-y-6">
       <PageHeader
         title="هویت و دسترسی"
-        description="پروفایل، اعضا، نقش‌ها، مجوزها و Scope در سطح مستأجر"
+        description="مدیریت حساب کاربری، اعضای سازمان، نقش‌ها، مجوزها و محدوده دسترسی"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "هویت و دسترسی" },
