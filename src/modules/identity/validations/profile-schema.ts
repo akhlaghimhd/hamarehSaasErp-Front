@@ -1,7 +1,3 @@
-/**
- * Self-service profile form (bio + address request only).
- */
-
 import { z } from "zod";
 
 const emptyToNull = (v: unknown) => {
@@ -14,15 +10,10 @@ export const selfProfileSchema = z.object({
     emptyToNull,
     z.string().max(500, "حداکثر ۵۰۰ کاراکتر").nullable().optional()
   ),
-  address: z.preprocess(
-    emptyToNull,
-    z.string().max(2000, "حداکثر ۲۰۰۰ کاراکتر").nullable().optional()
-  ),
 });
 
 export type SelfProfileFormValues = z.infer<typeof selfProfileSchema>;
 
-/** @deprecated identity fields are admin-only */
 export const profileUpsertSchema = selfProfileSchema;
 export type ProfileUpsertFormValues = SelfProfileFormValues;
 
@@ -44,7 +35,6 @@ export const ADDRESS_STATUS_LABELS: Record<number, string> = {
   3: "رد شده",
 };
 
-/** Minimal Gregorian → Jalali for read-only display */
 export function toJalaliDisplay(isoDate?: string | null): string {
   if (!isoDate) return "—";
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDate);
@@ -73,12 +63,8 @@ export function toJalaliDisplay(isoDate?: string | null): string {
     days = (days - 1) % 365;
   }
   const jm =
-    days < 186
-      ? 1 + Math.floor(days / 31)
-      : 7 + Math.floor((days - 186) / 30);
-  const jd =
-    1 +
-    (days < 186 ? days % 31 : (days - 186) % 30);
+    days < 186 ? 1 + Math.floor(days / 31) : 7 + Math.floor((days - 186) / 30);
+  const jd = 1 + (days < 186 ? days % 31 : (days - 186) % 30);
   const fa = "۰۱۲۳۴۵۶۷۸۹";
   const toFa = (n: number, w = 2) =>
     String(n)
