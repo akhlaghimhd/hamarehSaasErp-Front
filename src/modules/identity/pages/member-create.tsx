@@ -1,7 +1,4 @@
-/**
- * FE-P1-T08 — Invite / add tenant member form.
- * RHF + Zod, UI-04 field errors, permission identity.user.create.
- */
+/** FE-P1-T08 — افزودن کاربر به سازمان */
 
 "use client";
 
@@ -49,6 +46,8 @@ import {
   createMemberSchema,
   type CreateMemberFormValues,
 } from "../validations/member-schema";
+import { MSG_GENERIC_ERROR, MSG_NO_ACCESS } from "../lib/ui-copy";
+import { toFaDigits } from "@/shared/lib/utils";
 
 export function MemberCreatePage() {
   const router = useRouter();
@@ -91,7 +90,7 @@ export function MemberCreatePage() {
           setRolesError(
             e instanceof ApiClientError
               ? e.message
-              : "بارگذاری نقش‌ها ناموفق بود."
+              : "بارگذاری نقش‌ها ممکن نشد."
           );
         }
       })
@@ -114,15 +113,13 @@ export function MemberCreatePage() {
         is_owner: values.is_owner ?? false,
         role_ids: values.role_id ? [values.role_id] : [],
       });
-      toast.success("عضو با موفقیت اضافه شد");
-      router.push(
-        `/dashboard/identity/members/${member.tenant_user_id}`
-      );
+      toast.success("کاربر با موفقیت به سازمان اضافه شد");
+      router.push(`/dashboard/identity/members/${member.tenant_user_id}`);
     } catch (e) {
       const msg =
-        e instanceof ApiClientError
+        e instanceof ApiClientError && e.message
           ? e.message
-          : "افزودن عضو ناموفق بود.";
+          : MSG_GENERIC_ERROR;
       toast.error(msg);
       if (e instanceof ApiClientError && e.errors) {
         Object.entries(e.errors).forEach(([key, messages]) => {
@@ -139,16 +136,16 @@ export function MemberCreatePage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="افزودن عضو"
+          title="افزودن کاربر"
           breadcrumbs={[
             { label: "داشبورد", href: "/dashboard" },
             { label: "هویت و دسترسی", href: "/dashboard/identity" },
-            { label: "اعضا", href: "/dashboard/identity/members" },
+            { label: "کاربران", href: "/dashboard/identity/members" },
             { label: "افزودن" },
           ]}
         />
         <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-6 py-12 text-center text-sm text-muted-foreground">
-          دسترسی ایجاد عضو (identity.user.create) برای این حساب فعال نیست.
+          {MSG_NO_ACCESS}
         </div>
       </div>
     );
@@ -157,12 +154,12 @@ export function MemberCreatePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="افزودن عضو"
-        description="دعوت یا ایجاد کاربر و عضویت در مستأجر جاری"
+        title="افزودن کاربر"
+        description="ثبت کاربر جدید یا افزودن عضویت به سازمان"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "هویت و دسترسی", href: "/dashboard/identity" },
-          { label: "اعضا", href: "/dashboard/identity/members" },
+          { label: "کاربران", href: "/dashboard/identity/members" },
           { label: "افزودن" },
         ]}
         actions={
@@ -174,9 +171,9 @@ export function MemberCreatePage() {
 
       <Card className="max-w-3xl">
         <CardHeader>
-          <CardTitle className="text-base">اطلاعات عضو جدید</CardTitle>
+          <CardTitle className="text-base">اطلاعات کاربر جدید</CardTitle>
           <CardDescription>
-            در صورت وجود کاربر با همان ایمیل، فقط عضویت مستأجر ایجاد می‌شود.
+            اگر این ایمیل از قبل در سامانه باشد، فقط عضویت او در این سازمان ثبت می‌شود.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -267,7 +264,9 @@ export function MemberCreatePage() {
                           {...field}
                         />
                       </FormControl>
-                      <FormDescription>حداقل ۸ کاراکتر</FormDescription>
+                      <FormDescription>
+                        حداقل {toFaDigits(8)} نویسه
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -304,18 +303,16 @@ export function MemberCreatePage() {
                               value={r.tenant_role_id}
                             >
                               {r.name}
-                              {r.code ? ` (${r.code})` : ""}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                       {rolesError ? (
                         <p className="text-xs text-muted-foreground">
-                          نقش‌ها بارگذاری نشد ({rolesError}). می‌توانید بدون نقش
-                          ادامه دهید.
+                          نقش‌ها بارگذاری نشد. می‌توانید بدون نقش ادامه دهید و بعداً نقش بدهید.
                         </p>
                       ) : (
-                        <FormDescription>اختیاری — قابل تغییر بعداً</FormDescription>
+                        <FormDescription>اختیاری — بعداً هم قابل تغییر است</FormDescription>
                       )}
                       <FormMessage />
                     </FormItem>
@@ -333,9 +330,9 @@ export function MemberCreatePage() {
                         />
                       </FormControl>
                       <div className="space-y-1 leading-none">
-                        <FormLabel className="font-normal">مالک مستأجر</FormLabel>
+                        <FormLabel className="font-normal">مدیر اصلی سازمان</FormLabel>
                         <FormDescription>
-                          فقط در صورت نیاز سازمانی علامت بزنید.
+                          فقط اگر این فرد باید بالاترین سطح مدیریت سازمان را داشته باشد علامت بزنید.
                         </FormDescription>
                       </div>
                     </FormItem>
@@ -355,7 +352,7 @@ export function MemberCreatePage() {
                       در حال ذخیره…
                     </>
                   ) : (
-                    "افزودن عضو"
+                    "افزودن کاربر"
                   )}
                 </Button>
                 <Button type="button" variant="outline" size="sm" asChild>
