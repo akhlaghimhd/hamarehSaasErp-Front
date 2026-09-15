@@ -1,9 +1,6 @@
 /**
- * FE-P1 — Profile me (self-service policy locked):
- * - Identity fields: read-only (admin-managed)
- * - display_bio: self-editable
- * - address: self request → pending manager approval
- * - avatar: single image upload only
+ * Profile me — editable: avatar (crop+upload), bio, mobile (OTP).
+ * Identity fields: non-form read-only display only.
  */
 
 "use client";
@@ -12,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { UserRound, Loader2, Save, Camera, ImageIcon } from "lucide-react";
+import { UserRound, Loader2, Save, Camera } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import {
   Form,
@@ -21,9 +18,9 @@ import {
   FormLabel,
   FormControl,
   FormMessage,
-  FormDescription,
 } from "@/shared/components/form";
 import { Button } from "@/shared/components/ui/button";
+import { Input } from "@/shared/components/ui/input";
 import { useAuthStore } from "@/auth";
 import { ApiClientError } from "@/api";
 import {
@@ -31,8 +28,9 @@ import {
   useUpsertProfileMe,
   useUploadAvatarMe,
 } from "../hooks/use-profile-me";
+import { AvatarCropDialog } from "../components/avatar-crop-dialog";
+import { profileService } from "../services/profile-service";
 import {
-  ADDRESS_STATUS_LABELS,
   GENDER_LABELS,
   selfProfileSchema,
   toJalaliDisplay,
@@ -42,22 +40,21 @@ import {
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-function ReadOnlyField({
+function InfoItem({
   label,
   value,
   dir,
+  hint,
 }: {
   label: string;
   value: string;
   dir?: "ltr" | "rtl";
+  hint?: string;
 }) {
   return (
-    <div className="space-y-1">
-      <div className="text-xs font-medium text-muted-foreground">{label}</div>
-      <div
-        className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm"
-        dir={dir}
-      >
+    <div className="space-y-1" title={hint}>
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="text-sm font-medium" dir={dir}>
         {value || "—"}
       </div>
     </div>
@@ -66,29 +63,31 @@ function ReadOnlyField({
 
 export function ProfileMePage() {
   const user = useAuthStore((s) => s.user);
+  const setSession partial = useAuthStore.getState();
   const { data: profile, isLoading, isError, error, refetch } = useProfileMe();
   const upsert = useUpsertProfileMe();
   const uploadAvatar = useUploadAvatarMe();
   const fileRef = useRef<HTMLInputElement>(null);
+
   const [preview, setPreview] = useState<string | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+
+  const [mobileStep, setMobileStep] = useState<"idle" | "code">("idle");
+  const [newMobile, setNewMobile] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [mobileBusy, setMobileBusy] = useState(false);
+  const [debugCode, setDebugCode] = useState<string | null>(null);
 
   const form = useForm<SelfProfileFormValues>({
     resolver: zodResolver(selfProfileSchema),
-    defaultValues: {
-      display_bio: "",
-      address: "",
-    },
+    defaultValues: { display_bio: "" },
   });
 
   useEffect(() => {
     if (profile === undefined) return;
-    const pending =
-      profile?.address_change_status === 1 && profile?.pending_address
-        ? profile.pending_address
-        : profile?.address ?? "";
     form.reset({
       display_bio: profile?.display_bio ?? profile?.description ?? "",
-      address: pending ?? "",
     });
     setPreview(profile?.avatar_url ?? null);
   }, [profile, form]);
@@ -97,54 +96,96 @@ export function ProfileMePage() {
     ? `${user.first_name} ${user.last_name}`.trim() || user.email
     : "کاربر";
 
-  const addressStatus = Number(profile?.address_change_status ?? 0);
-  const addressStatusLabel = ADDRESS_STATUS_LABELS[addressStatus] ?? "";
+  const currentMobile = user?.mobile ?? profile?.user?.mobile ?? "";
 
-  const onSubmit = form.handleSubmit(async (values) => {
+  const onSubmitBio = form.handleSubmit(async (values) => {
     try {
       await upsert.mutateAsync({
         display_bio: values.display_bio || null,
-        address: values.address || null,
       });
-      toast.success(
-        values.address && values.address !== (profile?.address ?? "")
-          ? "ذخیره شد. تغییر آدرس پس از تأیید مدیر اعمال می‌شود."
-          : "پروفایل ذخیره شد"
-      );
+      toast.success("ذخیره شد");
     } catch (e) {
-      const msg =
-        e instanceof ApiClientError
-          ? e.message
-          : "ذخیره پروفایل ناموفق بود.";
-      toast.error(msg);
+      toast.error(
+        e instanceof ApiClientError ? e.message : "ذخیره ناموفق بود."
+      );
     }
   });
 
-  const onPickAvatar = async (file: File | null) => {
+  const onFileChosen = (file: File | null) => {
     if (!file) return;
     if (!ALLOWED_TYPES.includes(file.type)) {
-      toast.error("فقط فایل‌های JPG، PNG یا WebP مجاز است.");
+      toast.error("فرمت تصویر مجاز نیست.");
       return;
     }
     if (file.size > MAX_AVATAR_BYTES) {
-      toast.error("حجم تصویر حداکثر ۲ مگابایت باشد.");
+      toast.error("حجم فایل بیش از حد مجاز است.");
       return;
     }
+    setCropFile(file);
+    setCropOpen(true);
+  };
 
-    // Client-side dimension check (optional soft limit)
-    const objectUrl = URL.createObjectURL(file);
-    setPreview(objectUrl);
-
+  const onCropConfirm = async (cropped: File) => {
     try {
-      await uploadAvatar.mutateAsync(file);
-      toast.success("تصویر پروفایل به‌روز شد");
+      const updated = await uploadAvatar.mutateAsync(cropped);
+      setPreview(updated.avatar_url ?? null);
+      setCropOpen(false);
+      setCropFile(null);
+      toast.success("تصویر ذخیره شد");
     } catch (e) {
-      setPreview(profile?.avatar_url ?? null);
-      const msg =
-        e instanceof ApiClientError ? e.message : "آپلود تصویر ناموفق بود.";
-      toast.error(msg);
+      toast.error(
+        e instanceof ApiClientError ? e.message : "آپلود ناموفق بود."
+      );
+    }
+  };
+
+  const requestMobileOtp = async () => {
+    setMobileBusy(true);
+    setDebugCode(null);
+    try {
+      const res = await profileService.requestMobileChange(newMobile.trim());
+      setMobileStep("code");
+      if (res.debug_code) setDebugCode(res.debug_code);
+      toast.success("کد تأیید ارسال شد");
+    } catch (e) {
+      toast.error(
+        e instanceof ApiClientError ? e.message : "ارسال کد ناموفق بود."
+      );
     } finally {
-      URL.revokeObjectURL(objectUrl);
+      setMobileBusy(false);
+    }
+  };
+
+  const verifyMobileOtp = async () => {
+    setMobileBusy(true);
+    try {
+      const res = await profileService.verifyMobileChange(
+        newMobile.trim(),
+        otpCode.trim()
+      );
+      // refresh auth store mobile
+      const st = useAuthStore.getState();
+      if (st.user) {
+        st.setSession({
+          accessToken: st.accessToken!,
+          user: { ...st.user, mobile: res.mobile },
+          securityContext: st.securityContext!,
+          activeTenantId: st.activeTenantId,
+          organization: st.organization,
+        });
+      }
+      setMobileStep("idle");
+      setNewMobile("");
+      setOtpCode("");
+      setDebugCode(null);
+      toast.success("شماره موبایل به‌روز شد");
+      void refetch();
+    } catch (e) {
+      toast.error(
+        e instanceof ApiClientError ? e.message : "تأیید کد ناموفق بود."
+      );
+    } finally {
+      setMobileBusy(false);
     }
   };
 
@@ -152,7 +193,6 @@ export function ProfileMePage() {
     <div className="space-y-6">
       <PageHeader
         title="پروفایل من"
-        description="ویرایش محدود اطلاعات شخصی — فیلدهای هویتی توسط مدیر سیستم مدیریت می‌شود"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "هویت و دسترسی", href: "/dashboard/identity" },
@@ -161,7 +201,7 @@ export function ProfileMePage() {
       />
 
       <div className="rounded-xl border border-border/80 bg-card p-4 shadow-[var(--shadow-xs)] sm:p-6">
-        {/* Avatar + bio header */}
+        {/* Avatar */}
         <div className="mb-6 flex flex-col items-center gap-3 border-b border-border/60 pb-5 sm:flex-row sm:items-start sm:gap-4">
           <div className="relative">
             <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
@@ -169,7 +209,7 @@ export function ProfileMePage() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={preview}
-                  alt="آواتار"
+                  alt=""
                   className="h-full w-full object-cover"
                 />
               ) : (
@@ -183,8 +223,7 @@ export function ProfileMePage() {
               className="absolute -bottom-1 -start-1 h-8 w-8 rounded-full shadow"
               disabled={uploadAvatar.isPending}
               onClick={() => fileRef.current?.click()}
-              aria-label="تغییر تصویر پروفایل"
-              title="آپلود تصویر (حداکثر ۲ مگابایت)"
+              aria-label="تغییر تصویر"
             >
               {uploadAvatar.isPending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -198,8 +237,7 @@ export function ProfileMePage() {
               accept="image/jpeg,image/png,image/webp"
               className="hidden"
               onChange={(e) => {
-                const f = e.target.files?.[0] ?? null;
-                void onPickAvatar(f);
+                onFileChosen(e.target.files?.[0] ?? null);
                 e.target.value = "";
               }}
             />
@@ -212,17 +250,13 @@ export function ProfileMePage() {
                 {profile?.display_bio ?? profile?.description}
               </p>
             )}
-            <p className="flex items-center justify-center gap-1 text-[11px] text-muted-foreground sm:justify-start">
-              <ImageIcon className="h-3 w-3" />
-              یک تصویر JPG/PNG/WebP — حداکثر ۲ مگابایت
-            </p>
           </div>
         </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            در حال بارگذاری پروفایل…
+            در حال بارگذاری…
           </div>
         ) : isError &&
           !(error instanceof ApiClientError && error.statusCode === 404) ? (
@@ -230,7 +264,7 @@ export function ProfileMePage() {
             <p className="text-sm text-destructive">
               {error instanceof ApiClientError
                 ? error.message
-                : "بارگذاری پروفایل ناموفق بود."}
+                : "بارگذاری ناموفق بود."}
             </p>
             <Button
               type="button"
@@ -242,61 +276,49 @@ export function ProfileMePage() {
             </Button>
           </div>
         ) : (
-          <>
-            {/* Read-only identity */}
-            <div className="mb-6 space-y-3">
-              <h2 className="text-sm font-semibold">اطلاعات هویتی</h2>
-              <p className="text-[11px] text-muted-foreground">
-                این بخش فقط نمایش است و توسط مدیر سیستم / پرسنل ویرایش می‌شود.
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <ReadOnlyField label="نام" value={user?.first_name ?? ""} />
-                <ReadOnlyField
-                  label="نام خانوادگی"
-                  value={user?.last_name ?? ""}
-                />
-                <ReadOnlyField
-                  label="کد ملی"
-                  value={profile?.national_id ?? ""}
-                  dir="ltr"
-                />
-                <ReadOnlyField
-                  label="تاریخ تولد (شمسی)"
-                  value={toJalaliDisplay(profile?.birth_date)}
-                  dir="ltr"
-                />
-                <ReadOnlyField
-                  label="جنسیت"
-                  value={
-                    profile?.gender
-                      ? GENDER_LABELS[profile.gender] ?? "—"
-                      : "—"
-                  }
-                />
-                <ReadOnlyField
-                  label="موبایل ورود"
-                  value={user?.mobile ?? ""}
-                  dir="ltr"
-                />
-                <ReadOnlyField
-                  label="ایمیل ورود"
-                  value={user?.email ?? ""}
-                  dir="ltr"
-                />
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                تغییر موبایل/ایمیل ورود فقط از مسیر احراز هویت (OTP) امکان‌پذیر است.
-              </p>
-            </div>
+          <div className="space-y-8">
+            {/* Read-only identity — not a form */}
+            <section className="grid gap-4 sm:grid-cols-2">
+              <InfoItem label="نام" value={user?.first_name ?? ""} />
+              <InfoItem label="نام خانوادگی" value={user?.last_name ?? ""} />
+              <InfoItem
+                label="کد ملی"
+                value={profile?.national_id ?? ""}
+                dir="ltr"
+                hint="ویرایش این فیلد فقط توسط مدیر امکان‌پذیر است"
+              />
+              <InfoItem
+                label="تاریخ تولد"
+                value={toJalaliDisplay(profile?.birth_date)}
+                dir="ltr"
+              />
+              <InfoItem
+                label="جنسیت"
+                value={
+                  profile?.gender ? GENDER_LABELS[profile.gender] ?? "—" : "—"
+                }
+              />
+              <InfoItem
+                label="ایمیل"
+                value={user?.email ?? ""}
+                dir="ltr"
+              />
+              {profile?.address ? (
+                <div className="sm:col-span-2">
+                  <InfoItem label="آدرس" value={profile.address} />
+                </div>
+              ) : null}
+            </section>
 
+            {/* Bio */}
             <Form {...form}>
-              <form onSubmit={onSubmit} className="space-y-5" noValidate>
+              <form onSubmit={onSubmitBio} className="space-y-3" noValidate>
                 <FormField
                   control={form.control}
                   name="display_bio"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>متن زیر عکس (Bio)</FormLabel>
+                      <FormLabel>متن زیر عکس</FormLabel>
                       <FormControl>
                         <textarea
                           {...field}
@@ -304,57 +326,14 @@ export function ProfileMePage() {
                           rows={2}
                           maxLength={500}
                           className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                          placeholder="جمله‌ای کوتاه که دیگران زیر تصویر شما می‌بینند"
+                          placeholder="جمله‌ای کوتاه…"
                         />
                       </FormControl>
-                      <FormDescription>حداکثر ۵۰۰ کاراکتر</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
-                <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>آدرس</FormLabel>
-                      <FormControl>
-                        <textarea
-                          {...field}
-                          value={field.value ?? ""}
-                          rows={3}
-                          className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                          placeholder="آدرس محل سکونت"
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        تغییر آدرس پس از تأیید مدیر اعمال می‌شود.
-                        {addressStatusLabel ? (
-                          <span className="ms-1 font-medium text-primary">
-                            ({addressStatusLabel}
-                            {profile?.pending_address
-                              ? ` — پیشنهادی: ${profile.pending_address}`
-                              : ""}
-                            )
-                          </span>
-                        ) : null}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="flex items-center justify-end gap-2 border-t border-border/60 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={!form.formState.isDirty || upsert.isPending}
-                    onClick={() => form.reset()}
-                  >
-                    انصراف
-                  </Button>
+                <div className="flex justify-end">
                   <Button
                     type="submit"
                     size="sm"
@@ -371,9 +350,102 @@ export function ProfileMePage() {
                 </div>
               </form>
             </Form>
-          </>
+
+            {/* Mobile + OTP */}
+            <section className="space-y-3 rounded-lg border border-border/70 p-4">
+              <div className="text-sm font-medium">شماره موبایل</div>
+              <div className="text-sm" dir="ltr">
+                {currentMobile || "—"}
+              </div>
+
+              {mobileStep === "idle" ? (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="flex-1 space-y-1">
+                    <label className="text-xs text-muted-foreground">
+                      شماره جدید
+                    </label>
+                    <Input
+                      dir="ltr"
+                      className="h-9"
+                      value={newMobile}
+                      onChange={(e) => setNewMobile(e.target.value)}
+                      placeholder="09xxxxxxxxx"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={mobileBusy || !newMobile.trim()}
+                    onClick={() => void requestMobileOtp()}
+                  >
+                    {mobileBusy ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : null}
+                    ارسال کد
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="flex-1 space-y-1">
+                    <label className="text-xs text-muted-foreground">
+                      کد تأیید
+                    </label>
+                    <Input
+                      dir="ltr"
+                      className="h-9"
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value)}
+                      placeholder="------"
+                    />
+                    {debugCode && process.env.NODE_ENV === "development" ? (
+                      <p className="text-[11px] text-muted-foreground" dir="ltr">
+                        debug: {debugCode}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={mobileBusy}
+                      onClick={() => {
+                        setMobileStep("idle");
+                        setOtpCode("");
+                        setDebugCode(null);
+                      }}
+                    >
+                      انصراف
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={mobileBusy || otpCode.trim().length < 4}
+                      onClick={() => void verifyMobileOtp()}
+                    >
+                      {mobileBusy ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : null}
+                      تأیید
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </section>
+          </div>
         )}
       </div>
+
+      <AvatarCropDialog
+        open={cropOpen}
+        file={cropFile}
+        onOpenChange={(o) => {
+          setCropOpen(o);
+          if (!o) setCropFile(null);
+        }}
+        onConfirm={onCropConfirm}
+        busy={uploadAvatar.isPending}
+      />
     </div>
   );
 }
