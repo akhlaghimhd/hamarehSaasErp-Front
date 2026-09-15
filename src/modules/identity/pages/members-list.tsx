@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select";
 import { Can, usePermission } from "@/auth";
+import { toFaDigits } from "@/shared/lib/utils";
 import { useTenantUsers } from "../hooks/use-tenant-users";
 import { IdentityPermissions, type TenantUserDto } from "../types";
 
@@ -40,13 +41,14 @@ function memberDisplayName(row: TenantUserDto): string {
 function formatDate(value?: string | null): string {
   if (!value) return "—";
   try {
-    return new Intl.DateTimeFormat("fa-IR", {
+    const s = new Intl.DateTimeFormat("fa-IR", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
     }).format(new Date(value));
+    return toFaDigits(s);
   } catch {
-    return value;
+    return toFaDigits(value);
   }
 }
 
@@ -121,7 +123,9 @@ export function MembersListPage() {
       id: "mobile",
       header: "موبایل",
       cell: (row) => (
-        <span className="tabular-nums text-sm">{row.user?.mobile ?? "—"}</span>
+        <span className="tabular-nums text-sm" dir="ltr">
+          {row.user?.mobile ? toFaDigits(row.user.mobile) : "—"}
+        </span>
       ),
       className: "hidden md:table-cell",
       headerClassName: "hidden md:table-cell",
@@ -272,14 +276,14 @@ export function MembersListPage() {
             </Select>
             <div className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
               <Users className="h-3.5 w-3.5" />
-              <span>{total} عضو</span>
+              <span>{toFaDigits(total)} عضو</span>
             </div>
           </div>
         }
       />
 
       <p className="text-[11px] text-muted-foreground">
-        توجه: API فعلی فقط اعضای فعال (status=1) را برمی‌گرداند؛ فیلتر «غیرفعال»
+        توجه: API فعلی فقط اعضای فعال (status=۱) را برمی‌گرداند؛ فیلتر «غیرفعال»
         تا زمان پشتیبانی بک‌اند ممکن است خالی بماند.
       </p>
     </div>
