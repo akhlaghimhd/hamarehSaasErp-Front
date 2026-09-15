@@ -6,8 +6,10 @@ export { IdentityHome } from "./pages/identity-home";
 export { ProfileMePage } from "./pages/profile-me";
 export { MembersListPage } from "./pages/members-list";
 export { MemberDetailPage } from "./pages/member-detail";
+export { MemberCreatePage } from "./pages/member-create";
 export { profileService } from "./services/profile-service";
 export { tenantUserService } from "./services/tenant-user-service";
+export { roleService } from "./services/role-service";
 export { identityPaths } from "./services/paths";
 export {
   useProfileMe,
@@ -46,3 +48,7 @@ export {
   ADDRESS_STATUS_LABELS,
   toJalaliDisplay,
 } from "./validations/profile-schema";
+export {
+  createMemberSchema,
+  type CreateMemberFormValues,
+} from "./validations/member-schema";
