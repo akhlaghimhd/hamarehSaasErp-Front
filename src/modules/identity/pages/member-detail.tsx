@@ -1,14 +1,15 @@
 /**
- * FE-P1-T07 — Tenant member detail.
- * Shows membership + user fields from GET /users/{tenant_user_id}.
- * Assigned roles: no dedicated read API yet → empty state + note for T15.
+ * FE-P1-T07 + T09 — Tenant member detail.
+ * T09: change membership status (PUT status 0|1) + soft-delete membership.
  */
 
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Loader2, Shield, UserRound } from "lucide-react";
+import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import {
   Card,
@@ -20,9 +21,21 @@ import {
 import { Button } from "@/shared/components/ui/button";
 import { StatusChip } from "@/shared/components/data-display/status-chip";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog";
 import { Can, usePermission } from "@/auth";
 import { ApiClientError } from "@/api";
-import { useTenantUser } from "../hooks/use-tenant-users";
+import {
+  useTenantUser,
+  useUpdateTenantUser,
+  useSoftDeleteTenantUser,
+} from "../hooks/use-tenant-users";
 import { IdentityPermissions, type TenantUserDto } from "../types";
 
 function FieldLine({
@@ -159,13 +172,57 @@ function MemberSummary({ member }: { member: TenantUserDto }) {
 
 export function MemberDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const rawId = params?.id;
   const tenantUserId =
     typeof rawId === "string" ? rawId : Array.isArray(rawId) ? rawId[0] : "";
 
   const canView = usePermission(IdentityPermissions.userView);
+  const canUpdate = usePermission(IdentityPermissions.userUpdate);
+  const canDelete = usePermission(IdentityPermissions.userDelete);
+
   const { data, isLoading, isError, error, refetch } =
     useTenantUser(tenantUserId || null);
+  const updateMutation = useUpdateTenantUser();
+  const deleteMutation = useSoftDeleteTenantUser();
+
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const isActive = data != null && Number(data.status) === 1;
+  const nextStatus = isActive ? 0 : 1;
+
+  const onConfirmStatus = async () => {
+    if (!data) return;
+    try {
+      await updateMutation.mutateAsync({
+        tenantUserId: data.tenant_user_id,
+        payload: { status: nextStatus },
+      });
+      toast.success(
+        nextStatus === 1 ? "عضویت فعال شد" : "عضویت غیرفعال شد"
+      );
+      setStatusOpen(false);
+    } catch (e) {
+      toast.error(
+        e instanceof ApiClientError ? e.message : "تغییر وضعیت ناموفق بود."
+      );
+    }
+  };
+
+  const onConfirmDelete = async () => {
+    if (!data) return;
+    try {
+      await deleteMutation.mutateAsync(data.tenant_user_id);
+      toast.success("عضویت با حذف نرم از مستأجر برداشته شد");
+      setDeleteOpen(false);
+      router.push("/dashboard/identity/members");
+    } catch (e) {
+      toast.error(
+        e instanceof ApiClientError ? e.message : "حذف عضویت ناموفق بود."
+      );
+    }
+  };
 
   if (!canView) {
     return (
@@ -209,11 +266,26 @@ export function MemberDetailPage() {
             <Button variant="outline" size="sm" asChild>
               <Link href="/dashboard/identity/members">بازگشت به لیست</Link>
             </Button>
-            <Can permission={IdentityPermissions.userUpdate}>
-              <Button variant="outline" size="sm" disabled title="در T09">
-                تغییر وضعیت
+            {canUpdate && data ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setStatusOpen(true)}
+                disabled={updateMutation.isPending}
+              >
+                {isActive ? "غیرفعال‌سازی" : "فعال‌سازی"}
               </Button>
-            </Can>
+            ) : null}
+            {canDelete && data ? (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setDeleteOpen(true)}
+                disabled={deleteMutation.isPending}
+              >
+                حذف عضویت
+              </Button>
+            ) : null}
             <Can permission={IdentityPermissions.membershipHistoryView}>
               <Button variant="ghost" size="sm" disabled title="در T10">
                 تاریخچه عضویت
@@ -251,6 +323,86 @@ export function MemberDetailPage() {
       ) : (
         <MemberSummary member={data} />
       )}
+
+      <Dialog open={statusOpen} onOpenChange={setStatusOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {isActive ? "غیرفعال‌سازی عضویت" : "فعال‌سازی عضویت"}
+            </DialogTitle>
+            <DialogDescription>
+              {isActive
+                ? "با غیرفعال‌سازی، این کاربر دیگر نمی‌تواند با این مستأجر وارد شود تا دوباره فعال شود."
+                : "عضویت دوباره فعال می‌شود و کاربر می‌تواند وارد این مستأجر شود."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setStatusOpen(false)}
+              disabled={updateMutation.isPending}
+            >
+              انصراف
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => void onConfirmStatus()}
+              disabled={updateMutation.isPending}
+            >
+              {updateMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  در حال ذخیره…
+                </>
+              ) : (
+                "تأیید"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>حذف نرم عضویت</DialogTitle>
+            <DialogDescription>
+              عضویت از مستأجر حذف نرم می‌شود (بدون حذف فیزیکی). این عمل از لیست
+              اعضای فعال خارج می‌کند. کاربر سراسری حذف نمی‌شود.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteOpen(false)}
+              disabled={deleteMutation.isPending}
+            >
+              انصراف
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={() => void onConfirmDelete()}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  در حال حذف…
+                </>
+              ) : (
+                "تأیید حذف"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
