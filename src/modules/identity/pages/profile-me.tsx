@@ -63,7 +63,6 @@ function InfoItem({
 
 export function ProfileMePage() {
   const user = useAuthStore((s) => s.user);
-  const setSession partial = useAuthStore.getState();
   const { data: profile, isLoading, isError, error, refetch } = useProfileMe();
   const upsert = useUpsertProfileMe();
   const uploadAvatar = useUploadAvatarMe();
@@ -163,13 +162,12 @@ export function ProfileMePage() {
         newMobile.trim(),
         otpCode.trim()
       );
-      // refresh auth store mobile
       const st = useAuthStore.getState();
-      if (st.user) {
+      if (st.user && st.accessToken && st.securityContext) {
         st.setSession({
-          accessToken: st.accessToken!,
+          accessToken: st.accessToken,
           user: { ...st.user, mobile: res.mobile },
-          securityContext: st.securityContext!,
+          securityContext: st.securityContext,
           activeTenantId: st.activeTenantId,
           organization: st.organization,
         });
@@ -201,7 +199,6 @@ export function ProfileMePage() {
       />
 
       <div className="rounded-xl border border-border/80 bg-card p-4 shadow-[var(--shadow-xs)] sm:p-6">
-        {/* Avatar */}
         <div className="mb-6 flex flex-col items-center gap-3 border-b border-border/60 pb-5 sm:flex-row sm:items-start sm:gap-4">
           <div className="relative">
             <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
@@ -277,7 +274,6 @@ export function ProfileMePage() {
           </div>
         ) : (
           <div className="space-y-8">
-            {/* Read-only identity — not a form */}
             <section className="grid gap-4 sm:grid-cols-2">
               <InfoItem label="نام" value={user?.first_name ?? ""} />
               <InfoItem label="نام خانوادگی" value={user?.last_name ?? ""} />
@@ -298,11 +294,7 @@ export function ProfileMePage() {
                   profile?.gender ? GENDER_LABELS[profile.gender] ?? "—" : "—"
                 }
               />
-              <InfoItem
-                label="ایمیل"
-                value={user?.email ?? ""}
-                dir="ltr"
-              />
+              <InfoItem label="ایمیل" value={user?.email ?? ""} dir="ltr" />
               {profile?.address ? (
                 <div className="sm:col-span-2">
                   <InfoItem label="آدرس" value={profile.address} />
@@ -310,7 +302,6 @@ export function ProfileMePage() {
               ) : null}
             </section>
 
-            {/* Bio */}
             <Form {...form}>
               <form onSubmit={onSubmitBio} className="space-y-3" noValidate>
                 <FormField
@@ -351,7 +342,6 @@ export function ProfileMePage() {
               </form>
             </Form>
 
-            {/* Mobile + OTP */}
             <section className="space-y-3 rounded-lg border border-border/70 p-4">
               <div className="text-sm font-medium">شماره موبایل</div>
               <div className="text-sm" dir="ltr">
