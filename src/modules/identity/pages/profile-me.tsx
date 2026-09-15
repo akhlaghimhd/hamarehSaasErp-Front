@@ -193,7 +193,6 @@ export function ProfileMePage() {
         </Card>
       ) : (
         <div className="grid gap-4 lg:grid-cols-12">
-          {/* Identity summary — same width language as dashboard cards */}
           <Card className="lg:col-span-4">
             <CardContent className="flex flex-col items-start gap-4 p-5 sm:flex-row sm:items-center lg:flex-col lg:items-start">
               <div className="relative shrink-0">
@@ -297,7 +296,8 @@ export function ProfileMePage() {
                           <X className="h-3.5 w-3.5" />
                         </Button>
                         <Button
-                          type="button"\tableofcontents size="sm"
+                          type="button"
+                          size="sm"
                           className="h-7 gap-1 px-2.5"
                           disabled={upsert.isPending}
                           onClick={() => void saveBio()}
@@ -317,7 +317,6 @@ export function ProfileMePage() {
             </CardContent>
           </Card>
 
-          {/* Details grid — label above value, natural RTL */}
           <Card className="lg:col-span-8">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">اطلاعات هویتی</CardTitle>
