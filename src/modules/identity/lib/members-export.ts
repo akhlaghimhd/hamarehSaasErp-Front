@@ -43,6 +43,14 @@ function formatDateTime(value?: string | null): string {
   }
 }
 
+function escapeHtml(s: string) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function downloadBlob(filename: string, content: string, mime: string) {
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
@@ -55,45 +63,51 @@ function downloadBlob(filename: string, content: string, mime: string) {
   URL.revokeObjectURL(url);
 }
 
-/** هر ستون در سلول جدا — جداکننده تب برای اکسل فارسی */
+/**
+ * اکسل واقعی با جدول HTML/SpreadsheetML — هر فیلد یک سلول جدا
+ * (روش قابل‌اعتماد برای اکسل فارسی ویندوز)
+ */
 export function exportMembersExcel(rows: TenantUserDto[]) {
-  const sep = "\t";
   const header = ["نام", "ایمیل", "موبایل", "وضعیت", "مدیر اصلی", "تاریخ عضویت"];
-  const escapeCell = (value: string) => {
-    const s = String(value ?? "").replace(/\r?\n/g, " ").replace(/\t/g, " ");
-    if (/["\t]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-    return s;
-  };
-  const lines = rows.map((r) =>
-    [
-      memberDisplayName(r),
-      r.user?.email ?? "",
-      r.user?.mobile ?? "",
-      Number(r.status) === 1 ? "فعال" : "غیرفعال",
-      r.is_owner ? "بله" : "خیر",
-      r.created_at ? new Date(r.created_at).toLocaleDateString("en-CA") : "",
-    ]
-      .map(escapeCell)
-      .join(sep)
-  );
-  const content = "\uFEFF" + [header.join(sep), ...lines].join("\r\n");
+  const headHtml = header.map((h) => `<th>${escapeHtml(h)}</th>`).join("");
+  const bodyHtml = rows
+    .map((r) => {
+      const cells = [
+        memberDisplayName(r),
+        r.user?.email ?? "",
+        r.user?.mobile ?? "",
+        Number(r.status) === 1 ? "فعال" : "غیرفعال",
+        r.is_owner ? "بله" : "خیر",
+        r.created_at ? new Date(r.created_at).toLocaleDateString("en-CA") : "",
+      ];
+      return `<tr>${cells.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`;
+    })
+    .join("");
+
+  const html = `\uFEFF<html xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8" />
+<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
+<x:Name>کاربران</x:Name><x:WorksheetOptions><x:DisplayRightToLeft/></x:WorksheetOptions>
+</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+</head>
+<body dir="rtl">
+<table border="1">
+<thead><tr>${headHtml}</tr></thead>
+<tbody>${bodyHtml}</tbody>
+</table>
+</body></html>`;
+
   downloadBlob(
     `karbaran-sazman-${new Date().toISOString().slice(0, 10)}.xls`,
-    content,
+    html,
     "application/vnd.ms-excel;charset=utf-8"
   );
   toast.success("فایل اکسل آماده شد");
 }
 
-/** خروجی چاپ/PDF بدون گیر کردن صفحه */
 export function exportMembersPdf(rows: TenantUserDto[]) {
-  const escapeHtml = (s: string) =>
-    String(s)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-
   const body = rows
     .map((r) => {
       const cells = [

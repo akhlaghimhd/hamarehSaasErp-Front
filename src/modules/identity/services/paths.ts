@@ -10,6 +10,7 @@ export const identityPaths = {
     `${IDENTITY_BASE}/profiles/${userId}/approve-address`,
   users: `${IDENTITY_BASE}/users`,
   user: (id: string) => `${IDENTITY_BASE}/users/${id}`,
+  userRestore: (id: string) => `${IDENTITY_BASE}/users/${id}/restore`,
   roles: `${IDENTITY_BASE}/roles`,
   role: (id: string) => `${IDENTITY_BASE}/roles/${id}`,
   roleAssign: `${IDENTITY_BASE}/roles/assign`,

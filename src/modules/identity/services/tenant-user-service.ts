@@ -1,7 +1,5 @@
 /**
  * FE-P1-T02 — Tenant membership (TenantUser) API client.
- * Consumes IdentityCore endpoints under /identity-core/identity/users.
- * No invented logic; Token + X-Tenant-ID via apiClient only.
  */
 
 import { apiGet, apiPost, apiPut, apiDelete, ApiClientError } from "@/api";
@@ -20,13 +18,14 @@ function unwrapData<T>(envelope: unknown): T {
   return envelope as T;
 }
 
+export type MembershipListFilter = "active" | "deleted";
+
 export const tenantUserService = {
-  /**
-   * List active memberships for the current tenant.
-   * Backend currently returns only status = 1 (active).
-   */
-  async list(): Promise<TenantUserDto[]> {
-    const envelope = await apiGet(identityPaths.users);
+  async list(
+    membership: MembershipListFilter = "active"
+  ): Promise<TenantUserDto[]> {
+    const qs = membership === "deleted" ? "?membership=deleted" : "";
+    const envelope = await apiGet(`${identityPaths.users}${qs}`);
     const data = unwrapData<TenantUserDto[] | { data?: TenantUserDto[] }>(
       envelope
     );
@@ -78,8 +77,12 @@ export const tenantUserService = {
     return unwrapData<TenantUserDto>(envelope);
   },
 
-  /** Soft-delete membership (Law 1.4). */
   async softDelete(tenantUserId: string): Promise<void> {
     await apiDelete(identityPaths.user(tenantUserId));
+  },
+
+  async restore(tenantUserId: string): Promise<TenantUserDto> {
+    const envelope = await apiPost(identityPaths.userRestore(tenantUserId), {});
+    return unwrapData<TenantUserDto>(envelope);
   },
 };

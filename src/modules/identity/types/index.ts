@@ -46,7 +46,6 @@ export interface UpsertProfilePayload {
   display_bio?: string | null;
 }
 
-/** Nested user payload returned with TenantUser (from User model). */
 export interface TenantUserUserDto {
   user_id: string;
   first_name: string;
@@ -60,10 +59,6 @@ export interface TenantUserUserDto {
   updated_at?: string;
 }
 
-/**
- * tenant_users membership DTO (IdentityCore).
- * Aligned with TenantUser model + with(['user']) on list/show.
- */
 export interface TenantUserDto {
   tenant_user_id: string;
   tenant_id: string;
@@ -78,7 +73,6 @@ export interface TenantUserDto {
   user?: TenantUserUserDto | null;
 }
 
-/** POST /identity-core/identity/users — create / invite member. */
 export interface CreateTenantUserPayload {
   email: string;
   password: string;
@@ -89,7 +83,6 @@ export interface CreateTenantUserPayload {
   role_ids?: string[];
 }
 
-/** PUT /identity-core/identity/users/{id} — update membership / user fields. */
 export interface UpdateTenantUserPayload {
   first_name?: string;
   last_name?: string;
@@ -103,6 +96,7 @@ export const IdentityPermissions = {
   userCreate: "identity.user.create",
   userUpdate: "identity.user.update",
   userDelete: "identity.user.delete",
+  userRestore: "identity.user.restore",
   profileView: "identity.profile.view",
   profileUpdate: "identity.profile.update",
   roleView: "identity.role.view",
