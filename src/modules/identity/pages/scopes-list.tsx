@@ -1,4 +1,4 @@
-/** FE-P1-T16/T17 — Scopes list + create */
+/** FE-P1-T16/T17 — فهرست محدوده‌های دسترسی */
 
 "use client";
 
@@ -39,15 +39,13 @@ import {
 } from "../hooks/use-scopes";
 import { IdentityPermissions } from "../types";
 import type { ScopeDto } from "../services/scope-service";
-
-const SCOPE_TYPES = [
-  "COMPANY",
-  "BRANCH",
-  "WAREHOUSE",
-  "DEPARTMENT",
-  "COST_CENTER",
-  "CUSTOM",
-] as const;
+import {
+  SCOPE_TYPE_FA,
+  scopeTypeLabel,
+  MSG_GENERIC_ERROR,
+  MSG_LOAD_ERROR,
+  MSG_NO_ACCESS,
+} from "../lib/ui-copy";
 
 export function ScopesListPage() {
   const canView = usePermission(IdentityPermissions.scopeView);
@@ -75,13 +73,14 @@ export function ScopesListPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return rows;
-    return rows.filter((r) =>
-      [r.scope_name, r.scope_type, r.description]
+    return rows.filter((r) => {
+      const typeFa = scopeTypeLabel(r.scope_type);
+      return [r.scope_name, typeFa, r.description]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
-        .includes(q)
-    );
+        .includes(q);
+    });
   }, [rows, query]);
 
   const total = filtered.length;
@@ -99,9 +98,7 @@ export function ScopesListPage() {
       id: "type",
       header: "نوع",
       cell: (row) => (
-        <span className="text-xs" dir="ltr">
-          {row.scope_type}
-        </span>
+        <span className="text-xs">{scopeTypeLabel(row.scope_type)}</span>
       ),
     },
     {
@@ -124,13 +121,15 @@ export function ScopesListPage() {
             size="sm"
             className="h-8 text-destructive"
             onClick={async () => {
-              if (!window.confirm(`حذف محدوده «${row.scope_name}»؟`)) return;
+              if (!window.confirm(`محدوده «${row.scope_name}» حذف شود؟`)) return;
               try {
                 await deleteMutation.mutateAsync(row.scope_id);
                 toast.success("محدوده حذف شد");
               } catch (e) {
                 toast.error(
-                  e instanceof ApiClientError ? e.message : "حذف ناموفق"
+                  e instanceof ApiClientError && e.message
+                    ? e.message
+                    : MSG_GENERIC_ERROR
                 );
               }
             }}
@@ -149,20 +148,28 @@ export function ScopesListPage() {
         description: values.description.trim() || null,
         is_active: true,
       });
-      toast.success("محدوده ایجاد شد");
+      toast.success("محدوده دسترسی ثبت شد");
       setCreateOpen(false);
       form.reset({ scope_name: "", scope_type: "BRANCH", description: "" });
     } catch (e) {
-      toast.error(e instanceof ApiClientError ? e.message : "ایجاد ناموفق");
+      toast.error(
+        e instanceof ApiClientError && e.message ? e.message : MSG_GENERIC_ERROR
+      );
     }
   });
 
   if (!canView) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Scope" breadcrumbs={[{ label: "هویت و دسترسی", href: "/dashboard/identity" }, { label: "Scope" }]} />
+        <PageHeader
+          title="محدوده دسترسی"
+          breadcrumbs={[
+            { label: "هویت و دسترسی", href: "/dashboard/identity" },
+            { label: "محدوده دسترسی" },
+          ]}
+        />
         <div className="rounded-xl border border-dashed px-6 py-12 text-center text-sm text-muted-foreground">
-          دسترسی identity.scope.view فعال نیست.
+          {MSG_NO_ACCESS}
         </div>
       </div>
     );
@@ -171,12 +178,12 @@ export function ScopesListPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="محدوده‌های دسترسی (Scope)"
-        description="تعریف محدوده سازمانی در سطح مستأجر"
+        title="محدوده دسترسی"
+        description="تعیین محدوده کار کاربران، مانند شعبه یا واحد سازمانی"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "هویت و دسترسی", href: "/dashboard/identity" },
-          { label: "Scope" },
+          { label: "محدوده دسترسی" },
         ]}
         actions={
           canCreate ? (
@@ -190,7 +197,9 @@ export function ScopesListPage() {
 
       {isError ? (
         <div className="text-sm text-destructive">
-          {error instanceof Error ? error.message : "خطا"}
+          {error instanceof ApiClientError && error.message
+            ? error.message
+            : MSG_LOAD_ERROR}
           <Button variant="outline" size="sm" className="ms-2" onClick={() => void refetch()}>
             تلاش مجدد
           </Button>
@@ -204,9 +213,9 @@ export function ScopesListPage() {
         loading={isLoading || (isFetching && !data)}
         isFiltered={query.trim().length > 0}
         emptyTitle="محدوده‌ای تعریف نشده"
-        emptyDescription="اولین Scope را ایجاد کنید."
-        emptySearchTitle="نتیجه‌ای نیست"
-        emptySearchDescription="جستجو را تغییر دهید."
+        emptyDescription="اولین محدوده دسترسی سازمان را ثبت کنید."
+        emptySearchTitle="نتیجه‌ای پیدا نشد"
+        emptySearchDescription="عبارت جستجو را تغییر دهید."
         page={safePage}
         pageSize={pageSize}
         total={total}
@@ -257,9 +266,9 @@ export function ScopesListPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {SCOPE_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
+                  {Object.entries(SCOPE_TYPE_FA).map(([code, label]) => (
+                    <SelectItem key={code} value={code}>
+                      {label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -274,7 +283,7 @@ export function ScopesListPage() {
                 انصراف
               </Button>
               <Button type="submit" size="sm" disabled={createMutation.isPending}>
-                {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ایجاد"}
+                {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ثبت"}
               </Button>
             </DialogFooter>
           </form>
