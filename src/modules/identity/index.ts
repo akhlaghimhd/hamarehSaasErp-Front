@@ -5,6 +5,7 @@
 export { IdentityHome } from "./pages/identity-home";
 export { ProfileMePage } from "./pages/profile-me";
 export { profileService } from "./services/profile-service";
+export { tenantUserService } from "./services/tenant-user-service";
 export { identityPaths } from "./services/paths";
 export {
   useProfileMe,
@@ -13,11 +14,22 @@ export {
   profileMeQueryKey,
 } from "./hooks/use-profile-me";
 export {
+  useTenantUsers,
+  useTenantUser,
+  tenantUsersQueryKey,
+  tenantUserQueryKey,
+} from "./hooks/use-tenant-users";
+export {
   IdentityPermissions,
   type UserProfileDto,
   type SelfUpsertProfilePayload,
   type UpsertProfilePayload,
   type IdentityPermissionCode,
+  type TenantUserDto,
+  type TenantUserUserDto,
+  type TenantUserStatus,
+  type CreateTenantUserPayload,
+  type UpdateTenantUserPayload,
 } from "./types";
 export {
   selfProfileSchema,
