@@ -1,5 +1,5 @@
 /**
- * FE-P1-T07 + T09 + T10 + T15 — Tenant member detail.
+ * FE-P1-T07 + T09 + T10 + T15 — جزئیات کاربر سازمان
  */
 
 "use client";
@@ -40,6 +40,7 @@ import { useMembershipHistory } from "../hooks/use-membership-history";
 import { IdentityPermissions, type TenantUserDto } from "../types";
 import type { MembershipHistoryDto } from "../services/membership-history-service";
 import { AssignRolesCard } from "./assign-roles-card";
+import { MSG_GENERIC_ERROR, MSG_NO_ACCESS } from "../lib/ui-copy";
 
 function FieldLine({
   label,
@@ -91,11 +92,11 @@ function statusLabel(code: number | null | undefined): string {
 function reasonLabel(code?: string | null): string {
   if (!code) return "—";
   const map: Record<string, string> = {
-    JOIN: "پیوستن",
+    JOIN: "پیوستن به سازمان",
     STATUS_CHANGE: "تغییر وضعیت",
-    SOFT_DELETE: "حذف نرم",
+    SOFT_DELETE: "حذف از سازمان",
   };
-  return map[code] ?? code;
+  return map[code] ?? "سایر";
 }
 
 function MemberSummary({ member }: { member: TenantUserDto }) {
@@ -120,7 +121,7 @@ function MemberSummary({ member }: { member: TenantUserDto }) {
                 <StatusChip label="غیرفعال" tone="neutral" />
               )}
               {member.is_owner ? (
-                <StatusChip label="مالک مستأجر" tone="primary" />
+                <StatusChip label="مدیر اصلی سازمان" tone="primary" />
               ) : null}
             </div>
             <p className="text-[11px] text-muted-foreground">
@@ -132,10 +133,8 @@ function MemberSummary({ member }: { member: TenantUserDto }) {
 
       <Card className="lg:col-span-8">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">اطلاعات عضویت و کاربر</CardTitle>
-          <CardDescription>
-            داده‌ها از API عضویت مستأجر (TenantUser + User)
-          </CardDescription>
+          <CardTitle className="text-base">اطلاعات کاربر</CardTitle>
+          <CardDescription>اطلاعات پایه و وضعیت عضویت در سازمان</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
@@ -144,30 +143,15 @@ function MemberSummary({ member }: { member: TenantUserDto }) {
             <FieldLine label="ایمیل" value={u?.email ?? ""} dir="ltr" />
             <FieldLine
               label="موبایل"
-              value={toFaDigits(u?.mobile ?? "")}
-              dir="ltr"
+              value={u?.mobile ? toFaDigits(u.mobile) : ""}
             />
-            <FieldLine
-              label="شناسه عضویت"
-              value={member.tenant_user_id}
-              dir="ltr"
-            />
-            <FieldLine label="شناسه کاربر" value={member.user_id} dir="ltr" />
             <FieldLine
               label="وضعیت عضویت"
               value={Number(member.status) === 1 ? "فعال" : "غیرفعال"}
             />
             <FieldLine
-              label="مالک مستأجر"
+              label="مدیر اصلی سازمان"
               value={member.is_owner ? "بله" : "خیر"}
-            />
-            <FieldLine
-              label="نسخه ردیف"
-              value={
-                member.row_version != null
-                  ? toFaDigits(member.row_version)
-                  : "—"
-              }
             />
             <FieldLine
               label="آخرین به‌روزرسانی"
@@ -196,16 +180,16 @@ function HistoryPanel({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">تاریخچه عضویت</CardTitle>
+        <CardTitle className="text-base">سوابق عضویت</CardTitle>
         <CardDescription>
-          رویدادهای تغییر وضعیت و حذف نرم این عضویت
+          تغییرات وضعیت و حذف از سازمان برای این کاربر
         </CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
           <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            در حال بارگذاری تاریخچه…
+            در حال بارگذاری سوابق…
           </div>
         ) : errorMessage ? (
           <div className="space-y-2 py-6 text-center">
@@ -217,18 +201,18 @@ function HistoryPanel({
         ) : rows.length === 0 ? (
           <EmptyState
             icon={History}
-            title="رویدادی ثبت نشده"
-            description="پس از تغییر وضعیت یا حذف نرم، ردیف‌های تاریخچه اینجا دیده می‌شوند."
+            title="سابقه‌ای ثبت نشده"
+            description="پس از تغییر وضعیت یا حذف از سازمان، رویدادها اینجا دیده می‌شوند."
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[32rem] text-sm">
+            <table className="w-full min-w-[28rem] text-sm">
               <thead>
                 <tr className="border-b border-border/70 text-right text-xs text-muted-foreground">
                   <th className="px-2 py-2 font-medium">تاریخ</th>
                   <th className="px-2 py-2 font-medium">از</th>
                   <th className="px-2 py-2 font-medium">به</th>
-                  <th className="px-2 py-2 font-medium">دلیل</th>
+                  <th className="px-2 py-2 font-medium">رویداد</th>
                   <th className="px-2 py-2 font-medium">توضیح</th>
                 </tr>
               </thead>
@@ -296,9 +280,7 @@ export function MemberDetailPage() {
   const onConfirmStatus = async () => {
     if (!data) return;
     if (isSelf && nextStatus === 0) {
-      toast.error(
-        "نمی‌توانید عضویت خودتان را غیرفعال کنید. از حساب دیگری استفاده کنید یا از دیتابیس بازیابی کنید."
-      );
+      toast.error("نمی‌توانید حساب خودتان را در سازمان غیرفعال کنید.");
       setStatusOpen(false);
       return;
     }
@@ -314,7 +296,9 @@ export function MemberDetailPage() {
       void historyQuery.refetch();
     } catch (e) {
       toast.error(
-        e instanceof ApiClientError ? e.message : "تغییر وضعیت ناموفق بود."
+        e instanceof ApiClientError && e.message
+          ? e.message
+          : MSG_GENERIC_ERROR
       );
     }
   };
@@ -328,12 +312,14 @@ export function MemberDetailPage() {
     }
     try {
       await deleteMutation.mutateAsync(data.tenant_user_id);
-      toast.success("عضویت با حذف نرم از مستأجر برداشته شد");
+      toast.success("کاربر از سازمان حذف شد");
       setDeleteOpen(false);
       router.push("/dashboard/identity/members");
     } catch (e) {
       toast.error(
-        e instanceof ApiClientError ? e.message : "حذف عضویت ناموفق بود."
+        e instanceof ApiClientError && e.message
+          ? e.message
+          : MSG_GENERIC_ERROR
       );
     }
   };
@@ -342,16 +328,16 @@ export function MemberDetailPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="جزئیات عضو"
+          title="جزئیات کاربر"
           breadcrumbs={[
             { label: "داشبورد", href: "/dashboard" },
             { label: "هویت و دسترسی", href: "/dashboard/identity" },
-            { label: "اعضا", href: "/dashboard/identity/members" },
+            { label: "کاربران", href: "/dashboard/identity/members" },
             { label: "جزئیات" },
           ]}
         />
         <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-6 py-12 text-center text-sm text-muted-foreground">
-          دسترسی مشاهده اعضا (identity.user.view) برای این حساب فعال نیست.
+          {MSG_NO_ACCESS}
         </div>
       </div>
     );
@@ -361,24 +347,24 @@ export function MemberDetailPage() {
     data?.user != null
       ? [data.user.first_name, data.user.last_name].filter(Boolean).join(" ") ||
         data.user.email ||
-        "جزئیات عضو"
-      : "جزئیات عضو";
+        "جزئیات کاربر"
+      : "جزئیات کاربر";
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={title}
-        description="وضعیت عضویت و اطلاعات پایه عضو در مستأجر جاری"
+        description="وضعیت عضویت و اطلاعات پایه کاربر در سازمان"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "هویت و دسترسی", href: "/dashboard/identity" },
-          { label: "اعضا", href: "/dashboard/identity/members" },
+          { label: "کاربران", href: "/dashboard/identity/members" },
           { label: "جزئیات" },
         ]}
         actions={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/identity/members">بازگشت به لیست</Link>
+              <Link href="/dashboard/identity/members">بازگشت به فهرست</Link>
             </Button>
             {canUpdate && data ? (
               <Button
@@ -387,7 +373,7 @@ export function MemberDetailPage() {
                 onClick={() => setStatusOpen(true)}
                 disabled={updateMutation.isPending}
               >
-                {isActive ? "غیرفعال‌سازی" : "فعال‌سازی"}
+                {isActive ? "غیرفعال کردن" : "فعال کردن"}
               </Button>
             ) : null}
             {canDelete && data ? (
@@ -398,7 +384,7 @@ export function MemberDetailPage() {
                 disabled={deleteMutation.isPending || isSelf}
                 title={isSelf ? "حذف عضویت خود مجاز نیست" : undefined}
               >
-                حذف عضویت
+                حذف از سازمان
               </Button>
             ) : null}
           </div>
@@ -414,11 +400,11 @@ export function MemberDetailPage() {
         <Card>
           <CardContent className="space-y-3 py-10 text-center">
             <p className="text-sm text-destructive">
-              {error instanceof ApiClientError
+              {error instanceof ApiClientError && error.message
                 ? error.message
                 : data === null
-                  ? "عضو یافت نشد یا به این مستأجر تعلق ندارد."
-                  : "بارگذاری ناموفق بود."}
+                  ? "کاربر پیدا نشد یا به این سازمان تعلق ندارد."
+                  : MSG_GENERIC_ERROR}
             </p>
             <Button
               type="button"
@@ -439,9 +425,10 @@ export function MemberDetailPage() {
               loading={historyQuery.isLoading}
               errorMessage={
                 historyQuery.isError
-                  ? historyQuery.error instanceof ApiClientError
+                  ? historyQuery.error instanceof ApiClientError &&
+                    historyQuery.error.message
                     ? historyQuery.error.message
-                    : "بارگذاری تاریخچه ناموفق بود."
+                    : "بارگذاری سوابق ممکن نشد."
                   : null
               }
               onRetry={() => void historyQuery.refetch()}
@@ -454,12 +441,12 @@ export function MemberDetailPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {isActive ? "غیرفعال‌سازی عضویت" : "فعال‌سازی عضویت"}
+              {isActive ? "غیرفعال کردن عضویت" : "فعال کردن عضویت"}
             </DialogTitle>
             <DialogDescription>
               {isActive
-                ? "با غیرفعال‌سازی، این کاربر دیگر نمی‌تواند با این مستأجر وارد شود تا دوباره فعال شود."
-                : "عضویت دوباره فعال می‌شود و کاربر می‌تواند وارد این مستأجر شود."}
+                ? "با غیرفعال کردن، این کاربر تا زمان فعال‌سازی دوباره نمی‌تواند وارد سازمان شود."
+                : "عضویت دوباره فعال می‌شود و کاربر می‌تواند وارد سازمان شود."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -494,10 +481,10 @@ export function MemberDetailPage() {
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>حذف نرم عضویت</DialogTitle>
+            <DialogTitle>حذف از سازمان</DialogTitle>
             <DialogDescription>
-              عضویت از مستأجر حذف نرم می‌شود (بدون حذف فیزیکی). این عمل از لیست
-              اعضای فعال خارج می‌کند. کاربر سراسری حذف نمی‌شود.
+              عضویت این فرد از سازمان برداشته می‌شود. حساب کاربری سراسری او حذف
+              نمی‌شود و در صورت نیاز می‌توان دوباره او را به سازمان افزود.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
