@@ -1,4 +1,4 @@
-/** FE-P1-T13/T14 — Role detail + assign permissions */
+/** FE-P1-T13/T14 — جزئیات نقش و تخصیص مجوز */
 
 "use client";
 
@@ -27,6 +27,7 @@ import {
 } from "../hooks/use-roles";
 import { usePermissions } from "../hooks/use-permissions";
 import { IdentityPermissions } from "../types";
+import { MSG_GENERIC_ERROR, MSG_NO_ACCESS } from "../lib/ui-copy";
 
 export function RoleDetailPage() {
   const params = useParams();
@@ -74,11 +75,11 @@ export function RoleDetailPage() {
         tenantRoleId: roleId,
         permissionIds: Array.from(selected),
       });
-      toast.success("مجوزهای نقش ذخیره شد");
+      toast.success("مجوزهای این نقش ذخیره شد");
       void refetch();
     } catch (e) {
       toast.error(
-        e instanceof ApiClientError ? e.message : "ذخیره مجوزها ناموفق بود"
+        e instanceof ApiClientError && e.message ? e.message : MSG_GENERIC_ERROR
       );
     }
   };
@@ -93,16 +94,24 @@ export function RoleDetailPage() {
       });
       toast.success(next === 1 ? "نقش فعال شد" : "نقش غیرفعال شد");
     } catch (e) {
-      toast.error(e instanceof ApiClientError ? e.message : "خطا");
+      toast.error(
+        e instanceof ApiClientError && e.message ? e.message : MSG_GENERIC_ERROR
+      );
     }
   };
 
   if (!canView) {
     return (
       <div className="space-y-6">
-        <PageHeader title="جزئیات نقش" breadcrumbs={[{ label: "نقش‌ها", href: "/dashboard/identity/roles" }, { label: "جزئیات" }]} />
+        <PageHeader
+          title="جزئیات نقش"
+          breadcrumbs={[
+            { label: "نقش‌ها", href: "/dashboard/identity/roles" },
+            { label: "جزئیات" },
+          ]}
+        />
         <div className="rounded-xl border border-dashed px-6 py-12 text-center text-sm text-muted-foreground">
-          دسترسی کافی نیست.
+          {MSG_NO_ACCESS}
         </div>
       </div>
     );
@@ -112,7 +121,7 @@ export function RoleDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={role?.name ?? "جزئیات نقش"}
-        description={role?.description ?? "تخصیص مجوز به نقش"}
+        description={role?.description?.trim() || "مشاهده وضعیت نقش و تنظیم مجوزهای آن"}
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "هویت و دسترسی", href: "/dashboard/identity" },
@@ -122,7 +131,7 @@ export function RoleDetailPage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/identity/roles">بازگشت</Link>
+              <Link href="/dashboard/identity/roles">بازگشت به فهرست</Link>
             </Button>
             {canUpdate && role ? (
               <Button
@@ -131,7 +140,7 @@ export function RoleDetailPage() {
                 onClick={() => void onToggleStatus()}
                 disabled={updateMutation.isPending}
               >
-                {Number(role.status) === 1 ? "غیرفعال‌سازی" : "فعال‌سازی"}
+                {Number(role.status) === 1 ? "غیرفعال کردن" : "فعال کردن"}
               </Button>
             ) : null}
           </div>
@@ -146,14 +155,16 @@ export function RoleDetailPage() {
       ) : isError || !role ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-destructive">
-            {error instanceof ApiClientError ? error.message : "نقش یافت نشد"}
+            {error instanceof ApiClientError && error.message
+              ? error.message
+              : "این نقش پیدا نشد یا دیگر در دسترس نیست."}
           </CardContent>
         </Card>
       ) : (
         <>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">اطلاعات نقش</CardTitle>
+              <CardTitle className="text-base">وضعیت نقش</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-wrap items-center gap-2 text-sm">
               {Number(role.status) === 1 || role.status === undefined ? (
@@ -161,19 +172,14 @@ export function RoleDetailPage() {
               ) : (
                 <StatusChip label="غیرفعال" tone="neutral" />
               )}
-              {role.code ? (
-                <span className="text-muted-foreground" dir="ltr">
-                  {role.code}
-                </span>
-              ) : null}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">مجوزهای نقش</CardTitle>
+              <CardTitle className="text-base">مجوزهای این نقش</CardTitle>
               <CardDescription>
-                انتخاب مجوزها و ذخیره تخصیص (جایگزینی مجموعه مجوزها طبق API)
+                مواردی را که دارندگان این نقش باید به آن‌ها دسترسی داشته باشند انتخاب و ذخیره کنید.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -188,12 +194,7 @@ export function RoleDetailPage() {
                       onCheckedChange={() => toggle(p.tenant_permission_id)}
                       disabled={!canAssignPerms}
                     />
-                    <span>
-                      <span className="font-medium">{p.name}</span>
-                      <span className="mt-0.5 block text-[11px] text-muted-foreground" dir="ltr">
-                        {p.code}
-                      </span>
-                    </span>
+                    <span className="font-medium">{p.name}</span>
                   </label>
                 ))}
               </div>
@@ -209,7 +210,11 @@ export function RoleDetailPage() {
                     "ذخیره مجوزها"
                   )}
                 </Button>
-              ) : null}
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  برای ویرایش مجوزهای نقش، دسترسی لازم را ندارید.
+                </p>
+              )}
             </CardContent>
           </Card>
         </>
