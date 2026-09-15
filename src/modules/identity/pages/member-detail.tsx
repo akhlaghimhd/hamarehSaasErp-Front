@@ -1,6 +1,5 @@
 /**
- * FE-P1-T07 + T09 + T10 — Tenant member detail.
- * T09: status + soft-delete. T10: membership history list.
+ * FE-P1-T07 + T09 + T10 + T15 — Tenant member detail.
  */
 
 "use client";
@@ -8,7 +7,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { History, Loader2, Shield, UserRound } from "lucide-react";
+import { History, Loader2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import {
@@ -40,6 +39,7 @@ import {
 import { useMembershipHistory } from "../hooks/use-membership-history";
 import { IdentityPermissions, type TenantUserDto } from "../types";
 import type { MembershipHistoryDto } from "../services/membership-history-service";
+import { AssignRolesCard } from "./assign-roles-card";
 
 function FieldLine({
   label,
@@ -177,21 +177,7 @@ function MemberSummary({ member }: { member: TenantUserDto }) {
         </CardContent>
       </Card>
 
-      <Card className="lg:col-span-12">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">نقش‌های تخصیص‌یافته</CardTitle>
-          <CardDescription>
-            نمایش نقش‌های عضو پس از آماده‌شدن API خواندن نقش‌های کاربر (T15)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <EmptyState
-            icon={Shield}
-            title="لیست نقش‌ها هنوز از API در دسترس نیست"
-            description="بک‌اند فعلاً endpoint فهرست نقش‌های یک TenantUser را ندارد. تخصیص نقش در T15 و اسپرینت ۳ تکمیل می‌شود."
-          />
-        </CardContent>
-      </Card>
+      <AssignRolesCard userId={member.user_id} />
     </div>
   );
 }
