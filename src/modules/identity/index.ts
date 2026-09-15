@@ -4,6 +4,7 @@
 
 export { IdentityHome } from "./pages/identity-home";
 export { ProfileMePage } from "./pages/profile-me";
+export { MembersListPage } from "./pages/members-list";
 export { profileService } from "./services/profile-service";
 export { tenantUserService } from "./services/tenant-user-service";
 export { identityPaths } from "./services/paths";
