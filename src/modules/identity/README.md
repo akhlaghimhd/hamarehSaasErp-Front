@@ -1,24 +1,27 @@
 # Identity module (FE-P1)
 
-Tenant-scoped Identity & Access UI on top of Backend `IdentityCore`.
+## Profile me policy (locked 2026-09-15)
 
-## Sprint 1 (done)
+| Field | Self `/me` | Admin |
+|-------|------------|-------|
+| first/last name | RO | yes |
+| national_id | RO | yes |
+| birth_date (Jalali UI) | RO | yes |
+| gender (1/2 only) | RO | yes |
+| login mobile/email | RO (OTP later) | verified flow |
+| display_bio | edit | yes |
+| address | request → pending approval | approve endpoint |
+| avatar | single image upload | yes |
+| HR fields | none — deferred to HR module | — |
 
-| Code | Item |
-|------|------|
-| FE-P1-T01 | Module scaffold under `src/modules/identity` + routes `/dashboard/identity` |
-| FE-P1-T02 | `profileService` + `identityPaths` (API via central `apiClient`) |
-| FE-P1-T03 | `Can` / `usePermission` (already in `@/auth`) wired in hub + sidebar pattern |
-| FE-P1-T04 | Profile me page — GET/PUT `profiles/me` |
-| FE-P1-T05 | **Deferred** — no Backend change-password endpoint yet |
+## API
 
-## Routes
+- `GET/PUT /identity-core/identity/profiles/me`
+- `POST /identity-core/identity/profiles/me/avatar` (multipart `avatar`)
+- `POST /identity-core/identity/profiles/{userId}/approve-address` (permission: identity.profile.update)
 
-- `/dashboard/identity` — hub
-- `/dashboard/identity/me` — current user profile
+## Backend migrate
 
-## Rules
-
-- No business logic beyond form validation; Backend is SoT
-- Self profile (`/me`) needs only authenticated session + tenant header
-- Admin profile routes use `identity.profile.*` permissions (Sprint 2+)
+```bash
+docker compose exec app php artisan migrate
+```

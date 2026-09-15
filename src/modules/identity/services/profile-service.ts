@@ -2,7 +2,7 @@
  * FE-P1 — Profile service (self-service me + admin by userId).
  */
 
-import { apiGet, apiPut, apiClient, ApiClientError } from "@/api";
+import { apiGet, apiPut, apiPost, ApiClientError } from "@/api";
 import type { ApiSuccessResponse } from "@/api/types";
 import { identityPaths } from "./paths";
 import type {
@@ -31,30 +31,19 @@ export const profileService = {
     }
   },
 
-  /** Self-service: bio + address change request only */
   async upsertMe(payload: SelfUpsertProfilePayload): Promise<UserProfileDto> {
     const envelope = await apiPut(identityPaths.profileMe, payload);
     return unwrapData<UserProfileDto>(envelope);
   },
 
-  /**
-   * Single avatar image upload (multipart).
-   * Max 2MB; jpg/png/webp — enforced by Backend.
-   */
   async uploadAvatarMe(file: File): Promise<UserProfileDto> {
     const form = new FormData();
     form.append("avatar", file);
-    const envelope = await apiClient.post(
-      `${identityPaths.profileMe}/avatar`.replace(
-        /\/identity-core\/identity\/profiles\/me\/avatar$/,
-        "/identity-core/identity/profiles/me/avatar"
-      ),
-      form,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      }
-    );
-    return unwrapData<UserProfileDto>(envelope.data);
+    // Let the browser set multipart boundary (do not force application/json)
+    const envelope = await apiPost(identityPaths.profileMeAvatar, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return unwrapData<UserProfileDto>(envelope);
   },
 
   async getByUserId(userId: string): Promise<UserProfileDto | null> {
