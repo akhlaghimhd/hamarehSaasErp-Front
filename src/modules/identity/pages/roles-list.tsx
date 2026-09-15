@@ -1,4 +1,4 @@
-/** FE-P1-T11 — Roles list + create */
+/** FE-P1-T11 — فهرست و ایجاد نقش */
 
 "use client";
 
@@ -24,12 +24,13 @@ import {
   DialogTitle,
 } from "@/shared/components/ui/dialog";
 import { Label } from "@/shared/components/ui/label";
-import { Can, usePermission } from "@/auth";
+import { usePermission } from "@/auth";
 import { ApiClientError } from "@/api";
 import { toFaDigits } from "@/shared/lib/utils";
 import { useCreateRole, useRoles, useSoftDeleteRole } from "../hooks/use-roles";
 import { IdentityPermissions } from "../types";
 import type { RoleDto } from "../services/role-service";
+import { MSG_GENERIC_ERROR, MSG_LOAD_ERROR, MSG_NO_ACCESS } from "../lib/ui-copy";
 
 export function RolesListPage() {
   const canView = usePermission(IdentityPermissions.roleView);
@@ -54,7 +55,7 @@ export function RolesListPage() {
     const q = query.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((r) =>
-      [r.name, r.code, r.description].filter(Boolean).join(" ").toLowerCase().includes(q)
+      [r.name, r.description].filter(Boolean).join(" ").toLowerCase().includes(q)
     );
   }, [rows, query]);
 
@@ -67,16 +68,7 @@ export function RolesListPage() {
     {
       id: "name",
       header: "نام نقش",
-      cell: (row) => (
-        <div>
-          <div className="font-medium">{row.name}</div>
-          {row.code ? (
-            <div className="text-[11px] text-muted-foreground" dir="ltr">
-              {row.code}
-            </div>
-          ) : null}
-        </div>
-      ),
+      cell: (row) => <div className="font-medium">{row.name}</div>,
     },
     {
       id: "desc",
@@ -116,13 +108,15 @@ export function RolesListPage() {
               className="h-8 text-destructive"
               disabled={deleteMutation.isPending}
               onClick={async () => {
-                if (!window.confirm(`حذف نرم نقش «${row.name}»؟`)) return;
+                if (!window.confirm(`نقش «${row.name}» از فهرست نقش‌های سازمان حذف شود؟`)) return;
                 try {
                   await deleteMutation.mutateAsync(row.tenant_role_id);
-                  toast.success("نقش حذف نرم شد");
+                  toast.success("نقش حذف شد");
                 } catch (e) {
                   toast.error(
-                    e instanceof ApiClientError ? e.message : "حذف ناموفق بود"
+                    e instanceof ApiClientError && e.message
+                      ? e.message
+                      : MSG_GENERIC_ERROR
                   );
                 }
               }}
@@ -141,21 +135,30 @@ export function RolesListPage() {
         role_name: values.role_name.trim(),
         description: values.description.trim() || null,
       });
-      toast.success("نقش ایجاد شد");
+      toast.success("نقش با موفقیت ساخته شد");
       setCreateOpen(false);
       form.reset();
       window.location.href = `/dashboard/identity/roles/${role.tenant_role_id}`;
     } catch (e) {
-      toast.error(e instanceof ApiClientError ? e.message : "ایجاد نقش ناموفق بود");
+      toast.error(
+        e instanceof ApiClientError && e.message ? e.message : MSG_GENERIC_ERROR
+      );
     }
   });
 
   if (!canView) {
     return (
       <div className="space-y-6">
-        <PageHeader title="نقش‌ها" breadcrumbs={[{ label: "داشبورد", href: "/dashboard" }, { label: "هویت و دسترسی", href: "/dashboard/identity" }, { label: "نقش‌ها" }]} />
+        <PageHeader
+          title="نقش‌ها"
+          breadcrumbs={[
+            { label: "داشبورد", href: "/dashboard" },
+            { label: "هویت و دسترسی", href: "/dashboard/identity" },
+            { label: "نقش‌ها" },
+          ]}
+        />
         <div className="rounded-xl border border-dashed px-6 py-12 text-center text-sm text-muted-foreground">
-          دسترسی identity.role.view فعال نیست.
+          {MSG_NO_ACCESS}
         </div>
       </div>
     );
@@ -165,7 +168,7 @@ export function RolesListPage() {
     <div className="space-y-6">
       <PageHeader
         title="نقش‌ها"
-        description="مدیریت نقش‌های مستأجر و تخصیص مجوز"
+        description="تعریف نقش‌های سازمان و تعیین سطح دسترسی هر نقش"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "هویت و دسترسی", href: "/dashboard/identity" },
@@ -183,7 +186,9 @@ export function RolesListPage() {
 
       {isError ? (
         <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          {error instanceof Error ? error.message : "خطا"}
+          {error instanceof ApiClientError && error.message
+            ? error.message
+            : MSG_LOAD_ERROR}
           <Button variant="outline" size="sm" className="mt-2" onClick={() => void refetch()}>
             تلاش مجدد
           </Button>
@@ -196,9 +201,9 @@ export function RolesListPage() {
         getRowKey={(r) => r.tenant_role_id}
         loading={isLoading || (isFetching && !data)}
         isFiltered={query.trim().length > 0}
-        emptyTitle="نقشی تعریف نشده"
-        emptyDescription="اولین نقش مستأجر را بسازید."
-        emptySearchTitle="نتیجه‌ای نیست"
+        emptyTitle="هنوز نقشی تعریف نشده"
+        emptyDescription="اولین نقش سازمان را بسازید تا بتوانید به کاربران اختصاص دهید."
+        emptySearchTitle="نتیجه‌ای پیدا نشد"
         emptySearchDescription="عبارت جستجو را تغییر دهید."
         page={safePage}
         pageSize={pageSize}
@@ -234,7 +239,9 @@ export function RolesListPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>نقش جدید</DialogTitle>
-            <DialogDescription>نام نقش در سطح مستأجر جاری</DialogDescription>
+            <DialogDescription>
+              نامی قابل فهم برای نقش در سازمان خود وارد کنید.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={onCreate} className="space-y-3">
             <div className="space-y-1.5">
