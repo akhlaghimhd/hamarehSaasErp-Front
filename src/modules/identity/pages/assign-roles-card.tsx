@@ -1,4 +1,4 @@
-/** FE-P1-T15 — Assign roles to a tenant member (by user_id). */
+/** FE-P1-T15 — تخصیص نقش به عضو سازمان */
 
 "use client";
 
@@ -18,6 +18,7 @@ import { usePermission } from "@/auth";
 import { ApiClientError } from "@/api";
 import { useRoles, useAssignRoleToUser } from "../hooks/use-roles";
 import { IdentityPermissions } from "../types";
+import { MSG_GENERIC_ERROR } from "../lib/ui-copy";
 
 export function AssignRolesCard({ userId }: { userId: string }) {
   const canAssign = usePermission(IdentityPermissions.roleAssign);
@@ -36,7 +37,7 @@ export function AssignRolesCard({ userId }: { userId: string }) {
 
   const onAssign = async () => {
     if (selected.size === 0) {
-      toast.error("حداقل یک نقش انتخاب کنید");
+      toast.error("دست‌کم یک نقش را انتخاب کنید");
       return;
     }
     try {
@@ -44,11 +45,13 @@ export function AssignRolesCard({ userId }: { userId: string }) {
         userId,
         roleIds: Array.from(selected),
       });
-      toast.success("نقش‌ها به عضو تخصیص داده شد");
+      toast.success("نقش‌های انتخاب‌شده برای این کاربر ثبت شد");
       setSelected(new Set());
     } catch (e) {
       toast.error(
-        e instanceof ApiClientError ? e.message : "تخصیص نقش ناموفق بود"
+        e instanceof ApiClientError && e.message
+          ? e.message
+          : MSG_GENERIC_ERROR
       );
     }
   };
@@ -58,19 +61,18 @@ export function AssignRolesCard({ userId }: { userId: string }) {
       <CardHeader className="pb-2">
         <CardTitle className="text-base">تخصیص نقش</CardTitle>
         <CardDescription>
-          API فهرست نقش‌های فعلی عضو هنوز ندارد؛ از اینجا نقش جدید تخصیص دهید
-          (POST /roles/assign).
+          نقش‌های موردنظر را انتخاب کنید و برای این کاربر اعمال کنید.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {isLoading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            بارگذاری نقش‌ها…
+            در حال بارگذاری نقش‌ها…
           </div>
         ) : (roles ?? []).length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            نقشی تعریف نشده. ابتدا از بخش نقش‌ها یک نقش بسازید.
+            هنوز نقشی تعریف نشده است. ابتدا از بخش نقش‌ها یک نقش بسازید.
           </p>
         ) : (
           <div className="grid gap-2 sm:grid-cols-2">
@@ -101,12 +103,12 @@ export function AssignRolesCard({ userId }: { userId: string }) {
             {assignMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              "تخصیص نقش‌های انتخاب‌شده"
+              "اعمال نقش‌های انتخاب‌شده"
             )}
           </Button>
         ) : (
           <p className="text-xs text-muted-foreground">
-            نیاز به مجوز identity.role.assign
+            برای تخصیص نقش، مجوز لازم را ندارید.
           </p>
         )}
       </CardContent>
