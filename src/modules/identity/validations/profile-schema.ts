@@ -5,14 +5,15 @@ const emptyToNull = (v: unknown) => {
   return v;
 };
 
-export const BIO_MAX = 200;
+/** ~20 words in Persian ≈ 80 characters */
+export const BIO_MAX = 80;
 
 export const selfProfileSchema = z.object({
   display_bio: z.preprocess(
     emptyToNull,
     z
       .string()
-      .max(BIO_MAX, `حداکثر ${BIO_MAX} کاراکتر`)
+      .max(BIO_MAX, `حداکثر حدود ۲۰ کلمه (${BIO_MAX} کاراکتر)`)
       .nullable()
       .optional()
   ),
