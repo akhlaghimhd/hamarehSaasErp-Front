@@ -14,7 +14,9 @@ import {
   Plus,
   RotateCcw,
   Search,
+  Shield,
   Trash2,
+  UserCheck,
   UserMinus,
   Users,
   X,
@@ -73,11 +75,12 @@ type StatusFilter = "all" | "active" | "inactive";
 type SortKey = "name" | "email" | "mobile" | "status" | "joined";
 type SortDir = "asc" | "desc";
 type ColumnId = "name" | "email" | "mobile" | "status" | "joined" | "actions";
+type BulkKind = "activate" | "deactivate" | "delete" | "restore";
 
 type ConfirmState =
   | null
   | {
-      kind: "deactivate" | "delete";
+      kind: BulkKind;
       count: number;
       targets: TenantUserDto[];
     };
@@ -145,6 +148,17 @@ function sv(r: TenantUserDto, k: SortKey): string | number {
   return r.created_at ? new Date(r.created_at).getTime() : 0;
 }
 
+const BULK_SUCCESS: Record<BulkKind, (n: number) => string> = {
+  activate: (n) => `${toFaDigits(n)} کاربر فعال شد`,
+  deactivate: (n) => `${toFaDigits(n)} کاربر غیرفعال شد`,
+  delete: (n) => `${toFaDigits(n)} کاربر به فهرست حذف‌شده‌ها منتقل شد`,
+  restore: (n) =>
+    `${toFaDigits(n)} کاربر به فهرست سازمان برگشت؛ برای ورود به سامانه وضعیتشان را فعال کنید`,
+};
+
+const RESTORE_ONE_MSG =
+  "کاربر به فهرست سازمان برگشت؛ برای ورود به سامانه وضعیتش را فعال کنید.";
+
 export function MembersListPage() {
   const canView = usePermission(IdentityPermissions.userView);
   const canUpdate = usePermission(IdentityPermissions.userUpdate);
@@ -203,7 +217,7 @@ export function MembersListPage() {
 
   const filteredSorted = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = rows.filter((row) => {
+    const list = rows.filter((row) => {
       if (!isDeletedView) {
         const st = Number(row.status);
         if (statusFilter === "active" && st !== 1) return false;
@@ -239,13 +253,26 @@ export function MembersListPage() {
   const allPageSelected =
     pageIds.length > 0 && pageIds.every((id) => selected.has(id));
   const somePageSelected = pageIds.some((id) => selected.has(id));
-  const selectedRows = useMemo(
-    () => rows.filter((r) => selected.has(r.tenant_user_id)),
-    [rows, selected]
-  );
-  const exportTarget = selectedRows.length > 0 ? selectedRows : filteredSorted;
 
-  const runBulk = async (kind: "deactivate" | "delete", targets: TenantUserDto[]) => {
+  /** انتخاب‌شده‌ها با همان ترتیب فعلی جدول (سورت/فیلتر) */
+  const selectedRowsOrdered = useMemo(
+    () => filteredSorted.filter((r) => selected.has(r.tenant_user_id)),
+    [filteredSorted, selected]
+  );
+
+  /** خروجی دقیقاً مطابق نمای فعلی: فیلتر عضویت + وضعیت + جستجو + سورت */
+  const exportTarget =
+    selectedRowsOrdered.length > 0 ? selectedRowsOrdered : filteredSorted;
+
+  const exportLabel = isDeletedView
+    ? selected.size > 0
+      ? `خروجی حذف‌شده‌های انتخاب‌شده (${toFaDigits(selected.size)})`
+      : `خروجی حذف‌شده‌ها (${toFaDigits(total)})`
+    : selected.size > 0
+      ? `خروجی انتخاب‌شده‌ها (${toFaDigits(selected.size)})`
+      : `خروجی فهرست فعلی (${toFaDigits(total)})`;
+
+  const runBulk = async (kind: BulkKind, targets: TenantUserDto[]) => {
     cancelRef.current = false;
     setBulkBusy(true);
     setBulkProgress({ done: 0, total: targets.length });
@@ -259,13 +286,20 @@ export function MembersListPage() {
       }
       const r = targets[i];
       try {
-        if (kind === "deactivate") {
+        if (kind === "activate") {
+          await updateMutation.mutateAsync({
+            tenantUserId: r.tenant_user_id,
+            payload: { status: 1 },
+          });
+        } else if (kind === "deactivate") {
           await updateMutation.mutateAsync({
             tenantUserId: r.tenant_user_id,
             payload: { status: 0 },
           });
-        } else {
+        } else if (kind === "delete") {
           await deleteMutation.mutateAsync(r.tenant_user_id);
+        } else {
+          await restoreMutation.mutateAsync(r.tenant_user_id);
         }
         ok += 1;
       } catch {
@@ -281,13 +315,37 @@ export function MembersListPage() {
         `عملیات متوقف شد · انجام‌شده: ${toFaDigits(ok)} · باقی‌مانده انجام نشد`
       );
     } else if (ok) {
-      toast.success(
-        kind === "deactivate"
-          ? `${toFaDigits(ok)} کاربر غیرفعال شد`
-          : `${toFaDigits(ok)} کاربر به فهرست حذف‌شده‌ها منتقل شد`
-      );
+      toast.success(BULK_SUCCESS[kind](ok));
     }
     if (fail) toast.error(`${toFaDigits(fail)} مورد انجام نشد`);
+  };
+
+  const activateOne = async (row: TenantUserDto) => {
+    try {
+      await updateMutation.mutateAsync({
+        tenantUserId: row.tenant_user_id,
+        payload: { status: 1 },
+      });
+      toast.success("کاربر فعال شد و می‌تواند وارد سامانه شود.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "فعال‌سازی ممکن نشد");
+    }
+  };
+
+  const deactivateOne = async (row: TenantUserDto) => {
+    if (currentUserId && row.user_id === currentUserId) {
+      toast.error("نمی‌توانید خودتان را غیرفعال کنید.");
+      return;
+    }
+    try {
+      await updateMutation.mutateAsync({
+        tenantUserId: row.tenant_user_id,
+        payload: { status: 0 },
+      });
+      toast.success("کاربر غیرفعال شد.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "غیرفعال‌سازی ممکن نشد");
+    }
   };
 
   if (!canView) {
@@ -310,10 +368,10 @@ export function MembersListPage() {
 
   return (
     <TooltipProvider delayDuration={250}>
-      <div className="space-y-5">
+      <div className="space-y-4">
         <PageHeader
           title="کاربران سازمان"
-          description="جستجو، مرتب‌سازی و مدیریت اعضای سازمان — حذف نرم است و قابل بازگردانی"
+          description="جستجو، مرتب‌سازی و مدیریت کاربران سازمان — حذف نرم است و قابل بازگردانی"
           breadcrumbs={[
             { label: "داشبورد", href: "/dashboard" },
             { label: "هویت و دسترسی", href: "/dashboard/identity" },
@@ -352,7 +410,7 @@ export function MembersListPage() {
           <div className="relative min-w-[12rem] flex-1 sm:max-w-sm">
             <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
-              className="h-9 ps-8 text-sm"
+              className={cn("h-9 ps-8 text-sm", query && "pe-9")}
               placeholder="جستجو نام، ایمیل یا موبایل…"
               value={query}
               onChange={(e) => {
@@ -360,6 +418,19 @@ export function MembersListPage() {
                 setPage(1);
               }}
             />
+            {query ? (
+              <button
+                type="button"
+                className="absolute end-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="پاک کردن جستجو"
+                onClick={() => {
+                  setQuery("");
+                  setPage(1);
+                }}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
           </div>
 
           <Select
@@ -428,11 +499,7 @@ export function MembersListPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>
-                {selected.size > 0
-                  ? `خروجی از ${toFaDigits(selected.size)} انتخاب‌شده`
-                  : `خروجی از ${toFaDigits(total)} مورد`}
-              </DropdownMenuLabel>
+              <DropdownMenuLabel>{exportLabel}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="gap-2"
@@ -460,34 +527,65 @@ export function MembersListPage() {
           </div>
         </div>
 
+        {/* نوار عملیات گروهی — اعضای جاری */}
         {selected.size > 0 && !isDeletedView ? (
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/25 bg-primary/[0.06] px-3 py-2 text-sm">
             <span className="font-medium tabular-nums">
               {toFaDigits(selected.size)} مورد انتخاب شده
             </span>
             {canUpdate ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1.5"
-                disabled={bulkBusy}
-                onClick={() => {
-                  const targets = selectedRows.filter(
-                    (r) =>
-                      Number(r.status) === 1 &&
-                      !(currentUserId && r.user_id === currentUserId)
-                  );
-                  if (!targets.length) {
-                    toast.error("مورد قابل غیرفعال‌سازی نیست.");
-                    return;
-                  }
-                  setConfirm({ kind: "deactivate", count: targets.length, targets });
-                }}
-              >
-                <UserMinus className="h-3.5 w-3.5" />
-                غیرفعال‌سازی
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5"
+                  disabled={bulkBusy}
+                  onClick={() => {
+                    const targets = selectedRowsOrdered.filter(
+                      (r) => Number(r.status) !== 1
+                    );
+                    if (!targets.length) {
+                      toast.error("کاربر غیرفعالی در انتخاب نیست.");
+                      return;
+                    }
+                    setConfirm({
+                      kind: "activate",
+                      count: targets.length,
+                      targets,
+                    });
+                  }}
+                >
+                  <UserCheck className="h-3.5 w-3.5" />
+                  فعال‌سازی
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5"
+                  disabled={bulkBusy}
+                  onClick={() => {
+                    const targets = selectedRowsOrdered.filter(
+                      (r) =>
+                        Number(r.status) === 1 &&
+                        !(currentUserId && r.user_id === currentUserId)
+                    );
+                    if (!targets.length) {
+                      toast.error("مورد قابل غیرفعال‌سازی نیست.");
+                      return;
+                    }
+                    setConfirm({
+                      kind: "deactivate",
+                      count: targets.length,
+                      targets,
+                    });
+                  }}
+                >
+                  <UserMinus className="h-3.5 w-3.5" />
+                  غیرفعال‌سازی
+                </Button>
+              </>
             ) : null}
             {canDelete ? (
               <Button
@@ -497,7 +595,7 @@ export function MembersListPage() {
                 className="h-8 gap-1.5 text-destructive"
                 disabled={bulkBusy}
                 onClick={() => {
-                  const targets = selectedRows.filter(
+                  const targets = selectedRowsOrdered.filter(
                     (r) => !(currentUserId && r.user_id === currentUserId)
                   );
                   if (!targets.length) {
@@ -516,7 +614,55 @@ export function MembersListPage() {
               variant="ghost"
               size="sm"
               className="h-8 gap-1.5"
-              onClick={() => exportMembersExcel(selectedRows)}
+              onClick={() => exportMembersExcel(selectedRowsOrdered)}
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              اکسل
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 ms-auto gap-1"
+              onClick={() => setSelected(new Set())}
+            >
+              <X className="h-3.5 w-3.5" />
+              لغو انتخاب
+            </Button>
+          </div>
+        ) : null}
+
+        {/* نوار عملیات گروهی — حذف‌شده‌ها */}
+        {selected.size > 0 && isDeletedView && canRestore ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/25 bg-primary/[0.06] px-3 py-2 text-sm">
+            <span className="font-medium tabular-nums">
+              {toFaDigits(selected.size)} مورد انتخاب شده
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5"
+              disabled={bulkBusy}
+              onClick={() => {
+                const targets = selectedRowsOrdered;
+                if (!targets.length) return;
+                setConfirm({
+                  kind: "restore",
+                  count: targets.length,
+                  targets,
+                });
+              }}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              بازگردانی گروهی
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={() => exportMembersExcel(selectedRowsOrdered)}
             >
               <FileSpreadsheet className="h-3.5 w-3.5" />
               اکسل
@@ -537,7 +683,7 @@ export function MembersListPage() {
         {isLoading ? (
           <div className="space-y-2 rounded-lg border p-3">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="h-11 w-full" />
+              <Skeleton key={i} className="h-9 w-full" />
             ))}
           </div>
         ) : pageRows.length === 0 ? (
@@ -585,10 +731,16 @@ export function MembersListPage() {
                         }}
                       />
                     </TableHead>
+                    <TableHead className="w-10 text-center text-xs font-normal text-muted-foreground">
+                      ردیف
+                    </TableHead>
                     {COLS.filter((c) => visible[c.id]).map((c) => (
                       <TableHead
                         key={c.id}
-                        className={cn(c.sort && "cursor-pointer select-none")}
+                        className={cn(
+                          "h-9 py-1.5",
+                          c.sort && "cursor-pointer select-none"
+                        )}
                         onClick={
                           c.sort
                             ? () => {
@@ -623,9 +775,10 @@ export function MembersListPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pageRows.map((row) => {
+                  {pageRows.map((row, idx) => {
                     const active = Number(row.status) === 1;
                     const name = dn(row);
+                    const rowNo = (safePage - 1) * pageSize + idx + 1;
                     return (
                       <TableRow
                         key={row.tenant_user_id}
@@ -635,11 +788,11 @@ export function MembersListPage() {
                             : undefined
                         }
                         className={cn(
-                          "group hover:bg-primary/[0.04]",
+                          "group h-10 hover:bg-primary/[0.04]",
                           selected.has(row.tenant_user_id) && "bg-primary/[0.06]"
                         )}
                       >
-                        <TableCell className="w-10 pe-0">
+                        <TableCell className="w-10 py-1 pe-0">
                           <Checkbox
                             checked={selected.has(row.tenant_user_id)}
                             onCheckedChange={(v) =>
@@ -653,12 +806,15 @@ export function MembersListPage() {
                             onClick={(e) => e.stopPropagation()}
                           />
                         </TableCell>
+                        <TableCell className="w-10 py-1 text-center text-xs tabular-nums text-muted-foreground">
+                          {toFaDigits(rowNo)}
+                        </TableCell>
                         {visible.name ? (
-                          <TableCell>
-                            <div className="min-w-0">
+                          <TableCell className="py-1">
+                            <div className="flex min-w-0 items-center gap-1.5">
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <span className="block cursor-default truncate font-medium leading-tight">
+                                  <span className="block max-w-[14rem] cursor-default truncate text-sm font-medium leading-none">
                                     {name}
                                   </span>
                                 </TooltipTrigger>
@@ -679,15 +835,23 @@ export function MembersListPage() {
                                 </TooltipContent>
                               </Tooltip>
                               {row.is_owner ? (
-                                <div className="mt-0.5 text-[11px] text-primary">
-                                  مدیر اصلی
-                                </div>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span
+                                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                                      aria-label="مدیر اصلی"
+                                    >
+                                      <Shield className="h-3 w-3" />
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>مدیر اصلی سازمان</TooltipContent>
+                                </Tooltip>
                               ) : null}
                             </div>
                           </TableCell>
                         ) : null}
                         {visible.email ? (
-                          <TableCell>
+                          <TableCell className="py-1">
                             <span
                               className="block max-w-[12rem] truncate text-sm"
                               dir="ltr"
@@ -697,7 +861,7 @@ export function MembersListPage() {
                           </TableCell>
                         ) : null}
                         {visible.mobile ? (
-                          <TableCell>
+                          <TableCell className="py-1">
                             <span className="tabular-nums text-sm">
                               {row.user?.mobile
                                 ? toFaDigits(row.user.mobile)
@@ -706,7 +870,7 @@ export function MembersListPage() {
                           </TableCell>
                         ) : null}
                         {visible.status ? (
-                          <TableCell>
+                          <TableCell className="py-1">
                             {isDeletedView ? (
                               <StatusChip label="حذف‌شده" tone="neutral" />
                             ) : active ? (
@@ -717,7 +881,7 @@ export function MembersListPage() {
                           </TableCell>
                         ) : null}
                         {visible.joined ? (
-                          <TableCell>
+                          <TableCell className="py-1">
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span className="cursor-default tabular-nums text-xs text-muted-foreground">
@@ -735,48 +899,84 @@ export function MembersListPage() {
                           </TableCell>
                         ) : null}
                         {visible.actions ? (
-                          <TableCell>
-                            {isDeletedView ? (
-                              canRestore ? (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 gap-1"
-                                  disabled={restoreMutation.isPending}
-                                  onClick={() => {
-                                    void restoreMutation
-                                      .mutateAsync(row.tenant_user_id)
-                                      .then(() =>
-                                        toast.success(
-                                          "عضویت بازگردانی شد؛ برای استفاده باید دوباره فعال شود."
-                                        )
-                                      )
-                                      .catch((e) =>
-                                        toast.error(
-                                          e instanceof Error
-                                            ? e.message
-                                            : "بازگردانی ممکن نشد"
-                                        )
-                                      );
-                                  }}
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5" />
-                                  بازگردانی
-                                </Button>
+                          <TableCell className="py-1">
+                            <div className="flex flex-wrap items-center gap-0.5">
+                              {isDeletedView ? (
+                                canRestore ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 gap-1 px-2 text-xs"
+                                    disabled={restoreMutation.isPending}
+                                    onClick={() => {
+                                      void restoreMutation
+                                        .mutateAsync(row.tenant_user_id)
+                                        .then(() => toast.success(RESTORE_ONE_MSG))
+                                        .catch((e) =>
+                                          toast.error(
+                                            e instanceof Error
+                                              ? e.message
+                                              : "بازگردانی ممکن نشد"
+                                          )
+                                        );
+                                    }}
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                    بازگردانی
+                                  </Button>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">
+                                    —
+                                  </span>
+                                )
                               ) : (
-                                <span className="text-xs text-muted-foreground">
-                                  —
-                                </span>
-                              )
-                            ) : (
-                              <Button variant="ghost" size="sm" className="h-8" asChild>
-                                <Link
-                                  href={`/dashboard/identity/members/${row.tenant_user_id}`}
-                                >
-                                  جزئیات
-                                </Link>
-                              </Button>
-                            )}
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs"
+                                    asChild
+                                  >
+                                    <Link
+                                      href={`/dashboard/identity/members/${row.tenant_user_id}`}
+                                    >
+                                      جزئیات
+                                    </Link>
+                                  </Button>
+                                  {canUpdate ? (
+                                    active ? (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 gap-1 px-2 text-xs"
+                                        disabled={
+                                          updateMutation.isPending ||
+                                          Boolean(
+                                            currentUserId &&
+                                              row.user_id === currentUserId
+                                          )
+                                        }
+                                        onClick={() => void deactivateOne(row)}
+                                      >
+                                        <UserMinus className="h-3.5 w-3.5" />
+                                        غیرفعال
+                                      </Button>
+                                    ) : (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 gap-1 px-2 text-xs"
+                                        disabled={updateMutation.isPending}
+                                        onClick={() => void activateOne(row)}
+                                      >
+                                        <UserCheck className="h-3.5 w-3.5" />
+                                        فعال
+                                      </Button>
+                                    )
+                                  ) : null}
+                                </>
+                              )}
+                            </div>
                           </TableCell>
                         ) : null}
                       </TableRow>
@@ -785,7 +985,7 @@ export function MembersListPage() {
                 </TableBody>
               </Table>
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2.5 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-xs text-muted-foreground">
               <span className="tabular-nums">
                 صفحه {toFaDigits(safePage)} از {toFaDigits(totalPages)} ·{" "}
                 {toFaDigits(total)} مورد
@@ -844,18 +1044,33 @@ export function MembersListPage() {
               <h2 className="text-base font-semibold">
                 {confirm.kind === "delete"
                   ? "تأیید حذف از سازمان"
-                  : "تأیید غیرفعال‌سازی"}
+                  : confirm.kind === "restore"
+                    ? "تأیید بازگردانی"
+                    : confirm.kind === "activate"
+                      ? "تأیید فعال‌سازی"
+                      : "تأیید غیرفعال‌سازی"}
               </h2>
-              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                 {confirm.kind === "delete" ? (
                   <>
-                    قرار است {" "}
+                    قرار است{" "}
                     <strong className="text-foreground">
                       {toFaDigits(confirm.count)}
                     </strong>{" "}
                     کاربر از سازمان حذف شوند. حذف <strong>نرم</strong> است:
-                    سوابق و اثرات کارهای قبلی از بین نمی‌رود و از فهرست
-                    «حذف‌شده‌ها» قابل بازگردانی است.
+                    سوابق از بین نمی‌رود و از فهرست «حذف‌شده‌ها» قابل بازگردانی
+                    است.
+                  </>
+                ) : confirm.kind === "restore" ? (
+                  <>
+                    {toFaDigits(confirm.count)} کاربر به فهرست سازمان برمی‌گردند.
+                    پس از بازگردانی وضعیتشان غیرفعال است؛ برای ورود به سامانه باید
+                    فعال شوند.
+                  </>
+                ) : confirm.kind === "activate" ? (
+                  <>
+                    {toFaDigits(confirm.count)} کاربر فعال می‌شوند و می‌توانند وارد
+                    سامانه شوند.
                   </>
                 ) : (
                   <>
@@ -877,11 +1092,19 @@ export function MembersListPage() {
                 <Button
                   type="button"
                   size="sm"
-                  variant={confirm.kind === "delete" ? "destructive" : "default"}
+                  variant={
+                    confirm.kind === "delete" ? "destructive" : "default"
+                  }
                   disabled={bulkBusy}
                   onClick={() => void runBulk(confirm.kind, confirm.targets)}
                 >
-                  {confirm.kind === "delete" ? "حذف نرم" : "غیرفعال‌سازی"}
+                  {confirm.kind === "delete"
+                    ? "حذف نرم"
+                    : confirm.kind === "restore"
+                      ? "بازگردانی"
+                      : confirm.kind === "activate"
+                        ? "فعال‌سازی"
+                        : "غیرفعال‌سازی"}
                 </Button>
               </div>
             </div>
