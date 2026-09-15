@@ -1,12 +1,15 @@
 /**
- * FE-P1-T02 — IdentityCore API path constants (versioned under /api/v1).
+ * IdentityCore API path constants (versioned under /api/v1).
  */
 
 export const IDENTITY_BASE = "/identity-core/identity";
 
 export const identityPaths = {
   profileMe: `${IDENTITY_BASE}/profiles/me`,
+  profileMeAvatar: `${IDENTITY_BASE}/profiles/me/avatar`,
   profileByUser: (userId: string) => `${IDENTITY_BASE}/profiles/${userId}`,
+  profileApproveAddress: (userId: string) =>
+    `${IDENTITY_BASE}/profiles/${userId}/approve-address`,
   users: `${IDENTITY_BASE}/users`,
   user: (id: string) => `${IDENTITY_BASE}/users/${id}`,
   roles: `${IDENTITY_BASE}/roles`,
