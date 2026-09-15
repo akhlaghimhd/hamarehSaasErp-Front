@@ -1,6 +1,5 @@
 /**
- * FE-P1 — Identity module landing hub.
- * Open features: profile, members. Sprint 3/4 cards stay «به‌زودی».
+ * FE-P1 — Identity module landing hub (all phase features open).
  */
 
 "use client";
@@ -39,26 +38,26 @@ const cards: HubCard[] = [
   {
     href: "/dashboard/identity/roles",
     title: "نقش‌ها",
-    description: "اسپرینت ۳ — نقش و تخصیص مجوز",
+    description: "نقش و تخصیص مجوز",
     icon: Shield,
     permission: IdentityPermissions.roleView,
-    open: false,
+    open: true,
   },
   {
     href: "/dashboard/identity/permissions",
     title: "مجوزها",
-    description: "اسپرینت ۳ — فهرست مجوزها",
+    description: "فهرست و تعریف مجوز مستأجر",
     icon: KeyRound,
     permission: IdentityPermissions.permissionView,
-    open: false,
+    open: true,
   },
   {
     href: "/dashboard/identity/scopes",
     title: "Scope",
-    description: "اسپرینت ۴ — محدوده دسترسی",
+    description: "محدوده دسترسی سازمانی",
     icon: Scan,
     permission: IdentityPermissions.scopeView,
-    open: false,
+    open: true,
   },
 ];
 
@@ -142,16 +141,6 @@ export function IdentityHome() {
           />
         ))}
       </div>
-
-      {!canViewUsers ? (
-        <p className="text-xs text-muted-foreground">
-          برای باز شدن «اعضای مستأجر» نقش شما باید مجوز{" "}
-          <code className="rounded bg-muted px-1 py-0.5 text-[11px]" dir="ltr">
-            identity.user.view
-          </code>{" "}
-          داشته باشد (در JWT / security_context.permissions).
-        </p>
-      ) : null}
     </div>
   );
 }
