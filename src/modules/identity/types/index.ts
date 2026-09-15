@@ -2,6 +2,9 @@ export type GenderCode = 1 | 2;
 
 export type AddressChangeStatus = 0 | 1 | 2 | 3;
 
+/** Membership status on tenant_users (1 = active, 0 = inactive). */
+export type TenantUserStatus = 0 | 1;
+
 export interface UserProfileDto {
   profile_id?: string;
   user_id: string;
@@ -41,6 +44,58 @@ export interface UpsertProfilePayload {
   phone?: string | null;
   description?: string | null;
   display_bio?: string | null;
+}
+
+/** Nested user payload returned with TenantUser (from User model). */
+export interface TenantUserUserDto {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  mobile?: string | null;
+  user_kind?: number;
+  status?: number;
+  last_login_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * tenant_users membership DTO (IdentityCore).
+ * Aligned with TenantUser model + with(['user']) on list/show.
+ */
+export interface TenantUserDto {
+  tenant_user_id: string;
+  tenant_id: string;
+  user_id: string;
+  employee_id?: string | null;
+  is_owner: boolean;
+  status: TenantUserStatus | number;
+  row_version?: number;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+  user?: TenantUserUserDto | null;
+}
+
+/** POST /identity-core/identity/users — create / invite member. */
+export interface CreateTenantUserPayload {
+  email: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  mobile?: string | null;
+  is_owner?: boolean;
+  role_ids?: string[];
+}
+
+/** PUT /identity-core/identity/users/{id} — update membership / user fields. */
+export interface UpdateTenantUserPayload {
+  first_name?: string;
+  last_name?: string;
+  mobile?: string | null;
+  is_owner?: boolean;
+  status?: TenantUserStatus | number;
 }
 
 export const IdentityPermissions = {
