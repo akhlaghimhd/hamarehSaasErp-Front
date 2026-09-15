@@ -1,8 +1,4 @@
-/**
- * FE-P1-T06 — Tenant members list (UI-05).
- * Client-side search / filter / pagination over tenantUserService.list().
- * Permission gate: identity.user.view. Create CTA gated by identity.user.create.
- */
+/** FE-P1-T06 — فهرست کاربران سازمان */
 
 "use client";
 
@@ -28,6 +24,7 @@ import { Can, usePermission } from "@/auth";
 import { toFaDigits } from "@/shared/lib/utils";
 import { useTenantUsers } from "../hooks/use-tenant-users";
 import { IdentityPermissions, type TenantUserDto } from "../types";
+import { MSG_LOAD_ERROR, MSG_NO_ACCESS } from "../lib/ui-copy";
 
 type StatusFilter = "all" | "active" | "inactive";
 
@@ -73,14 +70,7 @@ export function MembersListPage() {
 
       if (!q) return true;
       const u = row.user;
-      const hay = [
-        u?.first_name,
-        u?.last_name,
-        u?.email,
-        u?.mobile,
-        row.tenant_user_id,
-        row.user_id,
-      ]
+      const hay = [u?.first_name, u?.last_name, u?.email, u?.mobile]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -96,8 +86,7 @@ export function MembersListPage() {
     safePage * pageSize
   );
 
-  const isFiltered =
-    query.trim().length > 0 || statusFilter !== "all";
+  const isFiltered = query.trim().length > 0 || statusFilter !== "all";
 
   const columns: DataTableColumn<TenantUserDto>[] = [
     {
@@ -107,7 +96,7 @@ export function MembersListPage() {
         <div className="min-w-0">
           <div className="truncate font-medium">{memberDisplayName(row)}</div>
           {row.is_owner ? (
-            <span className="text-[11px] text-muted-foreground">مالک مستأجر</span>
+            <span className="text-[11px] text-muted-foreground">مدیر اصلی سازمان</span>
           ) : null}
         </div>
       ),
@@ -123,7 +112,7 @@ export function MembersListPage() {
       id: "mobile",
       header: "موبایل",
       cell: (row) => (
-        <span className="tabular-nums text-sm" dir="ltr">
+        <span className="tabular-nums text-sm">
           {row.user?.mobile ? toFaDigits(row.user.mobile) : "—"}
         </span>
       ),
@@ -142,7 +131,7 @@ export function MembersListPage() {
     },
     {
       id: "joined",
-      header: "عضویت",
+      header: "تاریخ عضویت",
       cell: (row) => (
         <span className="tabular-nums text-xs text-muted-foreground">
           {formatDate(row.created_at)}
@@ -170,16 +159,16 @@ export function MembersListPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="اعضای مستأجر"
-          description="مدیریت عضویت کاربران در مستأجر جاری"
+          title="کاربران سازمان"
+          description="مدیریت اعضای سازمان"
           breadcrumbs={[
             { label: "داشبورد", href: "/dashboard" },
             { label: "هویت و دسترسی", href: "/dashboard/identity" },
-            { label: "اعضا" },
+            { label: "کاربران" },
           ]}
         />
         <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-6 py-12 text-center text-sm text-muted-foreground">
-          دسترسی مشاهده اعضا (identity.user.view) برای این حساب فعال نیست.
+          {MSG_NO_ACCESS}
         </div>
       </div>
     );
@@ -188,19 +177,19 @@ export function MembersListPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="اعضای مستأجر"
-        description="لیست عضویت کاربران در مستأجر جاری — بدون نشت بین مستأجرها"
+        title="کاربران سازمان"
+        description="فهرست و مدیریت اعضای فعال سازمان"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "هویت و دسترسی", href: "/dashboard/identity" },
-          { label: "اعضا" },
+          { label: "کاربران" },
         ]}
         actions={
           <Can permission={IdentityPermissions.userCreate}>
             <Button size="sm" asChild>
               <Link href="/dashboard/identity/members/new">
                 <Plus className="h-4 w-4" />
-                افزودن عضو
+                افزودن کاربر
               </Link>
             </Button>
           </Can>
@@ -209,9 +198,9 @@ export function MembersListPage() {
 
       {isError ? (
         <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          <p className="font-medium">خطا در دریافت لیست اعضا</p>
+          <p className="font-medium">دریافت فهرست کاربران ممکن نشد</p>
           <p className="mt-1 text-xs opacity-90">
-            {error instanceof Error ? error.message : "درخواست ناموفق بود."}
+            {error instanceof Error ? error.message : MSG_LOAD_ERROR}
           </p>
           <Button
             type="button"
@@ -231,9 +220,9 @@ export function MembersListPage() {
         getRowKey={(row) => row.tenant_user_id}
         loading={isLoading || (isFetching && !data)}
         isFiltered={isFiltered}
-        emptyTitle="هنوز عضوی ثبت نشده"
-        emptyDescription="اولین عضو مستأجر را اضافه کنید تا در این فهرست نمایش داده شود."
-        emptySearchTitle="نتیجه‌ای برای این جستجو نیست"
+        emptyTitle="هنوز کاربری ثبت نشده"
+        emptyDescription="اولین کاربر سازمان را اضافه کنید تا در این فهرست دیده شود."
+        emptySearchTitle="نتیجه‌ای پیدا نشد"
         emptySearchDescription="عبارت جستجو یا فیلتر وضعیت را تغییر دهید."
         page={safePage}
         pageSize={pageSize}
@@ -249,13 +238,13 @@ export function MembersListPage() {
               <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 className="h-9 ps-8"
-                placeholder="جستجو نام، ایمیل، موبایل..."
+                placeholder="جستجو نام، ایمیل، موبایل…"
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
                   setPage(1);
                 }}
-                aria-label="جستجوی اعضا"
+                aria-label="جستجوی کاربران"
               />
             </div>
             <Select
@@ -276,16 +265,11 @@ export function MembersListPage() {
             </Select>
             <div className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
               <Users className="h-3.5 w-3.5" />
-              <span>{toFaDigits(total)} عضو</span>
+              <span>{toFaDigits(total)} نفر</span>
             </div>
           </div>
         }
       />
-
-      <p className="text-[11px] text-muted-foreground">
-        توجه: API فعلی فقط اعضای فعال (status=۱) را برمی‌گرداند؛ فیلتر «غیرفعال»
-        تا زمان پشتیبانی بک‌اند ممکن است خالی بماند.
-      </p>
     </div>
   );
 }
