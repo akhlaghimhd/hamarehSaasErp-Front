@@ -16,6 +16,9 @@ export {
 export {
   useTenantUsers,
   useTenantUser,
+  useCreateTenantUser,
+  useUpdateTenantUser,
+  useSoftDeleteTenantUser,
   tenantUsersQueryKey,
   tenantUserQueryKey,
 } from "./hooks/use-tenant-users";
