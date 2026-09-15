@@ -1,12 +1,12 @@
-/**
- * React Query hooks for tenant memberships (TenantUser).
- * Used by FE-P1-T06+ member list / detail pages.
- */
+/** React Query hooks for tenant memberships (TenantUser). */
 
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { tenantUserService } from "../services/tenant-user-service";
+import {
+  tenantUserService,
+  type MembershipListFilter,
+} from "../services/tenant-user-service";
 import type {
   CreateTenantUserPayload,
   UpdateTenantUserPayload,
@@ -18,10 +18,10 @@ export function tenantUserQueryKey(tenantUserId: string) {
   return ["identity", "tenant-users", tenantUserId] as const;
 }
 
-export function useTenantUsers() {
+export function useTenantUsers(membership: MembershipListFilter = "active") {
   return useQuery({
-    queryKey: tenantUsersQueryKey,
-    queryFn: () => tenantUserService.list(),
+    queryKey: [...tenantUsersQueryKey, membership],
+    queryFn: () => tenantUserService.list(membership),
     staleTime: 60_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
@@ -80,6 +80,17 @@ export function useSoftDeleteTenantUser() {
     onSuccess: (_void, tenantUserId) => {
       void qc.invalidateQueries({ queryKey: tenantUsersQueryKey });
       qc.removeQueries({ queryKey: tenantUserQueryKey(tenantUserId) });
+    },
+  });
+}
+
+export function useRestoreTenantUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tenantUserId: string) =>
+      tenantUserService.restore(tenantUserId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: tenantUsersQueryKey });
     },
   });
 }
