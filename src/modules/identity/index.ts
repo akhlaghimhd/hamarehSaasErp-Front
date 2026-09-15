@@ -10,6 +10,7 @@ export { MemberCreatePage } from "./pages/member-create";
 export { profileService } from "./services/profile-service";
 export { tenantUserService } from "./services/tenant-user-service";
 export { roleService } from "./services/role-service";
+export { membershipHistoryService } from "./services/membership-history-service";
 export { identityPaths } from "./services/paths";
 export {
   useProfileMe,
@@ -26,6 +27,10 @@ export {
   tenantUsersQueryKey,
   tenantUserQueryKey,
 } from "./hooks/use-tenant-users";
+export {
+  useMembershipHistory,
+  membershipHistoryQueryKey,
+} from "./hooks/use-membership-history";
 export {
   IdentityPermissions,
   type UserProfileDto,
