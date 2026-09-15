@@ -1,5 +1,5 @@
 /**
- * FE-P1-T01 — Identity module landing (hub for upcoming membership/roles UI).
+ * FE-P1-T01 — Identity module landing (hub for membership/roles UI).
  */
 
 "use client";
@@ -21,10 +21,10 @@ const cards = [
   {
     href: "/dashboard/identity/members",
     title: "اعضای مستأجر",
-    description: "اسپرینت ۲ — لیست و مدیریت اعضا",
+    description: "لیست و مدیریت اعضای مستأجر",
     icon: Users,
     permission: IdentityPermissions.userView,
-    open: false as const,
+    open: true as const,
   },
   {
     href: "/dashboard/identity/roles",
@@ -102,11 +102,21 @@ export function IdentityHome() {
             );
           }
 
-          return (
+          const link = (
             <Link key={card.href} href={card.href} className="block">
               {body}
             </Link>
           );
+
+          if ("permission" in card && card.permission) {
+            return (
+              <Can key={card.href} permission={card.permission} fallback={null}>
+                {link}
+              </Can>
+            );
+          }
+
+          return link;
         })}
       </div>
     </div>
