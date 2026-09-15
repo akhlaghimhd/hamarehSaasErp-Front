@@ -40,7 +40,7 @@ import {
 const MAX_AVATAR_BYTES = 512 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-/** Inline «عنوان: مقدار» — same line, RTL-natural */
+/** Inline «عنوان: مقدار» — value stays next to label even for LTR emails */
 function FieldLine({
   label,
   value,
@@ -50,12 +50,17 @@ function FieldLine({
   value: string;
   dir?: "ltr" | "rtl";
 }) {
+  const text = value?.trim() ? value : "—";
   return (
     <div className="min-w-0 text-sm leading-relaxed">
       <span className="text-muted-foreground">{label}:</span>{" "}
-      <span className="font-medium text-foreground" dir={dir}>
-        {value?.trim() ? value : "—"}
-      </span>
+      {dir === "ltr" ? (
+        <bdi className="break-all font-medium text-foreground" dir="ltr">
+          {text}
+        </bdi>
+      ) : (
+        <span className="font-medium text-foreground">{text}</span>
+      )}
     </div>
   );
 }
@@ -193,11 +198,10 @@ export function ProfileMePage() {
         </Card>
       ) : (
         <div className="grid gap-4 lg:grid-cols-12">
-          {/* Avatar + name + bio — vertical center with avatar, tight 2-line bio */}
           <Card className="lg:col-span-4">
             <CardContent className="p-5">
-              <div className="flex items-center gap-4">
-                <div className="relative shrink-0 self-center">
+              <div className="flex items-start gap-4">
+                <div className="relative shrink-0">
                   <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-border/80 bg-muted shadow-[var(--shadow-xs)]">
                     {preview ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -235,14 +239,14 @@ export function ProfileMePage() {
                   />
                 </div>
 
-                <div className="flex min-h-20 min-w-0 flex-1 flex-col justify-center gap-1.5">
+                <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 pt-1">
                   <div className="text-base font-semibold leading-tight tracking-tight">
                     {displayName}
                   </div>
 
                   {!editingBio ? (
-                    <div className="flex items-center gap-1.5">
-                      <p className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug text-muted-foreground">
+                    <div className="flex items-start gap-1.5">
+                      <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm leading-snug text-muted-foreground">
                         {(profile?.display_bio || profile?.description)?.trim() || (
                           <span className="text-muted-foreground/55">
                             متن کوتاه زیر عکس…
@@ -320,7 +324,6 @@ export function ProfileMePage() {
             </CardContent>
           </Card>
 
-          {/* Identity: نام: مقدار on one line */}
           <Card className="lg:col-span-8">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">اطلاعات هویتی</CardTitle>
@@ -352,11 +355,13 @@ export function ProfileMePage() {
                   value={user?.mobile ?? ""}
                   dir="ltr"
                 />
-                <FieldLine
-                  label="ایمیل"
-                  value={user?.email ?? ""}
-                  dir="ltr"
-                />
+                <div className="sm:col-span-2 lg:col-span-2">
+                  <FieldLine
+                    label="ایمیل"
+                    value={user?.email ?? ""}
+                    dir="ltr"
+                  />
+                </div>
                 {profile?.address ? (
                   <div className="sm:col-span-2 lg:col-span-3">
                     <FieldLine label="آدرس" value={profile.address} />
