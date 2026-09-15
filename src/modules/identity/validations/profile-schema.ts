@@ -5,10 +5,16 @@ const emptyToNull = (v: unknown) => {
   return v;
 };
 
+export const BIO_MAX = 200;
+
 export const selfProfileSchema = z.object({
   display_bio: z.preprocess(
     emptyToNull,
-    z.string().max(500, "حداکثر ۵۰۰ کاراکتر").nullable().optional()
+    z
+      .string()
+      .max(BIO_MAX, `حداکثر ${BIO_MAX} کاراکتر`)
+      .nullable()
+      .optional()
   ),
 });
 
@@ -27,13 +33,6 @@ export const GENDER_OPTIONS: { value: string; label: string }[] = [
   { value: "1", label: "مرد" },
   { value: "2", label: "زن" },
 ];
-
-export const ADDRESS_STATUS_LABELS: Record<number, string> = {
-  0: "",
-  1: "در انتظار تأیید مدیر",
-  2: "تأیید شده",
-  3: "رد شده",
-};
 
 export function toJalaliDisplay(isoDate?: string | null): string {
   if (!isoDate) return "—";

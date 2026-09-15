@@ -1,7 +1,3 @@
-/**
- * Avatar pick → crop (zoom/pan) → confirm → returns File for upload.
- */
-
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -15,7 +11,8 @@ import {
 import { Button } from "@/shared/components/ui/button";
 import { Loader2 } from "lucide-react";
 
-const OUTPUT_SIZE = 512;
+const OUTPUT_SIZE = 400;
+const MAX_BYTES = 512 * 1024;
 
 export function AvatarCropDialog({
   open,
@@ -79,17 +76,16 @@ export function AvatarCropDialog({
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
-    // Viewport is 280×280 circle area in dialog
     const view = 280;
-    const scale = (Math.max(view / img.naturalWidth, view / img.naturalHeight) * zoom);
+    const scale =
+      Math.max(view / img.naturalWidth, view / img.naturalHeight) * zoom;
     const drawW = img.naturalWidth * scale;
     const drawH = img.naturalHeight * scale;
     const dx = (view - drawW) / 2 + offset.x;
     const dy = (view - drawH) / 2 + offset.y;
 
-    // Map viewport crop square to source image
-    const sx = (-dx) / scale;
-    const sy = (-dy) / scale;
+    const sx = -dx / scale;
+    const sy = -dy / scale;
     const sw = view / scale;
     const sh = view / scale;
 
@@ -97,11 +93,19 @@ export function AvatarCropDialog({
     ctx.fillRect(0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
 
-    const blob: Blob | null = await new Promise((resolve) =>
-      canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92)
+    let quality = 0.85;
+    let blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob((b) => resolve(b), "image/jpeg", quality)
     );
-    if (!blob) return null;
 
+    while (blob && blob.size > MAX_BYTES && quality > 0.45) {
+      quality -= 0.1;
+      blob = await new Promise((resolve) =>
+        canvas.toBlob((b) => resolve(b), "image/jpeg", quality)
+      );
+    }
+
+    if (!blob) return null;
     return new File([blob], "avatar.jpg", { type: "image/jpeg" });
   }, [file, offset.x, offset.y, zoom]);
 
@@ -112,8 +116,8 @@ export function AvatarCropDialog({
       setError("برش تصویر ناموفق بود.");
       return;
     }
-    if (cropped.size > 2 * 1024 * 1024) {
-      setError("حجم تصویر پس از برش بیش از ۲ مگابایت است.");
+    if (cropped.size > MAX_BYTES) {
+      setError("حجم تصویر پس از برش بیش از حد مجاز است.");
       return;
     }
     await onConfirm(cropped);
@@ -146,10 +150,6 @@ export function AvatarCropDialog({
                   transform: `translate(-50%, -50%) translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
                   transformOrigin: "center center",
                 }}
-                onLoad={() => {
-                  setZoom(1);
-                  setOffset({ x: 0, y: 0 });
-                }}
               />
             )}
           </div>
@@ -163,7 +163,7 @@ export function AvatarCropDialog({
               step={0.05}
               value={zoom}
               onChange={(e) => setZoom(Number(e.target.value))}
-              className="w-full"
+              className="w-full accent-primary"
             />
           </label>
 

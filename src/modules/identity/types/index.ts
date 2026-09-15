@@ -8,6 +8,7 @@ export interface UserProfileDto {
   national_id?: string | null;
   birth_date?: string | null;
   avatar_url?: string | null;
+  has_avatar?: boolean;
   gender?: number | null;
   address?: string | null;
   pending_address?: string | null;
