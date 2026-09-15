@@ -1,6 +1,6 @@
 /**
- * FE-P1-T07 + T09 — Tenant member detail.
- * T09: change membership status (PUT status 0|1) + soft-delete membership.
+ * FE-P1-T07 + T09 + T10 — Tenant member detail.
+ * T09: status + soft-delete. T10: membership history list.
  */
 
 "use client";
@@ -8,7 +8,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Loader2, Shield, UserRound } from "lucide-react";
+import { History, Loader2, Shield, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import {
@@ -29,14 +29,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/components/ui/dialog";
-import { Can, usePermission } from "@/auth";
+import { useAuthStore, usePermission } from "@/auth";
 import { ApiClientError } from "@/api";
+import { toFaDigits } from "@/shared/lib/utils";
 import {
   useTenantUser,
   useUpdateTenantUser,
   useSoftDeleteTenantUser,
 } from "../hooks/use-tenant-users";
+import { useMembershipHistory } from "../hooks/use-membership-history";
 import { IdentityPermissions, type TenantUserDto } from "../types";
+import type { MembershipHistoryDto } from "../services/membership-history-service";
 
 function FieldLine({
   label,
@@ -65,16 +68,34 @@ function FieldLine({
 function formatDate(value?: string | null): string {
   if (!value) return "—";
   try {
-    return new Intl.DateTimeFormat("fa-IR", {
+    const s = new Intl.DateTimeFormat("fa-IR", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
       hour: "2-digit",
       minute: "2-digit",
     }).format(new Date(value));
+    return toFaDigits(s);
   } catch {
-    return value;
+    return toFaDigits(value);
   }
+}
+
+function statusLabel(code: number | null | undefined): string {
+  if (code === 1) return "فعال";
+  if (code === 0) return "غیرفعال";
+  if (code == null) return "—";
+  return toFaDigits(code);
+}
+
+function reasonLabel(code?: string | null): string {
+  if (!code) return "—";
+  const map: Record<string, string> = {
+    JOIN: "پیوستن",
+    STATUS_CHANGE: "تغییر وضعیت",
+    SOFT_DELETE: "حذف نرم",
+  };
+  return map[code] ?? code;
 }
 
 function MemberSummary({ member }: { member: TenantUserDto }) {
@@ -121,7 +142,11 @@ function MemberSummary({ member }: { member: TenantUserDto }) {
             <FieldLine label="نام" value={u?.first_name ?? ""} />
             <FieldLine label="نام خانوادگی" value={u?.last_name ?? ""} />
             <FieldLine label="ایمیل" value={u?.email ?? ""} dir="ltr" />
-            <FieldLine label="موبایل" value={u?.mobile ?? ""} dir="ltr" />
+            <FieldLine
+              label="موبایل"
+              value={toFaDigits(u?.mobile ?? "")}
+              dir="ltr"
+            />
             <FieldLine
               label="شناسه عضویت"
               value={member.tenant_user_id}
@@ -139,9 +164,10 @@ function MemberSummary({ member }: { member: TenantUserDto }) {
             <FieldLine
               label="نسخه ردیف"
               value={
-                member.row_version != null ? String(member.row_version) : "—"
+                member.row_version != null
+                  ? toFaDigits(member.row_version)
+                  : "—"
               }
-              dir="ltr"
             />
             <FieldLine
               label="آخرین به‌روزرسانی"
@@ -170,6 +196,84 @@ function MemberSummary({ member }: { member: TenantUserDto }) {
   );
 }
 
+function HistoryPanel({
+  rows,
+  loading,
+  errorMessage,
+  onRetry,
+}: {
+  rows: MembershipHistoryDto[];
+  loading: boolean;
+  errorMessage?: string | null;
+  onRetry: () => void;
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">تاریخچه عضویت</CardTitle>
+        <CardDescription>
+          رویدادهای تغییر وضعیت و حذف نرم این عضویت
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            در حال بارگذاری تاریخچه…
+          </div>
+        ) : errorMessage ? (
+          <div className="space-y-2 py-6 text-center">
+            <p className="text-sm text-destructive">{errorMessage}</p>
+            <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+              تلاش مجدد
+            </Button>
+          </div>
+        ) : rows.length === 0 ? (
+          <EmptyState
+            icon={History}
+            title="رویدادی ثبت نشده"
+            description="پس از تغییر وضعیت یا حذف نرم، ردیف‌های تاریخچه اینجا دیده می‌شوند."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[32rem] text-sm">
+              <thead>
+                <tr className="border-b border-border/70 text-right text-xs text-muted-foreground">
+                  <th className="px-2 py-2 font-medium">تاریخ</th>
+                  <th className="px-2 py-2 font-medium">از</th>
+                  <th className="px-2 py-2 font-medium">به</th>
+                  <th className="px-2 py-2 font-medium">دلیل</th>
+                  <th className="px-2 py-2 font-medium">توضیح</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr
+                    key={row.history_id}
+                    className="border-b border-border/40 last:border-0"
+                  >
+                    <td className="px-2 py-2 tabular-nums">
+                      {formatDate(row.effective_date ?? row.created_at)}
+                    </td>
+                    <td className="px-2 py-2">
+                      {statusLabel(row.previous_status)}
+                    </td>
+                    <td className="px-2 py-2">{statusLabel(row.new_status)}</td>
+                    <td className="px-2 py-2">{reasonLabel(row.reason_code)}</td>
+                    <td className="px-2 py-2 text-muted-foreground">
+                      {row.description?.trim() || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function MemberDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -180,20 +284,38 @@ export function MemberDetailPage() {
   const canView = usePermission(IdentityPermissions.userView);
   const canUpdate = usePermission(IdentityPermissions.userUpdate);
   const canDelete = usePermission(IdentityPermissions.userDelete);
+  const canViewHistory = usePermission(
+    IdentityPermissions.membershipHistoryView
+  );
+
+  const currentUserId = useAuthStore((s) => s.user?.user_id);
 
   const { data, isLoading, isError, error, refetch } =
     useTenantUser(tenantUserId || null);
   const updateMutation = useUpdateTenantUser();
   const deleteMutation = useSoftDeleteTenantUser();
+  const historyQuery = useMembershipHistory(
+    canViewHistory && tenantUserId ? tenantUserId : null
+  );
 
   const [statusOpen, setStatusOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const isActive = data != null && Number(data.status) === 1;
   const nextStatus = isActive ? 0 : 1;
+  const isSelf = Boolean(
+    data && currentUserId && data.user_id === currentUserId
+  );
 
   const onConfirmStatus = async () => {
     if (!data) return;
+    if (isSelf && nextStatus === 0) {
+      toast.error(
+        "نمی‌توانید عضویت خودتان را غیرفعال کنید. از حساب دیگری استفاده کنید یا از دیتابیس بازیابی کنید."
+      );
+      setStatusOpen(false);
+      return;
+    }
     try {
       await updateMutation.mutateAsync({
         tenantUserId: data.tenant_user_id,
@@ -203,6 +325,7 @@ export function MemberDetailPage() {
         nextStatus === 1 ? "عضویت فعال شد" : "عضویت غیرفعال شد"
       );
       setStatusOpen(false);
+      void historyQuery.refetch();
     } catch (e) {
       toast.error(
         e instanceof ApiClientError ? e.message : "تغییر وضعیت ناموفق بود."
@@ -212,6 +335,11 @@ export function MemberDetailPage() {
 
   const onConfirmDelete = async () => {
     if (!data) return;
+    if (isSelf) {
+      toast.error("نمی‌توانید عضویت خودتان را حذف کنید.");
+      setDeleteOpen(false);
+      return;
+    }
     try {
       await deleteMutation.mutateAsync(data.tenant_user_id);
       toast.success("عضویت با حذف نرم از مستأجر برداشته شد");
@@ -281,16 +409,12 @@ export function MemberDetailPage() {
                 variant="destructive"
                 size="sm"
                 onClick={() => setDeleteOpen(true)}
-                disabled={deleteMutation.isPending}
+                disabled={deleteMutation.isPending || isSelf}
+                title={isSelf ? "حذف عضویت خود مجاز نیست" : undefined}
               >
                 حذف عضویت
               </Button>
             ) : null}
-            <Can permission={IdentityPermissions.membershipHistoryView}>
-              <Button variant="ghost" size="sm" disabled title="در T10">
-                تاریخچه عضویت
-              </Button>
-            </Can>
           </div>
         }
       />
@@ -321,7 +445,23 @@ export function MemberDetailPage() {
           </CardContent>
         </Card>
       ) : (
-        <MemberSummary member={data} />
+        <>
+          <MemberSummary member={data} />
+          {canViewHistory ? (
+            <HistoryPanel
+              rows={historyQuery.data ?? []}
+              loading={historyQuery.isLoading}
+              errorMessage={
+                historyQuery.isError
+                  ? historyQuery.error instanceof ApiClientError
+                    ? historyQuery.error.message
+                    : "بارگذاری تاریخچه ناموفق بود."
+                  : null
+              }
+              onRetry={() => void historyQuery.refetch()}
+            />
+          ) : null}
+        </>
       )}
 
       <Dialog open={statusOpen} onOpenChange={setStatusOpen}>
