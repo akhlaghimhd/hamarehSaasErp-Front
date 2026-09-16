@@ -1,19 +1,33 @@
 /**
  * Persian → Finglish for email local-part.
- * Strategy: whole-name dictionary first, then digraph/char map (aligned with backend).
+ * Order: full-name dict → word tokens → digraphs → chars.
  */
 
 const NAME_DICT: Record<string, string> = {
+  // —— نام‌های کوچک ——
   علی: "ali",
+  علیرضا: "alireza",
+  علی‌رضا: "alireza",
   محمد: "mohammad",
+  محمدعلی: "mohammadali",
+  محمدحسین: "mohammadhossein",
+  محمدرضا: "mohammadreza",
+  محمدرضا: "mohammadreza",
   مهدی: "mahdi",
+  مهدي: "mahdi",
   حسین: "hossein",
   حسن: "hasan",
   رضا: "reza",
   امیر: "amir",
+  امیرحسین: "amirhossein",
+  امیرمحمد: "amirmohammad",
   سعید: "saeed",
+  سعيد: "saeed",
   مجید: "majid",
+  مجيد: "majid",
   حمید: "hamid",
+  حميد: "hamid",
+  حمیدرضا: "hamidreza",
   جواد: "javad",
   احمد: "ahmad",
   محمود: "mahmoud",
@@ -23,54 +37,125 @@ const NAME_DICT: Record<string, string> = {
   یاسر: "yaser",
   یاسین: "yasin",
   یوسف: "yousef",
+  يوسف: "yousef",
   ابراهیم: "ebrahim",
   اسماعیل: "esmaeil",
+  اسماعيل: "esmaeil",
   مصطفی: "mostafa",
+  مصطفي: "mostafa",
   مرتضی: "morteza",
+  مرتضي: "morteza",
   کاظم: "kazem",
+  كاظم: "kazem",
   ناصر: "naser",
   نادر: "nader",
   فرهاد: "farhad",
   فرید: "farid",
+  فريد: "farid",
   فرزاد: "farzad",
+  فرشاد: "farshad",
+  فرشید: "farshid",
   بهرام: "bahram",
   بهروز: "behrouz",
   بهنام: "behnam",
+  بهمن: "bahman",
   بابک: "babak",
   پرویز: "parviz",
+  پرويز: "parviz",
   پیمان: "peyman",
   پویا: "pouya",
+  پوريا: "pouria",
+  پوریا: "pouria",
   کیان: "kian",
   کیوان: "keyvan",
   کوروش: "kourosh",
   آرش: "arash",
   آرمان: "arman",
   آرمین: "armin",
+  آریا: "arya",
   سینا: "sina",
+  سينا: "sina",
   سامان: "saman",
   سام: "sam",
   سهراب: "sohrab",
   شهاب: "shahab",
   شهرام: "shahram",
+  شاهین: "shahin",
   داریوش: "dariush",
   داوود: "davoud",
   داود: "davoud",
   عبدالله: "abdollah",
   عبداله: "abdollah",
+  محسن: "mohsen",
+  مهدیار: "mahdiyar",
+  میلاد: "milad",
+  میلان: "milan",
+  ایمان: "iman",
+  ايمان: "iman",
+  احسان: "ehsan",
+  اشکان: "ashkan",
+  افشین: "afshin",
+  امید: "omid",
+  اميد: "omid",
+  انوشیروان: "anoushirvan",
+  بیژن: "bijan",
+  جلال: "jalal",
+  جمال: "jamal",
+  جهانگیر: "jahangir",
+  حافظ: "hafez",
+  حبیب: "habib",
+  خشایار: "khashayar",
+  رامین: "ramin",
+  رامين: "ramin",
+  رسول: "rasoul",
+  سروش: "soroush",
+  صمد: "samad",
+  صادق: "sadegh",
+  طاهر: "taher",
+  عادل: "adel",
+  عارف: "aref",
+  عرفان: "erfan",
+  علی‌اکبر: "aliakbar",
+  علی اکبر: "aliakbar",
+  قاسم: "ghasem",
+  کامبیز: "kambiz",
+  کامران: "kamran",
+  کسری: "kasra",
+  مازیار: "maziar",
+  مانی: "mani",
+  مهران: "mehran",
+  مهرداد: "mehrdad",
+  نوید: "navid",
+  نويد: "navid",
+  نیما: "nima",
+  نيما: "nima",
+  وحید: "vahid",
+  وحيد: "vahid",
+  هادی: "hadi",
+  هادي: "hadi",
+  هومن: "houman",
+  همایون: "homayoun",
+  یحیی: "yahya",
+  // زنانه
   فاطمه: "fatemeh",
+  فاطمه زهرا: "fatemehzahra",
   زهرا: "zahra",
   مریم: "maryam",
   زینب: "zeynab",
+  زينب: "zeynab",
   سارا: "sara",
   نرگس: "narges",
   نازنین: "nazanin",
+  نسيم: "nasim",
   نسیم: "nasim",
   نیلوفر: "niloufar",
+  نيلوفر: "niloufar",
   مینا: "mina",
   مهسا: "mahsa",
   مهناز: "mahnaz",
   مونا: "mona",
   هانیه: "hanieh",
+  هانيه: "hanieh",
   هستی: "hasti",
   هلیا: "helia",
   الهام: "elham",
@@ -78,20 +163,35 @@ const NAME_DICT: Record<string, string> = {
   آیدا: "aida",
   ایدا: "aida",
   آتنا: "atena",
+  آتوسا: "atousa",
   پریسا: "parisa",
   پریا: "pariya",
   پگاه: "pegah",
   شیرین: "shirin",
+  شيرين: "shirin",
   شیدا: "sheida",
   سمیرا: "samira",
+  سميرا: "samira",
   سمیه: "somayeh",
   سعیده: "saeedeh",
   لیلا: "leila",
+  ليلا: "leila",
   لیدا: "lida",
   رویا: "roya",
+  ريا: "roya",
   ریحانه: "reyhaneh",
   راضیه: "razie",
   طاهره: "tahereh",
+  گلناز: "golnaz",
+  گلسا: "golsa",
+  کیمیا: "kimia",
+  مهتاب: "mahtab",
+  مهرناز: "mehrnaz",
+  نگین: "negin",
+  ياسمن: "yasaman",
+  یاسمن: "yasaman",
+  یاس: "yas",
+  // —— نام خانوادگی ——
   محمدی: "mohammadi",
   حسینی: "hosseini",
   رضایی: "rezaei",
@@ -99,16 +199,24 @@ const NAME_DICT: Record<string, string> = {
   احمدی: "ahmadi",
   موسوی: "mousavi",
   کریمی: "karimi",
+  كريمي: "karimi",
   جعفری: "jafari",
+  جعفري: "jafari",
   حیدری: "heidari",
+  حيدري: "heidari",
   نوری: "nouri",
+  نوري: "nouri",
   اکبری: "akbari",
+  كاظمي: "kazemi",
   کاظمی: "kazemi",
   عباسی: "abbasi",
   مرادی: "moradi",
+  مرادي: "moradi",
   علیزاده: "alizadeh",
+  عليزاده: "alizadeh",
   محمدزاده: "mohammadzadeh",
   رحیمی: "rahimi",
+  رحيمي: "rahimi",
   صالحی: "salehi",
   طاهری: "taheri",
   صادقی: "sadeghi",
@@ -117,6 +225,7 @@ const NAME_DICT: Record<string, string> = {
   شریفی: "sharifi",
   قاسمی: "ghasemi",
   یوسفی: "yousefi",
+  يوسفي: "yousefi",
   اسدی: "asadi",
   فرهادی: "farhadi",
   بهرامی: "bahrami",
@@ -129,95 +238,197 @@ const NAME_DICT: Record<string, string> = {
   سلطانی: "soltani",
   پارسا: "parsa",
   رستمی: "rostami",
+  رستمي: "rostami",
   اخلاقی: "akhlaghi",
+  اکلاقی: "akhlaghi",
+  جلالی: "jalali",
+  کرمی: "karami",
+  كرمي: "karami",
+  قربانی: "ghorbani",
+  قاسم‌زاده: "ghasemzadeh",
+  نژاد: "nejad",
+  پور: "pour",
+  زاده: "zadeh",
 };
 
-const CHAR_MAP: Array<[string, string]> = [
+/** Longest digraphs first */
+const DIGRAPHS: Array<[string, string]> = [
   ["خوا", "kha"],
+  ["خو", "kho"],
   ["خا", "kha"],
+  ["خی", "khi"],
   ["چه", "che"],
+  ["چی", "chi"],
+  ["چا", "cha"],
+  ["چو", "cho"],
   ["شه", "she"],
+  ["شا", "sha"],
+  ["شو", "sho"],
+  ["شی", "shi"],
   ["ژه", "zhe"],
-  ["غه", "ghe"],
+  ["ژا", "zha"],
+  ["غو", "gho"],
+  ["غا", "gha"],
+  ["غی", "ghi"],
   ["قه", "ghe"],
-  ["آ", "a"],
-  ["ا", "a"],
-  ["ب", "b"],
-  ["پ", "p"],
-  ["ت", "t"],
-  ["ث", "s"],
-  ["ج", "j"],
-  ["چ", "ch"],
-  ["ح", "h"],
-  ["خ", "kh"],
-  ["د", "d"],
-  ["ذ", "z"],
-  ["ر", "r"],
-  ["ز", "z"],
-  ["ژ", "zh"],
-  ["س", "s"],
-  ["ش", "sh"],
-  ["ص", "s"],
-  ["ض", "z"],
-  ["ط", "t"],
-  ["ظ", "z"],
-  ["ع", "a"],
-  ["غ", "gh"],
-  ["ف", "f"],
-  ["ق", "gh"],
-  ["ک", "k"],
-  ["ك", "k"],
-  ["گ", "g"],
-  ["ل", "l"],
-  ["م", "m"],
-  ["ن", "n"],
-  ["و", "o"],
-  ["ه", "h"],
-  ["ی", "i"],
-  ["ي", "i"],
-  ["ئ", "i"],
-  ["ء", ""],
-  ["ة", "h"],
-  ["ؤ", "o"],
-  ["إ", "e"],
-  ["أ", "a"],
+  ["قا", "gha"],
+  ["قو", "gho"],
+  ["قی", "ghi"],
+  ["له", "leh"],
+  ["لا", "la"],
+  ["لو", "lou"],
+  ["لی", "li"],
+  ["مه", "meh"],
+  ["ما", "ma"],
+  ["مو", "mo"],
+  ["می", "mi"],
+  ["نه", "neh"],
+  ["نا", "na"],
+  ["نو", "no"],
+  ["نی", "ni"],
+  ["به", "beh"],
+  ["با", "ba"],
+  ["بو", "bou"],
+  ["بی", "bi"],
+  ["ده", "deh"],
+  ["دا", "da"],
+  ["دو", "dou"],
+  ["دی", "di"],
+  ["ته", "teh"],
+  ["تا", "ta"],
+  ["تو", "tou"],
+  ["تی", "ti"],
+  ["ره", "reh"],
+  ["را", "ra"],
+  ["رو", "rou"],
+  ["ری", "ri"],
+  ["زه", "zeh"],
+  ["زا", "za"],
+  ["زو", "zou"],
+  ["زی", "zi"],
+  ["سه", "seh"],
+  ["سا", "sa"],
+  ["سو", "sou"],
+  ["سی", "si"],
+  ["فه", "feh"],
+  ["فا", "fa"],
+  ["فو", "fou"],
+  ["فی", "fi"],
+  ["که", "keh"],
+  ["كا", "ka"],
+  ["کا", "ka"],
+  ["کو", "kou"],
+  ["کی", "ki"],
+  ["گه", "geh"],
+  ["گا", "ga"],
+  ["گو", "gou"],
+  ["گی", "gi"],
+  ["جه", "jeh"],
+  ["جا", "ja"],
+  ["جو", "jou"],
+  ["جی", "ji"],
+  ["عه", "eh"],
+  ["عا", "a"],
+  ["عو", "ou"],
+  ["عی", "ei"],
+  ["حه", "heh"],
+  ["حا", "ha"],
+  ["حو", "hou"],
+  ["حی", "hi"],
+  ["یه", "yeh"],
+  ["یا", "ya"],
+  ["یو", "you"],
+  ["یی", "yi"],
 ];
 
+const CHARS: Record<string, string> = {
+  آ: "a",
+  ا: "a",
+  ب: "b",
+  پ: "p",
+  ت: "t",
+  ث: "s",
+  ج: "j",
+  چ: "ch",
+  ح: "h",
+  خ: "kh",
+  د: "d",
+  ذ: "z",
+  ر: "r",
+  ز: "z",
+  ژ: "zh",
+  س: "s",
+  ش: "sh",
+  ص: "s",
+  ض: "z",
+  ط: "t",
+  ظ: "z",
+  ع: "a",
+  غ: "gh",
+  ف: "f",
+  ق: "gh",
+  ک: "k",
+  ك: "k",
+  گ: "g",
+  ل: "l",
+  م: "m",
+  ن: "n",
+  و: "o",
+  ه: "h",
+  ی: "i",
+  ي: "i",
+  ئ: "i",
+  ء: "",
+  ة: "h",
+  ؤ: "o",
+  إ: "e",
+  أ: "a",
+  ٱ: "a",
+};
+
 function normalizeFa(text: string): string {
-  return text.trim().replace(/[\u200c\u0640]/g, ""); // ZWNJ + tatweel
+  return text
+    .trim()
+    .replace(/[\u200c\u200d\u0640]/g, "") // ZWNJ, ZWJ, tatweel
+    .replace(/\s+/g, " ");
+}
+
+function mapToken(token: string): string {
+  const key = normalizeFa(token);
+  if (!key) return "";
+  if (NAME_DICT[key]) return NAME_DICT[key];
+
+  let rest = key;
+  let out = "";
+  while (rest.length > 0) {
+    let hit = false;
+    for (const [from, to] of DIGRAPHS) {
+      if (rest.startsWith(from)) {
+        out += to;
+        rest = rest.slice(from.length);
+        hit = true;
+        break;
+      }
+    }
+    if (hit) continue;
+    const ch = rest[0];
+    out += CHARS[ch] ?? (/[a-zA-Z0-9]/.test(ch) ? ch.toLowerCase() : "");
+    rest = rest.slice(1);
+  }
+  return out;
 }
 
 export function transliterateFa(text: string): string {
   const normalized = normalizeFa(text);
   if (!normalized) return "";
+  if (NAME_DICT[normalized]) return NAME_DICT[normalized];
 
-  const dictHit = NAME_DICT[normalized];
-  if (dictHit) return dictHit;
-
-  // Tokenize on spaces for multi-part names
-  const parts = normalized.split(/\s+/).filter(Boolean);
-  if (parts.length > 1) {
-    return parts.map((p) => transliterateFa(p)).join(" ");
-  }
-
-  let rest = normalized;
-  let out = "";
-  while (rest.length > 0) {
-    let matched = false;
-    for (const [from, to] of CHAR_MAP) {
-      if (rest.startsWith(from)) {
-        out += to;
-        rest = rest.slice(from.length);
-        matched = true;
-        break;
-      }
-    }
-    if (!matched) {
-      out += rest[0];
-      rest = rest.slice(1);
-    }
-  }
-  return out;
+  return normalized
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(mapToken)
+    .filter(Boolean)
+    .join(" ");
 }
 
 export function slugNamePart(value: string): string {
