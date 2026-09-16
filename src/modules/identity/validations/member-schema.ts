@@ -9,12 +9,16 @@ export function normalizeIranMobile(raw: string): string {
   if (d.startsWith("9") && d.length === 10) {
     d = "0" + d;
   }
-  // Keep at most 11 digits for 09xxxxxxxxx
   if (d.length > 11) d = d.slice(0, 11);
   return d;
 }
 
 const IR_MOBILE = /^09\d{9}$/;
+
+const emptyToUndefined = (v: unknown) => {
+  if (v === "" || v === null || v === undefined) return undefined;
+  return v;
+};
 
 export const createMemberSchema = z.object({
   first_name: z
@@ -32,7 +36,7 @@ export const createMemberSchema = z.object({
     .trim()
     .transform((v) => normalizeIranMobile(v))
     .refine((v) => IR_MOBILE.test(v), {
-      message: "موبایل باید ۱۱ رقم و با ۰۹ شروع شود (مثال: ۰۹۱۲۱۲۳۴۵۶۷)",
+      message: "موبایل باید ۱۱ رقم و با ۰۹ شروع شود",
     }),
   email_local_part: z
     .string({ required_error: "بخش ابتدایی ایمیل الزامی است" })
@@ -43,6 +47,11 @@ export const createMemberSchema = z.object({
       /^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$/,
       "فقط حروف انگلیسی، عدد، نقطه، خط تیره و زیرخط"
     ),
+  role_id: z.preprocess(
+    emptyToUndefined,
+    z.string().uuid("شناسه نقش معتبر نیست").optional()
+  ),
+  is_owner: z.boolean().optional().default(false),
 });
 
 export type CreateMemberFormValues = z.infer<typeof createMemberSchema>;
