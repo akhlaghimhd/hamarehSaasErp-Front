@@ -1,31 +1,30 @@
 /**
  * Persian → Finglish for email local-part.
- * Order: full-name dict → word tokens → digraphs → chars.
- * All dict keys are quoted (spaces / ZWNJ are not valid bare identifiers).
+ *
+ * Pipeline:
+ * 1) whole-token dictionary
+ * 2) context-aware letter rules (و=v at start, و=o as vowel, …)
+ * 3) insert default short vowel "a" between consonant clusters
  */
 
 const NAME_DICT: Record<string, string> = {
   علی: "ali",
   علیرضا: "alireza",
   "علی‌رضا": "alireza",
+  "علی‌اکبر": "aliakbar",
+  "علی اکبر": "aliakbar",
   محمد: "mohammad",
   محمدعلی: "mohammadali",
   محمدحسین: "mohammadhossein",
   محمدرضا: "mohammadreza",
   مهدی: "mahdi",
-  مهدي: "mahdi",
   حسین: "hossein",
   حسن: "hasan",
   رضا: "reza",
   امیر: "amir",
-  امیرحسین: "amirhossein",
-  امیرمحمد: "amirmohammad",
   سعید: "saeed",
-  سعيد: "saeed",
   مجید: "majid",
-  مجيد: "majid",
   حمید: "hamid",
-  حميد: "hamid",
   حمیدرضا: "hamidreza",
   جواد: "javad",
   احمد: "ahmad",
@@ -36,34 +35,23 @@ const NAME_DICT: Record<string, string> = {
   یاسر: "yaser",
   یاسین: "yasin",
   یوسف: "yousef",
-  يوسف: "yousef",
   ابراهیم: "ebrahim",
   اسماعیل: "esmaeil",
-  اسماعيل: "esmaeil",
   مصطفی: "mostafa",
-  مصطفي: "mostafa",
   مرتضی: "morteza",
-  مرتضي: "morteza",
   کاظم: "kazem",
-  كاظم: "kazem",
   ناصر: "naser",
   نادر: "nader",
   فرهاد: "farhad",
   فرید: "farid",
-  فريد: "farid",
   فرزاد: "farzad",
-  فرشاد: "farshad",
-  فرشید: "farshid",
   بهرام: "bahram",
   بهروز: "behrouz",
   بهنام: "behnam",
-  بهمن: "bahman",
   بابک: "babak",
   پرویز: "parviz",
-  پرويز: "parviz",
   پیمان: "peyman",
   پویا: "pouya",
-  پوريا: "pouria",
   پوریا: "pouria",
   کیان: "kian",
   کیوان: "keyvan",
@@ -73,122 +61,93 @@ const NAME_DICT: Record<string, string> = {
   آرمین: "armin",
   آریا: "arya",
   سینا: "sina",
-  سينا: "sina",
   سامان: "saman",
-  سام: "sam",
   سهراب: "sohrab",
   شهاب: "shahab",
   شهرام: "shahram",
-  شاهین: "shahin",
   داریوش: "dariush",
   داوود: "davoud",
   داود: "davoud",
   عبدالله: "abdollah",
-  عبداله: "abdollah",
   محسن: "mohsen",
-  مهدیار: "mahdiyar",
   میلاد: "milad",
-  میلان: "milan",
   ایمان: "iman",
-  ايمان: "iman",
   احسان: "ehsan",
   اشکان: "ashkan",
   افشین: "afshin",
   امید: "omid",
-  اميد: "omid",
-  انوشیروان: "anoushirvan",
   بیژن: "bijan",
   جلال: "jalal",
   جمال: "jamal",
-  جهانگیر: "jahangir",
   حافظ: "hafez",
   حبیب: "habib",
-  خشایار: "khashayar",
   رامین: "ramin",
-  رامين: "ramin",
   رسول: "rasoul",
   سروش: "soroush",
-  صمد: "samad",
   صادق: "sadegh",
   طاهر: "taher",
   عادل: "adel",
   عارف: "aref",
   عرفان: "erfan",
-  "علی‌اکبر": "aliakbar",
-  "علی اکبر": "aliakbar",
   قاسم: "ghasem",
   کامبیز: "kambiz",
   کامران: "kamran",
   کسری: "kasra",
   مازیار: "maziar",
-  مانی: "mani",
   مهران: "mehran",
   مهرداد: "mehrdad",
   نوید: "navid",
-  نويد: "navid",
   نیما: "nima",
-  نيما: "nima",
   وحید: "vahid",
-  وحيد: "vahid",
   هادی: "hadi",
-  هادي: "hadi",
   هومن: "houman",
   همایون: "homayoun",
   یحیی: "yahya",
+  بتول: "batol",
+  ترحمی: "tarahomi",
+  واحدی: "vahedi",
+  واحد: "vahed",
   فاطمه: "fatemeh",
   "فاطمه زهرا": "fatemehzahra",
   زهرا: "zahra",
   مریم: "maryam",
   زینب: "zeynab",
-  زينب: "zeynab",
   سارا: "sara",
   نرگس: "narges",
   نازنین: "nazanin",
-  نسيم: "nasim",
   نسیم: "nasim",
   نیلوفر: "niloufar",
-  نيلوفر: "niloufar",
   مینا: "mina",
   مهسا: "mahsa",
   مهناز: "mahnaz",
   مونا: "mona",
   هانیه: "hanieh",
-  هانيه: "hanieh",
   هستی: "hasti",
   هلیا: "helia",
   الهام: "elham",
   الهه: "elahe",
   آیدا: "aida",
-  ایدا: "aida",
   آتنا: "atena",
   آتوسا: "atousa",
   پریسا: "parisa",
   پریا: "pariya",
   پگاه: "pegah",
   شیرین: "shirin",
-  شيرين: "shirin",
   شیدا: "sheida",
   سمیرا: "samira",
-  سميرا: "samira",
   سمیه: "somayeh",
   سعیده: "saeedeh",
   لیلا: "leila",
-  ليلا: "leila",
   لیدا: "lida",
   رویا: "roya",
-  ريا: "roya",
   ریحانه: "reyhaneh",
   راضیه: "razie",
   طاهره: "tahereh",
   گلناز: "golnaz",
-  گلسا: "golsa",
   کیمیا: "kimia",
   مهتاب: "mahtab",
-  مهرناز: "mehrnaz",
   نگین: "negin",
-  ياسمن: "yasaman",
   یاسمن: "yasaman",
-  یاس: "yas",
   محمدی: "mohammadi",
   حسینی: "hosseini",
   رضایی: "rezaei",
@@ -196,24 +155,16 @@ const NAME_DICT: Record<string, string> = {
   احمدی: "ahmadi",
   موسوی: "mousavi",
   کریمی: "karimi",
-  كريمي: "karimi",
   جعفری: "jafari",
-  جعفري: "jafari",
   حیدری: "heidari",
-  حيدري: "heidari",
   نوری: "nouri",
-  نوري: "nouri",
   اکبری: "akbari",
-  كاظمي: "kazemi",
   کاظمی: "kazemi",
   عباسی: "abbasi",
   مرادی: "moradi",
-  مرادي: "moradi",
   علیزاده: "alizadeh",
-  عليزاده: "alizadeh",
   محمدزاده: "mohammadzadeh",
   رحیمی: "rahimi",
-  رحيمي: "rahimi",
   صالحی: "salehi",
   طاهری: "taheri",
   صادقی: "sadeghi",
@@ -222,7 +173,6 @@ const NAME_DICT: Record<string, string> = {
   شریفی: "sharifi",
   قاسمی: "ghasemi",
   یوسفی: "yousefi",
-  يوسفي: "yousefi",
   اسدی: "asadi",
   فرهادی: "farhadi",
   بهرامی: "bahrami",
@@ -235,12 +185,9 @@ const NAME_DICT: Record<string, string> = {
   سلطانی: "soltani",
   پارسا: "parsa",
   رستمی: "rostami",
-  رستمي: "rostami",
   اخلاقی: "akhlaghi",
-  اکلاقی: "akhlaghi",
   جلالی: "jalali",
   کرمی: "karami",
-  كرمي: "karami",
   قربانی: "ghorbani",
   "قاسم‌زاده": "ghasemzadeh",
   نژاد: "nejad",
@@ -248,140 +195,51 @@ const NAME_DICT: Record<string, string> = {
   زاده: "zadeh",
 };
 
-/** Longest digraphs first */
+/** Digraph consonants (Latin output is multi-letter but one Persian unit) */
 const DIGRAPHS: Array<[string, string]> = [
-  ["خوا", "kha"],
-  ["خو", "kho"],
-  ["خا", "kha"],
-  ["خی", "khi"],
-  ["چه", "che"],
-  ["چی", "chi"],
-  ["چا", "cha"],
-  ["چو", "cho"],
-  ["شه", "she"],
-  ["شا", "sha"],
-  ["شو", "sho"],
-  ["شی", "shi"],
-  ["ژه", "zhe"],
-  ["ژا", "zha"],
-  ["غو", "gho"],
-  ["غا", "gha"],
-  ["غی", "ghi"],
-  ["قه", "ghe"],
-  ["قا", "gha"],
-  ["قو", "gho"],
-  ["قی", "ghi"],
-  ["له", "leh"],
-  ["لا", "la"],
-  ["لو", "lou"],
-  ["لی", "li"],
-  ["مه", "meh"],
-  ["ما", "ma"],
-  ["مو", "mo"],
-  ["می", "mi"],
-  ["نه", "neh"],
-  ["نا", "na"],
-  ["نو", "no"],
-  ["نی", "ni"],
-  ["به", "beh"],
-  ["با", "ba"],
-  ["بو", "bou"],
-  ["بی", "bi"],
-  ["ده", "deh"],
-  ["دا", "da"],
-  ["دو", "dou"],
-  ["دی", "di"],
-  ["ته", "teh"],
-  ["تا", "ta"],
-  ["تو", "tou"],
-  ["تی", "ti"],
-  ["ره", "reh"],
-  ["را", "ra"],
-  ["رو", "rou"],
-  ["ری", "ri"],
-  ["زه", "zeh"],
-  ["زا", "za"],
-  ["زو", "zou"],
-  ["زی", "zi"],
-  ["سه", "seh"],
-  ["سا", "sa"],
-  ["سو", "sou"],
-  ["سی", "si"],
-  ["فه", "feh"],
-  ["فا", "fa"],
-  ["فو", "fou"],
-  ["فی", "fi"],
-  ["که", "keh"],
-  ["كا", "ka"],
-  ["کا", "ka"],
-  ["کو", "kou"],
-  ["کی", "ki"],
-  ["گه", "geh"],
-  ["گا", "ga"],
-  ["گو", "gou"],
-  ["گی", "gi"],
-  ["جه", "jeh"],
-  ["جا", "ja"],
-  ["جو", "jou"],
-  ["جی", "ji"],
-  ["عه", "eh"],
-  ["عا", "a"],
-  ["عو", "ou"],
-  ["عی", "ei"],
-  ["حه", "heh"],
-  ["حا", "ha"],
-  ["حو", "hou"],
-  ["حی", "hi"],
-  ["یه", "yeh"],
-  ["یا", "ya"],
-  ["یو", "you"],
-  ["یی", "yi"],
+  ["خوا", "kh"], // will get vowel from next rules — kept simple
+  ["خ", "kh"],
+  ["چ", "ch"],
+  ["ش", "sh"],
+  ["ژ", "zh"],
+  ["غ", "gh"],
+  ["ق", "gh"],
 ];
 
-const CHARS: Record<string, string> = {
-  آ: "a",
-  ا: "a",
-  ب: "b",
-  پ: "p",
-  ت: "t",
-  ث: "s",
-  ج: "j",
-  چ: "ch",
-  ح: "h",
-  خ: "kh",
-  د: "d",
-  ذ: "z",
-  ر: "r",
-  ز: "z",
-  ژ: "zh",
-  س: "s",
-  ش: "sh",
-  ص: "s",
-  ض: "z",
-  ط: "t",
-  ظ: "z",
-  ع: "a",
-  غ: "gh",
-  ف: "f",
-  ق: "gh",
-  ک: "k",
-  ك: "k",
-  گ: "g",
-  ل: "l",
-  م: "m",
-  ن: "n",
-  و: "o",
-  ه: "h",
-  ی: "i",
-  ي: "i",
-  ئ: "i",
-  ء: "",
-  ة: "h",
-  ؤ: "o",
-  إ: "e",
-  أ: "a",
-  ٱ: "a",
-};
+const CONSONANT_FA = new Set([
+  "ب",
+  "پ",
+  "ت",
+  "ث",
+  "ج",
+  "چ",
+  "ح",
+  "خ",
+  "د",
+  "ذ",
+  "ر",
+  "ز",
+  "ژ",
+  "س",
+  "ش",
+  "ص",
+  "ض",
+  "ط",
+  "ظ",
+  "ع",
+  "غ",
+  "ف",
+  "ق",
+  "ک",
+  "ك",
+  "گ",
+  "ل",
+  "م",
+  "ن",
+  "ه",
+]);
+
+const VOWEL_LATIN = new Set(["a", "e", "i", "o", "u"]);
 
 function normalizeFa(text: string): string {
   return text
@@ -390,30 +248,138 @@ function normalizeFa(text: string): string {
     .replace(/\s+/g, " ");
 }
 
+function isFaConsonant(ch: string): boolean {
+  return CONSONANT_FA.has(ch);
+}
+
+/**
+ * Map one token with context:
+ * - leading و → v
+ * - و after consonant → o
+ * - ی → i (or y between vowels handled simply as i)
+ * - آ/ا → a
+ * - default short vowel a between consecutive consonants
+ */
 function mapToken(token: string): string {
   const key = normalizeFa(token);
   if (!key) return "";
   if (NAME_DICT[key]) return NAME_DICT[key];
 
-  // Also try with ZWNJ restored variants already stripped by normalize
-  let rest = key;
-  let out = "";
-  while (rest.length > 0) {
-    let hit = false;
+  type Piece = { kind: "c" | "v"; lat: string };
+  const pieces: Piece[] = [];
+  let i = 0;
+
+  while (i < key.length) {
+    const ch = key[i];
+
+    // digraph consonants
+    let digraphHit = false;
     for (const [from, to] of DIGRAPHS) {
-      if (rest.startsWith(from)) {
-        out += to;
-        rest = rest.slice(from.length);
-        hit = true;
+      if (key.startsWith(from, i) && from.length > 1) {
+        pieces.push({ kind: "c", lat: to });
+        i += from.length;
+        digraphHit = true;
         break;
       }
     }
-    if (hit) continue;
-    const ch = rest[0];
-    out += CHARS[ch] ?? (/[a-zA-Z0-9]/.test(ch) ? ch.toLowerCase() : "");
-    rest = rest.slice(1);
+    if (digraphHit) continue;
+
+    if (ch === "و") {
+      const prev = pieces[pieces.length - 1];
+      if (!prev) {
+        pieces.push({ kind: "c", lat: "v" }); // واحدی → v...
+      } else if (prev.kind === "c") {
+        pieces.push({ kind: "v", lat: "o" }); // ترحمی mid و as vowel-ish via later a-insert; و as o after C
+      } else {
+        pieces.push({ kind: "v", lat: "o" });
+      }
+      i += 1;
+      continue;
+    }
+
+    if (ch === "ی" || ch === "ي" || ch === "ئ") {
+      pieces.push({ kind: "v", lat: "i" });
+      i += 1;
+      continue;
+    }
+
+    if (ch === "آ" || ch === "ا" || ch === "أ" || ch === "إ" || ch === "ٱ") {
+      pieces.push({ kind: "v", lat: "a" });
+      i += 1;
+      continue;
+    }
+
+    if (ch === "ع") {
+      // often silent or a; treat as vowel a when between consonants context later
+      pieces.push({ kind: "v", lat: "a" });
+      i += 1;
+      continue;
+    }
+
+    const single: Record<string, string> = {
+      ب: "b",
+      پ: "p",
+      ت: "t",
+      ث: "s",
+      ج: "j",
+      چ: "ch",
+      ح: "h",
+      خ: "kh",
+      د: "d",
+      ذ: "z",
+      ر: "r",
+      ز: "z",
+      ژ: "zh",
+      س: "s",
+      ش: "sh",
+      ص: "s",
+      ض: "z",
+      ط: "t",
+      ظ: "z",
+      غ: "gh",
+      ف: "f",
+      ق: "gh",
+      ک: "k",
+      ك: "k",
+      گ: "g",
+      ل: "l",
+      م: "m",
+      ن: "n",
+      ه: "h",
+      ة: "h",
+    };
+
+    if (single[ch]) {
+      pieces.push({ kind: "c", lat: single[ch] });
+      i += 1;
+      continue;
+    }
+
+    if (/[a-zA-Z0-9]/.test(ch)) {
+      pieces.push({
+        kind: VOWEL_LATIN.has(ch.toLowerCase()) ? "v" : "c",
+        lat: ch.toLowerCase(),
+      });
+    }
+    i += 1;
   }
-  return out;
+
+  // Insert default short vowel "a" between consecutive consonants
+  // e.g. بتول: b-t-o-l → b-a-t-o-l ; ترحمی after mapping needs a between t-r, r-h, h-m
+  const out: string[] = [];
+  for (let p = 0; p < pieces.length; p++) {
+    const cur = pieces[p];
+    if (p > 0) {
+      const prev = pieces[p - 1];
+      if (prev.kind === "c" && cur.kind === "c") {
+        out.push("a");
+      }
+    }
+    out.push(cur.lat);
+  }
+
+  // Leading vowel-less: fine. Collapse aa
+  return out.join("").replace(/aa+/g, "a");
 }
 
 export function transliterateFa(text: string): string {

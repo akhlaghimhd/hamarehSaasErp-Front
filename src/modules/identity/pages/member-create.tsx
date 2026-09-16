@@ -1,7 +1,5 @@
 /**
- * افزودن کاربر:
- * مرحله ۱ — هویت + ایمیل (تمام‌عرض)
- * مرحله ۲ — پس از ثبت: نمایش خلاصه + نقش/مالک اختیاری یا رد شدن
+ * افزودن کاربر — فرم فرایندی تب‌دار (هویت → دسترسی) بدون ترک صفحه
  */
 
 "use client";
@@ -12,12 +10,13 @@ import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { CheckCircle2, Loader2, RefreshCw } from "lucide-react";
+import { Check, Loader2, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/shared/components/ui/card";
@@ -43,7 +42,10 @@ import {
 import { Label } from "@/shared/components/ui/label";
 import { usePermission } from "@/auth";
 import { ApiClientError } from "@/api";
-import { useCreateTenantUser, useUpdateTenantUser } from "../hooks/use-tenant-users";
+import {
+  useCreateTenantUser,
+  useUpdateTenantUser,
+} from "../hooks/use-tenant-users";
 import { tenantUserService } from "../services/tenant-user-service";
 import { roleService, type RoleDto } from "../services/role-service";
 import { IdentityPermissions, type TenantUserDto } from "../types";
@@ -56,7 +58,9 @@ import {
   suggestEmailLocalPart,
 } from "../lib/transliterate-fa";
 import { MSG_GENERIC_ERROR, MSG_NO_ACCESS } from "../lib/ui-copy";
-import { toFaDigits } from "@/shared/lib/utils";
+import { cn, toFaDigits } from "@/shared/lib/utils";
+
+type Step = "identity" | "access";
 
 export function MemberCreatePage() {
   const router = useRouter();
@@ -67,11 +71,10 @@ export function MemberCreatePage() {
   const createMutation = useCreateTenantUser();
   const updateMutation = useUpdateTenantUser();
 
+  const [step, setStep] = useState<Step>("identity");
   const [emailHost, setEmailHost] = useState<string | null>(null);
   const [hostLoading, setHostLoading] = useState(true);
   const [hostError, setHostError] = useState<string | null>(null);
-
-  /** پس از ثبت موفق هویت */
   const [created, setCreated] = useState<TenantUserDto | null>(null);
 
   const [roles, setRoles] = useState<RoleDto[]>([]);
@@ -93,10 +96,6 @@ export function MemberCreatePage() {
 
   const firstName = useWatch({ control: form.control, name: "first_name" });
   const lastName = useWatch({ control: form.control, name: "last_name" });
-  const emailLocal = useWatch({
-    control: form.control,
-    name: "email_local_part",
-  });
 
   const latinFirst = slugNamePart(firstName ?? "");
   const latinLast = slugNamePart(lastName ?? "");
@@ -104,7 +103,6 @@ export function MemberCreatePage() {
   useEffect(() => {
     let cancelled = false;
     setHostLoading(true);
-    setHostError(null);
     tenantUserService
       .getEmailHost()
       .then((data) => {
@@ -128,22 +126,24 @@ export function MemberCreatePage() {
     };
   }, []);
 
-  /** همیشه با تغییر نام، پیشنهاد ایمیل تازه شود (کاربر می‌تواند بعداً دستی اصلاح کند) */
   useEffect(() => {
-    if (created) return;
+    if (step !== "identity" || created) return;
     const suggested = suggestEmailLocalPart(firstName ?? "", lastName ?? "");
     form.setValue("email_local_part", suggested, {
       shouldValidate: false,
       shouldDirty: false,
     });
-  }, [firstName, lastName, form, created]);
+  }, [firstName, lastName, form, step, created]);
 
   const resyncEmail = () => {
-    const suggested = suggestEmailLocalPart(
-      form.getValues("first_name"),
-      form.getValues("last_name")
+    form.setValue(
+      "email_local_part",
+      suggestEmailLocalPart(
+        form.getValues("first_name"),
+        form.getValues("last_name")
+      ),
+      { shouldValidate: true }
     );
-    form.setValue("email_local_part", suggested, { shouldValidate: true });
   };
 
   const loadRoles = () => {
@@ -173,27 +173,18 @@ export function MemberCreatePage() {
         is_owner: false,
         role_ids: [],
       });
-      toast.success("کاربر ثبت شد. در صورت تمایل نقش را همین‌جا تنظیم کنید.");
       setCreated(member);
+      setStep("access");
       loadRoles();
+      toast.success("هویت ثبت شد");
     } catch (e) {
-      const msg =
-        e instanceof ApiClientError && e.message
-          ? e.message
-          : MSG_GENERIC_ERROR;
-      toast.error(msg);
-      if (e instanceof ApiClientError && e.errors) {
-        Object.entries(e.errors).forEach(([key, messages]) => {
-          const field = key as keyof CreateMemberFormValues;
-          if (messages?.[0] && field in form.getValues()) {
-            form.setError(field, { message: messages[0] });
-          }
-        });
-      }
+      toast.error(
+        e instanceof ApiClientError && e.message ? e.message : MSG_GENERIC_ERROR
+      );
     }
   });
 
-  const goToDetail = () => {
+  const finishToDetail = () => {
     if (created?.tenant_user_id) {
       router.push(`/dashboard/identity/members/${created.tenant_user_id}`);
     }
@@ -213,7 +204,7 @@ export function MemberCreatePage() {
         });
       }
       toast.success("دسترسی ذخیره شد");
-      goToDetail();
+      finishToDetail();
     } catch (e) {
       toast.error(
         e instanceof ApiClientError && e.message ? e.message : MSG_GENERIC_ERROR
@@ -223,19 +214,19 @@ export function MemberCreatePage() {
     }
   };
 
+  const resetForAnother = () => {
+    setCreated(null);
+    setStep("identity");
+    setSelectedRoleId(undefined);
+    setMakeOwner(false);
+    form.reset();
+  };
+
   if (!canCreate) {
     return (
-      <div className="w-full space-y-6">
-        <PageHeader
-          title="افزودن کاربر"
-          breadcrumbs={[
-            { label: "داشبورد", href: "/dashboard" },
-            { label: "هویت و دسترسی", href: "/dashboard/identity" },
-            { label: "کاربران", href: "/dashboard/identity/members" },
-            { label: "افزودن" },
-          ]}
-        />
-        <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-6 py-12 text-center text-sm text-muted-foreground">
+      <div className="space-y-6">
+        <PageHeader title="افزودن کاربر" breadcrumbs={breadcrumbs} />
+        <div className="rounded-xl border border-dashed bg-muted/20 px-6 py-12 text-center text-sm text-muted-foreground">
           {MSG_NO_ACCESS}
         </div>
       </div>
@@ -243,323 +234,323 @@ export function MemberCreatePage() {
   }
 
   const hostBlocked = !hostLoading && !emailHost;
+  const u = created?.user;
 
-  /* ——— مرحله ۲: بعد از ثبت ——— */
-  if (created) {
-    const u = created.user;
-    const fullName = [u?.first_name, u?.last_name].filter(Boolean).join(" ");
-
-    return (
-      <div className="w-full space-y-6">
-        <PageHeader
-          title="کاربر ثبت شد"
-          description="هویت ذخیره شد. نقش و دسترسی را همین‌جا تنظیم کنید یا بعداً از جزئیات کاربر."
-          breadcrumbs={[
-            { label: "داشبورد", href: "/dashboard" },
-            { label: "هویت و دسترسی", href: "/dashboard/identity" },
-            { label: "کاربران", href: "/dashboard/identity/members" },
-            { label: "افزودن" },
-          ]}
-        />
-
-        <Card className="w-full border-emerald-500/30 bg-emerald-500/5">
-          <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center">
-            <CheckCircle2 className="h-8 w-8 shrink-0 text-emerald-600" />
-            <div className="min-w-0 flex-1 space-y-1">
-              <p className="font-semibold">{fullName || "کاربر جدید"}</p>
-              <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
-                <span dir="ltr" className="font-mono">
-                  {u?.email}
-                </span>
-                <span>{u?.mobile ? toFaDigits(u.mobile) : "—"}</span>
-              </div>
-            </div>
-            <Button variant="outline" size="sm" onClick={goToDetail}>
-              مشاهده جزئیات
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="w-full">
-          <CardHeader className="border-b border-border/50 pb-4">
-            <CardTitle className="text-base">دسترسی و نقش</CardTitle>
-            <CardDescription>
-              اختیاری است. می‌توانید رد شوید و بعداً از صفحه جزئیات تنظیم کنید.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5 pt-5">
-            {(canAssignRole || canUpdate) && (
-              <>
-                {canAssignRole && (
-                  <div className="space-y-2">
-                    <Label>نقش</Label>
-                    <Select
-                      value={selectedRoleId ?? "__none__"}
-                      onValueChange={(v) =>
-                        setSelectedRoleId(v === "__none__" ? undefined : v)
-                      }
-                      disabled={rolesLoading}
-                    >
-                      <SelectTrigger className="h-10 w-full max-w-lg">
-                        <SelectValue
-                          placeholder={
-                            rolesLoading
-                              ? "بارگذاری…"
-                              : "بدون نقش — بعداً"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">بدون نقش — بعداً</SelectItem>
-                        {roles.map((r) => (
-                          <SelectItem
-                            key={r.tenant_role_id}
-                            value={r.tenant_role_id}
-                          >
-                            {r.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {canUpdate && (
-                  <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border/60 bg-muted/10 px-4 py-3">
-                    <Checkbox
-                      className="mt-0.5"
-                      checked={makeOwner}
-                      onCheckedChange={(v) => setMakeOwner(Boolean(v))}
-                    />
-                    <span className="space-y-0.5">
-                      <span className="block text-sm font-medium">
-                        مدیر اصلی سازمان (Owner)
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        فقط در صورت نیاز؛ بعداً هم از جزئیات کاربر قابل تغییر است.
-                      </span>
-                    </span>
-                  </label>
-                )}
-              </>
-            )}
-
-            <div className="flex flex-wrap gap-2 border-t border-border/50 pt-4">
-              <Button
-                type="button"
-                onClick={() => void onSaveAccess()}
-                disabled={
-                  accessSaving ||
-                  (!selectedRoleId && !makeOwner)
-                }
-              >
-                {accessSaving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    ذخیره…
-                  </>
-                ) : (
-                  "ذخیره دسترسی"
-                )}
-              </Button>
-              <Button type="button" variant="outline" onClick={goToDetail}>
-                بعداً تنظیم می‌کنم
-              </Button>
-              <Button type="button" variant="ghost" asChild>
-                <Link href="/dashboard/identity/members">فهرست کاربران</Link>
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setCreated(null);
-                  form.reset();
-                }}
-              >
-                افزودن کاربر دیگر
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  /* ——— مرحله ۱: فرم هویت ——— */
   return (
-    <div className="w-full space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title="افزودن کاربر"
-        description="ابتدا هویت و ایمیل سازمانی را ثبت کنید؛ نقش در مرحله بعد یا از جزئیات کاربر."
-        breadcrumbs={[
-          { label: "داشبورد", href: "/dashboard" },
-          { label: "هویت و دسترسی", href: "/dashboard/identity" },
-          { label: "کاربران", href: "/dashboard/identity/members" },
-          { label: "افزودن" },
-        ]}
+        description="فرایند دو مرحله‌ای: هویت، سپس دسترسی اختیاری"
+        breadcrumbs={breadcrumbs}
         actions={
           <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/identity/members">انصراف</Link>
+            <Link href="/dashboard/identity/members">بازگشت</Link>
           </Button>
         }
       />
 
-      {hostBlocked && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+      {/* Step tabs */}
+      <div className="flex w-full max-w-xl gap-1 rounded-lg border border-border/70 bg-muted/30 p-1">
+        <button
+          type="button"
+          className={cn(
+            "flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+            step === "identity"
+              ? "bg-background font-medium shadow-sm"
+              : "text-muted-foreground"
+          )}
+          onClick={() => {
+            if (!created) setStep("identity");
+          }}
+          disabled={Boolean(created)}
+        >
+          <span
+            className={cn(
+              "flex h-5 w-5 items-center justify-center rounded-full text-[11px]",
+              created
+                ? "bg-emerald-600 text-white"
+                : step === "identity"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted-foreground/20"
+            )}
+          >
+            {created ? <Check className="h-3 w-3" /> : "۱"}
+          </span>
+          هویت
+        </button>
+        <button
+          type="button"
+          className={cn(
+            "flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+            step === "access"
+              ? "bg-background font-medium shadow-sm"
+              : "text-muted-foreground",
+            !created && "opacity-60"
+          )}
+          onClick={() => {
+            if (created) setStep("access");
+          }}
+          disabled={!created}
+        >
+          <span
+            className={cn(
+              "flex h-5 w-5 items-center justify-center rounded-full text-[11px]",
+              step === "access"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted-foreground/20"
+            )}
+          >
+            ۲
+          </span>
+          دسترسی
+        </button>
+      </div>
+
+      {hostBlocked && step === "identity" && (
+        <div className="max-w-xl rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
           {hostError ?? "دامنه ایمیل سازمانی در دسترس نیست."}
         </div>
       )}
 
-      <Form {...form}>
-        <form onSubmit={onSubmitIdentity} className="w-full space-y-0" noValidate>
-          <Card className="w-full">
-            <CardHeader className="border-b border-border/50 pb-4">
-              <CardTitle className="text-base">اطلاعات هویتی</CardTitle>
-              <CardDescription>
-                با تغییر نام، پیشنهاد ایمیل به‌روز می‌شود. می‌توانید بخش قبل از @ را
-                دستی اصلاح کنید.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="w-full space-y-5 pt-6">
-              {/* ردیف نام */}
-              <div className="grid w-full grid-cols-1 gap-5 lg:grid-cols-2">
+      {/* ——— تب ۱: هویت ——— */}
+      {step === "identity" && (
+        <Card className="max-w-xl">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">اطلاعات هویتی</CardTitle>
+            <CardDescription className="text-xs">
+              نام فارسی را وارد کنید؛ فینگیلیش و ایمیل پیشنهاد می‌شود.
+            </CardDescription>
+          </CardHeader>
+          <Form {...form}>
+            <form onSubmit={onSubmitIdentity}>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="first_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel required>نام</FormLabel>
+                        <FormControl>
+                          <Input className="h-9" {...field} />
+                        </FormControl>
+                        <p className="font-mono text-[11px] text-muted-foreground" dir="ltr">
+                          {latinFirst || "\u00a0"}
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="last_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel required>نام خانوادگی</FormLabel>
+                        <FormControl>
+                          <Input className="h-9" {...field} />
+                        </FormControl>
+                        <p className="font-mono text-[11px] text-muted-foreground" dir="ltr">
+                          {latinLast || "\u00a0"}
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
                 <FormField
                   control={form.control}
-                  name="first_name"
+                  name="mobile"
                   render={({ field }) => (
-                    <FormItem className="w-full space-y-2">
-                      <FormLabel required>نام</FormLabel>
+                    <FormItem>
+                      <FormLabel required>موبایل</FormLabel>
                       <FormControl>
-                        <Input className="h-10 w-full" {...field} />
-                      </FormControl>
-                      <p className="h-4 font-mono text-xs text-muted-foreground" dir="ltr">
-                        {latinFirst || "\u00a0"}
-                      </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="last_name"
-                  render={({ field }) => (
-                    <FormItem className="w-full space-y-2">
-                      <FormLabel required>نام خانوادگی</FormLabel>
-                      <FormControl>
-                        <Input className="h-10 w-full" {...field} />
-                      </FormControl>
-                      <p className="h-4 font-mono text-xs text-muted-foreground" dir="ltr">
-                        {latinLast || "\u00a0"}
-                      </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* موبایل تمام‌عرض */}
-              <FormField
-                control={form.control}
-                name="mobile"
-                render={({ field }) => (
-                  <FormItem className="w-full space-y-2">
-                    <FormLabel required>موبایل</FormLabel>
-                    <FormControl>
-                      <Input
-                        className="h-10 w-full"
-                        dir="ltr"
-                        inputMode="tel"
-                        placeholder="09xxxxxxxxx"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      ورود اول با همین شماره و کد یک‌بارمصرف انجام می‌شود.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* ایمیل: گروه LTR یک‌پارچه — local | @domain */}
-              <FormField
-                control={form.control}
-                name="email_local_part"
-                render={({ field }) => (
-                  <FormItem className="w-full space-y-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <FormLabel required>ایمیل سازمانی</FormLabel>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 gap-1 text-xs"
-                        onClick={resyncEmail}
-                        disabled={!firstName && !lastName}
-                      >
-                        <RefreshCw className="h-3.5 w-3.5" />
-                        همگام با نام
-                      </Button>
-                    </div>
-                    <div
-                      className="flex h-10 w-full overflow-hidden rounded-md border border-input bg-background shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
-                      dir="ltr"
-                    >
-                      <FormControl>
-                        <input
-                          className="h-full min-w-0 flex-1 border-0 bg-transparent px-3 font-mono text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                          autoComplete="off"
-                          placeholder="first.last"
-                          disabled={hostBlocked || hostLoading}
-                          value={field.value}
-                          onChange={(e) =>
-                            field.onChange(e.target.value.toLowerCase())
-                          }
-                          onBlur={field.onBlur}
-                          name={field.name}
-                          ref={field.ref}
+                        <Input
+                          className="h-9"
+                          dir="ltr"
+                          inputMode="tel"
+                          placeholder="09xxxxxxxxx"
+                          {...field}
                         />
                       </FormControl>
-                      <div className="flex h-full shrink-0 items-center border-l border-input bg-muted/40 px-3 font-mono text-sm text-muted-foreground">
-                        @{hostLoading ? "…" : emailHost ?? "—"}
-                      </div>
-                    </div>
-                    <FormDescription>
-                      سمت چپ (در حالت LTR) قابل ویرایش است؛ دامنه بعد از @ ثابت
-                      سازمان است.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
+                      <FormDescription className="text-[11px]">
+                        ورود اول با موبایل و کد یک‌بارمصرف
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-          <div className="flex flex-wrap items-center gap-3 pt-6">
+                <FormField
+                  control={form.control}
+                  name="email_local_part"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-center justify-between gap-2">
+                        <FormLabel required>ایمیل سازمانی</FormLabel>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+                          onClick={resyncEmail}
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                          همگام با نام
+                        </button>
+                      </div>
+                      <div
+                        className="flex h-9 overflow-hidden rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1"
+                        dir="ltr"
+                      >
+                        <FormControl>
+                          <input
+                            className="h-full min-w-0 flex-1 border-0 bg-transparent px-2.5 font-mono text-sm outline-none"
+                            autoComplete="off"
+                            placeholder="first.last"
+                            disabled={hostBlocked || hostLoading}
+                            value={field.value}
+                            onChange={(e) =>
+                              field.onChange(e.target.value.toLowerCase())
+                            }
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            ref={field.ref}
+                          />
+                        </FormControl>
+                        <div className="flex shrink-0 items-center border-l border-input bg-muted/40 px-2.5 font-mono text-xs text-muted-foreground">
+                          @{hostLoading ? "…" : emailHost ?? "—"}
+                        </div>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+              <CardFooter className="flex flex-wrap gap-2 border-t border-border/50 pt-4">
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={
+                    hostBlocked ||
+                    hostLoading ||
+                    createMutation.isPending
+                  }
+                >
+                  {createMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      ثبت…
+                    </>
+                  ) : (
+                    "ثبت و ادامه"
+                  )}
+                </Button>
+                <Button type="button" variant="outline" size="sm" asChild>
+                  <Link href="/dashboard/identity/members">انصراف</Link>
+                </Button>
+              </CardFooter>
+            </form>
+          </Form>
+        </Card>
+      )}
+
+      {/* ——— تب ۲: دسترسی ——— */}
+      {step === "access" && created && (
+        <Card className="max-w-xl">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">دسترسی و نقش</CardTitle>
+            <CardDescription className="text-xs">
+              اختیاری — می‌توانید رد شوید و بعداً از جزئیات کاربر تنظیم کنید.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2.5 text-sm">
+              <p className="font-medium">
+                {[u?.first_name, u?.last_name].filter(Boolean).join(" ")}
+              </p>
+              <p className="mt-0.5 font-mono text-xs text-muted-foreground" dir="ltr">
+                {u?.email}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {u?.mobile ? toFaDigits(u.mobile) : ""}
+              </p>
+            </div>
+
+            {canAssignRole && (
+              <div className="space-y-1.5">
+                <Label className="text-sm">نقش</Label>
+                <Select
+                  value={selectedRoleId ?? "__none__"}
+                  onValueChange={(v) =>
+                    setSelectedRoleId(v === "__none__" ? undefined : v)
+                  }
+                  disabled={rolesLoading}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue
+                      placeholder={rolesLoading ? "…" : "بدون نقش"}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">بدون نقش — بعداً</SelectItem>
+                    {roles.map((r) => (
+                      <SelectItem key={r.tenant_role_id} value={r.tenant_role_id}>
+                        {r.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {canUpdate && (
+              <label className="flex items-start gap-2.5 rounded-md border border-border/60 px-3 py-2.5">
+                <Checkbox
+                  className="mt-0.5"
+                  checked={makeOwner}
+                  onCheckedChange={(v) => setMakeOwner(Boolean(v))}
+                />
+                <span className="text-sm leading-snug">
+                  <span className="font-medium">مدیر اصلی (Owner)</span>
+                  <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                    فقط در صورت نیاز
+                  </span>
+                </span>
+              </label>
+            )}
+          </CardContent>
+          <CardFooter className="flex flex-wrap gap-2 border-t border-border/50 pt-4">
             <Button
-              type="submit"
-              disabled={
-                hostBlocked ||
-                hostLoading ||
-                createMutation.isPending ||
-                form.formState.isSubmitting
-              }
+              type="button"
+              size="sm"
+              onClick={() => void onSaveAccess()}
+              disabled={accessSaving || (!selectedRoleId && !makeOwner)}
             >
-              {createMutation.isPending ? (
+              {accessSaving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  در حال ثبت…
+                  ذخیره…
                 </>
               ) : (
-                "ثبت کاربر و ادامه"
+                "ذخیره دسترسی"
               )}
             </Button>
-            <Button type="button" variant="outline" asChild>
-              <Link href="/dashboard/identity/members">انصراف</Link>
+            <Button type="button" variant="outline" size="sm" onClick={finishToDetail}>
+              بعداً تنظیم می‌کنم
             </Button>
-          </div>
-        </form>
-      </Form>
+            <Button type="button" variant="ghost" size="sm" onClick={resetForAnother}>
+              کاربر دیگر
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
     </div>
   );
 }
+
+const breadcrumbs = [
+  { label: "داشبورد", href: "/dashboard" },
+  { label: "هویت و دسترسی", href: "/dashboard/identity" },
+  { label: "کاربران", href: "/dashboard/identity/members" },
+  { label: "افزودن" },
+];
