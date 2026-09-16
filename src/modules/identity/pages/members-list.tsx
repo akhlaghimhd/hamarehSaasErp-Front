@@ -3,4 +3,4 @@
  */
 "use client";
 
-export { MembersListPage } from "./members-list-full";
+export { MembersListPage } from "./members-list-impl";
