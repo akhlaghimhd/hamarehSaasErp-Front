@@ -36,6 +36,11 @@ export const tenantUserService = {
     return [];
   },
 
+  async getEmailHost(): Promise<{ email_host: string }> {
+    const envelope = await apiGet(identityPaths.usersEmailHost);
+    return unwrapData<{ email_host: string }>(envelope);
+  },
+
   async getById(tenantUserId: string): Promise<TenantUserDto | null> {
     try {
       const envelope = await apiGet(identityPaths.user(tenantUserId));
@@ -49,13 +54,16 @@ export const tenantUserService = {
   },
 
   async create(payload: CreateTenantUserPayload): Promise<TenantUserDto> {
-    const body = {
+    const body: Record<string, unknown> = {
       first_name: payload.first_name,
       last_name: payload.last_name,
       mobile: payload.mobile,
       is_owner: payload.is_owner ?? false,
       role_ids: payload.role_ids ?? [],
     };
+    if (payload.email_local_part) {
+      body.email_local_part = payload.email_local_part;
+    }
     const envelope = await apiPost(identityPaths.users, body);
     return unwrapData<TenantUserDto>(envelope);
   },

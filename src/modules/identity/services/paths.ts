@@ -9,6 +9,7 @@ export const identityPaths = {
   profileApproveAddress: (userId: string) =>
     `${IDENTITY_BASE}/profiles/${userId}/approve-address`,
   users: `${IDENTITY_BASE}/users`,
+  usersEmailHost: `${IDENTITY_BASE}/users/email-host`,
   user: (id: string) => `${IDENTITY_BASE}/users/${id}`,
   userRestore: (id: string) => `${IDENTITY_BASE}/users/${id}/restore`,
   roles: `${IDENTITY_BASE}/roles`,
