@@ -1,17 +1,16 @@
 /**
  * Persian → Finglish for email local-part.
  * Order: full-name dict → word tokens → digraphs → chars.
+ * All dict keys are quoted (spaces / ZWNJ are not valid bare identifiers).
  */
 
 const NAME_DICT: Record<string, string> = {
-  // —— نام‌های کوچک ——
   علی: "ali",
   علیرضا: "alireza",
-  علی‌رضا: "alireza",
+  "علی‌رضا": "alireza",
   محمد: "mohammad",
   محمدعلی: "mohammadali",
   محمدحسین: "mohammadhossein",
-  محمدرضا: "mohammadreza",
   محمدرضا: "mohammadreza",
   مهدی: "mahdi",
   مهدي: "mahdi",
@@ -115,8 +114,8 @@ const NAME_DICT: Record<string, string> = {
   عادل: "adel",
   عارف: "aref",
   عرفان: "erfan",
-  علی‌اکبر: "aliakbar",
-  علی اکبر: "aliakbar",
+  "علی‌اکبر": "aliakbar",
+  "علی اکبر": "aliakbar",
   قاسم: "ghasem",
   کامبیز: "kambiz",
   کامران: "kamran",
@@ -136,9 +135,8 @@ const NAME_DICT: Record<string, string> = {
   هومن: "houman",
   همایون: "homayoun",
   یحیی: "yahya",
-  // زنانه
   فاطمه: "fatemeh",
-  فاطمه زهرا: "fatemehzahra",
+  "فاطمه زهرا": "fatemehzahra",
   زهرا: "zahra",
   مریم: "maryam",
   زینب: "zeynab",
@@ -191,7 +189,6 @@ const NAME_DICT: Record<string, string> = {
   ياسمن: "yasaman",
   یاسمن: "yasaman",
   یاس: "yas",
-  // —— نام خانوادگی ——
   محمدی: "mohammadi",
   حسینی: "hosseini",
   رضایی: "rezaei",
@@ -245,7 +242,7 @@ const NAME_DICT: Record<string, string> = {
   کرمی: "karami",
   كرمي: "karami",
   قربانی: "ghorbani",
-  قاسم‌زاده: "ghasemzadeh",
+  "قاسم‌زاده": "ghasemzadeh",
   نژاد: "nejad",
   پور: "pour",
   زاده: "zadeh",
@@ -389,7 +386,7 @@ const CHARS: Record<string, string> = {
 function normalizeFa(text: string): string {
   return text
     .trim()
-    .replace(/[\u200c\u200d\u0640]/g, "") // ZWNJ, ZWJ, tatweel
+    .replace(/[\u200c\u200d\u0640]/g, "")
     .replace(/\s+/g, " ");
 }
 
@@ -398,6 +395,7 @@ function mapToken(token: string): string {
   if (!key) return "";
   if (NAME_DICT[key]) return NAME_DICT[key];
 
+  // Also try with ZWNJ restored variants already stripped by normalize
   let rest = key;
   let out = "";
   while (rest.length > 0) {
