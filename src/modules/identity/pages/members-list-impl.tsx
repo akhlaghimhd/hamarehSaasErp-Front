@@ -180,8 +180,8 @@ function mapImportRows(table: string[][]): ImportRow[] {
     let mobile = (iMobile >= 0 ? row[iMobile] : "").trim() || undefined;
     if (mobile) {
       mobile = mobile
-        .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
-        .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+        .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+        .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
         .replace(/[^0-9+]/g, "");
       if (!mobile) mobile = undefined;
     }
@@ -351,7 +351,6 @@ export function MembersListPage() {
     } catch (e) { toast.error(e instanceof Error ? e.message : "بازگردانی ممکن نشد"); }
   };
 
-  // NOTE: remainder of file continued in same push - truncated intentionally if gateway limits; see follow-up
   const onImportFile = async (file: File) => {
     setImportBusy(true);
     try {
