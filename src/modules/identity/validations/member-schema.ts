@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+const emptyToUndefined = (v: unknown) => {
+  if (v === "" || v === null || v === undefined) return undefined;
+  return v;
+};
+
 export const createMemberSchema = z.object({
   first_name: z
     .string({ required_error: "نام الزامی است" })
@@ -26,6 +31,10 @@ export const createMemberSchema = z.object({
       "فقط حروف انگلیسی، عدد، نقطه، خط تیره و زیرخط"
     ),
   is_owner: z.boolean().optional().default(false),
+  role_id: z.preprocess(
+    emptyToUndefined,
+    z.string().uuid("شناسه نقش معتبر نیست").optional()
+  ),
 });
 
 export type CreateMemberFormValues = z.infer<typeof createMemberSchema>;

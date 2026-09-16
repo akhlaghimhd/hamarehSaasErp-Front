@@ -1,4 +1,4 @@
-/** افزودن کاربر — لایه‌بندی: هویت → ایمیل سازمانی (بدون نقش در این مرحله) */
+/** افزودن کاربر — چیدمان تمام‌عرض، فینگیلیش بهبودیافته، نقش اختیاری در انتها */
 
 "use client";
 
@@ -21,11 +21,17 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/components/ui/select";
+import {
   Form,
   FormControl,
   FormDescription,
   FormField,
-  FormGrid,
   FormItem,
   FormLabel,
   FormMessage,
@@ -34,6 +40,7 @@ import { usePermission } from "@/auth";
 import { ApiClientError } from "@/api";
 import { useCreateTenantUser } from "../hooks/use-tenant-users";
 import { tenantUserService } from "../services/tenant-user-service";
+import { roleService, type RoleDto } from "../services/role-service";
 import { IdentityPermissions } from "../types";
 import {
   createMemberSchema,
@@ -44,6 +51,7 @@ import {
   suggestEmailLocalPart,
 } from "../lib/transliterate-fa";
 import { MSG_GENERIC_ERROR, MSG_NO_ACCESS } from "../lib/ui-copy";
+import { cn } from "@/shared/lib/utils";
 
 export function MemberCreatePage() {
   const router = useRouter();
@@ -54,7 +62,9 @@ export function MemberCreatePage() {
   const [hostLoading, setHostLoading] = useState(true);
   const [hostError, setHostError] = useState<string | null>(null);
 
-  /** When user edits local-part manually, stop auto-sync from names. */
+  const [roles, setRoles] = useState<RoleDto[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+
   const localPartTouched = useRef(false);
 
   const form = useForm<CreateMemberFormValues>({
@@ -65,12 +75,17 @@ export function MemberCreatePage() {
       mobile: "",
       email_local_part: "",
       is_owner: false,
+      role_id: undefined,
     },
     mode: "onBlur",
   });
 
   const firstName = useWatch({ control: form.control, name: "first_name" });
   const lastName = useWatch({ control: form.control, name: "last_name" });
+  const emailLocal = useWatch({
+    control: form.control,
+    name: "email_local_part",
+  });
 
   const latinFirst = slugNamePart(firstName ?? "");
   const latinLast = slugNamePart(lastName ?? "");
@@ -103,6 +118,29 @@ export function MemberCreatePage() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    setRolesLoading(true);
+    roleService
+      .list()
+      .then((list) => {
+        if (!cancelled) {
+          setRoles(
+            list.filter((r) => r.status === undefined || Number(r.status) === 1)
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRoles([]);
+      })
+      .finally(() => {
+        if (!cancelled) setRolesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (localPartTouched.current) return;
     const suggested = suggestEmailLocalPart(firstName ?? "", lastName ?? "");
     form.setValue("email_local_part", suggested, {
@@ -126,7 +164,7 @@ export function MemberCreatePage() {
         mobile: values.mobile,
         email_local_part: values.email_local_part,
         is_owner: values.is_owner ?? false,
-        role_ids: [],
+        role_ids: values.role_id ? [values.role_id] : [],
       });
       const generatedEmail = member.user?.email;
       toast.success(
@@ -154,7 +192,7 @@ export function MemberCreatePage() {
 
   if (!canCreate) {
     return (
-      <div className="space-y-6">
+      <div className="mx-auto w-full max-w-4xl space-y-6">
         <PageHeader
           title="افزودن کاربر"
           breadcrumbs={[
@@ -172,12 +210,14 @@ export function MemberCreatePage() {
   }
 
   const hostBlocked = !hostLoading && !emailHost;
+  const previewEmail =
+    emailLocal && emailHost ? `${emailLocal}@${emailHost}` : null;
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-4xl space-y-6">
       <PageHeader
         title="افزودن کاربر"
-        description="ثبت هویت و ایمیل سازمانی؛ نقش و مجوزها در مرحله بعد از صفحه جزئیات کاربر"
+        description="اطلاعات هویتی و ایمیل سازمانی را تکمیل کنید. نقش اختیاری است و بعداً هم از جزئیات کاربر قابل تنظیم است."
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "هویت و دسترسی", href: "/dashboard/identity" },
@@ -192,78 +232,90 @@ export function MemberCreatePage() {
       />
 
       {hostBlocked && (
-        <div className="max-w-3xl rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           {hostError ??
-            "دامنه ایمیل سازمانی تنظیم نشده است. تا زمان پیکربندی دامنه، افزودن کاربر ممکن نیست."}
+            "دامنه ایمیل سازمانی در دسترس نیست. پس از pull بک‌اند و seed، دوباره تلاش کنید."}
         </div>
       )}
 
       <Form {...form}>
-        <form onSubmit={onSubmit} className="max-w-3xl space-y-5" noValidate>
-          {/* لایه ۱: هویت */}
-          <Card>
-            <CardHeader className="space-y-1 pb-3">
-              <CardTitle className="text-base">۱. هویت کاربر</CardTitle>
-              <CardDescription className="text-sm leading-relaxed">
-                نام فارسی را وارد کنید؛ معادل انگلیسی برای ساخت ایمیل پیشنهاد
-                می‌شود.
+        <form onSubmit={onSubmit} className="space-y-6" noValidate>
+          {/* هویت + تماس + ایمیل در یک کارت تمام‌عرض */}
+          <Card className="w-full">
+            <CardHeader className="border-b border-border/50 pb-4">
+              <CardTitle className="text-base font-semibold">
+                اطلاعات هویتی
+              </CardTitle>
+              <CardDescription>
+                نام فارسی را وارد کنید؛ معادل لاتین و پیشنهاد ایمیل به‌صورت
+                خودکار ساخته می‌شود.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-5">
-              <FormGrid columns={2} className="gap-x-4 gap-y-5">
+            <CardContent className="pt-6">
+              <div className="grid w-full grid-cols-1 gap-6 md:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="first_name"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="w-full">
                       <FormLabel required>نام</FormLabel>
                       <FormControl>
                         <Input
-                          className="h-9"
+                          className="h-10 w-full"
                           autoComplete="given-name"
                           {...field}
                         />
                       </FormControl>
-                      {latinFirst ? (
-                        <p className="text-xs text-muted-foreground dir-ltr font-mono">
-                          {latinFirst}
-                        </p>
-                      ) : null}
+                      <p
+                        className={cn(
+                          "min-h-[1.25rem] font-mono text-xs text-muted-foreground",
+                          !latinFirst && "invisible"
+                        )}
+                        dir="ltr"
+                      >
+                        {latinFirst || "—"}
+                      </p>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
                 <FormField
                   control={form.control}
                   name="last_name"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="w-full">
                       <FormLabel required>نام خانوادگی</FormLabel>
                       <FormControl>
                         <Input
-                          className="h-9"
+                          className="h-10 w-full"
                           autoComplete="family-name"
                           {...field}
                         />
                       </FormControl>
-                      {latinLast ? (
-                        <p className="text-xs text-muted-foreground dir-ltr font-mono">
-                          {latinLast}
-                        </p>
-                      ) : null}
+                      <p
+                        className={cn(
+                          "min-h-[1.25rem] font-mono text-xs text-muted-foreground",
+                          !latinLast && "invisible"
+                        )}
+                        dir="ltr"
+                      >
+                        {latinLast || "—"}
+                      </p>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
                 <FormField
                   control={form.control}
                   name="mobile"
                   render={({ field }) => (
-                    <FormItem className="sm:col-span-2">
+                    <FormItem className="w-full md:col-span-2">
                       <FormLabel required>موبایل</FormLabel>
                       <FormControl>
                         <Input
-                          className="h-9"
+                          className="h-10 w-full max-w-md"
                           dir="ltr"
                           inputMode="tel"
                           autoComplete="tel"
@@ -272,94 +324,141 @@ export function MemberCreatePage() {
                         />
                       </FormControl>
                       <FormDescription>
-                        شناسه ورود اولیه؛ کد تأیید به این شماره ارسال می‌شود
+                        شناسه ورود اولیه؛ کد یک‌بارمصرف به این شماره ارسال
+                        می‌شود.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </FormGrid>
+
+                <FormField
+                  control={form.control}
+                  name="email_local_part"
+                  render={({ field }) => (
+                    <FormItem className="w-full md:col-span-2">
+                      <FormLabel required>ایمیل سازمانی</FormLabel>
+                      <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
+                        <FormControl>
+                          <Input
+                            className="h-10 w-full flex-1 font-mono"
+                            dir="ltr"
+                            autoComplete="off"
+                            placeholder="first.last"
+                            disabled={hostBlocked || hostLoading}
+                            {...field}
+                            onChange={(e) => {
+                              localPartTouched.current = true;
+                              field.onChange(e.target.value.toLowerCase());
+                            }}
+                          />
+                        </FormControl>
+                        <div
+                          className="flex h-10 shrink-0 items-center justify-center rounded-md border border-input bg-muted/50 px-3 font-mono text-sm text-muted-foreground sm:min-w-[11rem]"
+                          dir="ltr"
+                        >
+                          @
+                          {hostLoading ? "…" : emailHost ?? "—"}
+                        </div>
+                      </div>
+                      {previewEmail ? (
+                        <p className="font-mono text-xs text-muted-foreground" dir="ltr">
+                          پیش‌نمایش: {previewEmail}
+                        </p>
+                      ) : (
+                        <FormDescription>
+                          بخش قبل از @ قابل ویرایش است؛ دامنه ثابت سازمان است.
+                        </FormDescription>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </CardContent>
           </Card>
 
-          {/* لایه ۲: ایمیل سازمانی */}
-          <Card>
-            <CardHeader className="space-y-1 pb-3">
-              <CardTitle className="text-base">۲. ایمیل سازمانی</CardTitle>
-              <CardDescription className="text-sm leading-relaxed">
-                بخش ابتدایی قابل ویرایش است؛ دامنه سازمان ثابت و غیرقابل تغییر
-                است.
+          {/* دسترسی — اختیاری؛ بعداً هم از جزئیات کاربر */}
+          <Card className="w-full">
+            <CardHeader className="border-b border-border/50 pb-4">
+              <CardTitle className="text-base font-semibold">
+                دسترسی و نقش
+                <span className="mr-2 text-xs font-normal text-muted-foreground">
+                  (اختیاری)
+                </span>
+              </CardTitle>
+              <CardDescription>
+                می‌توانید الان نقش بدهید یا بعداً از صفحه جزئیات کاربر تنظیم
+                کنید. مدیر اصلی فقط در صورت نیاز علامت زده شود.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-5 pt-6">
               <FormField
                 control={form.control}
-                name="email_local_part"
+                name="role_id"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel required>آدرس ایمیل</FormLabel>
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                  <FormItem className="w-full max-w-md">
+                    <FormLabel>نقش اولیه</FormLabel>
+                    <Select
+                      value={field.value ?? "__none__"}
+                      onValueChange={(v) =>
+                        field.onChange(v === "__none__" ? undefined : v)
+                      }
+                      disabled={rolesLoading}
+                    >
                       <FormControl>
-                        <Input
-                          className="h-9 flex-1 font-mono"
-                          dir="ltr"
-                          autoComplete="off"
-                          placeholder="first.last"
-                          disabled={hostBlocked || hostLoading}
-                          {...field}
-                          onChange={(e) => {
-                            localPartTouched.current = true;
-                            field.onChange(e.target.value.toLowerCase());
-                          }}
-                        />
+                        <SelectTrigger className="h-10 w-full">
+                          <SelectValue
+                            placeholder={
+                              rolesLoading
+                                ? "بارگذاری نقش‌ها…"
+                                : "بدون نقش — بعداً تنظیم شود"
+                            }
+                          />
+                        </SelectTrigger>
                       </FormControl>
-                      <div
-                        className="flex h-9 shrink-0 items-center rounded-md border border-input bg-muted/40 px-3 font-mono text-sm text-muted-foreground"
-                        dir="ltr"
-                      >
-                        @
-                        {hostLoading
-                          ? "…"
-                          : emailHost ?? "—"}
-                      </div>
-                    </div>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          بدون نقش — بعداً تنظیم شود
+                        </SelectItem>
+                        {roles.map((r) => (
+                          <SelectItem
+                            key={r.tenant_role_id}
+                            value={r.tenant_role_id}
+                          >
+                            {r.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormDescription>
-                      پیشنهاد از نام فارسی ساخته می‌شود؛ در صورت نیاز اصلاح کنید.
+                      خالی بگذارید اگر نقش را بعداً از جزئیات کاربر می‌دهید.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </CardContent>
-          </Card>
 
-          {/* لایه ۳: گزینه‌های عضویت */}
-          <Card>
-            <CardHeader className="space-y-1 pb-3">
-              <CardTitle className="text-base">۳. عضویت</CardTitle>
-              <CardDescription className="text-sm leading-relaxed">
-                نقش و مجوزها پس از ایجاد، از صفحه جزئیات کاربر قابل تخصیص هستند.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
               <FormField
                 control={form.control}
                 name="is_owner"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-start gap-3 space-y-0 rounded-lg border border-border/60 bg-muted/10 px-3 py-3">
+                  <FormItem className="flex w-full flex-row items-start gap-3 rounded-lg border border-border/60 bg-muted/15 px-4 py-3">
                     <FormControl>
                       <Checkbox
+                        className="mt-0.5"
                         checked={Boolean(field.value)}
                         onCheckedChange={(v) => field.onChange(Boolean(v))}
                       />
                     </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel className="font-normal">
-                        مدیر اصلی سازمان
+                    <div className="space-y-1 leading-snug">
+                      <FormLabel className="font-medium">
+                        مدیر اصلی سازمان (Owner)
                       </FormLabel>
-                      <FormDescription>
-                        فقط اگر این فرد باید بالاترین سطح مدیریت سازمان را داشته
-                        باشد علامت بزنید.
+                      <FormDescription className="text-xs">
+                        بالاترین سطح مدیریتی Tenant. معمولاً فقط برای یک یا چند
+                        نفر محدود استفاده شود؛ بعداً از جزئیات کاربر هم قابل
+                        تغییر است.
                       </FormDescription>
                     </div>
                   </FormItem>
@@ -368,10 +467,11 @@ export function MemberCreatePage() {
             </CardContent>
           </Card>
 
-          <div className="flex flex-wrap items-center gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-3 border-t border-border/60 pt-4">
             <Button
               type="submit"
-              size="sm"
+              size="default"
+              className="min-w-[8rem]"
               disabled={
                 hostBlocked ||
                 hostLoading ||
@@ -388,7 +488,7 @@ export function MemberCreatePage() {
                 "افزودن کاربر"
               )}
             </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
+            <Button type="button" variant="outline" asChild>
               <Link href="/dashboard/identity/members">انصراف</Link>
             </Button>
           </div>
