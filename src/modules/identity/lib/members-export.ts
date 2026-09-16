@@ -1,5 +1,6 @@
-/** Client-side export helpers for organization members list. */
+/** Client-side Excel (.xlsx) + PDF export for organization members. */
 
+import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { toFaDigits } from "@/shared/lib/utils";
 import type { TenantUserDto } from "../types";
@@ -52,18 +53,8 @@ function escapeHtml(s: string) {
     .replace(/"/g, "&quot;");
 }
 
-/** CSV cell: quote when needed (Excel-compatible) */
-function csvCell(value: string): string {
-  const v = String(value ?? "");
-  if (/[",\n\r]/.test(v)) {
-    return `"${v.replace(/"/g, '""')}"`;
-  }
-  return v;
-}
-
-function downloadBlob(filename: string, content: string | Blob, mime: string) {
-  const blob =
-    typeof content === "string" ? new Blob([content], { type: mime }) : content;
+function downloadArrayBuffer(filename: string, data: ArrayBuffer, mime: string) {
+  const blob = new Blob([data], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -74,62 +65,108 @@ function downloadBlob(filename: string, content: string | Blob, mime: string) {
   URL.revokeObjectURL(url);
 }
 
+function writeXlsxDownload(filename: string, sheetName: string, aoa: (string | number)[][]) {
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  // عرض تقریبی ستون‌ها برای خوانایی در اکسل
+  const colCount = aoa[0]?.length ?? 1;
+  ws["!cols"] = Array.from({ length: colCount }, (_, i) => {
+    let max = 10;
+    for (const row of aoa) {
+      const cell = row[i];
+      const len = cell == null ? 0 : String(cell).length;
+      if (len > max) max = len;
+    }
+    return { wch: Math.min(Math.max(max + 2, 12), 40) };
+  });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  // bookType xlsx = فرمت واقعی Office Open XML
+  const out = XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+  downloadArrayBuffer(
+    filename,
+    out,
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+}
+
 /**
- * خروجی اکسل استاندارد:
- * - فایل CSV با BOM UTF-8 (اکسل ویندوز/مک بدون خطا باز می‌کند)
+ * خروجی واقعی Excel (.xlsx)
+ * - هر ستون یک سلول جدا
  * - تاریخ عضویت شمسی
+ * - بدون وابستگی به HTML جعلی
  */
 export function exportMembersExcel(rows: TenantUserDto[]) {
-  const header = [
-    "نام",
-    "ایمیل",
-    "موبایل",
-    "وضعیت",
-    "مدیر اصلی",
-    "تاریخ عضویت",
+  const aoa: (string | number)[][] = [
+    ["نام", "ایمیل", "موبایل", "وضعیت", "مدیر اصلی", "تاریخ عضویت"],
   ];
-  const lines: string[] = [header.map(csvCell).join(",")];
-
   for (const r of rows) {
-    const cells = [
+    aoa.push([
       memberDisplayName(r),
       r.user?.email ?? "",
       r.user?.mobile ?? "",
       Number(r.status) === 1 ? "فعال" : "غیرفعال",
       r.is_owner ? "بله" : "خیر",
       r.created_at ? formatJalaliDate(r.created_at) : "",
-    ];
-    lines.push(cells.map(csvCell).join(","));
+    ]);
   }
-
-  // BOM برای تشخیص UTF-8 توسط اکسل
-  const csv = "\uFEFF" + lines.join("\r\n") + "\r\n";
   const stamp = formatJalaliDate(new Date().toISOString()).replace(/\//g, "-");
-  downloadBlob(
-    `karbaran-sazman-${stamp}.csv`,
-    csv,
-    "text/csv;charset=utf-8"
-  );
-  toast.success("فایل اکسل (CSV) آماده شد — با اکسل باز کنید");
+  writeXlsxDownload(`karbaran-sazman-${stamp}.xlsx`, "کاربران", aoa);
+  toast.success("فایل اکسل آماده شد");
 }
 
 /**
- * الگوی ثبت گروهی — CSV UTF-8 استاندارد برای اکسل
+ * الگوی ثبت گروهی — فایل واقعی .xlsx
+ * ستون‌ها: نام | نام خانوادگی | ایمیل | موبایل
  */
 export function downloadMembersImportTemplate() {
-  const lines = [
-    ["نام", "نام خانوادگی", "ایمیل", "موبایل"].map(csvCell).join(","),
-    ["علی", "رضایی", "ali.rezaei.import@example.com", "09121234567"]
-      .map(csvCell)
-      .join(","),
-    ["سارا", "محمدی", "sara.mohammadi.import@example.com", "09129876543"]
-      .map(csvCell)
-      .join(","),
+  const aoa: (string | number)[][] = [
+    ["نام", "نام خانوادگی", "ایمیل", "موبایل"],
+    ["علی", "رضایی", "ali.rezaei.import@example.com", "09121234567"],
+    ["سارا", "محمدی", "sara.mohammadi.import@example.com", "09129876543"],
   ];
-  const csv = "\uFEFF" + lines.join("\r\n") + "\r\n";
-  downloadBlob("olgu-karbaran.csv", csv, "text/csv;charset=utf-8");
+  writeXlsxDownload("olgu-karbaran.xlsx", "الگو", aoa);
   toast.message(
-    "الگوی CSV دانلود شد. در اکسل پر کنید، با همان فرمت CSV (UTF-8) ذخیره کنید، سپس «ورود از اکسل»."
+    "الگوی اکسل دانلود شد. ردیف‌های نمونه را پاک کنید، کاربران را وارد کنید و همان فایل .xlsx را بارگذاری کنید."
+  );
+}
+
+/**
+ * خواندن جدول از فایل اکسل واقعی (.xlsx / .xls) یا CSV
+ */
+export async function readSpreadsheetTable(file: File): Promise<string[][]> {
+  const name = file.name.toLowerCase();
+  const isExcel =
+    name.endsWith(".xlsx") ||
+    name.endsWith(".xls") ||
+    name.endsWith(".xlsm") ||
+    file.type.includes("spreadsheet") ||
+    file.type.includes("excel");
+
+  if (isExcel || name.endsWith(".csv") || name.endsWith(".tsv") || name.endsWith(".txt")) {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {
+      type: "array",
+      codepage: 65001, // UTF-8
+      cellDates: false,
+      raw: false,
+    });
+    if (!wb.SheetNames.length) {
+      throw new Error("فایل برگه‌ای ندارد.");
+    }
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const aoa = XLSX.utils.sheet_to_json<(string | number | null | undefined)[]>(sheet, {
+      header: 1,
+      defval: "",
+      blankrows: false,
+      raw: false,
+    });
+    return aoa.map((row) =>
+      (row ?? []).map((cell) => String(cell ?? "").trim())
+    );
+  }
+
+  throw new Error(
+    "فرمت پشتیبانی‌شده نیست. فایل .xlsx (اکسل) یا در صورت نیاز CSV بارگذاری کنید."
   );
 }
 
