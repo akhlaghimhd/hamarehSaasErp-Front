@@ -1,1 +1,3 @@
-PLACEHOLDER_WILL_REPLACE
+"use client";
+
+export { MembersListPage } from "./members-list-impl";
