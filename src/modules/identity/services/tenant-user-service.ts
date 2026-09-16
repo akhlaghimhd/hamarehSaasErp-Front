@@ -50,11 +50,9 @@ export const tenantUserService = {
 
   async create(payload: CreateTenantUserPayload): Promise<TenantUserDto> {
     const body = {
-      email: payload.email,
-      password: payload.password,
       first_name: payload.first_name,
       last_name: payload.last_name,
-      mobile: payload.mobile ?? null,
+      mobile: payload.mobile,
       is_owner: payload.is_owner ?? false,
       role_ids: payload.role_ids ?? [],
     };

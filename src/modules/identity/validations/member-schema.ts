@@ -6,15 +6,6 @@ const emptyToUndefined = (v: unknown) => {
 };
 
 export const createMemberSchema = z.object({
-  email: z
-    .string({ required_error: "ایمیل الزامی است" })
-    .trim()
-    .email("ایمیل معتبر نیست")
-    .max(255, "حداکثر ۲۵۵ کاراکتر"),
-  password: z
-    .string({ required_error: "رمز عبور الزامی است" })
-    .min(8, "حداقل ۸ کاراکتر")
-    .max(100, "حداکثر ۱۰۰ کاراکتر"),
   first_name: z
     .string({ required_error: "نام الزامی است" })
     .trim()
@@ -25,10 +16,11 @@ export const createMemberSchema = z.object({
     .trim()
     .min(1, "نام خانوادگی الزامی است")
     .max(100, "حداکثر ۱۰۰ کاراکتر"),
-  mobile: z.preprocess(
-    emptyToUndefined,
-    z.string().max(20, "حداکثر ۲۰ کاراکتر").optional()
-  ),
+  mobile: z
+    .string({ required_error: "شماره موبایل الزامی است" })
+    .trim()
+    .min(10, "شماره موبایل معتبر نیست")
+    .max(20, "حداکثر ۲۰ کاراکتر"),
   is_owner: z.boolean().optional().default(false),
   /** Optional initial role (single) — sent as role_ids array to API. */
   role_id: z.preprocess(

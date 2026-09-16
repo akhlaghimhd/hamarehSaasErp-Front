@@ -1,4 +1,4 @@
-/** FE-P1-T08 — افزودن کاربر به سازمان */
+/** FE-P1-T08 — افزودن کاربر به سازمان (بدون رمز؛ ایمیل سازمانی خودکار) */
 
 "use client";
 
@@ -47,7 +47,6 @@ import {
   type CreateMemberFormValues,
 } from "../validations/member-schema";
 import { MSG_GENERIC_ERROR, MSG_NO_ACCESS } from "../lib/ui-copy";
-import { toFaDigits } from "@/shared/lib/utils";
 
 export function MemberCreatePage() {
   const router = useRouter();
@@ -61,8 +60,6 @@ export function MemberCreatePage() {
   const form = useForm<CreateMemberFormValues>({
     resolver: zodResolver(createMemberSchema),
     defaultValues: {
-      email: "",
-      password: "",
       first_name: "",
       last_name: "",
       mobile: "",
@@ -105,15 +102,18 @@ export function MemberCreatePage() {
   const onSubmit = form.handleSubmit(async (values) => {
     try {
       const member = await createMutation.mutateAsync({
-        email: values.email,
-        password: values.password,
         first_name: values.first_name,
         last_name: values.last_name,
-        mobile: values.mobile || null,
+        mobile: values.mobile,
         is_owner: values.is_owner ?? false,
         role_ids: values.role_id ? [values.role_id] : [],
       });
-      toast.success("کاربر با موفقیت به سازمان اضافه شد");
+      const generatedEmail = member.user?.email;
+      toast.success(
+        generatedEmail
+          ? `کاربر اضافه شد. ایمیل سازمانی: ${generatedEmail}`
+          : "کاربر با موفقیت به سازمان اضافه شد"
+      );
       router.push(`/dashboard/identity/members/${member.tenant_user_id}`);
     } catch (e) {
       const msg =
@@ -155,7 +155,7 @@ export function MemberCreatePage() {
     <div className="space-y-6">
       <PageHeader
         title="افزودن کاربر"
-        description="ثبت کاربر جدید یا افزودن عضویت به سازمان"
+        description="ثبت عضویت جدید؛ ورود اول با موبایل و کد یک‌بارمصرف، سپس تعیین رمز توسط خود کاربر"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "هویت و دسترسی", href: "/dashboard/identity" },
@@ -170,16 +170,18 @@ export function MemberCreatePage() {
       />
 
       <Card className="max-w-3xl">
-        <CardHeader>
+        <CardHeader className="space-y-1.5">
           <CardTitle className="text-base">اطلاعات کاربر جدید</CardTitle>
-          <CardDescription>
-            اگر این ایمیل از قبل در سامانه باشد، فقط عضویت او در این سازمان ثبت می‌شود.
+          <CardDescription className="text-sm leading-relaxed">
+            ایمیل سازمانی به‌صورت خودکار ساخته می‌شود. رمز عبور را مدیر وارد
+            نمی‌کند؛ کاربر در اولین ورود با موبایل، رمز خود را تعیین می‌کند. اگر
+            دامنه ایمیل سازمان تنظیم نشده باشد، افزودن کاربر ممکن نیست.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-2">
           <Form {...form}>
-            <form onSubmit={onSubmit} className="space-y-5" noValidate>
-              <FormGrid columns={2}>
+            <form onSubmit={onSubmit} className="space-y-6" noValidate>
+              <FormGrid columns={2} className="gap-x-4 gap-y-5">
                 <FormField
                   control={form.control}
                   name="first_name"
@@ -187,7 +189,11 @@ export function MemberCreatePage() {
                     <FormItem>
                       <FormLabel required>نام</FormLabel>
                       <FormControl>
-                        <Input className="h-9" autoComplete="given-name" {...field} />
+                        <Input
+                          className="h-9"
+                          autoComplete="given-name"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -212,60 +218,22 @@ export function MemberCreatePage() {
                 />
                 <FormField
                   control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel required>ایمیل</FormLabel>
-                      <FormControl>
-                        <Input
-                          className="h-9"
-                          type="email"
-                          dir="ltr"
-                          autoComplete="email"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
                   name="mobile"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>موبایل</FormLabel>
-                      <FormControl>
-                        <Input
-                          className="h-9"
-                          dir="ltr"
-                          autoComplete="tel"
-                          {...field}
-                          value={field.value ?? ""}
-                        />
-                      </FormControl>
-                      <FormDescription>اختیاری</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
                     <FormItem className="sm:col-span-2">
-                      <FormLabel required>رمز عبور اولیه</FormLabel>
+                      <FormLabel required>موبایل</FormLabel>
                       <FormControl>
                         <Input
                           className="h-9"
-                          type="password"
                           dir="ltr"
-                          autoComplete="new-password"
+                          inputMode="tel"
+                          autoComplete="tel"
+                          placeholder="09xxxxxxxxx"
                           {...field}
                         />
                       </FormControl>
                       <FormDescription>
-                        حداقل {toFaDigits(8)} نویسه
+                        شناسه ورود اولیه؛ کد تأیید به این شماره ارسال می‌شود
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -309,10 +277,13 @@ export function MemberCreatePage() {
                       </Select>
                       {rolesError ? (
                         <p className="text-xs text-muted-foreground">
-                          نقش‌ها بارگذاری نشد. می‌توانید بدون نقش ادامه دهید و بعداً نقش بدهید.
+                          نقش‌ها بارگذاری نشد. می‌توانید بدون نقش ادامه دهید و
+                          بعداً نقش بدهید.
                         </p>
                       ) : (
-                        <FormDescription>اختیاری — بعداً هم قابل تغییر است</FormDescription>
+                        <FormDescription>
+                          اختیاری — بعداً هم قابل تغییر است
+                        </FormDescription>
                       )}
                       <FormMessage />
                     </FormItem>
@@ -322,7 +293,7 @@ export function MemberCreatePage() {
                   control={form.control}
                   name="is_owner"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-start gap-3 space-y-0 sm:col-span-2">
+                    <FormItem className="flex flex-row items-start gap-3 space-y-0 sm:col-span-2 rounded-lg border border-border/60 bg-muted/10 px-3 py-3">
                       <FormControl>
                         <Checkbox
                           checked={Boolean(field.value)}
@@ -330,9 +301,12 @@ export function MemberCreatePage() {
                         />
                       </FormControl>
                       <div className="space-y-1 leading-none">
-                        <FormLabel className="font-normal">مدیر اصلی سازمان</FormLabel>
+                        <FormLabel className="font-normal">
+                          مدیر اصلی سازمان
+                        </FormLabel>
                         <FormDescription>
-                          فقط اگر این فرد باید بالاترین سطح مدیریت سازمان را داشته باشد علامت بزنید.
+                          فقط اگر این فرد باید بالاترین سطح مدیریت سازمان را
+                          داشته باشد علامت بزنید.
                         </FormDescription>
                       </div>
                     </FormItem>
@@ -344,7 +318,9 @@ export function MemberCreatePage() {
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={createMutation.isPending || form.formState.isSubmitting}
+                  disabled={
+                    createMutation.isPending || form.formState.isSubmitting
+                  }
                 >
                   {createMutation.isPending ? (
                     <>
