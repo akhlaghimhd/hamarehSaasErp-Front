@@ -1,1 +1,3 @@
-SEE_ARTIFACTS_FILE_TOO_LARGE_USE_DIRECT_CONTENT
+"use client";
+
+export { MembersListPage } from "./members-list-view";
