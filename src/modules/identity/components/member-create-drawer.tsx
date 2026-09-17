@@ -147,7 +147,6 @@ export function MemberCreateDrawer({ open, onOpenChange, onCreated }: Props) {
     );
   };
 
-  /** بستن عمدی فقط با انصراف / ضربدر — کلیک بیرون وقتی dirty مسدود است */
   const closeDrawer = () => {
     form.reset();
     onOpenChange(false);
@@ -177,7 +176,7 @@ export function MemberCreateDrawer({ open, onOpenChange, onCreated }: Props) {
         is_owner: values.is_owner ?? false,
         role_ids: values.role_id ? [values.role_id] : [],
       });
-      toast.success("کاربر با موفقیت اضافه شد");
+      toast.success("کاربر اضافه شد.");
       form.reset();
       onCreated?.();
       if (!options.keepOpen) {
@@ -220,7 +219,7 @@ export function MemberCreateDrawer({ open, onOpenChange, onCreated }: Props) {
         <SheetHeader>
           <SheetTitle>افزودن کاربر</SheetTitle>
           <SheetDescription>
-            هویت، ایمیل سازمانی و دسترسی را در یک مرحله تکمیل کنید.
+            مشخصات کاربر و نقش سازمانی را وارد کنید.
           </SheetDescription>
         </SheetHeader>
 
@@ -302,7 +301,7 @@ export function MemberCreateDrawer({ open, onOpenChange, onCreated }: Props) {
                         />
                       </FormControl>
                       <FormDescription>
-                        ۱۱ رقم، شروع با ۰۹
+                        شماره موبایل ۱۱ رقمی با ۰۹
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -322,7 +321,7 @@ export function MemberCreateDrawer({ open, onOpenChange, onCreated }: Props) {
                           onClick={resyncEmail}
                         >
                           <RefreshCw className="h-3 w-3" />
-                          از نام
+                          پیشنهاد از نام
                         </button>
                       </div>
                       <div
@@ -398,7 +397,7 @@ export function MemberCreateDrawer({ open, onOpenChange, onCreated }: Props) {
                         </SelectContent>
                       </Select>
                       <FormDescription>
-                        می‌توانید بعداً از جزئیات کاربر هم تغییر دهید
+                        نقش را می‌توانید بعداً هم تغییر دهید
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -422,7 +421,7 @@ export function MemberCreateDrawer({ open, onOpenChange, onCreated }: Props) {
                           مدیر اصلی سازمان
                         </FormLabel>
                         <FormDescription>
-                          فقط در صورت نیاز علامت بزنید
+                          دسترسی کامل مدیریت سازمان
                         </FormDescription>
                       </div>
                     </FormItem>
