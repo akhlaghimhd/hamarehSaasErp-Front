@@ -80,11 +80,11 @@ export function activityOf(r: TenantUserDto, deletedView: boolean): ActivityKind
 }
 
 export const ACTIVITY_LABEL: Record<Exclude<ActivityKind, null>, string> = {
-  new: "عضو جدید (حداکثر ۳ روز از عضویت، بدون تغییر وضعیت بعدی)",
-  activated: "اخیراً فعال شده (۷ روز اخیر)",
-  deactivated: "اخیراً غیرفعال شده (۷ روز اخیر)",
-  removed: "اخیراً از سازمان حذف شده (۷ روز اخیر)",
-  restored: "اخیراً بازگردانی شده",
+  new: "عضو تازه‌وارد",
+  activated: "به‌تازگی فعال شده",
+  deactivated: "به‌تازگی غیرفعال شده",
+  removed: "به‌تازگی از سازمان حذف شده",
+  restored: "به‌تازگی بازگردانده شده",
 };
 
 export const ACTIVITY_CLASS: Record<Exclude<ActivityKind, null>, string> = {
@@ -122,13 +122,13 @@ export function sv(r: TenantUserDto, k: SortKey): string | number {
 }
 
 export const BULK_SUCCESS: Record<BulkKind, (n: number) => string> = {
-  activate: (n) => `${toFaDigits(n)} کاربر فعال شد`,
-  deactivate: (n) => `${toFaDigits(n)} کاربر غیرفعال شد`,
-  delete: (n) => `${toFaDigits(n)} کاربر به فهرست حذف‌شده‌ها منتقل شد`,
-  restore: (n) => `${toFaDigits(n)} کاربر به فهرست سازمان برگشت؛ برای ورود به سامانه وضعیتشان را فعال کنید`,
+  activate: (n) => `${toFaDigits(n)} کاربر فعال شد.`,
+  deactivate: (n) => `${toFaDigits(n)} کاربر غیرفعال شد.`,
+  delete: (n) => `${toFaDigits(n)} کاربر از فهرست جاری خارج شد.`,
+  restore: (n) => `${toFaDigits(n)} کاربر بازگردانده شد. در صورت نیاز وضعیت را فعال کنید.`,
 };
 
-export const RESTORE_ONE_MSG = "کاربر به فهرست سازمان برگشت؛ برای ورود به سامانه وضعیتش را فعال کنید.";
+export const RESTORE_ONE_MSG = "کاربر بازگردانده شد. در صورت نیاز وضعیت را فعال کنید.";
 
 export type ImportRow = { first_name: string; last_name: string; email: string; mobile?: string; password: string };
 
