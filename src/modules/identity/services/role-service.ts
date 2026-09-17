@@ -9,6 +9,7 @@ import { identityPaths } from "./paths";
 export interface RoleDto {
   tenant_role_id: string;
   tenant_id?: string;
+  parent_role_id?: string | null;
   code?: string;
   name: string;
   description?: string | null;
