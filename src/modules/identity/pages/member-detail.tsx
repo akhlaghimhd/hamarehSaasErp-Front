@@ -1,5 +1,5 @@
 /**
- * FE-P1-T07 + T09 + T10 + T15 — جزئیات کاربر سازمان
+ * Member detail — membership, status, roles, history
  */
 
 "use client";
@@ -116,7 +116,7 @@ function HistorySection({
           <History className="h-4 w-4" />
           تاریخچه عضویت
         </CardTitle>
-        <CardDescription>رویدادهای عضویت و تغییر وضعیت</CardDescription>
+        <CardDescription>سوابق پیوستن، تغییر وضعیت و خروج از سازمان</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -125,9 +125,9 @@ function HistorySection({
             در حال بارگذاری…
           </div>
         ) : isError ? (
-          <p className="text-sm text-destructive">دریافت تاریخچه ممکن نشد.</p>
+          <p className="text-sm text-destructive">بارگذاری تاریخچه ممکن نشد.</p>
         ) : items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">رویدادی ثبت نشده است.</p>
+          <p className="text-sm text-muted-foreground">هنوز رویدادی ثبت نشده است.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[28rem] text-sm">
@@ -219,7 +219,7 @@ export function MemberDetailPage() {
     }
     try {
       await deleteMutation.mutateAsync(data.tenant_user_id);
-      toast.success("کاربر از سازمان حذف شد (حذف نرم).");
+      toast.success("کاربر از فهرست جاری سازمان خارج شد.");
       setConfirmDelete(false);
       router.push("/dashboard/identity/members");
     } catch (e) {
@@ -262,8 +262,8 @@ export function MemberDetailPage() {
         />
         <EmptyState
           icon={UserRound}
-          title="شناسه نامعتبر"
-          description="لینک جزئیات قابل خواندن نیست. از فهرست کاربران وارد شوید."
+          title="صفحه در دسترس نیست"
+          description="از فهرست کاربران سازمان دوباره وارد این صفحه شوید."
           action={
             <Button asChild variant="outline" size="sm">
               <Link href="/dashboard/identity/members">بازگشت به فهرست</Link>
@@ -296,7 +296,7 @@ export function MemberDetailPage() {
           ]}
         />
         <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          <p className="font-medium">کاربر یافت نشد یا دسترسی ندارید</p>
+          <p className="font-medium">اطلاعات این کاربر در دسترس نیست</p>
           <p className="mt-1 text-xs">
             {error instanceof Error ? error.message : MSG_GENERIC_ERROR}
           </p>
@@ -320,7 +320,7 @@ export function MemberDetailPage() {
     <div className="flex min-h-0 flex-col gap-4">
       <PageHeader
         title={fullName}
-        description="عضویت در سازمان، وضعیت و دسترسی‌ها"
+        description="وضعیت عضویت، اطلاعات تماس و نقش‌های کاربر"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "هویت و دسترسی", href: "/dashboard/identity" },
@@ -404,7 +404,7 @@ export function MemberDetailPage() {
           <DialogHeader>
             <DialogTitle>تأیید حذف از سازمان</DialogTitle>
             <DialogDescription>
-              حذف نرم است؛ کاربر به فهرست حذف‌شده‌ها منتقل می‌شود و قابل بازگردانی است.
+              کاربر از فهرست جاری سازمان خارج می‌شود و در صورت نیاز قابل بازگردانی است.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -423,7 +423,7 @@ export function MemberDetailPage() {
               disabled={deleteMutation.isPending}
               onClick={() => void onDelete()}
             >
-              حذف نرم
+              تأیید حذف
             </Button>
           </DialogFooter>
         </DialogContent>
