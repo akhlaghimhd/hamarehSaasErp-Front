@@ -1,8 +1,8 @@
-/** تخصیص نقش به عضو سازمان — ویرایش درون‌کارت */
+/** نقش‌های کاربر — نمایش فعلی + ویرایش درون‌کارت */
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, Pencil, Shield, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -16,16 +16,31 @@ import { Button } from "@/shared/components/ui/button";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { usePermission } from "@/auth";
 import { ApiClientError } from "@/api";
-import { useRoles, useAssignRoleToUser } from "../hooks/use-roles";
+import {
+  useRoles,
+  useUserRoles,
+  useAssignRoleToUser,
+} from "../hooks/use-roles";
 import { IdentityPermissions } from "../types";
 import { MSG_GENERIC_ERROR } from "../lib/ui-copy";
 
 export function AssignRolesCard({ userId }: { userId: string }) {
   const canAssign = usePermission(IdentityPermissions.roleAssign);
-  const { data: roles, isLoading } = useRoles();
+  const { data: allRoles, isLoading: loadingAll } = useRoles();
+  const {
+    data: userRoles,
+    isLoading: loadingUser,
+    refetch: refetchUserRoles,
+  } = useUserRoles(userId);
   const assignMutation = useAssignRoleToUser();
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!editing && userRoles) {
+      setSelected(new Set(userRoles.map((r) => r.tenant_role_id)));
+    }
+  }, [userRoles, editing]);
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -37,16 +52,16 @@ export function AssignRolesCard({ userId }: { userId: string }) {
   };
 
   const startEdit = () => {
-    setSelected(new Set());
+    setSelected(new Set((userRoles ?? []).map((r) => r.tenant_role_id)));
     setEditing(true);
   };
 
   const cancelEdit = () => {
-    setSelected(new Set());
+    setSelected(new Set((userRoles ?? []).map((r) => r.tenant_role_id)));
     setEditing(false);
   };
 
-  const onAssign = async () => {
+  const onSave = async () => {
     if (selected.size === 0) {
       toast.error("دست‌کم یک نقش را انتخاب کنید.");
       return;
@@ -56,9 +71,9 @@ export function AssignRolesCard({ userId }: { userId: string }) {
         userId,
         roleIds: Array.from(selected),
       });
-      toast.success("نقش‌ها برای این کاربر ذخیره شد.");
-      setSelected(new Set());
+      toast.success("نقش‌ها ذخیره شد.");
       setEditing(false);
+      void refetchUserRoles();
     } catch (e) {
       toast.error(
         e instanceof ApiClientError && e.message
@@ -68,14 +83,15 @@ export function AssignRolesCard({ userId }: { userId: string }) {
     }
   };
 
+  const isLoading = loadingAll || loadingUser;
+  const assigned = userRoles ?? [];
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
         <div className="space-y-1">
           <CardTitle className="text-base">نقش‌ها</CardTitle>
-          <CardDescription>
-            نقش‌های سازمانی این کاربر را مدیریت کنید
-          </CardDescription>
+          <CardDescription>نقش‌های سازمانی این کاربر</CardDescription>
         </div>
         {canAssign && !editing ? (
           <Button
@@ -94,31 +110,33 @@ export function AssignRolesCard({ userId }: { userId: string }) {
         {isLoading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            در حال بارگذاری نقش‌ها…
+            در حال بارگذاری…
           </div>
-        ) : (roles ?? []).length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            هنوز نقشی تعریف نشده است. ابتدا از بخش نقش‌ها یک نقش بسازید.
-          </p>
         ) : editing ? (
           <>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {(roles ?? []).map((r) => (
-                <label
-                  key={r.tenant_role_id}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-border/60 p-2.5 text-sm transition hover:bg-muted/40"
-                >
-                  <Checkbox
-                    checked={selected.has(r.tenant_role_id)}
-                    onCheckedChange={() => toggle(r.tenant_role_id)}
-                  />
-                  <span className="flex items-center gap-1.5">
-                    <Shield className="h-3.5 w-3.5 text-muted-foreground" />
-                    {r.name}
-                  </span>
-                </label>
-              ))}
-            </div>
+            {(allRoles ?? []).length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                نقشی تعریف نشده است. از بخش نقش‌ها یک نقش بسازید.
+              </p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {(allRoles ?? []).map((r) => (
+                  <label
+                    key={r.tenant_role_id}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-border/60 p-2.5 text-sm transition hover:bg-muted/40"
+                  >
+                    <Checkbox
+                      checked={selected.has(r.tenant_role_id)}
+                      onCheckedChange={() => toggle(r.tenant_role_id)}
+                    />
+                    <span className="flex items-center gap-1.5">
+                      <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+                      {r.name}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
             <div className="flex flex-wrap justify-end gap-2">
               <Button
                 type="button"
@@ -134,23 +152,34 @@ export function AssignRolesCard({ userId }: { userId: string }) {
                 type="button"
                 size="sm"
                 disabled={assignMutation.isPending || selected.size === 0}
-                onClick={() => void onAssign()}
+                onClick={() => void onSave()}
               >
                 {assignMutation.isPending ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <Check className="h-3.5 w-3.5" />
                 )}
-                ذخیره نقش‌ها
+                ذخیره
               </Button>
             </div>
           </>
-        ) : (
+        ) : assigned.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            {canAssign
-              ? "برای افزودن نقش، روی ویرایش بزنید و نقش‌های موردنظر را انتخاب کنید."
-              : "برای تغییر نقش‌ها مجوز لازم را ندارید."}
+            هنوز نقشی برای این کاربر ثبت نشده است.
+            {canAssign ? " با ویرایش می‌توانید نقش اضافه کنید." : ""}
           </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {assigned.map((r) => (
+              <span
+                key={r.tenant_role_id}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/30 px-2.5 py-1 text-xs text-foreground/90"
+              >
+                <Shield className="h-3 w-3 text-muted-foreground" />
+                {r.name}
+              </span>
+            ))}
+          </div>
         )}
       </CardContent>
     </Card>
