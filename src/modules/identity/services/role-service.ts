@@ -1,5 +1,5 @@
 /**
- * FE-P1 Sprint 3 — Role API client.
+ * Role API client.
  */
 
 import { apiDelete, apiGet, apiPost, apiPut } from "@/api";
@@ -52,6 +52,11 @@ function asList<T>(data: T[] | { data?: T[] } | null | undefined): T[] {
 export const roleService = {
   async list(): Promise<RoleDto[]> {
     const envelope = await apiGet(identityPaths.roles);
+    return asList(unwrapData(envelope));
+  },
+
+  async listByUser(userId: string): Promise<RoleDto[]> {
+    const envelope = await apiGet(`${identityPaths.roles}/user/${userId}`);
     return asList(unwrapData(envelope));
   },
 

@@ -1,5 +1,5 @@
 /**
- * FE-P1-T10 — Membership history API client.
+ * Membership history API client.
  */
 
 import { apiGet } from "@/api";
@@ -17,6 +17,7 @@ export interface MembershipHistoryDto {
   effective_date?: string | null;
   created_at?: string;
   created_by?: string | null;
+  actor_name?: string | null;
   row_version?: number;
 }
 

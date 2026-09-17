@@ -13,11 +13,26 @@ export function roleQueryKey(id: string) {
   return ["identity", "roles", id] as const;
 }
 
+export function userRolesQueryKey(userId: string) {
+  return ["identity", "roles", "user", userId] as const;
+}
+
 export function useRoles() {
   return useQuery({
     queryKey: rolesQueryKey,
     queryFn: () => roleService.list(),
     staleTime: 60_000,
+    retry: 1,
+  });
+}
+
+export function useUserRoles(userId: string | null | undefined) {
+  return useQuery({
+    queryKey: userRolesQueryKey(userId ?? ""),
+    queryFn: () =>
+      userId ? roleService.listByUser(userId) : Promise.resolve([]),
+    enabled: Boolean(userId),
+    staleTime: 30_000,
     retry: 1,
   });
 }
@@ -68,6 +83,7 @@ export function useSoftDeleteRole() {
 }
 
 export function useAssignRoleToUser() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: ({
       userId,
@@ -76,6 +92,10 @@ export function useAssignRoleToUser() {
       userId: string;
       roleIds: string[];
     }) => roleService.assignToUser(userId, roleIds),
+    onSuccess: (_v, vars) => {
+      void qc.invalidateQueries({ queryKey: userRolesQueryKey(vars.userId) });
+      void qc.invalidateQueries({ queryKey: rolesQueryKey });
+    },
   });
 }
 
