@@ -1,9 +1,18 @@
-/** نقش‌های کاربر — نمایش فعلی + ویرایش درون‌کارت */
+/** نقش‌های کاربر — جستجو، درخت، تمایز افزودن/حذف */
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { Loader2, Pencil, Shield, X, Check } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  Loader2,
+  Pencil,
+  Search,
+  Shield,
+  X,
+  Check,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   Card,
@@ -14,6 +23,7 @@ import {
 } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
 import { Checkbox } from "@/shared/components/ui/checkbox";
+import { Input } from "@/shared/components/ui/input";
 import { usePermission } from "@/auth";
 import { ApiClientError } from "@/api";
 import {
@@ -21,8 +31,220 @@ import {
   useUserRoles,
   useAssignRoleToUser,
 } from "../hooks/use-roles";
+import type { RoleDto } from "../services/role-service";
 import { IdentityPermissions } from "../types";
 import { MSG_GENERIC_ERROR } from "../lib/ui-copy";
+import { cn } from "@/shared/lib/utils";
+
+type RoleNode = RoleDto & {
+  parent_role_id?: string | null;
+  children: RoleNode[];
+};
+
+function buildTree(roles: RoleDto[]): RoleNode[] {
+  const map = new Map<string, RoleNode>();
+  for (const r of roles) {
+    map.set(r.tenant_role_id, {
+      ...r,
+      parent_role_id: (r as RoleDto & { parent_role_id?: string | null })
+        .parent_role_id ?? null,
+      children: [],
+    });
+  }
+  const roots: RoleNode[] = [];
+  for (const node of map.values()) {
+    const pid = node.parent_role_id;
+    if (pid && map.has(pid)) {
+      map.get(pid)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  const sortFn = (a: RoleNode, b: RoleNode) =>
+    (a.name || "").localeCompare(b.name || "", "fa");
+  const sortRec = (nodes: RoleNode[]) => {
+    nodes.sort(sortFn);
+    nodes.forEach((n) => sortRec(n.children));
+  };
+  sortRec(roots);
+  return roots;
+}
+
+function filterTree(nodes: RoleNode[], q: string): RoleNode[] {
+  if (!q.trim()) return nodes;
+  const needle = q.trim().toLowerCase();
+  const walk = (list: RoleNode[]): RoleNode[] => {
+    const out: RoleNode[] = [];
+    for (const n of list) {
+      const kids = walk(n.children);
+      const selfMatch =
+        (n.name || "").toLowerCase().includes(needle) ||
+        (n.code || "").toLowerCase().includes(needle) ||
+        (n.description || "").toLowerCase().includes(needle);
+      if (selfMatch || kids.length > 0) {
+        out.push({ ...n, children: kids });
+      }
+    }
+    return out;
+  };
+  return walk(nodes);
+}
+
+function collectDescendantIds(node: RoleNode): string[] {
+  const ids: string[] = [];
+  for (const c of node.children) {
+    ids.push(c.tenant_role_id, ...collectDescendantIds(c));
+  }
+  return ids;
+}
+
+type SelectionState = "kept" | "added" | "removed" | "none";
+
+function selectionState(
+  id: string,
+  selected: Set<string>,
+  initial: Set<string>
+): SelectionState {
+  const on = selected.has(id);
+  const was = initial.has(id);
+  if (on && was) return "kept";
+  if (on && !was) return "added";
+  if (!on && was) return "removed";
+  return "none";
+}
+
+function parentCheckState(
+  node: RoleNode,
+  selected: Set<string>
+): "all" | "some" | "none" {
+  const childIds = collectDescendantIds(node);
+  const focus = childIds.length > 0 ? childIds : [node.tenant_role_id];
+  const count = focus.filter((id) => selected.has(id)).length;
+  if (count === 0) return "none";
+  if (count === focus.length) return "all";
+  return "some";
+}
+
+function RoleTreeRow({
+  node,
+  depth,
+  selected,
+  initial,
+  expanded,
+  onToggleExpand,
+  onToggle,
+  onToggleMany,
+}: {
+  node: RoleNode;
+  depth: number;
+  selected: Set<string>;
+  initial: Set<string>;
+  expanded: Set<string>;
+  onToggleExpand: (id: string) => void;
+  onToggle: (id: string) => void;
+  onToggleMany: (ids: string[], select: boolean) => void;
+}) {
+  const hasChildren = node.children.length > 0;
+  const isOpen = expanded.has(node.tenant_role_id);
+  const state = selectionState(node.tenant_role_id, selected, initial);
+  const parentState = hasChildren ? parentCheckState(node, selected) : null;
+
+  const rowClass = cn(
+    "flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm transition",
+    state === "added" &&
+      "border-emerald-500/50 bg-emerald-500/10 text-emerald-900 dark:text-emerald-100",
+    state === "removed" &&
+      "border-destructive/40 bg-destructive/10 text-destructive line-through opacity-80",
+    state === "kept" && "border-primary/30 bg-primary/5 text-foreground",
+    state === "none" && "border-transparent hover:bg-muted/40"
+  );
+
+  const onParentToggle = () => {
+    if (!hasChildren) {
+      onToggle(node.tenant_role_id);
+      return;
+    }
+    const ids = collectDescendantIds(node);
+    const allOn = ids.every((id) => selected.has(id));
+    onToggleMany(ids, !allOn);
+  };
+
+  return (
+    <div className="space-y-1">
+      <div
+        className={rowClass}
+        style={{ paddingInlineStart: `${depth * 1.1 + 0.5}rem` }}
+      >
+        {hasChildren ? (
+          <button
+            type="button"
+            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted"
+            onClick={() => onToggleExpand(node.tenant_role_id)}
+            aria-label={isOpen ? "بستن" : "باز کردن"}
+          >
+            {isOpen ? (
+              <ChevronDown className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronLeft className="h-3.5 w-3.5" />
+            )}
+          </button>
+        ) : (
+          <span className="inline-block w-6 shrink-0" />
+        )}
+
+        <Checkbox
+          checked={
+            hasChildren
+              ? parentState === "all"
+                ? true
+                : parentState === "some"
+                  ? "indeterminate"
+                  : false
+              : selected.has(node.tenant_role_id)
+          }
+          onCheckedChange={() => {
+            if (hasChildren) onParentToggle();
+            else onToggle(node.tenant_role_id);
+          }}
+        />
+
+        <span className="flex min-w-0 flex-1 items-center gap-1.5">
+          <Shield className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="truncate font-medium">{node.name}</span>
+          {hasChildren && parentState === "some" ? (
+            <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-800 dark:text-amber-200">
+              زیرنقش انتخاب‌شده
+            </span>
+          ) : null}
+          {state === "added" ? (
+            <span className="shrink-0 text-[10px] text-emerald-700 dark:text-emerald-300">
+              جدید
+            </span>
+          ) : null}
+          {state === "removed" ? (
+            <span className="shrink-0 text-[10px]">حذف می‌شود</span>
+          ) : null}
+        </span>
+      </div>
+
+      {hasChildren && isOpen
+        ? node.children.map((c) => (
+            <RoleTreeRow
+              key={c.tenant_role_id}
+              node={c}
+              depth={depth + 1}
+              selected={selected}
+              initial={initial}
+              expanded={expanded}
+              onToggleExpand={onToggleExpand}
+              onToggle={onToggle}
+              onToggleMany={onToggleMany}
+            />
+          ))
+        : null}
+    </div>
+  );
+}
 
 export function AssignRolesCard({ userId }: { userId: string }) {
   const canAssign = usePermission(IdentityPermissions.roleAssign);
@@ -35,12 +257,35 @@ export function AssignRolesCard({ userId }: { userId: string }) {
   const assignMutation = useAssignRoleToUser();
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [initial, setInitial] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!editing && userRoles) {
-      setSelected(new Set(userRoles.map((r) => r.tenant_role_id)));
+      const ids = new Set(userRoles.map((r) => r.tenant_role_id));
+      setSelected(ids);
+      setInitial(ids);
     }
   }, [userRoles, editing]);
+
+  const tree = useMemo(() => buildTree(allRoles ?? []), [allRoles]);
+  const filtered = useMemo(() => filterTree(tree, query), [tree, query]);
+
+  useEffect(() => {
+    if (!editing) return;
+    const next = new Set<string>();
+    const walk = (nodes: RoleNode[]) => {
+      for (const n of nodes) {
+        if (n.children.length > 0) {
+          next.add(n.tenant_role_id);
+          walk(n.children);
+        }
+      }
+    };
+    walk(filtered);
+    setExpanded(next);
+  }, [editing, query, filtered]);
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -51,13 +296,37 @@ export function AssignRolesCard({ userId }: { userId: string }) {
     });
   };
 
+  const toggleMany = (ids: string[], select: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (select) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const startEdit = () => {
-    setSelected(new Set((userRoles ?? []).map((r) => r.tenant_role_id)));
+    const ids = new Set((userRoles ?? []).map((r) => r.tenant_role_id));
+    setSelected(ids);
+    setInitial(ids);
+    setQuery("");
     setEditing(true);
   };
 
   const cancelEdit = () => {
-    setSelected(new Set((userRoles ?? []).map((r) => r.tenant_role_id)));
+    setSelected(new Set(initial));
+    setQuery("");
     setEditing(false);
   };
 
@@ -85,6 +354,8 @@ export function AssignRolesCard({ userId }: { userId: string }) {
 
   const isLoading = loadingAll || loadingUser;
   const assigned = userRoles ?? [];
+  const addedCount = [...selected].filter((id) => !initial.has(id)).length;
+  const removedCount = [...initial].filter((id) => !selected.has(id)).length;
 
   return (
     <Card>
@@ -114,29 +385,61 @@ export function AssignRolesCard({ userId }: { userId: string }) {
           </div>
         ) : editing ? (
           <>
+            <div className="relative">
+              <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="h-9 ps-8"
+                placeholder="جستجوی نقش…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1 rounded border border-primary/30 bg-primary/5 px-1.5 py-0.5">
+                فعلی
+              </span>
+              <span className="inline-flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-800 dark:text-emerald-200">
+                افزوده‌شده
+              </span>
+              <span className="inline-flex items-center gap-1 rounded border border-destructive/40 bg-destructive/10 px-1.5 py-0.5 text-destructive line-through">
+                حذف می‌شود
+              </span>
+            </div>
+
             {(allRoles ?? []).length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 نقشی تعریف نشده است. از بخش نقش‌ها یک نقش بسازید.
               </p>
+            ) : filtered.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                نقشی با این جستجو پیدا نشد.
+              </p>
             ) : (
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {(allRoles ?? []).map((r) => (
-                  <label
-                    key={r.tenant_role_id}
-                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-border/60 p-2.5 text-sm transition hover:bg-muted/40"
-                  >
-                    <Checkbox
-                      checked={selected.has(r.tenant_role_id)}
-                      onCheckedChange={() => toggle(r.tenant_role_id)}
-                    />
-                    <span className="flex items-center gap-1.5">
-                      <Shield className="h-3.5 w-3.5 text-muted-foreground" />
-                      {r.name}
-                    </span>
-                  </label>
+              <div className="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-border/50 p-2">
+                {filtered.map((n) => (
+                  <RoleTreeRow
+                    key={n.tenant_role_id}
+                    node={n}
+                    depth={0}
+                    selected={selected}
+                    initial={initial}
+                    expanded={expanded}
+                    onToggleExpand={toggleExpand}
+                    onToggle={toggle}
+                    onToggleMany={toggleMany}
+                  />
                 ))}
               </div>
             )}
+
+            {(addedCount > 0 || removedCount > 0) && (
+              <p className="text-xs text-muted-foreground">
+                {addedCount > 0 ? `${addedCount} نقش اضافه می‌شود. ` : ""}
+                {removedCount > 0 ? `${removedCount} نقش حذف می‌شود.` : ""}
+              </p>
+            )}
+
             <div className="flex flex-wrap justify-end gap-2">
               <Button
                 type="button"
