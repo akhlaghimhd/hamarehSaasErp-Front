@@ -27,7 +27,7 @@ import { Separator } from "@/shared/components/ui/separator";
 import { ApiClientError } from "@/api";
 import { useCreateRole, useRoles } from "../hooks/use-roles";
 import { usePermissions } from "../hooks/use-permissions";
-import { roleService } from "../services/role-service";
+import { roleService, type RoleDto } from "../services/role-service";
 import { MSG_GENERIC_ERROR } from "../lib/ui-copy";
 import { toFaDigits } from "@/shared/lib/utils";
 
@@ -43,8 +43,49 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   /** Pre-select parent when creating a child from a row action. */
   defaultParentId?: string | null;
-  onCreated?: (roleId: string) => void;
+  /** Called after successful create; list stays open — do not hard-navigate away. */
+  onCreated?: (role: RoleDto) => void;
 };
+
+type TreeOption = { id: string; label: string; depth: number };
+
+function buildTreeOptions(roles: RoleDto[]): TreeOption[] {
+  const byParent = new Map<string | null, RoleDto[]>();
+  for (const r of roles) {
+    const key = r.parent_role_id ?? null;
+    const list = byParent.get(key) ?? [];
+    list.push(r);
+    byParent.set(key, list);
+  }
+  for (const list of byParent.values()) {
+    list.sort((a, b) => a.name.localeCompare(b.name, "fa"));
+  }
+  const out: TreeOption[] = [];
+  const walk = (parentId: string | null, depth: number, path: Set<string>) => {
+    const kids = byParent.get(parentId) ?? [];
+    for (const r of kids) {
+      if (path.has(r.tenant_role_id)) continue;
+      const prefix = depth > 0 ? `${"\u2003".repeat(depth)}└ ` : "";
+      out.push({
+        id: r.tenant_role_id,
+        label: `${prefix}${r.name}`,
+        depth,
+      });
+      const next = new Set(path);
+      next.add(r.tenant_role_id);
+      walk(r.tenant_role_id, depth + 1, next);
+    }
+  };
+  walk(null, 0, new Set());
+  // orphans (parent missing from list)
+  const listed = new Set(out.map((o) => o.id));
+  for (const r of roles) {
+    if (!listed.has(r.tenant_role_id)) {
+      out.push({ id: r.tenant_role_id, label: r.name, depth: 0 });
+    }
+  }
+  return out;
+}
 
 export function RoleCreateDrawer({
   open,
@@ -82,6 +123,8 @@ export function RoleCreateDrawer({
     [roles]
   );
 
+  const treeOptions = useMemo(() => buildTreeOptions(activeRoles), [activeRoles]);
+
   useEffect(() => {
     if (!open) return;
     form.reset({
@@ -93,7 +136,6 @@ export function RoleCreateDrawer({
     setSelectedPerms(new Set());
   }, [open, defaultParentId, form]);
 
-  // Copy permission checkboxes from another role (snapshot only — not live inheritance).
   useEffect(() => {
     if (!open || !inheritFromId) return;
     let cancelled = false;
@@ -133,8 +175,7 @@ export function RoleCreateDrawer({
   };
 
   const handleOpenChange = (next: boolean) => {
-    if (!next && isDirty) {
-      // keep open when dirty — user must cancel explicitly
+    if (!next && (isDirty || selectedPerms.size > 0)) {
       return;
     }
     if (!next) {
@@ -163,11 +204,11 @@ export function RoleCreateDrawer({
         parent_role_id: values.parent_role_id || null,
         permission_ids: Array.from(selectedPerms),
       });
-      toast.success("نقش با موفقیت ساخته شد");
+      toast.success(`نقش «${role.name}» ساخته شد`);
       form.reset();
       setSelectedPerms(new Set());
       onOpenChange(false);
-      onCreated?.(role.tenant_role_id);
+      onCreated?.(role);
     } catch (e) {
       toast.error(
         e instanceof ApiClientError && e.message ? e.message : MSG_GENERIC_ERROR
@@ -175,8 +216,7 @@ export function RoleCreateDrawer({
     }
   });
 
-  const permsDirty = selectedPerms.size > 0;
-  const formDirty = isDirty || permsDirty;
+  const formDirty = isDirty || selectedPerms.size > 0;
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
@@ -196,8 +236,8 @@ export function RoleCreateDrawer({
         <SheetHeader>
           <SheetTitle>نقش جدید</SheetTitle>
           <SheetDescription>
-            نقش والد برای سلسله‌مراتب سازمانی است. کپی مجوز فقط برای تیک زدن راحت
-            است و در دیتابیس ارث‌بری زنده رخ نمی‌دهد.
+            والد فقط برای سلسله‌مراتب است. می‌توانید نقش ریشه بسازید یا زیر یک نقش
+            موجود. کپی مجوز فقط تیک‌ها را پر می‌کند و ارث‌بری زنده نیست.
           </SheetDescription>
         </SheetHeader>
 
@@ -222,7 +262,7 @@ export function RoleCreateDrawer({
             </div>
 
             <div className="space-y-1.5">
-              <Label>نقش والد (زیرمجموعه)</Label>
+              <Label>نقش والد</Label>
               <Select
                 value={form.watch("parent_role_id") ?? "__none__"}
                 onValueChange={(v) =>
@@ -237,16 +277,17 @@ export function RoleCreateDrawer({
                   <SelectValue placeholder="بدون والد (نقش ریشه)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">بدون والد (نقش ریشه)</SelectItem>
-                  {activeRoles.map((r) => (
-                    <SelectItem key={r.tenant_role_id} value={r.tenant_role_id}>
-                      {r.name}
+                  <SelectItem value="__none__">بدون والد — نقش ریشه</SelectItem>
+                  {treeOptions.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground">
-                فقط برای نمایش سلسله‌مراتب؛ مجوزها جداگانه مدیریت می‌شوند.
+                زیرمجموعه‌ها با تورفتگی زیر والد نشان داده می‌شوند. انتخاب «بدون
+                والد» نقش را در ریشه قرار می‌دهد.
               </p>
             </div>
 
@@ -269,9 +310,9 @@ export function RoleCreateDrawer({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">بدون کپی</SelectItem>
-                  {activeRoles.map((r) => (
-                    <SelectItem key={r.tenant_role_id} value={r.tenant_role_id}>
-                      {r.name}
+                  {treeOptions.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -290,7 +331,7 @@ export function RoleCreateDrawer({
                   {inheritBusy ? " · در حال کپی…" : ""}
                 </span>
               </div>
-              <div className="grid max-h-56 gap-1.5 overflow-y-auto rounded-md border border-border/60 p-2 sm:grid-cols-1">
+              <div className="grid max-h-56 gap-1.5 overflow-y-auto rounded-md border border-border/60 p-2">
                 {(allPerms ?? []).map((p) => (
                   <label
                     key={p.tenant_permission_id}
