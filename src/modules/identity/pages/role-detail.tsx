@@ -282,8 +282,8 @@ export function RoleDetailPage() {
             open={createOpen}
             onOpenChange={setCreateOpen}
             defaultParentId={role.tenant_role_id}
-            onCreated={(id) => {
-              window.location.href = `/dashboard/identity/roles/${id}`;
+            onCreated={() => {
+              void refetch();
             }}
           />
         </>
