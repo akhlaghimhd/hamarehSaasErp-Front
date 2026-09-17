@@ -152,7 +152,7 @@ export function MembersListPage() {
   const activateOne = async (row: TenantUserDto) => {
     try {
       await updateMutation.mutateAsync({ tenantUserId: row.tenant_user_id, payload: { status: 1 } });
-      toast.success("کاربر فعال شد و می‌تواند وارد سامانه شود.");
+      toast.success("کاربر فعال شد.");
     } catch (e) { toast.error(e instanceof Error ? e.message : "فعال‌سازی ممکن نشد"); }
   };
 
@@ -182,7 +182,7 @@ export function MembersListPage() {
       const table = await readSpreadsheetTable(file);
       const mapped = mapImportRows(table);
       if (!mapped.length) {
-        toast.error("ردیف معتبری پیدا نشد. ستون‌های لازم: نام، نام خانوادگی، ایمیل — موبایل اختیاری است.");
+        toast.error("در فایل ردیف معتبری پیدا نشد. از الگوی اکسل استفاده کنید.");
         return;
       }
       const seen = new Set<string>();
@@ -229,7 +229,7 @@ export function MembersListPage() {
       if (dupInFile) toast.message(`${toFaDigits(dupInFile)} ردیف به‌خاطر ایمیل تکراری داخل فایل نادیده گرفته شد`);
       if (fail) toast.error(`${toFaDigits(fail)} ردیف ثبت نشد. ${failSamples.join(" · ")}`);
     } catch {
-      toast.error("خواندن فایل ممکن نشد. الگوی اکسل (.xlsx) را دانلود کنید، پر کنید و همان فایل را بارگذاری کنید.");
+      toast.error("خواندن فایل ممکن نشد. الگوی اکسل را دانلود کنید و دوباره تلاش کنید.");
     } finally {
       setImportBusy(false);
       if (importRef.current) importRef.current.value = "";
@@ -252,7 +252,7 @@ export function MembersListPage() {
       <div className="flex min-h-0 flex-col gap-3">
         <PageHeader
           title="کاربران سازمان"
-          description="جستجو، مرتب‌سازی و مدیریت کاربران سازمان — حذف نرم است و قابل بازگردانی"
+          description="اعضای سازمان را جستجو کنید، وضعیتشان را تغییر دهید یا عضو جدید اضافه کنید"
           breadcrumbs={[{ label: "داشبورد", href: "/dashboard" }, { label: "هویت و دسترسی", href: "/dashboard/identity" }, { label: "کاربران" }]}
           actions={
             <div className="flex flex-wrap items-center gap-2">
@@ -275,7 +275,7 @@ export function MembersListPage() {
 
         {isError ? (
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            <p className="font-medium">دریافت فهرست ممکن نشد</p>
+            <p className="font-medium">بارگذاری فهرست ممکن نشد</p>
             <p className="mt-1 text-xs">{error instanceof Error ? error.message : MSG_LOAD_ERROR}</p>
             <Button variant="outline" size="sm" className="mt-3 h-8" onClick={() => void refetch()}>تلاش مجدد</Button>
           </div>
@@ -284,7 +284,7 @@ export function MembersListPage() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[12rem] flex-1 sm:max-w-sm">
             <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input className={cn("h-8 ps-8 text-sm", query && "pe-8")} placeholder="جستجو نام، ایمیل یا موبایل…" value={query} onChange={(e) => { setQuery(e.target.value); setPage(1); }} />
+            <Input className={cn("h-8 ps-8 text-sm", query && "pe-8")} placeholder="نام، ایمیل یا موبایل…" value={query} onChange={(e) => { setQuery(e.target.value); setPage(1); }} />
             {query ? (
               <button type="button" className="absolute end-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="پاک کردن جستجو" onClick={() => { setQuery(""); setPage(1); }}>
                 <X className="h-3.5 w-3.5" />
@@ -344,12 +344,12 @@ export function MembersListPage() {
               <>
                 <Button type="button" size="sm" variant="outline" className="h-7 gap-1" disabled={bulkBusy} onClick={() => {
                   const targets = selectedRowsOrdered.filter((r) => Number(r.status) !== 1);
-                  if (!targets.length) { toast.message("کاربر غیرفعالی در انتخاب نیست"); return; }
+                  if (!targets.length) { toast.message("در انتخاب فعلی کاربر غیرفعالی نیست."); return; }
                   setConfirm({ kind: "activate", count: targets.length, targets });
                 }}><UserCheck className="h-3.5 w-3.5" />فعال‌سازی گروهی</Button>
                 <Button type="button" size="sm" variant="outline" className="h-7 gap-1" disabled={bulkBusy} onClick={() => {
                   const targets = selectedRowsOrdered.filter((r) => Number(r.status) === 1 && !(currentUserId && r.user_id === currentUserId));
-                  if (!targets.length) { toast.message("کاربر فعالی (به‌جز خودتان) در انتخاب نیست"); return; }
+                  if (!targets.length) { toast.message("در انتخاب فعلی کاربر فعالی (به‌جز خودتان) نیست."); return; }
                   setConfirm({ kind: "deactivate", count: targets.length, targets });
                 }}><UserMinus className="h-3.5 w-3.5" />غیرفعال‌سازی گروهی</Button>
               </>
@@ -409,8 +409,8 @@ export function MembersListPage() {
                     <TableCell colSpan={10} className="p-0">
                       <EmptyState
                         icon={Users}
-                        title={isFiltered ? "نتیجه‌ای یافت نشد" : isDeletedView ? "حذف‌شده‌ای نیست" : "هنوز کاربری افزوده نشده"}
-                        description={isFiltered ? "عبارت جستجو یا فیلتر را تغییر دهید" : isDeletedView ? "کاربران حذف‌شده از اینجا قابل بازگردانی هستند" : "با دکمه افزودن یا ورود از اکسل شروع کنید"}
+                        title={isFiltered ? "نتیجه‌ای پیدا نشد" : isDeletedView ? "کاربر حذف‌شده‌ای نیست" : "هنوز عضوی ثبت نشده"}
+                        description={isFiltered ? "عبارت جستجو یا فیلتر را تغییر دهید." : isDeletedView ? "در صورت حذف اشتباه، می‌توانید کاربر را از اینجا بازگردانید." : "برای شروع، کاربر جدید اضافه کنید یا از فایل اکسل وارد کنید."}
                       />
                     </TableCell>
                   </TableRow>
@@ -522,19 +522,19 @@ export function MembersListPage() {
               </h3>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                 {confirm.kind === "delete" ? (
-                  <>قرار است <strong className="text-foreground">{toFaDigits(confirm.count)}</strong> کاربر از سازمان حذف شوند. حذف <strong>نرم</strong> است.</>
+                  <>قرار است <strong className="text-foreground">{toFaDigits(confirm.count)}</strong> کاربر از فهرست جاری سازمان خارج شوند. در صورت نیاز بعداً قابل بازگردانی هستند.</>
                 ) : confirm.kind === "restore" ? (
-                  <>{toFaDigits(confirm.count)} کاربر به فهرست سازمان برمی‌گردند.</>
+                  <>{toFaDigits(confirm.count)} کاربر دوباره به فهرست جاری سازمان برمی‌گردند.</>
                 ) : confirm.kind === "activate" ? (
-                  <>{toFaDigits(confirm.count)} کاربر فعال می‌شوند.</>
+                  <>وضعیت {toFaDigits(confirm.count)} کاربر به «فعال» تغییر می‌کند.</>
                 ) : (
-                  <>{toFaDigits(confirm.count)} کاربر غیرفعال می‌شوند.</>
+                  <>وضعیت {toFaDigits(confirm.count)} کاربر به «غیرفعال» تغییر می‌کند.</>
                 )}
               </p>
               <div className="mt-5 flex flex-wrap justify-end gap-2">
                 <Button type="button" variant="outline" size="sm" disabled={bulkBusy} onClick={() => setConfirm(null)}>انصراف</Button>
                 <Button type="button" size="sm" variant={confirm.kind === "delete" ? "destructive" : "default"} disabled={bulkBusy} onClick={() => void runBulk(confirm.kind, confirm.targets)}>
-                  {confirm.kind === "delete" ? "حذف نرم" : confirm.kind === "restore" ? "بازگردانی" : confirm.kind === "activate" ? "فعال‌سازی" : "غیرفعال‌سازی"}
+                  {confirm.kind === "delete" ? "تأیید حذف" : confirm.kind === "restore" ? "بازگردانی" : confirm.kind === "activate" ? "فعال‌سازی" : "غیرفعال‌سازی"}
                 </Button>
               </div>
             </div>
