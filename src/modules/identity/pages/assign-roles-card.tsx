@@ -1,4 +1,4 @@
-/** نقش‌های کاربر — جستجو، درخت، تمایز افزودن/حذف */
+/** نقش‌های کاربر — جستجو، درخت، تمایز ملایم افزودن/حذف */
 
 "use client";
 
@@ -46,8 +46,9 @@ function buildTree(roles: RoleDto[]): RoleNode[] {
   for (const r of roles) {
     map.set(r.tenant_role_id, {
       ...r,
-      parent_role_id: (r as RoleDto & { parent_role_id?: string | null })
-        .parent_role_id ?? null,
+      parent_role_id:
+        (r as RoleDto & { parent_role_id?: string | null }).parent_role_id ??
+        null,
       children: [],
     });
   }
@@ -149,16 +150,6 @@ function RoleTreeRow({
   const state = selectionState(node.tenant_role_id, selected, initial);
   const parentState = hasChildren ? parentCheckState(node, selected) : null;
 
-  const rowClass = cn(
-    "flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm transition",
-    state === "added" &&
-      "border-emerald-500/50 bg-emerald-500/10 text-emerald-900 dark:text-emerald-100",
-    state === "removed" &&
-      "border-destructive/40 bg-destructive/10 text-destructive line-through opacity-80",
-    state === "kept" && "border-primary/30 bg-primary/5 text-foreground",
-    state === "none" && "border-transparent hover:bg-muted/40"
-  );
-
   const onParentToggle = () => {
     if (!hasChildren) {
       onToggle(node.tenant_role_id);
@@ -170,10 +161,10 @@ function RoleTreeRow({
   };
 
   return (
-    <div className="space-y-1">
+    <div>
       <div
-        className={rowClass}
-        style={{ paddingInlineStart: `${depth * 1.1 + 0.5}rem` }}
+        className="flex items-center gap-2 py-1.5 text-sm"
+        style={{ paddingInlineStart: `${depth * 1.15 + 0.25}rem` }}
       >
         {hasChildren ? (
           <button
@@ -208,22 +199,15 @@ function RoleTreeRow({
           }}
         />
 
-        <span className="flex min-w-0 flex-1 items-center gap-1.5">
-          <Shield className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <span className="truncate font-medium">{node.name}</span>
-          {hasChildren && parentState === "some" ? (
-            <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-800 dark:text-amber-200">
-              زیرنقش انتخاب‌شده
-            </span>
-          ) : null}
-          {state === "added" ? (
-            <span className="shrink-0 text-[10px] text-emerald-700 dark:text-emerald-300">
-              جدید
-            </span>
-          ) : null}
-          {state === "removed" ? (
-            <span className="shrink-0 text-[10px]">حذف می‌شود</span>
-          ) : null}
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate",
+            state === "added" && "text-emerald-700 dark:text-emerald-400",
+            state === "removed" &&
+              "text-destructive/80 line-through decoration-destructive/50"
+          )}
+        >
+          {node.name}
         </span>
       </div>
 
@@ -354,8 +338,6 @@ export function AssignRolesCard({ userId }: { userId: string }) {
 
   const isLoading = loadingAll || loadingUser;
   const assigned = userRoles ?? [];
-  const addedCount = [...selected].filter((id) => !initial.has(id)).length;
-  const removedCount = [...initial].filter((id) => !selected.has(id)).length;
 
   return (
     <Card>
@@ -395,18 +377,6 @@ export function AssignRolesCard({ userId }: { userId: string }) {
               />
             </div>
 
-            <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-              <span className="inline-flex items-center gap-1 rounded border border-primary/30 bg-primary/5 px-1.5 py-0.5">
-                فعلی
-              </span>
-              <span className="inline-flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-800 dark:text-emerald-200">
-                افزوده‌شده
-              </span>
-              <span className="inline-flex items-center gap-1 rounded border border-destructive/40 bg-destructive/10 px-1.5 py-0.5 text-destructive line-through">
-                حذف می‌شود
-              </span>
-            </div>
-
             {(allRoles ?? []).length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 نقشی تعریف نشده است. از بخش نقش‌ها یک نقش بسازید.
@@ -416,7 +386,7 @@ export function AssignRolesCard({ userId }: { userId: string }) {
                 نقشی با این جستجو پیدا نشد.
               </p>
             ) : (
-              <div className="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-border/50 p-2">
+              <div className="max-h-72 overflow-y-auto rounded-lg border border-border/40 px-1 py-1">
                 {filtered.map((n) => (
                   <RoleTreeRow
                     key={n.tenant_role_id}
@@ -431,13 +401,6 @@ export function AssignRolesCard({ userId }: { userId: string }) {
                   />
                 ))}
               </div>
-            )}
-
-            {(addedCount > 0 || removedCount > 0) && (
-              <p className="text-xs text-muted-foreground">
-                {addedCount > 0 ? `${addedCount} نقش اضافه می‌شود. ` : ""}
-                {removedCount > 0 ? `${removedCount} نقش حذف می‌شود.` : ""}
-              </p>
             )}
 
             <div className="flex flex-wrap justify-end gap-2">
