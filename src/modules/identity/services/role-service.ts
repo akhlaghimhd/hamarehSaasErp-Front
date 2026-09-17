@@ -6,6 +6,13 @@ import { apiDelete, apiGet, apiPost, apiPut } from "@/api";
 import type { ApiSuccessResponse } from "@/api/types";
 import { identityPaths } from "./paths";
 
+export interface RolePermissionRef {
+  tenant_permission_id: string;
+  code?: string;
+  name?: string;
+  module_name?: string;
+}
+
 export interface RoleDto {
   tenant_role_id: string;
   tenant_id?: string;
@@ -18,16 +25,23 @@ export interface RoleDto {
   row_version?: number;
   created_at?: string;
   updated_at?: string;
-  permissions?: Array<{
-    tenant_permission_id: string;
-    code?: string;
+  deleted_at?: string | null;
+  parent?: { tenant_role_id: string; name?: string; code?: string } | null;
+  children?: Array<{
+    tenant_role_id: string;
+    parent_role_id?: string | null;
     name?: string;
+    code?: string;
+    status?: number;
   }>;
+  permissions?: RolePermissionRef[];
 }
 
 export interface CreateRolePayload {
   role_name: string;
   description?: string | null;
+  parent_role_id?: string | null;
+  /** Explicit snapshot of permission IDs — no live inheritance. */
   permission_ids?: string[];
 }
 
