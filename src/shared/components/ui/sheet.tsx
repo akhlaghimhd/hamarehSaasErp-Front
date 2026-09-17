@@ -28,19 +28,21 @@ SheetOverlay.displayName = DialogPrimitive.Overlay.displayName;
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    /** Physical screen side (not logical start/end) so RTL does not invert animation. */
     side?: "right" | "left";
   }
->(({ side = "left", className, children, ...props }, ref) => (
+>(({ side = "right", className, children, ...props }, ref) => (
   <SheetPortal>
     <SheetOverlay />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
         "fixed z-50 flex h-full w-full flex-col gap-0 border-border bg-background shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-200 data-[state=open]:duration-300",
-        side === "left" &&
-          "inset-y-0 start-0 border-e data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-xl",
+        /* Physical edges — avoids RTL start/end mismatch that made the panel appear from center */
         side === "right" &&
-          "inset-y-0 end-0 border-s data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-xl",
+          "inset-y-0 right-0 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-xl",
+        side === "left" &&
+          "inset-y-0 left-0 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-xl",
         className
       )}
       {...props}

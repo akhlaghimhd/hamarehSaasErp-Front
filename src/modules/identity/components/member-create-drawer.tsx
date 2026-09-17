@@ -182,7 +182,7 @@ export function MemberCreateDrawer({ open, onOpenChange, onCreated }: Props) {
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="left" className="w-full sm:max-w-lg">
+      <SheetContent side="right" className="w-full sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>افزودن کاربر</SheetTitle>
           <SheetDescription>
