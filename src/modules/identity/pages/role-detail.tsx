@@ -1,11 +1,11 @@
-/** FE-P1-T13/T14 — جزئیات نقش و تخصیص مجوز */
+/** FE-P1-T13/T14 — جزئیات نقش، زیرنقش‌ها و تخصیص مجوز */
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import {
@@ -28,6 +28,8 @@ import {
 import { usePermissions } from "../hooks/use-permissions";
 import { IdentityPermissions } from "../types";
 import { MSG_GENERIC_ERROR, MSG_NO_ACCESS } from "../lib/ui-copy";
+import { RoleCreateDrawer } from "../components/role-create-drawer";
+import { toFaDigits } from "@/shared/lib/utils";
 
 export function RoleDetailPage() {
   const params = useParams();
@@ -37,6 +39,7 @@ export function RoleDetailPage() {
 
   const canView = usePermission(IdentityPermissions.roleView);
   const canUpdate = usePermission(IdentityPermissions.roleUpdate);
+  const canCreate = usePermission(IdentityPermissions.roleCreate);
   const canAssignPerms = usePermission(
     IdentityPermissions.roleAssignPermissions
   );
@@ -45,6 +48,8 @@ export function RoleDetailPage() {
   const { data: allPerms } = usePermissions();
   const updateMutation = useUpdateRole();
   const assignMutation = useAssignPermissionsToRole();
+
+  const [createOpen, setCreateOpen] = useState(false);
 
   const linkedIds = useMemo(() => {
     const fromRel = (role?.permissions ?? [])
@@ -133,6 +138,17 @@ export function RoleDetailPage() {
             <Button variant="outline" size="sm" asChild>
               <Link href="/dashboard/identity/roles">بازگشت به فهرست</Link>
             </Button>
+            {canCreate && role ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1"
+                onClick={() => setCreateOpen(true)}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                زیرنقش
+              </Button>
+            ) : null}
             {canUpdate && role ? (
               <Button
                 variant="outline"
@@ -164,22 +180,66 @@ export function RoleDetailPage() {
         <>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">وضعیت نقش</CardTitle>
+              <CardTitle className="text-base">وضعیت و سلسله‌مراتب</CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-wrap items-center gap-2 text-sm">
+            <CardContent className="flex flex-wrap items-center gap-3 text-sm">
               {Number(role.status) === 1 || role.status === undefined ? (
                 <StatusChip label="فعال" tone="success" />
               ) : (
                 <StatusChip label="غیرفعال" tone="neutral" />
               )}
+              {role.parent?.name || role.parent_role_id ? (
+                <span className="text-muted-foreground">
+                  والد:{" "}
+                  {role.parent?.tenant_role_id ? (
+                    <Link
+                      className="font-medium text-foreground underline-offset-2 hover:underline"
+                      href={`/dashboard/identity/roles/${role.parent.tenant_role_id}`}
+                    >
+                      {role.parent.name ?? role.parent_role_id}
+                    </Link>
+                  ) : (
+                    <span className="font-medium text-foreground">
+                      {role.parent?.name ?? "—"}
+                    </span>
+                  )}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">نقش ریشه (بدون والد)</span>
+              )}
             </CardContent>
           </Card>
+
+          {(role.children?.length ?? 0) > 0 ? (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">زیرنقش‌ها</CardTitle>
+                <CardDescription>
+                  هر زیرنقش مجوزهای خودش را دارد؛ تغییر مجوز والد روی فرزند اثر
+                  ندارد.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-2">
+                {role.children!.map((c) => (
+                  <Button key={c.tenant_role_id} variant="secondary" size="sm" asChild>
+                    <Link href={`/dashboard/identity/roles/${c.tenant_role_id}`}>
+                      {c.name}
+                      {c.status !== undefined && Number(c.status) !== 1
+                        ? " (غیرفعال)"
+                        : ""}
+                    </Link>
+                  </Button>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">مجوزهای این نقش</CardTitle>
               <CardDescription>
-                مواردی را که دارندگان این نقش باید به آن‌ها دسترسی داشته باشند انتخاب و ذخیره کنید.
+                موارد انتخاب‌شده فقط برای همین نقش ذخیره می‌شوند ({toFaDigits(selected.size)}{" "}
+                انتخاب).
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -217,6 +277,15 @@ export function RoleDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          <RoleCreateDrawer
+            open={createOpen}
+            onOpenChange={setCreateOpen}
+            defaultParentId={role.tenant_role_id}
+            onCreated={(id) => {
+              window.location.href = `/dashboard/identity/roles/${id}`;
+            }}
+          />
         </>
       )}
     </div>
