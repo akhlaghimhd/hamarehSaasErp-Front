@@ -79,6 +79,7 @@ export function MemberCreateDrawer({ open, onOpenChange, onCreated }: Props) {
   const lastName = useWatch({ control: form.control, name: "last_name" });
   const latinFirst = slugNamePart(firstName ?? "");
   const latinLast = slugNamePart(lastName ?? "");
+  const { isDirty } = form.formState;
 
   useEffect(() => {
     if (!open) return;
@@ -146,6 +147,12 @@ export function MemberCreateDrawer({ open, onOpenChange, onCreated }: Props) {
     );
   };
 
+  /** بستن عمدی فقط با انصراف / ضربدر — کلیک بیرون وقتی dirty مسدود است */
+  const closeDrawer = () => {
+    form.reset();
+    onOpenChange(false);
+  };
+
   const handleOpenChange = (next: boolean) => {
     if (!next) {
       form.reset();
@@ -153,7 +160,10 @@ export function MemberCreateDrawer({ open, onOpenChange, onCreated }: Props) {
     onOpenChange(next);
   };
 
-  const onSubmit = form.handleSubmit(async (values) => {
+  const saveMember = async (
+    values: CreateMemberFormValues,
+    options: { keepOpen: boolean }
+  ) => {
     if (!emailHost) {
       toast.error(hostError ?? "دامنه ایمیل سازمانی در دسترس نیست.");
       return;
@@ -169,20 +179,44 @@ export function MemberCreateDrawer({ open, onOpenChange, onCreated }: Props) {
       });
       toast.success("کاربر با موفقیت اضافه شد");
       form.reset();
-      onOpenChange(false);
       onCreated?.();
+      if (!options.keepOpen) {
+        onOpenChange(false);
+      }
     } catch (e) {
       toast.error(
         e instanceof ApiClientError && e.message ? e.message : MSG_GENERIC_ERROR
       );
     }
-  });
+  };
+
+  const onSubmit = form.handleSubmit((values) =>
+    saveMember(values, { keepOpen: false })
+  );
+
+  const onSubmitAndAddAnother = form.handleSubmit((values) =>
+    saveMember(values, { keepOpen: true })
+  );
 
   const hostBlocked = !hostLoading && !emailHost;
+  const submitDisabled =
+    hostBlocked || hostLoading || createMutation.isPending;
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg">
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-lg"
+        onInteractOutside={(e) => {
+          if (isDirty) e.preventDefault();
+        }}
+        onPointerDownOutside={(e) => {
+          if (isDirty) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (isDirty) e.preventDefault();
+        }}
+      >
         <SheetHeader>
           <SheetTitle>افزودن کاربر</SheetTitle>
           <SheetDescription>
@@ -397,23 +431,33 @@ export function MemberCreateDrawer({ open, onOpenChange, onCreated }: Props) {
               </section>
             </div>
 
-            <SheetFooter>
+            <SheetFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => handleOpenChange(false)}
+                onClick={closeDrawer}
                 disabled={createMutation.isPending}
               >
                 انصراف
               </Button>
               <Button
-                type="submit"
+                type="button"
+                variant="secondary"
                 size="sm"
-                disabled={
-                  hostBlocked || hostLoading || createMutation.isPending
-                }
+                disabled={submitDisabled}
+                onClick={() => void onSubmitAndAddAnother()}
               >
+                {createMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    در حال ثبت…
+                  </>
+                ) : (
+                  "ثبت و افزودن بعدی"
+                )}
+              </Button>
+              <Button type="submit" size="sm" disabled={submitDisabled}>
                 {createMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
