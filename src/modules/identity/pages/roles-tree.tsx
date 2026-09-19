@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   Plus,
   Trash2,
+  Pencil,
   UserCheck,
   UserMinus,
 } from "lucide-react";
@@ -18,23 +19,17 @@ import {
 import { cn, toFaDigits } from "@/shared/lib/utils";
 import type { RoleDto } from "../services/role-service";
 
-export type TreeNode = {
-  role: RoleDto;
-  children: TreeNode[];
-  depth: number;
-};
+const TREE_INDENT = 20;
 
-export const TREE_INDENT = 22;
+export type TreeNode = { role: RoleDto; children: TreeNode[] };
 
-export function buildChildrenMap(roles: RoleDto[]): Map<string | null, RoleDto[]> {
-  const map = new Map<string | null, RoleDto[]>();
-  const ids = new Set(roles.map((r) => r.tenant_role_id));
+export function buildChildrenMap(roles: RoleDto[]): Map<string, RoleDto[]> {
+  const map = new Map<string, RoleDto[]>();
   for (const r of roles) {
-    let key: string | null = r.parent_role_id ?? null;
-    if (key && !ids.has(key)) key = null;
-    const list = map.get(key) ?? [];
+    const pid = r.parent_role_id ?? "";
+    const list = map.get(pid) ?? [];
     list.push(r);
-    map.set(key, list);
+    map.set(pid, list);
   }
   for (const list of map.values()) {
     list.sort((a, b) => a.name.localeCompare(b.name, "fa"));
@@ -43,58 +38,43 @@ export function buildChildrenMap(roles: RoleDto[]): Map<string | null, RoleDto[]
 }
 
 export function buildTree(roles: RoleDto[]): TreeNode[] {
+  const byId = new Map(roles.map((r) => [r.tenant_role_id, r]));
   const children = buildChildrenMap(roles);
-  const walk = (
-    parentId: string | null,
-    depth: number,
-    path: Set<string>
-  ): TreeNode[] => {
-    const kids = children.get(parentId) ?? [];
-    const out: TreeNode[] = [];
-    for (const r of kids) {
-      if (path.has(r.tenant_role_id)) continue;
-      const next = new Set(path);
-      next.add(r.tenant_role_id);
-      out.push({
-        role: r,
-        depth,
-        children: walk(r.tenant_role_id, depth + 1, next),
-      });
-    }
-    return out;
-  };
-  return walk(null, 0, new Set());
-}
-
-type StatusFilter = "all" | "active" | "inactive";
-
-function matchesRole(r: RoleDto, q: string, status: StatusFilter): boolean {
-  const st = Number(r.status);
-  if (status === "active" && r.status !== undefined && st !== 1) return false;
-  if (status === "inactive" && st !== 0) return false;
-  if (!q) return true;
-  return [r.name, r.description, r.code]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase()
-    .includes(q);
+  const roots: RoleDto[] = [];
+  for (const r of roles) {
+    const pid = r.parent_role_id;
+    if (!pid || !byId.has(pid)) roots.push(r);
+  }
+  roots.sort((a, b) => a.name.localeCompare(b.name, "fa"));
+  const walk = (role: RoleDto): TreeNode => ({
+    role,
+    children: (children.get(role.tenant_role_id) ?? []).map(walk),
+  });
+  return roots.map(walk);
 }
 
 export function filterRolesKeepAncestors(
   roles: RoleDto[],
   q: string,
-  status: StatusFilter
+  status: "all" | "active" | "inactive"
 ): RoleDto[] {
-  if (!q && status === "all") return roles;
   const byId = new Map(roles.map((r) => [r.tenant_role_id, r]));
+  const match = (r: RoleDto) => {
+    if (status === "active" && r.status !== 1) return false;
+    if (status === "inactive" && r.status === 1) return false;
+    if (!q) return true;
+    return [r.name, r.code, r.description]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(q);
+  };
   const keep = new Set<string>();
   for (const r of roles) {
-    if (!matchesRole(r, q, status)) continue;
+    if (!match(r)) continue;
     keep.add(r.tenant_role_id);
     let pid = r.parent_role_id;
-    const seen = new Set<string>();
-    while (pid && !seen.has(pid)) {
-      seen.add(pid);
+    while (pid && byId.has(pid)) {
       keep.add(pid);
       pid = byId.get(pid)?.parent_role_id ?? null;
     }
@@ -119,10 +99,10 @@ export function RoleTreeItem({
   onActivate,
   onDeactivate,
   onDelete,
+  onRename,
 }: {
   node: TreeNode;
   isLast: boolean;
-  /** For each depth 0..depth-1: should the vertical guide continue past this row? */
   ancestorContinues: boolean[];
   expanded: Set<string>;
   selectedId: string | null;
@@ -137,15 +117,17 @@ export function RoleTreeItem({
   onActivate: (role: RoleDto) => void;
   onDeactivate: (role: RoleDto) => void;
   onDelete: (role: RoleDto) => void;
+  onRename: (role: RoleDto) => void;
 }) {
-  const { role, children, depth } = node;
+  const { role, children } = node;
+  const depth = ancestorContinues.length;
   const hasChildren = children.length > 0;
   const open = searching || expanded.has(role.tenant_role_id);
-  const isSelected = selectedId === role.tenant_role_id;
-  const isActive = role.status === undefined || Number(role.status) === 1;
+  const selected = selectedId === role.tenant_role_id;
+  const isActive = role.status === 1;
 
   return (
-    <div className="select-none">
+    <div>
       <div
         role="button"
         tabIndex={0}
@@ -157,53 +139,44 @@ export function RoleTreeItem({
           }
         }}
         className={cn(
-          "group relative flex min-h-[2.25rem] items-center gap-1 rounded-md pe-1 transition-colors",
-          isSelected
-            ? "bg-primary/10 ring-1 ring-inset ring-primary/25"
-            : "hover:bg-muted/50"
+          "group relative flex cursor-pointer items-center gap-1 rounded-md pe-1 transition-colors",
+          selected ? "bg-primary/10" : "hover:bg-muted/50"
         )}
       >
-        <div
-          className="relative flex shrink-0 self-stretch"
-          style={{ width: depth * TREE_INDENT + TREE_INDENT }}
-          aria-hidden
-        >
-          {ancestorContinues.map((continues, i) => (
+        <div className="relative shrink-0 self-stretch" style={{ width: (depth + 1) * TREE_INDENT }}>
+          {ancestorContinues.map((cont, i) =>
+            cont ? (
+              <span
+                key={i}
+                className="absolute top-0 bottom-0 w-px bg-border/70"
+                style={{ insetInlineStart: i * TREE_INDENT + TREE_INDENT / 2 }}
+              />
+            ) : null
+          )}
+          {depth > 0 ? (
             <span
-              key={i}
-              className="absolute top-0 bottom-0 w-px bg-border/70"
+              className="absolute top-0 h-1/2 w-px bg-border/70"
+              style={{ insetInlineStart: (depth - 1) * TREE_INDENT + TREE_INDENT / 2 }}
+            />
+          ) : null}
+          {depth > 0 && !isLast ? (
+            <span
+              className="absolute top-1/2 bottom-0 w-px bg-border/70"
+              style={{ insetInlineStart: (depth - 1) * TREE_INDENT + TREE_INDENT / 2 }}
+            />
+          ) : null}
+          {depth > 0 ? (
+            <span
+              className="absolute top-1/2 h-px bg-border/70"
               style={{
-                insetInlineStart: i * TREE_INDENT + TREE_INDENT / 2,
-                opacity: continues ? 1 : 0,
+                insetInlineStart: (depth - 1) * TREE_INDENT + TREE_INDENT / 2,
+                width: TREE_INDENT / 2,
               }}
             />
-          ))}
-          {depth > 0 ? (
-            <>
-              <span
-                className="absolute w-px bg-border/70"
-                style={{
-                  insetInlineStart: (depth - 1) * TREE_INDENT + TREE_INDENT / 2,
-                  top: 0,
-                  bottom: isLast ? "50%" : 0,
-                }}
-              />
-              <span
-                className="absolute h-px bg-border/70"
-                style={{
-                  insetInlineStart: (depth - 1) * TREE_INDENT + TREE_INDENT / 2,
-                  width: TREE_INDENT / 2,
-                  top: "50%",
-                }}
-              />
-            </>
           ) : null}
           <div
             className="absolute top-1/2 z-[1] flex -translate-y-1/2 items-center justify-center"
-            style={{
-              insetInlineStart: depth * TREE_INDENT,
-              width: TREE_INDENT,
-            }}
+            style={{ insetInlineStart: depth * TREE_INDENT, width: TREE_INDENT }}
           >
             {hasChildren ? (
               <button
@@ -216,11 +189,7 @@ export function RoleTreeItem({
                 aria-label={open ? "جمع کردن" : "باز کردن"}
                 disabled={searching}
               >
-                {open ? (
-                  <ChevronDown className="h-3 w-3" />
-                ) : (
-                  <ChevronLeft className="h-3 w-3" />
-                )}
+                {open ? <ChevronDown className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
               </button>
             ) : (
               <span className="h-1.5 w-1.5 rounded-full bg-border" />
@@ -310,6 +279,23 @@ export function RoleTreeItem({
               </Tooltip>
             )
           ) : null}
+          {canUpdate ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  disabled={bulkBusy}
+                  onClick={() => onRename(role)}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>ویرایش عنوان</TooltipContent>
+            </Tooltip>
+          ) : null}
           {canDelete ? (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -350,6 +336,7 @@ export function RoleTreeItem({
               onActivate={onActivate}
               onDeactivate={onDeactivate}
               onDelete={onDelete}
+              onRename={onRename}
             />
           ))
         : null}
