@@ -100,8 +100,7 @@ export function MemberDetailPage() {
 
   const canView = usePermission(IdentityPermissions.userView);
   const canUpdate = usePermission(IdentityPermissions.userUpdate);
-  const isSessionOwner = useAuthStore((s) => s.securityContext?.is_owner === true);
-  const canManageOwner = isSessionOwner;
+  const canManageOwner = useAuthStore((s) => s.securityContext?.is_owner === true);
   const canDelete = usePermission(IdentityPermissions.userDelete);
   const canViewHistory = usePermission(
     IdentityPermissions.membershipHistoryView
@@ -320,19 +319,21 @@ export function MemberDetailPage() {
     );
   }
 
-  const displayName =
+  const fullName =
     [data.user?.first_name, data.user?.last_name].filter(Boolean).join(" ") ||
     "کاربر";
+  const bioText =
+    (profile as { bio?: string | null } | null | undefined)?.bio?.trim() ?? "";
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={displayName}
+        title={fullName}
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "هویت و دسترسی", href: "/dashboard/identity" },
           { label: "کاربران", href: "/dashboard/identity/members" },
-          { label: displayName },
+          { label: fullName },
         ]}
         actions={
           <div className="flex flex-wrap gap-2">
@@ -361,51 +362,81 @@ export function MemberDetailPage() {
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base">هویت و عضویت</CardTitle>
+      <div className="grid gap-4 lg:grid-cols-12">
+        <Card className="lg:col-span-4">
+          <CardContent className="p-5">
+            <div className="flex items-start gap-4">
+              <div className="relative shrink-0">
+                <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-border/80 bg-muted shadow-[var(--shadow-xs)]">
+                  {profile?.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={profile.avatar_url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <UserRound className="h-9 w-9 text-muted-foreground/70" />
+                  )}
+                </div>
+              </div>
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className="truncate text-base font-semibold leading-tight">
+                  {fullName}
+                </p>
+                {data.is_owner ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-800 dark:text-amber-200">
+                    <Shield className="h-3 w-3" />
+                    مدیر اصلی
+                  </span>
+                ) : null}
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {bioText || "بیویی ثبت نشده است."}
+                </p>
+              </div>
+            </div>
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              تصویر و معرفی کوتاه از پروفایل شخصی کاربر است.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-8">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+            <CardTitle className="text-base">اطلاعات هویتی</CardTitle>
             <div className="flex items-center gap-2">
               <StatusChip
                 label={active ? "فعال" : "غیرفعال"}
                 tone={active ? "success" : "neutral"}
               />
-              {data.is_owner ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:text-amber-200">
-                  <Shield className="h-3 w-3" />
-                  مدیر اصلی
-                </span>
-              ) : null}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {canUpdate && !editingIdentity ? (
-              <div className="flex justify-end">
+              {canUpdate && !editingIdentity ? (
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-8 gap-1"
+                  className="h-8 gap-1.5"
                   onClick={startEditIdentity}
                 >
                   <Pencil className="h-3.5 w-3.5" />
                   ویرایش
                 </Button>
-              </div>
-            ) : null}
-
+              ) : null}
+            </div>
+          </CardHeader>
+          <CardContent>
             {editingIdentity ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <label className="text-xs text-muted-foreground">نام</label>
                     <Input
                       className="h-9"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
+                      autoComplete="given-name"
                     />
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <label className="text-xs text-muted-foreground">
                       نام خانوادگی
                     </label>
@@ -413,21 +444,24 @@ export function MemberDetailPage() {
                       className="h-9"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
+                      autoComplete="family-name"
                     />
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">موبایل</label>
-                  <Input
-                    className="h-9 tabular-nums"
-                    dir="ltr"
-                    value={mobile}
-                    onChange={(e) =>
-                      setMobile(normalizeIranMobile(e.target.value))
-                    }
-                    placeholder="09121234567"
-                    maxLength={11}
-                  />
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs text-muted-foreground">
+                      موبایل
+                    </label>
+                    <Input
+                      className="h-9 tabular-nums"
+                      dir="ltr"
+                      value={mobile}
+                      onChange={(e) =>
+                        setMobile(normalizeIranMobile(e.target.value))
+                      }
+                      placeholder="09121234567"
+                      maxLength={11}
+                    />
+                  </div>
                 </div>
                 {canManageOwner ? (
                   <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border/60 px-3 py-3">
@@ -439,8 +473,7 @@ export function MemberDetailPage() {
                     <span className="space-y-0.5 text-sm">
                       <span className="font-medium">مدیر اصلی سازمان</span>
                       <span className="block text-xs text-muted-foreground">
-                        فقط مالک فعلی می‌تواند مالک جدید تعیین کند. مالک bypass
-                        کامل دسترسی و حفاظت «آخرین مالک» دارد.
+                        فقط مالک فعلی می‌تواند این پرچم را تغییر دهد.
                       </span>
                     </span>
                   </label>
@@ -453,7 +486,7 @@ export function MemberDetailPage() {
                     disabled={updateMutation.isPending}
                     onClick={cancelEditIdentity}
                   >
-                    <X className="me-1 h-3.5 w-3.5" />
+                    <X className="h-3.5 w-3.5" />
                     انصراف
                   </Button>
                   <Button
@@ -463,69 +496,64 @@ export function MemberDetailPage() {
                     onClick={() => void saveIdentity()}
                   >
                     {updateMutation.isPending ? (
-                      <Loader2 className="me-1 h-3.5 w-3.5 animate-spin" />
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <Check className="me-1 h-3.5 w-3.5" />
+                      <Check className="h-3.5 w-3.5" />
                     )}
                     ذخیره
                   </Button>
                 </div>
               </div>
             ) : (
-              <div className="space-y-2">
-                <FieldLine label="نام" value={data.user?.first_name ?? ""} />
-                <FieldLine
-                  label="نام خانوادگی"
-                  value={data.user?.last_name ?? ""}
-                />
-                <FieldLine
-                  label="موبایل"
-                  value={data.user?.mobile ?? ""}
-                  dir="ltr"
-                />
-                <FieldLine
-                  label="ایمیل"
-                  value={data.user?.email ?? ""}
-                  dir="ltr"
-                />
-                <FieldLine
-                  label="عضویت از"
-                  value={formatDate(data.created_at)}
-                />
+              <div className="space-y-3">
+                <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <FieldLine label="نام" value={data.user?.first_name ?? ""} />
+                  <FieldLine
+                    label="نام خانوادگی"
+                    value={data.user?.last_name ?? ""}
+                  />
+                  <FieldLine
+                    label="موبایل"
+                    value={data.user?.mobile ?? ""}
+                    dir="ltr"
+                  />
+                  <FieldLine
+                    label="ایمیل"
+                    value={data.user?.email ?? ""}
+                    dir="ltr"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-x-6 gap-y-1 border-t border-border/40 pt-3 text-[11px] text-muted-foreground">
+                  <span className="whitespace-nowrap">
+                    عضویت از {formatDate(data.created_at)}
+                  </span>
+                  <span className="whitespace-nowrap">
+                    آخرین تغییر {formatDate(data.updated_at)}
+                  </span>
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
-
-        <AssignRolesCard tenantUserId={data.tenant_user_id} userId={data.user_id} />
       </div>
+
+      <AssignRolesCard userId={data.user_id} />
 
       {canViewHistory ? (
         <MembershipHistoryPanel
           items={historyQuery.data ?? []}
           isLoading={historyQuery.isLoading}
+          isError={historyQuery.isError}
         />
-      ) : null}
-
-      {canViewProfile && profile ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">پروفایل</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <FieldLine label="عنوان شغلی" value={profile.job_title ?? ""} />
-            <FieldLine label="درباره" value={profile.bio ?? ""} />
-          </CardContent>
-        </Card>
       ) : null}
 
       <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>حذف از سازمان</DialogTitle>
+            <DialogTitle>تأیید حذف از سازمان</DialogTitle>
             <DialogDescription>
-              عضویت «{displayName}» از فهرست جاری سازمان حذف نرم می‌شود. این عمل
-              قابل بازگردانی از فهرست حذف‌شده‌ها است.
+              کاربر از فهرست جاری سازمان خارج می‌شود و در صورت نیاز قابل
+              بازگردانی است. این عمل حذف فیزیکی حساب نیست.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
