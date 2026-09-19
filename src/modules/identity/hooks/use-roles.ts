@@ -113,6 +113,7 @@ export function useAssignPermissionsToRole() {
       void qc.invalidateQueries({
         queryKey: roleQueryKey(vars.tenantRoleId),
       });
+      void qc.invalidateQueries({ queryKey: rolesQueryKey });
     },
   });
 }
