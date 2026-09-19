@@ -61,6 +61,9 @@ type TreeNode = {
   depth: number;
 };
 
+/** Horizontal indent per tree level (px). */
+const TREE_INDENT = 22;
+
 function buildChildrenMap(roles: RoleDto[]): Map<string | null, RoleDto[]> {
   const map = new Map<string | null, RoleDto[]>();
   const ids = new Set(roles.map((r) => r.tenant_role_id));
@@ -79,7 +82,11 @@ function buildChildrenMap(roles: RoleDto[]): Map<string | null, RoleDto[]> {
 
 function buildTree(roles: RoleDto[]): TreeNode[] {
   const children = buildChildrenMap(roles);
-  const walk = (parentId: string | null, depth: number, path: Set<string>): TreeNode[] => {
+  const walk = (
+    parentId: string | null,
+    depth: number,
+    path: Set<string>
+  ): TreeNode[] => {
     const kids = children.get(parentId) ?? [];
     const out: TreeNode[] = [];
     for (const r of kids) {
@@ -109,7 +116,6 @@ function matchesRole(r: RoleDto, q: string, status: StatusFilter): boolean {
     .includes(q);
 }
 
-/** Keep ancestors of matching nodes so tree context remains visible. */
 function filterRolesKeepAncestors(
   roles: RoleDto[],
   q: string,
@@ -132,8 +138,16 @@ function filterRolesKeepAncestors(
   return roles.filter((r) => keep.has(r.tenant_role_id));
 }
 
+/**
+ * Classic file-tree row:
+ * - continuous pale vertical lines through ancestors that still have siblings below
+ * - elbow (vertical + horizontal) into this node
+ * - expand chevron only when node has children
+ */
 function RoleTreeItem({
   node,
+  isLast,
+  ancestorContinues,
   expanded,
   selectedId,
   searching,
@@ -149,6 +163,9 @@ function RoleTreeItem({
   onDelete,
 }: {
   node: TreeNode;
+  isLast: boolean;
+  /** For each depth 0..depth-1: should the vertical guide continue past this row? */
+  ancestorContinues: boolean[];
   expanded: Set<string>;
   selectedId: string | null;
   searching: boolean;
@@ -182,35 +199,82 @@ function RoleTreeItem({
           }
         }}
         className={cn(
-          "group flex items-start gap-1 rounded-lg border px-2 py-2 transition-colors",
+          "group relative flex min-h-[2.75rem] items-center gap-1 rounded-md pe-1 transition-colors",
           isSelected
-            ? "border-primary/40 bg-primary/10 shadow-sm"
-            : "border-transparent hover:border-border/60 hover:bg-muted/40"
+            ? "bg-primary/10 ring-1 ring-inset ring-primary/25"
+            : "hover:bg-muted/50"
         )}
-        style={{ marginInlineStart: depth * 12 }}
       >
-        {hasChildren ? (
-          <button
-            type="button"
-            className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-muted"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!searching) onToggleExpand(role.tenant_role_id);
+        {/* Tree guide gutters */}
+        <div
+          className="relative flex shrink-0 self-stretch"
+          style={{ width: depth * TREE_INDENT + TREE_INDENT }}
+          aria-hidden
+        >
+          {ancestorContinues.map((continues, i) => (
+            <span
+              key={i}
+              className="absolute top-0 bottom-0 w-px bg-border/70"
+              style={{
+                insetInlineStart: i * TREE_INDENT + TREE_INDENT / 2,
+                opacity: continues ? 1 : 0,
+              }}
+            />
+          ))}
+          {depth > 0 ? (
+            <>
+              {/* vertical segment into this node (full height if not last, half if last) */}
+              <span
+                className="absolute w-px bg-border/70"
+                style={{
+                  insetInlineStart: (depth - 1) * TREE_INDENT + TREE_INDENT / 2,
+                  top: 0,
+                  bottom: isLast ? "50%" : 0,
+                }}
+              />
+              {/* horizontal elbow */}
+              <span
+                className="absolute h-px bg-border/70"
+                style={{
+                  insetInlineStart: (depth - 1) * TREE_INDENT + TREE_INDENT / 2,
+                  width: TREE_INDENT / 2,
+                  top: "50%",
+                }}
+              />
+            </>
+          ) : null}
+          {/* expand control column at this depth */}
+          <div
+            className="absolute top-1/2 z-[1] flex -translate-y-1/2 items-center justify-center"
+            style={{
+              insetInlineStart: depth * TREE_INDENT,
+              width: TREE_INDENT,
             }}
-            aria-label={open ? "جمع کردن" : "باز کردن"}
-            disabled={searching}
           >
-            {open ? (
-              <ChevronDown className="h-3.5 w-3.5" />
+            {hasChildren ? (
+              <button
+                type="button"
+                className="inline-flex h-5 w-5 items-center justify-center rounded-sm border border-border/60 bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!searching) onToggleExpand(role.tenant_role_id);
+                }}
+                aria-label={open ? "جمع کردن" : "باز کردن"}
+                disabled={searching}
+              >
+                {open ? (
+                  <ChevronDown className="h-3 w-3" />
+                ) : (
+                  <ChevronLeft className="h-3 w-3" />
+                )}
+              </button>
             ) : (
-              <ChevronLeft className="h-3.5 w-3.5" />
+              <span className="h-1.5 w-1.5 rounded-full bg-border" />
             )}
-          </button>
-        ) : (
-          <span className="mt-0.5 inline-block h-6 w-6 shrink-0" />
-        )}
+          </div>
+        </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 py-1.5">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="truncate text-sm font-medium">{role.name}</span>
             {depth === 0 ? (
@@ -228,7 +292,7 @@ function RoleTreeItem({
               </span>
             ) : null}
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
             {isActive ? (
               <StatusChip label="فعال" tone="success" />
             ) : (
@@ -243,7 +307,7 @@ function RoleTreeItem({
         </div>
 
         <div
-          className="flex shrink-0 items-center gap-0.5 opacity-70 group-hover:opacity-100"
+          className="flex shrink-0 items-center gap-0.5 opacity-60 group-hover:opacity-100"
           onClick={(e) => e.stopPropagation()}
         >
           {canCreate ? (
@@ -318,12 +382,13 @@ function RoleTreeItem({
         </div>
       </div>
 
-      {hasChildren && open ? (
-        <div className="mt-0.5 space-y-0.5 border-s border-border/40 ms-3 ps-1">
-          {children.map((child) => (
+      {hasChildren && open
+        ? children.map((child, idx) => (
             <RoleTreeItem
               key={child.role.tenant_role_id}
               node={child}
+              isLast={idx === children.length - 1}
+              ancestorContinues={[...ancestorContinues, !isLast]}
               expanded={expanded}
               selectedId={selectedId}
               searching={searching}
@@ -338,7 +403,90 @@ function RoleTreeItem({
               onDeactivate={onDeactivate}
               onDelete={onDelete}
             />
-          ))}
+          ))
+        : null}
+    </div>
+  );
+}
+
+function PermissionModuleGroup({
+  moduleName,
+  permissions,
+  draftPerms,
+  canAssign,
+  busy,
+  defaultOpen,
+  onToggle,
+}: {
+  moduleName: string;
+  permissions: Array<{
+    tenant_permission_id: string;
+    name: string;
+    code?: string;
+  }>;
+  draftPerms: Set<string>;
+  canAssign: boolean;
+  busy: boolean;
+  defaultOpen: boolean;
+  onToggle: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const selectedInGroup = permissions.filter((p) =>
+    draftPerms.has(p.tenant_permission_id)
+  ).length;
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-border/60">
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 bg-muted/25 px-3 py-2 text-start hover:bg-muted/40"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        {open ? (
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        ) : (
+          <ChevronLeft className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        )}
+        <span className="min-w-0 flex-1 truncate text-xs font-semibold">
+          {moduleName}
+        </span>
+        <span className="shrink-0 text-[10px] text-muted-foreground">
+          {toFaDigits(selectedInGroup)}/{toFaDigits(permissions.length)}
+        </span>
+      </button>
+      {open ? (
+        <div className="space-y-1 border-t border-border/50 p-2">
+          {permissions.map((p) => {
+            const checked = draftPerms.has(p.tenant_permission_id);
+            return (
+              <label
+                key={p.tenant_permission_id}
+                className={cn(
+                  "flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                  checked ? "bg-primary/5" : "hover:bg-muted/40",
+                  !canAssign && "cursor-default opacity-80"
+                )}
+              >
+                <Checkbox
+                  className="mt-0.5"
+                  checked={checked}
+                  onCheckedChange={() =>
+                    canAssign && onToggle(p.tenant_permission_id)
+                  }
+                  disabled={!canAssign || busy}
+                />
+                <span className="min-w-0 leading-snug">
+                  <span className="font-medium">{p.name}</span>
+                  {p.code ? (
+                    <span className="ms-1.5 font-mono text-[10px] text-muted-foreground">
+                      {p.code}
+                    </span>
+                  ) : null}
+                </span>
+              </label>
+            );
+          })}
         </div>
       ) : null}
     </div>
@@ -350,7 +498,9 @@ export function RolesListPage() {
   const canCreate = usePermission(IdentityPermissions.roleCreate);
   const canUpdate = usePermission(IdentityPermissions.roleUpdate);
   const canDelete = usePermission(IdentityPermissions.roleDelete);
-  const canAssignPerms = usePermission(IdentityPermissions.roleAssignPermissions);
+  const canAssignPerms = usePermission(
+    IdentityPermissions.roleAssignPermissions
+  );
 
   const { data, isLoading, isError, error, refetch, isFetching } = useRoles();
   const { data: allPerms, isLoading: permsLoading } = usePermissions();
@@ -466,7 +616,8 @@ export function RolesListPage() {
     const all = new Set<string>();
     const children = buildChildrenMap(filteredRoles);
     for (const r of filteredRoles) {
-      if ((children.get(r.tenant_role_id) ?? []).length) all.add(r.tenant_role_id);
+      if ((children.get(r.tenant_role_id) ?? []).length)
+        all.add(r.tenant_role_id);
     }
     setExpanded(all);
   };
@@ -635,6 +786,7 @@ export function RolesListPage() {
         ) : null}
 
         <div className="grid min-h-[calc(100vh-12rem)] grid-cols-1 gap-3 lg:grid-cols-2">
+          {/* راست: درخت نقش */}
           <section className="flex min-h-[20rem] flex-col overflow-hidden rounded-xl border border-border/70 bg-card lg:order-1">
             <div className="flex flex-wrap items-center gap-2 border-b border-border/60 bg-muted/20 px-3 py-2.5">
               <Shield className="h-4 w-4 text-muted-foreground" />
@@ -723,11 +875,13 @@ export function RolesListPage() {
                   }
                 />
               ) : (
-                <div className="space-y-0.5">
-                  {tree.map((node) => (
+                <div>
+                  {tree.map((node, idx) => (
                     <RoleTreeItem
                       key={node.role.tenant_role_id}
                       node={node}
+                      isLast={idx === tree.length - 1}
+                      ancestorContinues={[]}
                       expanded={expanded}
                       selectedId={selectedId}
                       searching={searchingRoles}
@@ -750,6 +904,7 @@ export function RolesListPage() {
             </div>
           </section>
 
+          {/* چپ: مجوزها */}
           <section className="flex min-h-[20rem] flex-col overflow-hidden rounded-xl border border-border/70 bg-card lg:order-2">
             <div className="flex flex-wrap items-center gap-2 border-b border-border/60 bg-muted/20 px-3 py-2.5">
               <h2 className="text-sm font-semibold">
@@ -810,8 +965,8 @@ export function RolesListPage() {
                 ) : null}
               </div>
               <p className="mt-1.5 text-[11px] text-muted-foreground">
-                تیک بزنید یا بردارید؛ سپس «ذخیره» را بزنید. مجوز هر نقش مستقل است
-                (بدون ارث‌بری زنده از والد).
+                هر ماژول را باز کنید، تیک بزنید، سپس ذخیره. مجوز هر نقش مستقل
+                است.
               </p>
             </div>
 
@@ -823,14 +978,14 @@ export function RolesListPage() {
                 />
               ) : detailLoading && !selectedRoleDetail ? (
                 <div className="space-y-2">
-                  {Array.from({ length: 10 }).map((_, i) => (
-                    <Skeleton key={i} className="h-9 w-full" />
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
                   ))}
                 </div>
               ) : permsLoading ? (
                 <div className="space-y-2">
-                  {Array.from({ length: 10 }).map((_, i) => (
-                    <Skeleton key={i} className="h-9 w-full" />
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
                   ))}
                 </div>
               ) : filteredPerms.length === 0 ? (
@@ -842,48 +997,18 @@ export function RolesListPage() {
                   }
                 />
               ) : (
-                <div className="space-y-4">
-                  {permsByModule.map(([mod, list]) => (
-                    <div key={mod}>
-                      <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {mod}
-                      </h3>
-                      <div className="space-y-1">
-                        {list.map((p) => {
-                          const checked = draftPerms.has(p.tenant_permission_id);
-                          return (
-                            <label
-                              key={p.tenant_permission_id}
-                              className={cn(
-                                "flex cursor-pointer items-start gap-2 rounded-lg border px-2.5 py-2 text-sm transition-colors",
-                                checked
-                                  ? "border-primary/30 bg-primary/5"
-                                  : "border-border/50 hover:bg-muted/40",
-                                !canAssignPerms && "cursor-default opacity-80"
-                              )}
-                            >
-                              <Checkbox
-                                className="mt-0.5"
-                                checked={checked}
-                                onCheckedChange={() =>
-                                  canAssignPerms &&
-                                  togglePerm(p.tenant_permission_id)
-                                }
-                                disabled={!canAssignPerms || assignMutation.isPending}
-                              />
-                              <span className="min-w-0 leading-snug">
-                                <span className="font-medium">{p.name}</span>
-                                {p.code ? (
-                                  <span className="ms-1.5 font-mono text-[10px] text-muted-foreground">
-                                    {p.code}
-                                  </span>
-                                ) : null}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
+                <div className="space-y-2">
+                  {permsByModule.map(([mod, list], idx) => (
+                    <PermissionModuleGroup
+                      key={mod}
+                      moduleName={mod}
+                      permissions={list}
+                      draftPerms={draftPerms}
+                      canAssign={canAssignPerms}
+                      busy={assignMutation.isPending}
+                      defaultOpen={idx === 0 || Boolean(permQuery.trim())}
+                      onToggle={togglePerm}
+                    />
                   ))}
                 </div>
               )}
