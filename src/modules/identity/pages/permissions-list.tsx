@@ -1,24 +1,34 @@
-/** Permissions catalog — read-only for tenant admins. Source of truth = platform seeders. */
+/** Permissions catalog — owner may relabel name + description; create/delete still seeder-only. */
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Search, KeyRound, X, Info } from "lucide-react";
+import { Loader2, Search, KeyRound, X, Info, Pencil } from "lucide-react";
+import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { Input } from "@/shared/components/ui/input";
 import { Button } from "@/shared/components/ui/button";
 import { Skeleton } from "@/shared/components/ui/skeleton";
+import { Textarea } from "@/shared/components/ui/textarea";
+import { Label } from "@/shared/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/shared/components/ui/tooltip";
-import { usePermission } from "@/auth";
+import { useAuthStore, usePermission } from "@/auth";
 import { ApiClientError } from "@/api";
 import { cn, toFaDigits } from "@/shared/lib/utils";
-import { usePermissions } from "../hooks/use-permissions";
+import { usePermissions, useUpdatePermission } from "../hooks/use-permissions";
 import { IdentityPermissions } from "../types";
 import type { PermissionDto } from "../services/permission-service";
 import {
@@ -34,13 +44,21 @@ import {
 
 export function PermissionsListPage() {
   const canView = usePermission(IdentityPermissions.permissionView);
+  const isOwner = useAuthStore((s) => s.securityContext?.is_owner === true);
+  const canRelabel = isOwner;
 
   const { data, isLoading, isError, error, refetch, isFetching } =
     usePermissions();
+  const updateMutation = useUpdatePermission();
 
   const [moduleQuery, setModuleQuery] = useState("");
   const [permQuery, setPermQuery] = useState("");
   const [selectedModule, setSelectedModule] = useState<string | null>(null);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing] = useState<PermissionDto | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editHint, setEditHint] = useState("");
 
   const rows = data ?? [];
 
@@ -61,7 +79,6 @@ export function PermissionsListPage() {
         )
       ),
       count: perms.length,
-      activeCount: perms.filter((p) => (p.status ?? 1) === 1).length,
     }));
     entries.sort((a, b) => a.name.localeCompare(b.name, "fa"));
     return entries;
@@ -111,6 +128,40 @@ export function PermissionsListPage() {
     );
   }, [modules, selectedModule, permQuery]);
 
+  function openEdit(p: PermissionDto) {
+    setEditing(p);
+    setEditName(p.name?.trim() || displayPermissionName(p.name, p.code));
+    setEditHint(p.description?.trim() || "");
+    setEditOpen(true);
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    const name = editName.trim();
+    if (!name) {
+      toast.error("عنوان مجوز نمی‌تواند خالی باشد.");
+      return;
+    }
+    try {
+      await updateMutation.mutateAsync({
+        id: editing.tenant_permission_id,
+        payload: {
+          name,
+          description: editHint.trim() || null,
+        },
+      });
+      toast.success("عنوان و راهنمای مجوز ذخیره شد.");
+      setEditOpen(false);
+      setEditing(null);
+    } catch (e) {
+      const msg =
+        e instanceof ApiClientError && e.message
+          ? e.message
+          : "ذخیره ممکن نشد.";
+      toast.error(msg);
+    }
+  }
+
   if (!canView) {
     return (
       <div className="space-y-6">
@@ -134,7 +185,11 @@ export function PermissionsListPage() {
       <div className="flex min-h-0 flex-col gap-3">
         <PageHeader
           title="مجوزها"
-          description="کاتالوگ عملیات سیستم — فقط مشاهده. ایجاد و حذف فقط از طریق تیم توسعه (سیدر) انجام می‌شود."
+          description={
+            canRelabel
+              ? "کاتالوگ عملیات سیستم. مالک می‌تواند عنوان و راهنمای کاربری را ویرایش کند؛ ایجاد/حذف فقط از سیدر."
+              : "کاتالوگ عملیات سیستم — فقط مشاهده. ایجاد و حذف فقط از طریق تیم توسعه (سیدر)."
+          }
           breadcrumbs={[
             { label: "داشبورد", href: "/dashboard" },
             { label: "هویت و دسترسی", href: "/dashboard/identity" },
@@ -145,10 +200,11 @@ export function PermissionsListPage() {
         <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <p className="leading-relaxed">
-            مجوزها عملیات تعریف‌شده در نرم‌افزار هستند. مدیر سازمان فقط از صفحهٔ
-            «نقش‌ها» مشخص می‌کند هر نقش به کدام عملیات دسترسی دارد. فعال یا
-            غیرفعال بودن گروه‌ها برای هر مشتری توسط مالک پلتفرم بر اساس طرح
-            اشتراک تنظیم می‌شود.
+            کد سیستمی مجوز تغییر نمی‌کند. تخصیص عملیات به نقش‌ها در صفحه «نقش‌ها»
+            انجام می‌شود.
+            {canRelabel
+              ? " با آیکن ویرایش می‌توانید عنوان فارسی و راهنمای (هینت) هر مجوز را برای همین سازمان تنظیم کنید."
+              : " ویرایش عنوان و راهنما فقط برای مالک سازمان فعال است."}
           </p>
         </div>
 
@@ -306,42 +362,54 @@ export function PermissionsListPage() {
                     const active = (p.status ?? 1) === 1;
                     return (
                       <li key={p.tenant_permission_id}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div
-                              className={cn(
-                                "flex items-center gap-2 rounded-md px-2.5 py-2",
-                                !active && "opacity-50"
-                              )}
-                            >
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2">
+                        <div
+                          className={cn(
+                            "flex items-start gap-2 rounded-md px-2.5 py-2",
+                            !active && "opacity-50"
+                          )}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
                                   <span className="truncate text-[13px] font-medium text-foreground">
                                     {title}
                                   </span>
-                                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                                    {actionTypeLabel(p.action_type)}
-                                  </span>
-                                  {!active ? (
-                                    <span className="shrink-0 text-[10px] text-amber-700 dark:text-amber-300">
-                                      غیرفعال در این سازمان
-                                    </span>
-                                  ) : null}
-                                </div>
-                                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                                  {hint}
-                                </p>
-                              </div>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  side="top"
+                                  className="max-w-xs text-xs leading-relaxed"
+                                >
+                                  <p className="font-medium">{title}</p>
+                                  <p className="mt-1 opacity-90">{hint}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                {actionTypeLabel(p.action_type)}
+                              </span>
+                              {!active ? (
+                                <span className="shrink-0 text-[10px] text-amber-700 dark:text-amber-300">
+                                  غیرفعال
+                                </span>
+                              ) : null}
                             </div>
-                          </TooltipTrigger>
-                          <TooltipContent
-                            side="left"
-                            className="max-w-xs text-xs leading-relaxed"
-                          >
-                            <p className="font-medium">{title}</p>
-                            <p className="mt-1 opacity-90">{hint}</p>
-                          </TooltipContent>
-                        </Tooltip>
+                            <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">
+                              {hint}
+                            </p>
+                          </div>
+                          {canRelabel ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                              onClick={() => openEdit(p)}
+                              aria-label="ویرایش عنوان و راهنما"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : null}
+                        </div>
                       </li>
                     );
                   })}
@@ -350,6 +418,71 @@ export function PermissionsListPage() {
             </div>
           </section>
         </div>
+
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>ویرایش عنوان و راهنمای مجوز</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-1">
+              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+                کد سیستمی:{" "}
+                <span className="font-mono text-foreground">
+                  {editing?.code ?? "—"}
+                </span>
+                <span className="mt-1 block">این کد قابل تغییر نیست.</span>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="perm-name">عنوان نمایشی</Label>
+                <Input
+                  id="perm-name"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  maxLength={200}
+                  placeholder="مثلاً مشاهده کاربران"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="perm-hint">راهنمای کاربری (هینت)</Label>
+                <Textarea
+                  id="perm-hint"
+                  value={editHint}
+                  onChange={(e) => setEditHint(e.target.value)}
+                  maxLength={500}
+                  rows={4}
+                  placeholder="توضیح دقیق برای مدیر: این مجوز دقیقاً چه کاری را مجاز می‌کند…"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  این متن در tooltip و زیر عنوان نشان داده می‌شود.
+                </p>
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditOpen(false)}
+                disabled={updateMutation.isPending}
+              >
+                انصراف
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void saveEdit()}
+                disabled={updateMutation.isPending}
+              >
+                {updateMutation.isPending ? (
+                  <>
+                    <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />
+                    در حال ذخیره…
+                  </>
+                ) : (
+                  "ذخیره"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </TooltipProvider>
   );
