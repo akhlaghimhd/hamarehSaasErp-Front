@@ -48,6 +48,7 @@ import {
   filterRolesKeepAncestors,
 } from "./roles-tree";
 import { PermissionModuleGroup } from "./roles-perm-group";
+import { localizeModuleName } from "../lib/permission-labels";
 
 type StatusFilter = "all" | "active" | "inactive";
 
@@ -144,7 +145,7 @@ export function RolesListPage() {
     const q = permQuery.trim().toLowerCase();
     if (!q) return list;
     return list.filter((p) =>
-      [p.name, p.code, p.module_name, p.description]
+      [p.name, p.code, p.module_name, p.description, localizeModuleName(p.module_name)]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
@@ -155,7 +156,7 @@ export function RolesListPage() {
   const permsByModule = useMemo(() => {
     const map = new Map<string, typeof filteredPerms>();
     for (const p of filteredPerms) {
-      const mod = p.module_name?.trim() || "سایر";
+      const mod = localizeModuleName(p.module_name);
       const list = map.get(mod) ?? [];
       list.push(p);
       map.set(mod, list);
@@ -382,22 +383,10 @@ export function RolesListPage() {
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
               ) : null}
               <div className="ms-auto flex gap-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={expandAll}
-                >
+                <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={expandAll}>
                   باز کردن همه
                 </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={collapseAll}
-                >
+                <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={collapseAll}>
                   جمع کردن
                 </Button>
               </div>
@@ -423,10 +412,7 @@ export function RolesListPage() {
                   </button>
                 ) : null}
               </div>
-              <Select
-                value={statusFilter}
-                onValueChange={(v) => setStatusFilter(v as StatusFilter)}
-              >
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
                 <SelectTrigger className="h-8 w-[8rem]">
                   <SelectValue />
                 </SelectTrigger>
@@ -447,9 +433,7 @@ export function RolesListPage() {
                 </div>
               ) : tree.length === 0 ? (
                 <EmptyState
-                  title={
-                    searchingRoles ? "نتیجه‌ای پیدا نشد" : "هنوز نقشی تعریف نشده"
-                  }
+                  title={searchingRoles ? "نتیجه‌ای پیدا نشد" : "هنوز نقشی تعریف نشده"}
                   description={
                     searchingRoles
                       ? "عبارت یا فیلتر را تغییر دهید"
@@ -474,9 +458,7 @@ export function RolesListPage() {
                       canCreate={canCreate}
                       canUpdate={canUpdate}
                       canDelete={canDelete}
-                      bulkBusy={
-                        updateMutation.isPending || deleteMutation.isPending
-                      }
+                      bulkBusy={updateMutation.isPending || deleteMutation.isPending}
                       onCreateChild={(id) => openCreate(id)}
                       onActivate={(r) => void activateOne(r)}
                       onDeactivate={(r) => void deactivateOne(r)}
@@ -491,9 +473,7 @@ export function RolesListPage() {
           <section className="flex min-h-[20rem] flex-col overflow-hidden rounded-xl border border-border/70 bg-card lg:order-2">
             <div className="flex flex-wrap items-center gap-2 border-b border-border/60 bg-muted/20 px-3 py-2.5">
               <h2 className="text-sm font-semibold">
-                {selectedName
-                  ? `مجوزهای «${selectedName}»`
-                  : "مجوزهای نقش"}
+                {selectedName ? `مجوزهای «${selectedName}»` : "مجوزهای نقش"}
               </h2>
               {detailFetching || detailLoading ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
@@ -508,31 +488,14 @@ export function RolesListPage() {
               ) : null}
               <div className="ms-auto flex gap-1">
                 {canAssignPerms && selectedId && permsDirty ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 gap-1"
-                    disabled={assignMutation.isPending}
-                    onClick={resetPermissions}
-                  >
+                  <Button type="button" variant="ghost" size="sm" className="h-7 gap-1" disabled={assignMutation.isPending} onClick={resetPermissions}>
                     <RotateCcw className="h-3.5 w-3.5" />
                     انصراف
                   </Button>
                 ) : null}
                 {canAssignPerms && selectedId ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-7 gap-1"
-                    disabled={!permsDirty || assignMutation.isPending}
-                    onClick={() => void savePermissions()}
-                  >
-                    {assignMutation.isPending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Save className="h-3.5 w-3.5" />
-                    )}
+                  <Button type="button" size="sm" className="h-7 gap-1" disabled={!permsDirty || assignMutation.isPending} onClick={() => void savePermissions()}>
+                    {assignMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                     ذخیره
                   </Button>
                 ) : null}
@@ -550,48 +513,25 @@ export function RolesListPage() {
                   disabled={!selectedId}
                 />
                 {permQuery ? (
-                  <button
-                    type="button"
-                    className="absolute end-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                    aria-label="پاک کردن"
-                    onClick={() => setPermQuery("")}
-                  >
+                  <button type="button" className="absolute end-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="پاک کردن" onClick={() => setPermQuery("")}>
                     <X className="h-3.5 w-3.5" />
                   </button>
                 ) : null}
               </div>
               <p className="mt-1.5 text-[11px] text-muted-foreground">
-                هر ماژول را باز کنید، تیک بزنید، سپس ذخیره. مجوز هر نقش مستقل است.
-                برداشتن تیک «انتخاب همه» گروه را به آخرین ذخیره برمی‌گرداند.
+                هر ماژول را باز کنید، تیک بزنید، سپس ذخیره. برداشتن تیک «انتخاب همه» گروه را به آخرین ذخیره برمی‌گرداند.
               </p>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
               {!selectedId ? (
-                <EmptyState
-                  title="نقشی انتخاب نشده"
-                  description="از پنل راست یک نقش را انتخاب کنید"
-                />
+                <EmptyState title="نقشی انتخاب نشده" description="از پنل راست یک نقش را انتخاب کنید" />
               ) : detailLoading && !selectedRoleDetail ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
-                  ))}
-                </div>
+                <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
               ) : permsLoading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
-                  ))}
-                </div>
+                <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
               ) : filteredPerms.length === 0 ? (
-                <EmptyState
-                  title={
-                    permQuery.trim()
-                      ? "مجوزی با این جستجو نیست"
-                      : "هنوز مجوزی تعریف نشده"
-                  }
-                />
+                <EmptyState title={permQuery.trim() ? "مجوزی با این جستجو نیست" : "هنوز مجوزی تعریف نشده"} />
               ) : (
                 <div className="space-y-2">
                   {permsByModule.map(([mod, list], idx) => (
@@ -613,33 +553,14 @@ export function RolesListPage() {
 
             {canAssignPerms && selectedId && permsDirty ? (
               <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-muted/20 px-3 py-2">
-                <span className="text-xs text-muted-foreground">
-                  تغییرات ذخیره نشده
-                </span>
+                <span className="text-xs text-muted-foreground">تغییرات ذخیره نشده</span>
                 <div className="flex gap-1.5">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 gap-1.5"
-                    disabled={assignMutation.isPending}
-                    onClick={resetPermissions}
-                  >
+                  <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5" disabled={assignMutation.isPending} onClick={resetPermissions}>
                     <RotateCcw className="h-4 w-4" />
                     انصراف
                   </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-8 gap-1.5"
-                    disabled={assignMutation.isPending}
-                    onClick={() => void savePermissions()}
-                  >
-                    {assignMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4" />
-                    )}
+                  <Button type="button" size="sm" className="h-8 gap-1.5" disabled={assignMutation.isPending} onClick={() => void savePermissions()}>
+                    {assignMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                     ذخیره مجوزها
                   </Button>
                 </div>
