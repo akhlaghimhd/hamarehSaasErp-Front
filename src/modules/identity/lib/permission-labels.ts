@@ -1,4 +1,18 @@
-/** Persian display for permission module + permission titles (fallback when DB still mixed). */
+/** Persian display helpers for permissions (module, title, module icon). */
+
+import type { LucideIcon } from "lucide-react";
+import {
+  Calculator,
+  Package,
+  Database,
+  Building2,
+  Handshake,
+  ShoppingCart,
+  Shield,
+  Workflow,
+  LayoutGrid,
+  Server,
+} from "lucide-react";
 
 const MODULE_FA: Record<string, string> = {
   Identity: "هویت و دسترسی",
@@ -23,8 +37,8 @@ const MODULE_FA: Record<string, string> = {
   Sales: "خرید و فروش",
   SaasAdmin: "مدیریت پلتفرم",
   saasadmin: "مدیریت پلتفرم",
-  SaasPlatform: "پلتفرم SaaS",
-  saasplatform: "پلتفرم SaaS",
+  SaasPlatform: "مدیریت پلتفرم",
+  saasplatform: "مدیریت پلتفرم",
   Workflow: "گردش کار",
   workflow: "گردش کار",
   DocumentManagement: "مدیریت اسناد",
@@ -54,14 +68,8 @@ const ACTION_FA: Record<string, string> = {
   restore: "بازگردانی",
   start: "شروع",
   complete: "انجام",
-  READ: "مشاهده",
-  CREATE: "ایجاد",
-  UPDATE: "ویرایش",
-  DELETE: "حذف",
-  EXECUTE: "اجرا",
 };
 
-/** Word-level entity translation for code segments / leftover English in names. */
 const WORD_FA: Record<string, string> = {
   user: "کاربر",
   users: "کاربران",
@@ -94,7 +102,6 @@ const WORD_FA: Record<string, string> = {
   schedule: "برنامه",
   purchase: "خرید",
   sales: "فروش",
-  salesorder: "سفارش فروش",
   receipt: "رسید",
   requisition: "درخواست",
   delivery: "حواله",
@@ -121,12 +128,35 @@ const WORD_FA: Record<string, string> = {
   log: "لاگ",
   admin: "مدیریت",
   saas: "پلتفرم",
+  platform: "پلتفرم",
+  master: "پایه",
+  data: "داده",
+};
+
+/** Module header → Lucide icon (until permission.icon is stored in DB). */
+export const MODULE_ICONS: Record<string, LucideIcon> = {
+  "هویت و دسترسی": Shield,
+  حسابداری: Calculator,
+  انبار: Package,
+  "داده‌های پایه": Database,
+  سازمان: Building2,
+  "شرکای تجاری": Handshake,
+  "خرید و فروش": ShoppingCart,
+  "مدیریت پلتفرم": Server,
+  "گردش کار": Workflow,
+  "مدیریت اسناد": LayoutGrid,
+  تولید: Package,
 };
 
 export function localizeModuleName(name?: string | null): string {
   const raw = (name ?? "").trim();
   if (!raw) return "سایر";
   return MODULE_FA[raw] ?? MODULE_FA[raw.toLowerCase()] ?? raw;
+}
+
+export function moduleIcon(moduleName?: string | null): LucideIcon {
+  const fa = localizeModuleName(moduleName);
+  return MODULE_ICONS[fa] ?? LayoutGrid;
 }
 
 function translateWords(raw: string): string {
@@ -138,27 +168,20 @@ function translateWords(raw: string): string {
   return parts.map((w) => WORD_FA[w] ?? w).join(" ");
 }
 
-/**
- * Prefer DB Persian name. If name is missing, pure English, or mixed (FA action + EN entity),
- * rebuild from code with full Persian words.
- */
+/** Always prefer pure Persian title; rebuild from code when Latin remains. */
 export function displayPermissionName(
   name?: string | null,
   code?: string | null
 ): string {
   const n = (name ?? "").trim();
-  const hasPersian = /[\u0600-\u06FF]/.test(n);
   const hasLatin = /[A-Za-z]{2,}/.test(n);
 
-  // Clean Persian-only title from DB
-  if (n && hasPersian && !hasLatin) return n;
+  if (n && !hasLatin) return n;
 
   if (code) {
     const parts = code.split(".");
     const action = parts[parts.length - 1] ?? "";
-    const entityRaw = parts.slice(0, -1).join(".") || parts[0] || "";
-    // drop module prefix if present (identity.user.view → user)
-    const entityParts = entityRaw.split(".");
+    const entityParts = parts.slice(0, -1);
     const entity =
       entityParts.length > 1
         ? entityParts.slice(1).join(" ")
@@ -166,22 +189,18 @@ export function displayPermissionName(
     const a = ACTION_FA[action] ?? action;
     const e = translateWords(entity);
     const built = `${a} ${e}`.replace(/\s+/g, " ").trim();
-    if (built) return built;
+    if (built && !/[A-Za-z]{2,}/.test(built)) return built;
+    if (built) return built.replace(/[A-Za-z]+/g, (m) => WORD_FA[m.toLowerCase()] ?? m);
   }
 
-  // Last resort: translate leftover English words inside name
-  if (n) {
-    if (hasLatin) {
-      return n
-        .split(/(\s+)/)
-        .map((tok) =>
-          /[A-Za-z]/.test(tok) ? translateWords(tok) : tok
-        )
-        .join("")
-        .replace(/\s+/g, " ")
-        .trim();
-    }
-    return n;
+  if (n && hasLatin) {
+    return n
+      .split(/(\s+)/)
+      .map((tok) => (/[A-Za-z]/.test(tok) ? translateWords(tok) : tok))
+      .join("")
+      .replace(/\s+/g, " ")
+      .trim();
   }
-  return "—";
+
+  return n || "—";
 }

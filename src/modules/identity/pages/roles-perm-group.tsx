@@ -10,7 +10,10 @@ import {
   TooltipTrigger,
 } from "@/shared/components/ui/tooltip";
 import { cn, toFaDigits } from "@/shared/lib/utils";
-import { displayPermissionName } from "../lib/permission-labels";
+import {
+  displayPermissionName,
+  moduleIcon,
+} from "../lib/permission-labels";
 
 export function PermissionModuleGroup({
   moduleName,
@@ -44,6 +47,7 @@ export function PermissionModuleGroup({
   ).length;
   const allSelected = ids.length > 0 && selectedInGroup === ids.length;
   const someSelected = selectedInGroup > 0 && !allSelected;
+  const Icon = moduleIcon(moduleName);
 
   return (
     <div className="overflow-hidden rounded-lg border border-border/60">
@@ -68,6 +72,7 @@ export function PermissionModuleGroup({
           ) : (
             <ChevronLeft className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           )}
+          <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
           <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">
             {moduleName}
           </span>
