@@ -1,95 +1,58 @@
-export type GenderCode = 1 | 2;
+/** Identity module shared types and permission codes. */
 
-export type AddressChangeStatus = 0 | 1 | 2 | 3;
-
-/** Membership status on tenant_users (1 = active, 0 = inactive). */
-export type TenantUserStatus = 0 | 1;
-
-export interface UserProfileDto {
-  profile_id?: string;
-  user_id: string;
-  national_id?: string | null;
-  birth_date?: string | null;
-  avatar_url?: string | null;
-  has_avatar?: boolean;
-  gender?: number | null;
-  address?: string | null;
-  pending_address?: string | null;
-  address_change_status?: AddressChangeStatus | number;
-  phone?: string | null;
-  display_bio?: string | null;
-  description?: string | null;
-  row_version?: number;
-  created_at?: string;
-  updated_at?: string;
-  user?: {
-    user_id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-    mobile?: string | null;
-  } | null;
-}
-
-export interface SelfUpsertProfilePayload {
-  display_bio?: string | null;
-}
-
-export interface UpsertProfilePayload {
-  national_id?: string | null;
-  birth_date?: string | null;
-  avatar_url?: string | null;
-  gender?: number | null;
-  address?: string | null;
-  phone?: string | null;
-  description?: string | null;
-  display_bio?: string | null;
-}
+export type TenantUserStatus = "active" | "inactive" | "pending" | string;
 
 export interface TenantUserUserDto {
-  user_id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
+  user_id?: string;
+  email?: string | null;
   mobile?: string | null;
-  user_kind?: number;
-  status?: number;
-  last_login_at?: string | null;
-  created_at?: string;
-  updated_at?: string;
+  display_name?: string | null;
 }
 
 export interface TenantUserDto {
   tenant_user_id: string;
-  tenant_id: string;
-  user_id: string;
-  employee_id?: string | null;
-  is_owner: boolean;
-  status: TenantUserStatus | number;
-  row_version?: number;
-  created_at?: string;
-  updated_at?: string;
-  deleted_at?: string | null;
+  tenant_id?: string;
+  user_id?: string;
+  status?: number | TenantUserStatus;
+  is_owner?: boolean;
+  joined_at?: string | null;
   user?: TenantUserUserDto | null;
+  [key: string]: unknown;
 }
 
-/** Admin create: no password; email domain from server; local part optional override. */
 export interface CreateTenantUserPayload {
-  first_name: string;
-  last_name: string;
   mobile: string;
-  email_local_part?: string;
-  is_owner?: boolean;
-  role_ids?: string[];
+  display_name?: string;
+  [key: string]: unknown;
 }
 
 export interface UpdateTenantUserPayload {
+  status?: number;
+  display_name?: string;
+  [key: string]: unknown;
+}
+
+export interface UserProfileDto {
+  user_id?: string;
+  display_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  avatar_url?: string | null;
+  gender?: string | null;
+  birth_date?: string | null;
+  [key: string]: unknown;
+}
+
+export interface SelfUpsertProfilePayload {
+  display_name?: string;
   first_name?: string;
   last_name?: string;
-  mobile?: string | null;
-  is_owner?: boolean;
-  status?: TenantUserStatus | number;
+  gender?: string;
+  birth_date?: string | null;
+  [key: string]: unknown;
 }
+
+export type UpsertProfilePayload = SelfUpsertProfilePayload;
 
 export const IdentityPermissions = {
   userView: "identity.user.view",
@@ -106,6 +69,9 @@ export const IdentityPermissions = {
   roleAssign: "identity.role.assign",
   roleAssignPermissions: "identity.role.assign-permissions",
   permissionView: "identity.permission.view",
+  permissionCreate: "identity.permission.create",
+  permissionUpdate: "identity.permission.update",
+  permissionDelete: "identity.permission.delete",
   scopeView: "identity.scope.view",
   scopeAssign: "identity.scope.assign",
   membershipHistoryView: "identity.membership_history.view",
