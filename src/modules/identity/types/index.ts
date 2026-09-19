@@ -1,12 +1,17 @@
-/** Identity module shared types and permission codes. */
+export type GenderCode = 1 | 2;
 
-export type TenantUserStatus = "active" | "inactive" | "pending" | string;
+export type AddressChangeStatus = 0 | 1 | 2 | 3;
+
+/** Membership status on tenant_users (1 = active, 0 = inactive). */
+export type TenantUserStatus = 0 | 1;
 
 export interface TenantUserUserDto {
   user_id?: string;
   email?: string | null;
   mobile?: string | null;
   display_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
 }
 
 export interface TenantUserDto {
@@ -16,6 +21,7 @@ export interface TenantUserDto {
   status?: number | TenantUserStatus;
   is_owner?: boolean;
   joined_at?: string | null;
+  left_at?: string | null;
   user?: TenantUserUserDto | null;
   [key: string]: unknown;
 }
@@ -38,7 +44,7 @@ export interface UserProfileDto {
   first_name?: string | null;
   last_name?: string | null;
   avatar_url?: string | null;
-  gender?: string | null;
+  gender?: GenderCode | null;
   birth_date?: string | null;
   [key: string]: unknown;
 }
@@ -47,7 +53,7 @@ export interface SelfUpsertProfilePayload {
   display_name?: string;
   first_name?: string;
   last_name?: string;
-  gender?: string;
+  gender?: GenderCode | string;
   birth_date?: string | null;
   [key: string]: unknown;
 }
