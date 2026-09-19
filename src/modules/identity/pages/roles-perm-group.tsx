@@ -33,7 +33,7 @@ export function PermissionModuleGroup({
   busy: boolean;
   defaultOpen: boolean;
   onToggle: (id: string) => void;
-  /** checked=true → select all in group; false → restore group to last saved baseline */
+  /** checked=true → select all in group; false → clear all in group */
   onToggleMany: (ids: string[], checked: boolean) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -57,7 +57,7 @@ export function PermissionModuleGroup({
           aria-label={`انتخاب همه ${moduleName}`}
           title={
             allSelected
-              ? "برگرداندن این گروه به وضعیت ذخیره‌شده"
+              ? "برداشتن انتخاب همه مجوزهای این گروه"
               : "انتخاب همه مجوزهای این گروه"
           }
         />
