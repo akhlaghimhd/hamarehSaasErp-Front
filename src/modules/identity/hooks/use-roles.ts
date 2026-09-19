@@ -42,7 +42,7 @@ export function useRole(id: string | null | undefined) {
     queryKey: roleQueryKey(id ?? ""),
     queryFn: () => (id ? roleService.getById(id) : Promise.resolve(null)),
     enabled: Boolean(id),
-    staleTime: 60_000,
+    staleTime: 30_000,
     retry: 1,
   });
 }
@@ -112,8 +112,9 @@ export function useAssignPermissionsToRole() {
     onSuccess: (_v, vars) => {
       void qc.invalidateQueries({
         queryKey: roleQueryKey(vars.tenantRoleId),
+        refetchType: "active",
       });
-      void qc.invalidateQueries({ queryKey: rolesQueryKey });
+      void qc.invalidateQueries({ queryKey: rolesQueryKey, refetchType: "active" });
     },
   });
 }
