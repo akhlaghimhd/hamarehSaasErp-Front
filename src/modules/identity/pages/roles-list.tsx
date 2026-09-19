@@ -26,6 +26,14 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog";
+import { Label } from "@/shared/components/ui/label";
 import { usePermission } from "@/auth";
 import { ApiClientError } from "@/api";
 import { cn, toFaDigits } from "@/shared/lib/utils";
@@ -74,6 +82,9 @@ export function RolesListPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
   const [defaultParentId, setDefaultParentId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<RoleDto | null>(null);
+  const [renameTarget, setRenameTarget] = useState<RoleDto | null>(null);
+  const [renameName, setRenameName] = useState("");
   const [draftPerms, setDraftPerms] = useState<Set<string>>(new Set());
   const [baselinePerms, setBaselinePerms] = useState<Set<string>>(new Set());
   const [permsDirty, setPermsDirty] = useState(false);
@@ -238,15 +249,48 @@ export function RolesListPage() {
     }
   };
 
-  const deleteOne = async (row: RoleDto) => {
-    if (!window.confirm(`نقش «${row.name}» حذف نرم شود؟`)) return;
+  const requestDelete = (row: RoleDto) => {
+    setDeleteTarget(row);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await deleteMutation.mutateAsync(row.tenant_role_id);
+      await deleteMutation.mutateAsync(deleteTarget.tenant_role_id);
       toast.success("نقش حذف شد");
-      if (selectedId === row.tenant_role_id) setSelectedId(null);
+      if (selectedId === deleteTarget.tenant_role_id) setSelectedId(null);
+      setDeleteTarget(null);
     } catch (e) {
       toast.error(
         e instanceof ApiClientError && e.message ? e.message : "حذف ممکن نشد"
+      );
+    }
+  };
+
+  const requestRename = (row: RoleDto) => {
+    setRenameTarget(row);
+    setRenameName(row.name);
+  };
+
+  const confirmRename = async () => {
+    if (!renameTarget) return;
+    const name = renameName.trim();
+    if (!name) {
+      toast.error("عنوان نقش را وارد کنید");
+      return;
+    }
+    try {
+      await updateMutation.mutateAsync({
+        id: renameTarget.tenant_role_id,
+        payload: { name },
+      });
+      toast.success("عنوان نقش به‌روز شد");
+      setRenameTarget(null);
+      void refetch();
+      if (selectedId === renameTarget.tenant_role_id) void refetchDetail();
+    } catch (e) {
+      toast.error(
+        e instanceof ApiClientError && e.message ? e.message : "ویرایش ممکن نشد"
       );
     }
   };
@@ -464,7 +508,8 @@ export function RolesListPage() {
                       onCreateChild={(id) => openCreate(id)}
                       onActivate={(r) => void activateOne(r)}
                       onDeactivate={(r) => void deactivateOne(r)}
-                      onDelete={(r) => void deleteOne(r)}
+                      onDelete={requestDelete}
+                      onRename={requestRename}
                     />
                   ))}
                 </div>
@@ -520,9 +565,6 @@ export function RolesListPage() {
                   </button>
                 ) : null}
               </div>
-              <p className="mt-1.5 text-[11px] text-muted-foreground">
-                هر ماژول را باز کنید، تیک بزنید، سپس ذخیره. برای برگرداندن همه تغییرات از «انصراف» استفاده کنید.
-              </p>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
@@ -570,6 +612,54 @@ export function RolesListPage() {
             ) : null}
           </section>
         </div>
+
+        <Dialog open={Boolean(deleteTarget)} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+          <DialogContent className="sm:max-w-md" dir="rtl">
+            <DialogHeader>
+              <DialogTitle>حذف نقش</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              نقش «{deleteTarget?.name}» حذف نرم شود؟
+              اگر این نقش زیرنقش داشته باشد یا به کاربری تخصیص داده شده باشد، سیستم اجازهٔ حذف نمی‌دهد.
+            </p>
+            <DialogFooter className="gap-2 sm:justify-start">
+              <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleteMutation.isPending}>
+                انصراف
+              </Button>
+              <Button type="button" variant="destructive" onClick={() => void confirmDelete()} disabled={deleteMutation.isPending}>
+                {deleteMutation.isPending ? "در حال حذف…" : "حذف نقش"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={Boolean(renameTarget)} onOpenChange={(o) => !o && setRenameTarget(null)}>
+          <DialogContent className="sm:max-w-md" dir="rtl">
+            <DialogHeader>
+              <DialogTitle>ویرایش عنوان نقش</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="role-rename">عنوان</Label>
+              <Input
+                id="role-rename"
+                value={renameName}
+                onChange={(e) => setRenameName(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void confirmRename();
+                }}
+              />
+            </div>
+            <DialogFooter className="gap-2 sm:justify-start">
+              <Button type="button" variant="outline" onClick={() => setRenameTarget(null)} disabled={updateMutation.isPending}>
+                انصراف
+              </Button>
+              <Button type="button" onClick={() => void confirmRename()} disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? "در حال ذخیره…" : "ذخیره"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <RoleCreateDrawer
           open={createOpen}
