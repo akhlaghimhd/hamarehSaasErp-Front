@@ -170,7 +170,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   hasPermission: (code) => {
-    const perms = get().securityContext?.permissions ?? [];
+    const ctx = get().securityContext;
+    if (!ctx) return false;
+    // Align with backend: tenant owner receives full catalog at login;
+    // also treat is_owner as full UI access if permissions array was empty.
+    if (ctx.is_owner === true) return true;
+    const perms = ctx.permissions ?? [];
     return perms.includes(code);
   },
 }));
