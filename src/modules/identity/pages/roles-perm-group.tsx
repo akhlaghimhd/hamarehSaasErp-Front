@@ -33,6 +33,7 @@ export function PermissionModuleGroup({
   busy: boolean;
   defaultOpen: boolean;
   onToggle: (id: string) => void;
+  /** checked=true → select all in group; false → restore group to last saved baseline */
   onToggleMany: (ids: string[], checked: boolean) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -54,6 +55,11 @@ export function PermissionModuleGroup({
             onToggleMany(ids, v === true);
           }}
           aria-label={`انتخاب همه ${moduleName}`}
+          title={
+            allSelected
+              ? "برگرداندن این گروه به وضعیت ذخیره‌شده"
+              : "انتخاب همه مجوزهای این گروه"
+          }
         />
         <button
           type="button"
@@ -78,9 +84,9 @@ export function PermissionModuleGroup({
         <div className="space-y-0.5 border-t border-border/50 p-2">
           {permissions.map((p) => {
             const checked = draftPerms.has(p.tenant_permission_id);
-            const tip =
+            const description =
               p.description?.trim() ||
-              (p.code ? `کد فنی: ${p.code}` : p.name);
+              "توضیح بیشتری برای این مجوز ثبت نشده است.";
             return (
               <Tooltip key={p.tenant_permission_id}>
                 <TooltipTrigger asChild>
@@ -101,12 +107,12 @@ export function PermissionModuleGroup({
                     <span className="min-w-0 truncate font-medium">{p.name}</span>
                   </label>
                 </TooltipTrigger>
-                <TooltipContent side="left" className="max-w-xs text-xs leading-relaxed">
-                  <p className="font-medium">{p.name}</p>
-                  <p className="mt-1 text-muted-foreground">{tip}</p>
-                  {p.code ? (
-                    <p className="mt-1 font-mono text-[10px] opacity-70">{p.code}</p>
-                  ) : null}
+                <TooltipContent
+                  side="left"
+                  className="max-w-xs text-xs leading-relaxed"
+                >
+                  <p className="font-medium text-background">{p.name}</p>
+                  <p className="mt-1 opacity-90">{description}</p>
                 </TooltipContent>
               </Tooltip>
             );
