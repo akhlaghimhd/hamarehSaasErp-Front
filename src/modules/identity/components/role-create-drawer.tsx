@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, X } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -14,22 +14,14 @@ import {
 } from "@/shared/components/ui/sheet";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
-import { Checkbox } from "@/shared/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select";
 import { Label } from "@/shared/components/ui/label";
 import { Separator } from "@/shared/components/ui/separator";
 import { ApiClientError } from "@/api";
 import { useCreateRole, useRoles } from "../hooks/use-roles";
-import { usePermissions } from "../hooks/use-permissions";
 import { roleService, type RoleDto } from "../services/role-service";
 import { MSG_GENERIC_ERROR } from "../lib/ui-copy";
 import { toFaDigits } from "@/shared/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 type FormValues = {
   role_name: string;
@@ -43,19 +35,31 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   /** Pre-select parent when creating a child from a row action. */
   defaultParentId?: string | null;
-  /** Called after successful create; list stays open — do not hard-navigate away. */
+  /** After create: parent should select the new role so permissions can be set in the side panel. */
   onCreated?: (role: RoleDto) => void;
 };
 
-type TreeOption = { id: string; label: string; depth: number };
+type TreeOption = {
+  id: string;
+  name: string;
+  depth: number;
+  childCount: number;
+};
 
 function buildTreeOptions(roles: RoleDto[]): TreeOption[] {
   const byParent = new Map<string | null, RoleDto[]>();
+  const childCount = new Map<string, number>();
   for (const r of roles) {
     const key = r.parent_role_id ?? null;
     const list = byParent.get(key) ?? [];
     list.push(r);
     byParent.set(key, list);
+    if (r.parent_role_id) {
+      childCount.set(
+        r.parent_role_id,
+        (childCount.get(r.parent_role_id) ?? 0) + 1
+      );
+    }
   }
   for (const list of byParent.values()) {
     list.sort((a, b) => a.name.localeCompare(b.name, "fa"));
@@ -65,11 +69,11 @@ function buildTreeOptions(roles: RoleDto[]): TreeOption[] {
     const kids = byParent.get(parentId) ?? [];
     for (const r of kids) {
       if (path.has(r.tenant_role_id)) continue;
-      const prefix = depth > 0 ? `${"\u2003".repeat(depth)}└ ` : "";
       out.push({
         id: r.tenant_role_id,
-        label: `${prefix}${r.name}`,
+        name: r.name,
         depth,
+        childCount: childCount.get(r.tenant_role_id) ?? 0,
       });
       const next = new Set(path);
       next.add(r.tenant_role_id);
@@ -77,14 +81,134 @@ function buildTreeOptions(roles: RoleDto[]): TreeOption[] {
     }
   };
   walk(null, 0, new Set());
-  // orphans (parent missing from list)
   const listed = new Set(out.map((o) => o.id));
   for (const r of roles) {
     if (!listed.has(r.tenant_role_id)) {
-      out.push({ id: r.tenant_role_id, label: r.name, depth: 0 });
+      out.push({
+        id: r.tenant_role_id,
+        name: r.name,
+        depth: 0,
+        childCount: childCount.get(r.tenant_role_id) ?? 0,
+      });
     }
   }
   return out;
+}
+
+/** Searchable tree picker — replaces flat Select for long role hierarchies. */
+function RoleTreePicker({
+  label,
+  value,
+  onChange,
+  options,
+  noneLabel,
+  placeholder,
+  disabled,
+}: {
+  label: string;
+  value: string | undefined;
+  onChange: (id: string | undefined) => void;
+  options: TreeOption[];
+  noneLabel: string;
+  placeholder: string;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+
+  const selected = options.find((o) => o.id === value);
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return options;
+    return options.filter((o) => o.name.toLowerCase().includes(needle));
+  }, [options, q]);
+
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <div className="relative">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => setOpen((v) => !v)}
+          className={cn(
+            "flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 text-sm",
+            "hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50"
+          )}
+        >
+          <span className={cn("truncate", !selected && "text-muted-foreground")}>
+            {selected ? selected.name : placeholder}
+          </span>
+          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
+        </button>
+
+        {open ? (
+          <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
+            <div className="border-b border-border/60 p-2">
+              <Input
+                className="h-8"
+                placeholder="جستجوی نقش…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="max-h-56 overflow-y-auto py-1">
+              <button
+                type="button"
+                className={cn(
+                  "flex w-full items-center gap-2 px-3 py-1.5 text-start text-sm hover:bg-muted/60",
+                  !value && "bg-muted/40 font-medium"
+                )}
+                onClick={() => {
+                  onChange(undefined);
+                  setOpen(false);
+                  setQ("");
+                }}
+              >
+                <span className="w-4 shrink-0">
+                  {!value ? <Check className="h-3.5 w-3.5" /> : null}
+                </span>
+                {noneLabel}
+              </button>
+              {filtered.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  className={cn(
+                    "flex w-full items-center gap-1 px-3 py-1.5 text-start text-sm hover:bg-muted/60",
+                    value === o.id && "bg-muted/40 font-medium",
+                    o.depth > 0 && "text-muted-foreground"
+                  )}
+                  style={{ paddingInlineStart: 12 + o.depth * 14 }}
+                  onClick={() => {
+                    onChange(o.id);
+                    setOpen(false);
+                    setQ("");
+                  }}
+                >
+                  <span className="w-4 shrink-0">
+                    {value === o.id ? <Check className="h-3.5 w-3.5" /> : null}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{o.name}</span>
+                  {o.childCount > 0 ? (
+                    <span className="shrink-0 text-[10px] text-muted-foreground">
+                      {toFaDigits(o.childCount)} زیر
+                    </span>
+                  ) : null}
+                </button>
+              ))}
+              {filtered.length === 0 ? (
+                <p className="px-3 py-2 text-xs text-muted-foreground">
+                  نقشی یافت نشد.
+                </p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export function RoleCreateDrawer({
@@ -95,7 +219,6 @@ export function RoleCreateDrawer({
 }: Props) {
   const createMutation = useCreateRole();
   const { data: roles } = useRoles();
-  const { data: allPerms } = usePermissions();
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -104,26 +227,22 @@ export function RoleCreateDrawer({
       parent_role_id: undefined,
       inherit_from_role_id: undefined,
     },
+    mode: "onTouched",
   });
 
   const { isDirty } = form.formState;
-  const [selectedPerms, setSelectedPerms] = useState<Set<string>>(new Set());
-  const [inheritBusy, setInheritBusy] = useState(false);
-
   const inheritFromId = useWatch({
     control: form.control,
     name: "inherit_from_role_id",
   });
+  const [inheritBusy, setInheritBusy] = useState(false);
+  const [copiedPermIds, setCopiedPermIds] = useState<string[]>([]);
+  const [copyHint, setCopyHint] = useState<string | null>(null);
 
-  const activeRoles = useMemo(
-    () =>
-      (roles ?? []).filter(
-        (r) => r.status === undefined || Number(r.status) === 1
-      ),
+  const treeOptions = useMemo(
+    () => buildTreeOptions(roles ?? []),
     [roles]
   );
-
-  const treeOptions = useMemo(() => buildTreeOptions(activeRoles), [activeRoles]);
 
   useEffect(() => {
     if (!open) return;
@@ -133,29 +252,41 @@ export function RoleCreateDrawer({
       parent_role_id: defaultParentId || undefined,
       inherit_from_role_id: undefined,
     });
-    setSelectedPerms(new Set());
+    setCopiedPermIds([]);
+    setCopyHint(null);
   }, [open, defaultParentId, form]);
 
+  // Snapshot copy of permission IDs from another role (not live inheritance).
   useEffect(() => {
-    if (!open || !inheritFromId) return;
+    if (!open || !inheritFromId) {
+      if (!inheritFromId) {
+        setCopiedPermIds([]);
+        setCopyHint(null);
+      }
+      return;
+    }
     let cancelled = false;
     setInheritBusy(true);
+    setCopyHint(null);
     roleService
       .getById(inheritFromId)
       .then((role) => {
         if (cancelled) return;
         const ids = (role.permissions ?? [])
           .map((p) => p.tenant_permission_id)
-          .filter(Boolean);
-        setSelectedPerms(new Set(ids));
-        toast.message(
-          ids.length
-            ? `${toFaDigits(ids.length)} مجوز از نقش انتخاب‌شده کپی شد (فقط برای راحتی؛ ارث‌بری زنده نیست)`
-            : "نقش انتخاب‌شده مجوزی ندارد"
+          .filter(Boolean) as string[];
+        setCopiedPermIds(ids);
+        setCopyHint(
+          ids.length > 0
+            ? `${toFaDigits(ids.length)} مجوز از «${role.name}» برای ذخیره اولیه کپی می‌شود (ارث‌بری زنده نیست)`
+            : `نقش «${role.name}» مجوزی ندارد`
         );
       })
       .catch(() => {
-        if (!cancelled) toast.error("بارگذاری مجوزهای نقش مبدأ ممکن نشد");
+        if (!cancelled) {
+          setCopiedPermIds([]);
+          setCopyHint("کپی مجوز ممکن نشد");
+        }
       })
       .finally(() => {
         if (!cancelled) setInheritBusy(false);
@@ -165,30 +296,21 @@ export function RoleCreateDrawer({
     };
   }, [inheritFromId, open]);
 
-  const togglePerm = (id: string) => {
-    setSelectedPerms((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const closeForced = () => {
+    form.reset();
+    setCopiedPermIds([]);
+    setCopyHint(null);
+    onOpenChange(false);
   };
 
   const handleOpenChange = (next: boolean) => {
-    if (!next && (isDirty || selectedPerms.size > 0)) {
-      return;
-    }
     if (!next) {
+      // Always allow close via X / Escape — reset dirty form
       form.reset();
-      setSelectedPerms(new Set());
+      setCopiedPermIds([]);
+      setCopyHint(null);
     }
     onOpenChange(next);
-  };
-
-  const closeForced = () => {
-    form.reset();
-    setSelectedPerms(new Set());
-    onOpenChange(false);
   };
 
   const onSubmit = form.handleSubmit(async (values) => {
@@ -202,11 +324,15 @@ export function RoleCreateDrawer({
         role_name: name,
         description: values.description.trim() || null,
         parent_role_id: values.parent_role_id || null,
-        permission_ids: Array.from(selectedPerms),
+        // Optional snapshot at create — further edits happen in the side panel
+        permission_ids: copiedPermIds,
       });
-      toast.success(`نقش «${role.name}» ساخته شد`);
+      toast.success(
+        `نقش «${role.name}» ساخته شد — از پنل مجوزها تخصیص را کامل کنید`
+      );
       form.reset();
-      setSelectedPerms(new Set());
+      setCopiedPermIds([]);
+      setCopyHint(null);
       onOpenChange(false);
       onCreated?.(role);
     } catch (e) {
@@ -216,32 +342,42 @@ export function RoleCreateDrawer({
     }
   });
 
-  const formDirty = isDirty || selectedPerms.size > 0;
-
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent
         side="right"
-        className="flex w-full flex-col sm:max-w-lg"
+        className="flex w-full flex-col sm:max-w-md"
+        // X / Escape always close; only block accidental outside click when dirty
         onInteractOutside={(e) => {
-          if (formDirty) e.preventDefault();
+          if (isDirty || copiedPermIds.length > 0) e.preventDefault();
         }}
         onPointerDownOutside={(e) => {
-          if (formDirty) e.preventDefault();
-        }}
-        onEscapeKeyDown={(e) => {
-          if (formDirty) e.preventDefault();
+          if (isDirty || copiedPermIds.length > 0) e.preventDefault();
         }}
       >
+        {/* Explicit close — always works (Radix default X can be blocked by overlays) */}
+        <button
+          type="button"
+          className="absolute end-3 top-3 z-10 rounded-md p-1.5 text-muted-foreground opacity-80 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
+          onClick={closeForced}
+          aria-label="بستن"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
         <SheetHeader>
           <SheetTitle>نقش جدید</SheetTitle>
           <SheetDescription>
-            والد فقط برای سلسله‌مراتب است. می‌توانید نقش ریشه بسازید یا زیر یک نقش
-            موجود. کپی مجوز فقط تیک‌ها را پر می‌کند و ارث‌بری زنده نیست.
+            فقط نام، والد و در صورت نیاز کپی اولیه مجوز. پس از ایجاد، نقش در درخت
+            انتخاب می‌شود تا مجوزها را در پنل کناری تنظیم کنید.
           </SheetDescription>
         </SheetHeader>
 
-        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col" noValidate>
+        <form
+          onSubmit={onSubmit}
+          className="flex min-h-0 flex-1 flex-col"
+          noValidate
+        >
           <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
             <div className="space-y-1.5">
               <Label htmlFor="role_name">نام نقش *</Label>
@@ -261,105 +397,47 @@ export function RoleCreateDrawer({
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label>نقش والد</Label>
-              <Select
-                value={form.watch("parent_role_id") ?? "__none__"}
-                onValueChange={(v) =>
-                  form.setValue(
-                    "parent_role_id",
-                    v === "__none__" ? undefined : v,
-                    { shouldDirty: true }
-                  )
-                }
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="بدون والد (نقش ریشه)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">بدون والد — نقش ریشه</SelectItem>
-                  {treeOptions.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[11px] text-muted-foreground">
-                زیرمجموعه‌ها با تورفتگی زیر والد نشان داده می‌شوند. انتخاب «بدون
-                والد» نقش را در ریشه قرار می‌دهد.
-              </p>
-            </div>
+            <RoleTreePicker
+              label="نقش والد (سلسله‌مراتب)"
+              value={form.watch("parent_role_id")}
+              onChange={(id) =>
+                form.setValue("parent_role_id", id, { shouldDirty: true })
+              }
+              options={treeOptions}
+              noneLabel="بدون والد — نقش ریشه"
+              placeholder="انتخاب والد یا ریشه"
+              disabled={createMutation.isPending}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              تورفتگی = زیرنقش. عدد «فر» تعداد فرزند مستقیم است. این فقط ساختار
+              درختی است و مجوز را خودکار منتقل نمی‌کند.
+            </p>
 
             <Separator />
 
-            <div className="space-y-1.5">
-              <Label>کپی مجوزها از نقش دیگر</Label>
-              <Select
-                value={form.watch("inherit_from_role_id") ?? "__none__"}
-                onValueChange={(v) =>
-                  form.setValue(
-                    "inherit_from_role_id",
-                    v === "__none__" ? undefined : v,
-                    { shouldDirty: true }
-                  )
-                }
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="انتخاب نقش مبدأ (اختیاری)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">بدون کپی</SelectItem>
-                  {treeOptions.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[11px] text-muted-foreground">
-                تیک‌ها یک‌بار کپی می‌شوند؛ تغییر بعدی نقش مبدأ روی این نقش اثر
-                ندارد.
+            <RoleTreePicker
+              label="کپی اولیه مجوز از نقش دیگر (اختیاری)"
+              value={form.watch("inherit_from_role_id")}
+              onChange={(id) =>
+                form.setValue("inherit_from_role_id", id, { shouldDirty: true })
+              }
+              options={treeOptions}
+              noneLabel="بدون کپی — مجوزها را بعداً از پنل تنظیم کنید"
+              placeholder="انتخاب نقش مبدأ"
+              disabled={createMutation.isPending || inheritBusy}
+            />
+            {inheritBusy ? (
+              <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                در حال خواندن مجوزهای نقش مبدأ…
               </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label>مجوزهای این نقش</Label>
-                <span className="text-[11px] text-muted-foreground">
-                  {toFaDigits(selectedPerms.size)} انتخاب‌شده
-                  {inheritBusy ? " · در حال کپی…" : ""}
-                </span>
-              </div>
-              <div className="grid max-h-56 gap-1.5 overflow-y-auto rounded-md border border-border/60 p-2">
-                {(allPerms ?? []).map((p) => (
-                  <label
-                    key={p.tenant_permission_id}
-                    className="flex cursor-pointer items-start gap-2 rounded-md px-1.5 py-1 text-sm hover:bg-muted/50"
-                  >
-                    <Checkbox
-                      className="mt-0.5"
-                      checked={selectedPerms.has(p.tenant_permission_id)}
-                      onCheckedChange={() => togglePerm(p.tenant_permission_id)}
-                      disabled={inheritBusy || createMutation.isPending}
-                    />
-                    <span className="leading-snug">
-                      <span className="font-medium">{p.name}</span>
-                      {p.code ? (
-                        <span className="ms-1 font-mono text-[10px] text-muted-foreground">
-                          {p.code}
-                        </span>
-                      ) : null}
-                    </span>
-                  </label>
-                ))}
-                {(allPerms ?? []).length === 0 ? (
-                  <p className="px-1 py-2 text-xs text-muted-foreground">
-                    هنوز مجوزی در سازمان تعریف نشده است.
-                  </p>
-                ) : null}
-              </div>
-            </div>
+            ) : copyHint ? (
+              <p className="text-[11px] text-muted-foreground">{copyHint}</p>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                کپی فقط یک‌بار در لحظه ایجاد است؛ بعداً از پنل کناری ویرایش کنید.
+              </p>
+            )}
           </div>
 
           <SheetFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
@@ -372,7 +450,11 @@ export function RoleCreateDrawer({
             >
               انصراف
             </Button>
-            <Button type="submit" size="sm" disabled={createMutation.isPending || inheritBusy}>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={createMutation.isPending || inheritBusy}
+            >
               {createMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
