@@ -145,7 +145,13 @@ export function RolesListPage() {
     const q = permQuery.trim().toLowerCase();
     if (!q) return list;
     return list.filter((p) =>
-      [p.name, p.code, p.module_name, p.description, localizeModuleName(p.module_name)]
+      [
+        p.name,
+        p.code,
+        p.module_name,
+        p.description,
+        localizeModuleName(p.module_name),
+      ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
@@ -264,12 +270,8 @@ export function RolesListPage() {
     setDraftPerms((prev) => {
       const next = new Set(prev);
       for (const id of ids) {
-        if (checked) {
-          next.add(id);
-        } else {
-          if (baselinePerms.has(id)) next.add(id);
-          else next.delete(id);
-        }
+        if (checked) next.add(id);
+        else next.delete(id);
       }
       return next;
     });
@@ -519,7 +521,7 @@ export function RolesListPage() {
                 ) : null}
               </div>
               <p className="mt-1.5 text-[11px] text-muted-foreground">
-                هر ماژول را باز کنید، تیک بزنید، سپس ذخیره. برداشتن تیک «انتخاب همه» گروه را به آخرین ذخیره برمی‌گرداند.
+                هر ماژول را باز کنید، تیک بزنید، سپس ذخیره. برای برگرداندن همه تغییرات از «انصراف» استفاده کنید.
               </p>
             </div>
 
