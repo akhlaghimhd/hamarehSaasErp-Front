@@ -10,6 +10,10 @@ import {
   TooltipTrigger,
 } from "@/shared/components/ui/tooltip";
 import { cn, toFaDigits } from "@/shared/lib/utils";
+import {
+  actionTypeLabel,
+  displayPermissionName,
+} from "../lib/permission-labels";
 
 export function PermissionModuleGroup({
   moduleName,
@@ -26,6 +30,7 @@ export function PermissionModuleGroup({
     tenant_permission_id: string;
     name: string;
     code?: string;
+    action_type?: string | null;
     description?: string | null;
   }>;
   draftPerms: Set<string>;
@@ -84,9 +89,11 @@ export function PermissionModuleGroup({
         <div className="space-y-0.5 border-t border-border/50 p-2">
           {permissions.map((p) => {
             const checked = draftPerms.has(p.tenant_permission_id);
+            const title = displayPermissionName(p.name, p.code);
+            const secondary = actionTypeLabel(p.action_type, p.code);
             const description =
               p.description?.trim() ||
-              "توضیح بیشتری برای این مجوز ثبت نشده است.";
+              "توضیح بیشتری برای این مجوز در سیستم ثبت نشده است.";
             return (
               <Tooltip key={p.tenant_permission_id}>
                 <TooltipTrigger asChild>
@@ -104,14 +111,21 @@ export function PermissionModuleGroup({
                       }
                       disabled={!canAssign || busy}
                     />
-                    <span className="min-w-0 truncate font-medium">{p.name}</span>
+                    <span className="min-w-0 flex-1 truncate">
+                      <span className="font-medium">{title}</span>
+                      {secondary ? (
+                        <span className="ms-1.5 text-[11px] font-normal text-muted-foreground">
+                          {secondary}
+                        </span>
+                      ) : null}
+                    </span>
                   </label>
                 </TooltipTrigger>
                 <TooltipContent
                   side="left"
                   className="max-w-xs text-xs leading-relaxed"
                 >
-                  <p className="font-medium text-background">{p.name}</p>
+                  <p className="font-medium">{title}</p>
                   <p className="mt-1 opacity-90">{description}</p>
                 </TooltipContent>
               </Tooltip>
