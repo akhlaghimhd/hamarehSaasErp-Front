@@ -10,10 +10,7 @@ import {
   TooltipTrigger,
 } from "@/shared/components/ui/tooltip";
 import { cn, toFaDigits } from "@/shared/lib/utils";
-import {
-  actionTypeLabel,
-  displayPermissionName,
-} from "../lib/permission-labels";
+import { displayPermissionName } from "../lib/permission-labels";
 
 export function PermissionModuleGroup({
   moduleName,
@@ -38,7 +35,6 @@ export function PermissionModuleGroup({
   busy: boolean;
   defaultOpen: boolean;
   onToggle: (id: string) => void;
-  /** checked=true → select all in group; false → clear all in group */
   onToggleMany: (ids: string[], checked: boolean) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -60,11 +56,6 @@ export function PermissionModuleGroup({
             onToggleMany(ids, v === true);
           }}
           aria-label={`انتخاب همه ${moduleName}`}
-          title={
-            allSelected
-              ? "برداشتن انتخاب همه مجوزهای این گروه"
-              : "انتخاب همه مجوزهای این گروه"
-          }
         />
         <button
           type="button"
@@ -77,7 +68,7 @@ export function PermissionModuleGroup({
           ) : (
             <ChevronLeft className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           )}
-          <span className="min-w-0 flex-1 truncate text-xs font-semibold">
+          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">
             {moduleName}
           </span>
           <span className="shrink-0 text-[10px] text-muted-foreground">
@@ -90,17 +81,18 @@ export function PermissionModuleGroup({
           {permissions.map((p) => {
             const checked = draftPerms.has(p.tenant_permission_id);
             const title = displayPermissionName(p.name, p.code);
-            const secondary = actionTypeLabel(p.action_type, p.code);
             const description =
               p.description?.trim() ||
-              "توضیح بیشتری برای این مجوز در سیستم ثبت نشده است.";
+              `مجوز «${title}» — دسترسی به این عملیات در سیستم.`;
             return (
               <Tooltip key={p.tenant_permission_id}>
                 <TooltipTrigger asChild>
                   <label
                     className={cn(
-                      "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
-                      checked ? "bg-primary/5" : "hover:bg-muted/40",
+                      "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-colors",
+                      checked
+                        ? "bg-primary/5 text-foreground"
+                        : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
                       !canAssign && "cursor-default opacity-80"
                     )}
                   >
@@ -111,13 +103,8 @@ export function PermissionModuleGroup({
                       }
                       disabled={!canAssign || busy}
                     />
-                    <span className="min-w-0 flex-1 truncate">
-                      <span className="font-medium">{title}</span>
-                      {secondary ? (
-                        <span className="ms-1.5 text-[11px] font-normal text-muted-foreground">
-                          {secondary}
-                        </span>
-                      ) : null}
+                    <span className="min-w-0 flex-1 truncate font-normal">
+                      {title}
                     </span>
                   </label>
                 </TooltipTrigger>
