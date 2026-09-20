@@ -100,12 +100,19 @@ export const authService = {
     return interpretLoginPayload(raw);
   },
 
-  async requestOtp(mobile: string): Promise<{
+  async requestOtp(
+    mobile: string,
+    opts?: { forceResend?: boolean }
+  ): Promise<{
     expires_in: number;
     resend_available_in: number;
     debug_code?: string;
   }> {
-    const envelope = await apiPost(OTP_REQUEST_PATH, { mobile: mobile.trim() });
+    const body: Record<string, unknown> = { mobile: mobile.trim() };
+    if (opts?.forceResend) {
+      body.force_resend = true;
+    }
+    const envelope = await apiPost(OTP_REQUEST_PATH, body);
     return unwrapData(envelope);
   },
 
