@@ -48,6 +48,7 @@ import { MembershipHistoryPanel } from "./membership-history-panel";
 import { MSG_GENERIC_ERROR, MSG_NO_ACCESS } from "../lib/ui-copy";
 import { decodeMemberRef } from "../lib/member-ref";
 import { profileService } from "../services/profile-service";
+import { tenantUserService } from "../services/tenant-user-service";
 import { normalizeIranMobile } from "../validations/member-schema";
 
 function formatDate(value?: string | null): string {
@@ -88,6 +89,12 @@ function FieldLine({
       )}
     </div>
   );
+}
+
+function splitEmail(email?: string | null): { local: string; host: string } {
+  if (!email || !email.includes("@")) return { local: "", host: "" };
+  const i = email.lastIndexOf("@");
+  return { local: email.slice(0, i), host: email.slice(i + 1) };
 }
 
 export function MemberDetailPage() {
@@ -135,6 +142,8 @@ export function MemberDetailPage() {
   const [lastName, setLastName] = useState("");
   const [mobile, setMobile] = useState("");
   const [isOwner, setIsOwner] = useState(false);
+  const [emailLocalPart, setEmailLocalPart] = useState("");
+  const [emailHost, setEmailHost] = useState<string | null>(null);
 
   useEffect(() => {
     if (!data) return;
@@ -142,6 +151,7 @@ export function MemberDetailPage() {
     setLastName(data.user?.last_name ?? "");
     setMobile(data.user?.mobile ?? "");
     setIsOwner(Boolean(data.is_owner));
+    setEmailLocalPart(splitEmail(data.user?.email).local);
   }, [data]);
 
   const isSelf = Boolean(
@@ -155,7 +165,12 @@ export function MemberDetailPage() {
     setLastName(data.user?.last_name ?? "");
     setMobile(data.user?.mobile ?? "");
     setIsOwner(Boolean(data.is_owner));
+    setEmailLocalPart(splitEmail(data.user?.email).local);
     setEditingIdentity(true);
+    void tenantUserService
+      .getEmailHost()
+      .then((d) => setEmailHost(d.email_host))
+      .catch(() => setEmailHost(splitEmail(data.user?.email).host || null));
   };
 
   const cancelEditIdentity = () => {
@@ -175,6 +190,11 @@ export function MemberDetailPage() {
       toast.error("موبایل باید ۱۱ رقم و با ۰۹ شروع شود.");
       return;
     }
+    const local = emailLocalPart.trim().toLowerCase();
+    if (!local) {
+      toast.error("بخش ابتدایی ایمیل الزامی است.");
+      return;
+    }
     try {
       await updateMutation.mutateAsync({
         tenantUserId: data.tenant_user_id,
@@ -182,6 +202,7 @@ export function MemberDetailPage() {
           first_name: fn,
           last_name: ln,
           mobile: mob || null,
+          email_local_part: local,
           ...(canManageOwner ? { is_owner: isOwner } : {}),
         },
       });
@@ -461,6 +482,39 @@ export function MemberDetailPage() {
                       placeholder="09121234567"
                       maxLength={11}
                     />
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs text-muted-foreground">
+                      ایمیل سازمانی
+                    </label>
+                    <div
+                      className="flex h-9 overflow-hidden rounded-md border border-input bg-background"
+                      dir="ltr"
+                    >
+                      <input
+                        className="h-full min-w-0 flex-1 border-0 bg-transparent px-2.5 font-mono text-sm outline-none"
+                        value={emailLocalPart}
+                        onChange={(e) =>
+                          setEmailLocalPart(
+                            e.target.value
+                              .toLowerCase()
+                              .replace(/[^a-z0-9._-]/g, "")
+                          )
+                        }
+                        placeholder="first.last"
+                        autoComplete="off"
+                      />
+                      <span className="flex shrink-0 items-center border-l border-input bg-muted/40 px-2.5 font-mono text-xs text-muted-foreground">
+                        @
+                        {emailHost ??
+                          (splitEmail(data.user?.email).host || "—")}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      فقط بخش قبل از @ قابل ویرایش است. دامنه بر اساس قرارداد
+                      سازمان (دامنه اختصاصی یا برند روی دامنه پلتفرم) تعیین
+                      می‌شود.
+                    </p>
                   </div>
                 </div>
                 {canManageOwner ? (
