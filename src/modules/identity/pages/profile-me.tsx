@@ -1,5 +1,6 @@
 /**
  * Profile me — full shell width, avatar+bio aligned, identity as «label: value».
+ * Change-password card uses same policy as first-login / forgot-password.
  */
 
 "use client";
@@ -13,6 +14,7 @@ import {
   Pencil,
   Check,
   X,
+  KeyRound,
 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import {
@@ -22,7 +24,14 @@ import {
   CardTitle,
 } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
-import { useAuthStore } from "@/auth";
+import { Input } from "@/shared/components/ui/input";
+import { Label } from "@/shared/components/ui/label";
+import {
+  useAuthStore,
+  authService,
+  validatePasswordClient,
+  PASSWORD_HINT,
+} from "@/auth";
 import { ApiClientError } from "@/api";
 import {
   useProfileMe,
@@ -79,6 +88,13 @@ export function ProfileMePage() {
 
   const [editingBio, setEditingBio] = useState(false);
   const [bioDraft, setBioDraft] = useState("");
+
+  // Change password
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newPassword2, setNewPassword2] = useState("");
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwError, setPwError] = useState<string | null>(null);
 
   const setPreviewSafe = useCallback((url: string | null) => {
     if (previewRef.current && previewRef.current.startsWith("blob:")) {
@@ -158,6 +174,43 @@ export function ProfileMePage() {
       toast.error(
         e instanceof ApiClientError ? e.message : "ذخیره ناموفق بود."
       );
+    }
+  };
+
+  const onChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwError(null);
+    if (!currentPassword) {
+      setPwError("رمز فعلی را وارد کنید.");
+      return;
+    }
+    const policyErr = validatePasswordClient(newPassword, {
+      firstName: user?.first_name,
+      lastName: user?.last_name,
+      email: user?.email,
+      mobile: user?.mobile,
+    });
+    if (policyErr) {
+      setPwError(policyErr);
+      return;
+    }
+    if (newPassword !== newPassword2) {
+      setPwError("تکرار رمز با رمز جدید یکسان نیست.");
+      return;
+    }
+    setPwBusy(true);
+    try {
+      await authService.changePassword(currentPassword, newPassword, newPassword2);
+      setCurrentPassword("");
+      setNewPassword("");
+      setNewPassword2("");
+      toast.success("رمز عبور با موفقیت تغییر کرد.");
+    } catch (err) {
+      setPwError(
+        err instanceof ApiClientError ? err.message : "تغییر رمز ناموفق بود."
+      );
+    } finally {
+      setPwBusy(false);
     }
   };
 
@@ -368,6 +421,84 @@ export function ProfileMePage() {
                   </div>
                 ) : null}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-12">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <KeyRound className="h-4 w-4" />
+                تغییر رمز عبور
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form
+                onSubmit={(e) => void onChangePassword(e)}
+                className="grid max-w-xl gap-3 sm:grid-cols-2"
+              >
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs">رمز فعلی</Label>
+                  <Input
+                    type="password"
+                    dir="ltr"
+                    className="h-9"
+                    value={currentPassword}
+                    onChange={(e) => {
+                      setCurrentPassword(e.target.value);
+                      setPwError(null);
+                    }}
+                    autoComplete="current-password"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">رمز جدید</Label>
+                  <Input
+                    type="password"
+                    dir="ltr"
+                    className="h-9"
+                    value={newPassword}
+                    onChange={(e) => {
+                      setNewPassword(e.target.value);
+                      setPwError(null);
+                    }}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">تکرار رمز جدید</Label>
+                  <Input
+                    type="password"
+                    dir="ltr"
+                    className="h-9"
+                    value={newPassword2}
+                    onChange={(e) => {
+                      setNewPassword2(e.target.value);
+                      setPwError(null);
+                    }}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground sm:col-span-2">
+                  {PASSWORD_HINT}
+                </p>
+                {pwError ? (
+                  <p className="text-xs text-destructive sm:col-span-2" role="alert">
+                    {pwError}
+                  </p>
+                ) : null}
+                <div className="sm:col-span-2">
+                  <Button type="submit" size="sm" disabled={pwBusy}>
+                    {pwBusy ? (
+                      <>
+                        <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />
+                        در حال ذخیره…
+                      </>
+                    ) : (
+                      "ذخیره رمز جدید"
+                    )}
+                  </Button>
+                </div>
+              </form>
             </CardContent>
           </Card>
         </div>
