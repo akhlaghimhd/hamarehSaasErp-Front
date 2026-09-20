@@ -235,10 +235,10 @@ export const authService = {
 
   async forgotPasswordRequest(
     mobile: string,
-    opts?: { forceResend?: boolean }
+    reg?: { forceResend?: boolean }
   ): Promise<{ expires_in: number; resend_available_in: number; debug_code?: string }> {
     const body: Record<string, unknown> = { mobile: mobile.trim() };
-    if (opts?.forceResend) body.force_resend = true;
+    if (reg?.forceResend) body.force_resend = true;
     const envelope = await apiPost(FORGOT_REQUEST_PATH, body);
     return unwrapData(envelope);
   },
@@ -257,10 +257,6 @@ export const authService = {
     });
   },
 
-  /**
-   * Platform profile for current user (requires auth + tenant header).
-   * Backend: GET identity-core/identity/profiles/me
-   */
   async getProfile(): Promise<UserProfile> {
     const envelope = await apiGet(PROFILE_ME_PATH);
     return unwrapData<UserProfile>(envelope as unknown);
@@ -273,6 +269,14 @@ export const authService = {
       // ignore network/session errors on logout
     } finally {
       useAuthStore.getState().clearSession();
+      // OTP one-time code was already consumed on login; clear any stale UI timer/session
+      try {
+        if (typeof sessionStorage !== "undefined") {
+          sessionStorage.removeItem("hamareh.login.otp_session");
+        }
+      } catch {
+        /* ignore */
+      }
     }
   },
 };
