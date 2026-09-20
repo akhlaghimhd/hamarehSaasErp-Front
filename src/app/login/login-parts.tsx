@@ -10,7 +10,8 @@ import { cn } from "@/shared/lib/utils";
 import { LoginBackground } from "./login-background";
 
 export const OTP_LENGTH = 6;
-export const OTP_TIMER_SEC = 180;
+/** Align with backend OtpLoginService::TTL_SECONDS (5 minutes). */
+export const OTP_TIMER_SEC = 300;
 
 export function toFa(v: string | number) {
   return String(v).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
