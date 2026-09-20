@@ -14,6 +14,14 @@ export interface TenantUserUserDto {
   last_name?: string | null;
 }
 
+/** Role summary attached on members list. */
+export interface TenantUserRoleSummaryDto {
+  tenant_role_id: string;
+  name?: string | null;
+  code?: string | null;
+  parent_role_id?: string | null;
+}
+
 export interface TenantUserDto {
   tenant_user_id: string;
   tenant_id?: string;
@@ -23,6 +31,8 @@ export interface TenantUserDto {
   joined_at?: string | null;
   left_at?: string | null;
   user?: TenantUserUserDto | null;
+  /** Assigned roles (from list API). */
+  roles?: TenantUserRoleSummaryDto[];
   [key: string]: unknown;
 }
 
