@@ -5,12 +5,20 @@ import { Sparkles, UserCheck, UserMinus, Trash2, RotateCcw } from "lucide-react"
 import { Button } from "@/shared/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { cn, toFaDigits } from "@/shared/lib/utils";
-import type { TenantUserDto } from "../types";
+import type { TenantUserDto, TenantUserRoleSummaryDto } from "../types";
 
 export type StatusFilter = "all" | "active" | "inactive";
-export type SortKey = "name" | "email" | "mobile" | "status" | "joined" | "lastChange";
+export type SortKey = "name" | "email" | "mobile" | "status" | "role" | "joined" | "lastChange";
 export type SortDir = "asc" | "desc";
-export type ColumnId = "name" | "email" | "mobile" | "status" | "joined" | "lastChange" | "actions";
+export type ColumnId =
+  | "name"
+  | "email"
+  | "mobile"
+  | "role"
+  | "status"
+  | "joined"
+  | "lastChange"
+  | "actions";
 export type BulkKind = "activate" | "deactivate" | "delete" | "restore";
 export type ConfirmState = null | { kind: BulkKind; count: number; targets: TenantUserDto[] };
 export type ActivityKind = "new" | "activated" | "deactivated" | "removed" | "restored" | null;
@@ -19,13 +27,14 @@ export const COLS: { id: ColumnId; label: string; hideable?: boolean; sort?: Sor
   { id: "name", label: "نام", hideable: false, sort: "name" },
   { id: "email", label: "ایمیل", sort: "email" },
   { id: "mobile", label: "موبایل", sort: "mobile" },
+  { id: "role", label: "نقش", sort: "role" },
   { id: "status", label: "وضعیت", sort: "status" },
   { id: "joined", label: "تاریخ عضویت", sort: "joined" },
   { id: "lastChange", label: "آخرین تغییر وضعیت", sort: "lastChange" },
   { id: "actions", label: "عملیات", hideable: false },
 ];
 
-export const SKY = "identity.members.columns.v3";
+export const SKY = "identity.members.columns.v4";
 export const DAY_MS = 24 * 60 * 60 * 1000;
 export const RECENT_DAYS = 7;
 
@@ -34,6 +43,56 @@ export function dn(r: TenantUserDto) {
   if (!u) return "—";
   const n = [u.first_name, u.last_name].filter(Boolean).join(" ").trim();
   return n || u.email || "—";
+}
+
+/** Depth from root in role tree (0 = root). Missing parent treated as root. */
+function roleDepth(
+  role: TenantUserRoleSummaryDto,
+  byId: Map<string, TenantUserRoleSummaryDto>
+): number {
+  let d = 0;
+  let pid = role.parent_role_id ?? null;
+  const seen = new Set<string>();
+  while (pid && byId.has(pid) && !seen.has(pid)) {
+    seen.add(pid);
+    d += 1;
+    pid = byId.get(pid)?.parent_role_id ?? null;
+  }
+  // parent outside assigned set still counts as higher if parent_role_id set
+  if (pid && !byId.has(pid)) d += 1;
+  return d;
+}
+
+/**
+ * Highest role in the tree among assigned roles (closest to root / parent-most).
+ * Owner badge is separate; this is role hierarchy only.
+ */
+export function pickHighestRole(r: TenantUserDto): TenantUserRoleSummaryDto | null {
+  const roles = (r.roles ?? []) as TenantUserRoleSummaryDto[];
+  if (!roles.length) return null;
+  const byId = new Map(roles.map((x) => [x.tenant_role_id, x]));
+  let best = roles[0];
+  let bestDepth = roleDepth(best, byId);
+  for (let i = 1; i < roles.length; i++) {
+    const cur = roles[i];
+    const d = roleDepth(cur, byId);
+    if (d < bestDepth) {
+      best = cur;
+      bestDepth = d;
+    } else if (d === bestDepth) {
+      const an = (best.name || "").localeCompare(cur.name || "", "fa");
+      if (an > 0) best = cur;
+    }
+  }
+  return best;
+}
+
+export function highestRoleName(r: TenantUserDto): string {
+  if (r.is_owner) {
+    const hr = pickHighestRole(r);
+    return hr?.name ? `${hr.name}` : "مدیر اصلی";
+  }
+  return pickHighestRole(r)?.name ?? "—";
 }
 
 export function fd(v?: string | null) {
@@ -55,7 +114,7 @@ export function fdt(v?: string | null) {
 }
 
 export function lastChangeAt(r: TenantUserDto): string | null {
-  if (r.deleted_at) return r.deleted_at;
+  if (r.deleted_at) return r.deleted_at as string;
   return r.updated_at ?? r.created_at ?? null;
 }
 
@@ -67,15 +126,15 @@ export function isRecent(iso?: string | null, days = RECENT_DAYS): boolean {
 }
 
 export function activityOf(r: TenantUserDto, deletedView: boolean): ActivityKind {
-  const createdMs = r.created_at ? new Date(r.created_at).getTime() : NaN;
-  const updatedMs = r.updated_at ? new Date(r.updated_at).getTime() : NaN;
+  const createdMs = r.created_at ? new Date(r.created_at as string).getTime() : NaN;
+  const updatedMs = r.updated_at ? new Date(r.updated_at as string).getTime() : NaN;
   const statusChanged = Number.isFinite(createdMs) && Number.isFinite(updatedMs) && updatedMs - createdMs > 90_000;
-  if (deletedView && r.deleted_at && isRecent(r.deleted_at, 7)) return "removed";
-  if (!deletedView && r.updated_at && isRecent(r.updated_at, 7) && statusChanged) {
+  if (deletedView && r.deleted_at && isRecent(r.deleted_at as string, 7)) return "removed";
+  if (!deletedView && r.updated_at && isRecent(r.updated_at as string, 7) && statusChanged) {
     if (Number(r.status) === 1) return "activated";
     if (Number(r.status) === 0) return "deactivated";
   }
-  if (!deletedView && r.created_at && isRecent(r.created_at, 3) && !statusChanged) return "new";
+  if (!deletedView && r.created_at && isRecent(r.created_at as string, 3) && !statusChanged) return "new";
   return null;
 }
 
@@ -113,12 +172,13 @@ export function sv(r: TenantUserDto, k: SortKey): string | number {
   if (k === "name") return dn(r).toLowerCase();
   if (k === "email") return (r.user?.email ?? "").toLowerCase();
   if (k === "mobile") return r.user?.mobile ?? "";
+  if (k === "role") return highestRoleName(r).toLowerCase();
   if (k === "status") return Number(r.status) === 1 ? 1 : 0;
   if (k === "lastChange") {
     const v = lastChangeAt(r);
     return v ? new Date(v).getTime() : 0;
   }
-  return r.created_at ? new Date(r.created_at).getTime() : 0;
+  return r.created_at ? new Date(r.created_at as string).getTime() : 0;
 }
 
 export const BULK_SUCCESS: Record<BulkKind, (n: number) => string> = {
