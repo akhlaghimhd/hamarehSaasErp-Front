@@ -1,4 +1,4 @@
-/** نقش‌های کاربر — جستجو، درخت، تمایز ملایم افزودن/حذف */
+/** نقش‌های کاربر — جستجو، درخت، انتخاب مستقل هر نقش (بدون cascade والد/فرزند) */
 
 "use client";
 
@@ -91,14 +91,6 @@ function filterTree(nodes: RoleNode[], q: string): RoleNode[] {
   return walk(nodes);
 }
 
-function collectDescendantIds(node: RoleNode): string[] {
-  const ids: string[] = [];
-  for (const c of node.children) {
-    ids.push(c.tenant_role_id, ...collectDescendantIds(c));
-  }
-  return ids;
-}
-
 type SelectionState = "kept" | "added" | "removed" | "none";
 
 function selectionState(
@@ -114,18 +106,6 @@ function selectionState(
   return "none";
 }
 
-function parentCheckState(
-  node: RoleNode,
-  selected: Set<string>
-): "all" | "some" | "none" {
-  const childIds = collectDescendantIds(node);
-  const focus = childIds.length > 0 ? childIds : [node.tenant_role_id];
-  const count = focus.filter((id) => selected.has(id)).length;
-  if (count === 0) return "none";
-  if (count === focus.length) return "all";
-  return "some";
-}
-
 function RoleTreeRow({
   node,
   depth,
@@ -134,7 +114,6 @@ function RoleTreeRow({
   expanded,
   onToggleExpand,
   onToggle,
-  onToggleMany,
 }: {
   node: RoleNode;
   depth: number;
@@ -143,22 +122,11 @@ function RoleTreeRow({
   expanded: Set<string>;
   onToggleExpand: (id: string) => void;
   onToggle: (id: string) => void;
-  onToggleMany: (ids: string[], select: boolean) => void;
 }) {
   const hasChildren = node.children.length > 0;
   const isOpen = expanded.has(node.tenant_role_id);
   const state = selectionState(node.tenant_role_id, selected, initial);
-  const parentState = hasChildren ? parentCheckState(node, selected) : null;
-
-  const onParentToggle = () => {
-    if (!hasChildren) {
-      onToggle(node.tenant_role_id);
-      return;
-    }
-    const ids = collectDescendantIds(node);
-    const allOn = ids.every((id) => selected.has(id));
-    onToggleMany(ids, !allOn);
-  };
+  const isChecked = selected.has(node.tenant_role_id);
 
   return (
     <div>
@@ -183,20 +151,10 @@ function RoleTreeRow({
           <span className="inline-block w-6 shrink-0" />
         )}
 
+        {/* هر نقش مستقل است — بدون cascade والد/فرزند (مجوزها snapshot هستند) */}
         <Checkbox
-          checked={
-            hasChildren
-              ? parentState === "all"
-                ? true
-                : parentState === "some"
-                  ? "indeterminate"
-                  : false
-              : selected.has(node.tenant_role_id)
-          }
-          onCheckedChange={() => {
-            if (hasChildren) onParentToggle();
-            else onToggle(node.tenant_role_id);
-          }}
+          checked={isChecked}
+          onCheckedChange={() => onToggle(node.tenant_role_id)}
         />
 
         <span
@@ -222,7 +180,6 @@ function RoleTreeRow({
               expanded={expanded}
               onToggleExpand={onToggleExpand}
               onToggle={onToggle}
-              onToggleMany={onToggleMany}
             />
           ))
         : null}
@@ -276,17 +233,6 @@ export function AssignRolesCard({ userId }: { userId: string }) {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleMany = (ids: string[], select: boolean) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      for (const id of ids) {
-        if (select) next.add(id);
-        else next.delete(id);
-      }
       return next;
     });
   };
@@ -397,7 +343,6 @@ export function AssignRolesCard({ userId }: { userId: string }) {
                     expanded={expanded}
                     onToggleExpand={toggleExpand}
                     onToggle={toggle}
-                    onToggleMany={toggleMany}
                   />
                 ))}
               </div>
