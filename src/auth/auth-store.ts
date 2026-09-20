@@ -59,6 +59,8 @@ interface AuthState {
     activeTenantId: string | null;
     organization?: ActiveOrganization | null;
   }) => void;
+  /** Merge fields into the logged-in user (e.g. after self name edit) and persist snapshot. */
+  patchUser: (partial: Partial<AuthUser>) => void;
   clearSession: () => void;
   setActiveTenantId: (tenantId: string | null) => void;
   setOrganization: (org: ActiveOrganization | null) => void;
@@ -123,6 +125,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isHydrated: true,
       isAuthenticated: true,
     });
+  },
+
+  patchUser: (partial) => {
+    const { user, securityContext, activeTenantId, organization } = get();
+    if (!user) return;
+    const nextUser = { ...user, ...partial };
+    if (securityContext) {
+      writeSnapshot({
+        user: nextUser,
+        security_context: securityContext,
+        active_tenant_id: activeTenantId,
+        organization,
+      });
+    }
+    set({ user: nextUser });
   },
 
   clearSession: () => {
