@@ -10,10 +10,14 @@ import { cn } from "@/shared/lib/utils";
 import { LoginBackground } from "./login-background";
 
 export const OTP_LENGTH = 6;
-/** Align with backend OtpLoginService::TTL_SECONDS (5 minutes). Code validity window. */
-export const OTP_TIMER_SEC = 300;
-/** Minimum seconds between resend clicks (UX). Abuse/force limits are enforced by backend. */
-export const OTP_RESEND_MIN_SEC = 30;
+/** Align with backend OtpLoginService::TTL_SECONDS (10 minutes). Soft UI hint only — not a hard lock. */
+export const OTP_TIMER_SEC = 600;
+/**
+ * Client-side resend lock seconds.
+ * Backend enforces the real 10-minute cooldown; UI must NOT scare the user with a short countdown
+ * that looks like "code expires in 30s". Keep at 0 so the button stays available; server answers.
+ */
+export const OTP_RESEND_MIN_SEC = 0;
 
 export function toFa(v: string | number) {
   return String(v).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
@@ -78,12 +82,12 @@ export function ActionButton({ loading, loadingLabel, children, className, disab
 export function ResendButton({ cooldownSec, totalSec, disabled, busy, onClick, minLockSec = OTP_RESEND_MIN_SEC }: {
   cooldownSec: number; totalSec: number; disabled?: boolean; busy?: boolean; onClick: () => void; minLockSec?: number;
 }) {
-  // Only lock for the first minLockSec after send — NOT the full code TTL.
-  // Full 5-minute validity is server-side; force-resend + abuse lock live on backend.
+  // Backend owns the real 10-minute cooldown. UI keeps the button available (minLockSec default 0)
+  // so the user is not pushed into "code expires in 30s" panic. Server returns a clear message if blocked.
   const elapsed = Math.max(0, totalSec - cooldownSec);
-  const lockLeft = Math.max(0, minLockSec - elapsed);
+  const lockLeft = minLockSec > 0 ? Math.max(0, minLockSec - elapsed) : 0;
   const locked = lockLeft > 0;
-  const progress = locked ? 1 - lockLeft / minLockSec : 1;
+  const progress = locked && minLockSec > 0 ? 1 - lockLeft / minLockSec : 1;
   const r = 18;
   const c = 2 * Math.PI * r;
   const offset = c * (1 - progress);
@@ -190,7 +194,8 @@ export function LoginShell({ children, showVisual = true }: { children: React.Re
         @keyframes login-breathe { 0%, 100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1); } }
         @keyframes login-spin { to { transform: rotate(360deg); } }
         @keyframes login-shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
-        @keyframes login-ring-pulse { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+        @keyframes login-ring-pulse { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; }
+        }
         @keyframes login-ring-rotate { to { transform: rotate(360deg); } }
         @keyframes login-card-in { from { opacity: 0; transform: translateY(10px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
         @keyframes login-glow {
