@@ -10,14 +10,14 @@ import { cn } from "@/shared/lib/utils";
 import { LoginBackground } from "./login-background";
 
 export const OTP_LENGTH = 6;
-/** Align with backend OtpLoginService::TTL_SECONDS (10 minutes). Soft UI hint only — not a hard lock. */
+/** Align with backend OtpLoginService::TTL_SECONDS (10 minutes). */
 export const OTP_TIMER_SEC = 600;
 /**
- * Client-side resend lock seconds.
- * Backend enforces the real 10-minute cooldown; UI must NOT scare the user with a short countdown
- * that looks like "code expires in 30s". Keep at 0 so the button stays available; server answers.
+ * Client-side resend lock: show waiting ring only while inside the 10-minute
+ * window after a successful code send (matches backend RESEND_COOLDOWN_SECONDS).
+ * This is NOT "code expires" — it means "cannot request another NEW code yet".
  */
-export const OTP_RESEND_MIN_SEC = 0;
+export const OTP_RESEND_MIN_SEC = 600;
 
 export function toFa(v: string | number) {
   return String(v).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
@@ -82,8 +82,8 @@ export function ActionButton({ loading, loadingLabel, children, className, disab
 export function ResendButton({ cooldownSec, totalSec, disabled, busy, onClick, minLockSec = OTP_RESEND_MIN_SEC }: {
   cooldownSec: number; totalSec: number; disabled?: boolean; busy?: boolean; onClick: () => void; minLockSec?: number;
 }) {
-  // Backend owns the real 10-minute cooldown. UI keeps the button available (minLockSec default 0)
-  // so the user is not pushed into "code expires in 30s" panic. Server returns a clear message if blocked.
+  // Show waiting circle only during the 10-minute resend cooldown after a successful send.
+  // Label "ارسال مجدد · m:ss" = wait before requesting a NEW code (not code expiry).
   const elapsed = Math.max(0, totalSec - cooldownSec);
   const lockLeft = minLockSec > 0 ? Math.max(0, minLockSec - elapsed) : 0;
   const locked = lockLeft > 0;
