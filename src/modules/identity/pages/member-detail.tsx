@@ -44,6 +44,7 @@ import {
 import { useMembershipHistory } from "../hooks/use-membership-history";
 import { IdentityPermissions } from "../types";
 import { AssignRolesCard } from "./assign-roles-card";
+import { AssignScopesCard } from "./assign-scopes-card";
 import { MembershipHistoryPanel } from "./membership-history-panel";
 import { MSG_GENERIC_ERROR, MSG_NO_ACCESS } from "../lib/ui-copy";
 import { decodeMemberRef } from "../lib/member-ref";
@@ -522,27 +523,19 @@ export function MemberDetailPage() {
                       </span>
                     </div>
                     <p className="text-[11px] text-muted-foreground">
-                      فقط بخش قبل از @ قابل ویرایش است. دامنه بر اساس قرارداد
-                      سازمان (دامنه اختصاصی یا برند روی دامنه پلتفرم) تعیین
-                      می‌شود.
+                      فقط بخش قبل از @ قابل ویرایش است.
                     </p>
                   </div>
+                  {canManageOwner ? (
+                    <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                      <Checkbox
+                        checked={isOwner}
+                        onCheckedChange={(v) => setIsOwner(v === true)}
+                      />
+                      مدیر اصلی سازمان
+                    </label>
+                  ) : null}
                 </div>
-                {canManageOwner ? (
-                  <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border/60 px-3 py-3">
-                    <Checkbox
-                      className="mt-0.5"
-                      checked={isOwner}
-                      onCheckedChange={(v) => setIsOwner(Boolean(v))}
-                    />
-                    <span className="space-y-0.5 text-sm">
-                      <span className="font-medium">مدیر اصلی سازمان</span>
-                      <span className="block text-xs text-muted-foreground">
-                        فقط مالک فعلی می‌تواند این پرچم را تغییر دهد.
-                      </span>
-                    </span>
-                  </label>
-                ) : null}
                 <div className="flex flex-wrap justify-end gap-2">
                   <Button
                     type="button"
@@ -590,10 +583,10 @@ export function MemberDetailPage() {
                 </div>
                 <div className="flex flex-wrap gap-x-6 gap-y-1 border-t border-border/40 pt-3 text-[11px] text-muted-foreground">
                   <span className="whitespace-nowrap">
-                    عضویت از {formatDate(data.created_at)}
+                    عضویت از {formatDate(data.created_at as string | null)}
                   </span>
                   <span className="whitespace-nowrap">
-                    آخرین تغییر {formatDate(data.updated_at)}
+                    آخرین تغییر {formatDate(data.updated_at as string | null)}
                   </span>
                 </div>
               </div>
@@ -602,7 +595,9 @@ export function MemberDetailPage() {
         </Card>
       </div>
 
-      <AssignRolesCard userId={data.user_id} />
+      <AssignRolesCard userId={data.user_id!} />
+
+      <AssignScopesCard tenantUserId={data.tenant_user_id} />
 
       {canViewHistory ? (
         <MembershipHistoryPanel
