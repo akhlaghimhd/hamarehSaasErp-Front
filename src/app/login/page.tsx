@@ -14,7 +14,14 @@ import { toast } from "sonner";
 import { KeyRound, Smartphone, Building2, Pencil, Loader2 } from "lucide-react";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
-import { authService, useAuthStore, type OrganizationOption } from "@/auth";
+import {
+  authService,
+  useAuthStore,
+  validatePasswordClient,
+  PASSWORD_HINT,
+  type OrganizationOption,
+  type AuthUser,
+} from "@/auth";
 import { ApiClientError } from "@/api";
 import { cn } from "@/shared/lib/utils";
 import { LoginVisual } from "./login-visual";
@@ -74,8 +81,10 @@ function friendlyError(raw: string, context: "password" | "otp-mobile" | "otp-co
   if (m.includes("not found") || (m.includes("user") && m.includes("exist"))) return "حسابی با این مشخصات پیدا نشد.";
   if (m.includes("mobile") || m.includes("phone") || m.includes("شماره")) return "شماره موبایل نامعتبر است (۰۹۱۲xxxxxxxx).";
   if (m.includes("too many") || m.includes("rate") || m.includes("throttle")) return "تعداد درخواست‌ها زیاد است. کمی صبر کنید.";
-  if (m.includes("expired") || m.includes("expire")) return "کد منقضی شده. کد جدید درخواست کنید.";
-  if (m.includes("code") && (m.includes("invalid") || m.includes("wrong"))) return "کد واردشده نادرست است.";
+  if (m.includes("expired") || m.includes("expire") || m.includes("منقضی")) {
+    return "این کد دیگر معتبر نیست. «ارسال مجدد» را بزنید تا کد جدید بگیرید.";
+  }
+  if (m.includes("code") && (m.includes("invalid") || m.includes("wrong") || m.includes("نادرست"))) return "کد واردشده نادرست است.";
   return raw || "عملیات ناموفق بود.";
 }
 
@@ -85,7 +94,7 @@ export default function LoginPage() {
   const isHydrated = useAuthStore((s) => s.isHydrated);
   const hydrate = useAuthStore((s) => s.hydrate);
 
-  const [mode, setMode] = useState<"password" | "otp">("password");
+  const [mode, setMode] = useState<"password" | "otp" | "set-password" | "forgot">("password");
   const [formError, setFormError] = useState<string | null>(null);
   const [passwordFails, setPasswordFails] = useState(0);
   const [needHumanCheck, setNeedHumanCheck] = useState(false);
@@ -108,6 +117,19 @@ export default function LoginPage() {
   const [orgBusy, setOrgBusy] = useState(false);
   const autoSubmitLock = useRef(false);
 
+  const [setPasswordUser, setSetPasswordUser] = useState<AuthUser | null>(null);
+  const [setPasswordToken, setSetPasswordToken] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [newPassword2, setNewPassword2] = useState("");
+  const [setPasswordBusy, setSetPasswordBusy] = useState(false);
+
+  const [forgotStep, setForgotStep] = useState<"idle" | "mobile" | "code" | "password">("idle");
+  const [forgotMobile, setForgotMobile] = useState("");
+  const [forgotCode, setForgotCode] = useState("");
+  const [forgotPassword, setForgotPassword] = useState("");
+  const [forgotPassword2, setForgotPassword2] = useState("");
+  const [forgotBusy, setForgotBusy] = useState(false);
+
   const { register, handleSubmit, setValue, getValues, watch, formState: { errors, isSubmitting } } = useForm<PasswordForm>({
     resolver: zodResolver(passwordSchema),
     defaultValues: { identifier: "", password: "" },
@@ -119,9 +141,15 @@ export default function LoginPage() {
   const markEdited = () => { if (blockedUntilEdit) setBlockedUntilEdit(false); };
   const goToDashboard = useCallback(() => { router.replace("/dashboard"); }, [router]);
 
+  const clearOtpLocalSession = useCallback(() => {
+    try { sessionStorage.removeItem(OTP_SESSION_KEY); } catch { /* ignore */ }
+    setLastOtpSession(null);
+    setTimerLeft(0);
+    setDebugCode(null);
+  }, []);
+
   useEffect(() => { if (!isHydrated) hydrate(); }, [isHydrated, hydrate]);
 
-  // Restore OTP session after refresh (allow code step without re-send while timer alive)
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem(OTP_SESSION_KEY);
@@ -139,7 +167,6 @@ export default function LoginPage() {
     } catch { /* ignore */ }
   }, []);
 
-  // Keep sessionStorage in sync when timer dies
   useEffect(() => {
     if (!lastOtpSession) return;
     if (lastOtpSession.endsAt <= Date.now()) {
@@ -148,12 +175,12 @@ export default function LoginPage() {
   }, [lastOtpSession, timerLeft]);
 
   useEffect(() => { if (isHydrated && isAuthenticated && !orgs) goToDashboard(); }, [isHydrated, isAuthenticated, orgs, goToDashboard]);
+
   useEffect(() => {
     if (!lastOtpSession) { setTimerLeft(0); return; }
     const tick = () => {
       const left = Math.max(0, Math.ceil((lastOtpSession.endsAt - Date.now()) / 1000));
       setTimerLeft(left);
-      // When cooldown ends, unlock resend (do not keep form blocked)
       if (left === 0) {
         setBlockedUntilEdit(false);
         autoSubmitLock.current = false;
@@ -165,9 +192,21 @@ export default function LoginPage() {
   }, [lastOtpSession]);
 
   const handleLoginResult = async (result: Awaited<ReturnType<typeof authService.loginWithPassword>>) => {
+    if (result.kind === "must_set_password") {
+      setPasswordFails(0); setOtpFails(0); setHumanGateArmed(false);
+      humanPassOnceRef.current = false; setNeedHumanCheck(false);
+      clearOtpLocalSession();
+      setSetPasswordUser(result.user);
+      setSetPasswordToken(result.accessToken);
+      setMode("set-password");
+      setFormError(null);
+      toast.message("لطفاً رمز عبور خود را تعیین کنید");
+      return;
+    }
     if (result.kind === "session") {
       setPasswordFails(0); setOtpFails(0); setHumanGateArmed(false);
       humanPassOnceRef.current = false; setNeedHumanCheck(false);
+      clearOtpLocalSession();
       toast.success("ورود با موفقیت انجام شد");
       goToDashboard();
       return;
@@ -219,10 +258,10 @@ export default function LoginPage() {
     } catch { /* ignore */ }
   };
 
-  const doRequestOtpNetwork = async (mobile: string) => {
+  const doRequestOtpNetwork = async (mobile: string, forceResend = false) => {
     setOtpRequestBusy(true); setFormError(null);
     try {
-      const res = await authService.requestOtp(mobile);
+      const res = await authService.requestOtp(mobile, { forceResend });
       const debug = typeof res.debug_code === "string" ? res.debug_code : undefined;
       const ttlSec =
         typeof res.expires_in === "number" && res.expires_in > 0
@@ -234,20 +273,14 @@ export default function LoginPage() {
     } catch (err) {
       const raw = err instanceof ApiClientError ? err.message : "ارسال کد ناموفق بود.";
       const lower = raw.toLowerCase();
-      // Backend still has an active OTP — stay on code step; do NOT invent a new timer/debug as if resent
+      // Backend: active unconsumed OTP → soft message (do not invent new code)
       if (
         (err instanceof ApiClientError && err.statusCode === 429) ||
-        lower.includes("قبلی") || lower.includes("معتبر") || lower.includes("resend") || lower.includes("retry")
+        lower.includes("قبلی") || lower.includes("معتبر") || lower.includes("resend") || lower.includes("retry") || lower.includes("مکرر")
       ) {
         setOtpStep("code");
         setBlockedUntilEdit(false);
-        if (lastOtpSession && lastOtpSession.mobile === mobile && lastOtpSession.endsAt > Date.now()) {
-          setDebugCode(lastOtpSession.debugCode ?? null);
-          setFormError("کد قبلی هنوز معتبر است؛ همان کد را وارد کنید.");
-        } else {
-          // Frontend timer ended but backend may still hold the OTP briefly — do not show stale debug as a new code
-          setFormError("کد قبلی هنوز از سمت سرور فعال است. چند لحظه صبر کنید و دوباره «ارسال مجدد» را بزنید.");
-        }
+        setFormError(raw || "آخرین کدی که دریافت کردید هنوز معتبر است.");
       } else {
         setFormError(friendlyError(raw, "otp-mobile"));
         setBlockedUntilEdit(true);
@@ -259,7 +292,6 @@ export default function LoginPage() {
 
   const onRequestOtp = async (opts?: { force?: boolean }) => {
     if (needHumanCheck) return;
-    // force (resend) must work even if form was blocked after a failed verify / expired attempt
     if (blockedUntilEdit && !opts?.force) return;
     if (opts?.force) {
       setBlockedUntilEdit(false);
@@ -269,14 +301,12 @@ export default function LoginPage() {
     const mobile = normalizeMobile(otpMobile);
     if (!isValidIranMobile(mobile)) { setOtpMobileError("فرمت صحیح: ۰۹۱۲xxxxxxxx"); setBlockedUntilEdit(true); return; }
     setOtpMobile(mobile);
-    if (!opts?.force && lastOtpSession && lastOtpSession.mobile === mobile && lastOtpSession.endsAt > Date.now()) {
-      setOtpStep("code"); setDebugCode(lastOtpSession.debugCode ?? null); return;
-    }
-    if (otpFails >= 1 && !humanPassOnceRef.current) {
+    // Always call backend — local session may be stale after login/consume
+    if (otpFails >= 1 && !humanPassOnceRef.current && !opts?.force) {
       setHumanGateArmed(true); setPendingAfterCheck("otp"); setNeedHumanCheck(true); return;
     }
     humanPassOnceRef.current = false;
-    await doRequestOtpNetwork(mobile);
+    await doRequestOtpNetwork(mobile, Boolean(opts?.force));
   };
 
   const onVerifyOtp = useCallback(async (codeOverride?: string) => {
@@ -287,7 +317,7 @@ export default function LoginPage() {
     humanPassOnceRef.current = false;
     const code = (codeOverride ?? otpCode).replace(/\D/g, "");
     if (code.length !== OTP_LENGTH) return;
-    if (timerLeft <= 0) { setFormError("کد منقضی شده. کد جدید درخواست کنید."); setBlockedUntilEdit(true); return; }
+    // Do not block on local timer — server decides validity
     autoSubmitLock.current = true; setOtpVerifyBusy(true); setFormError(null);
     try {
       const result = await authService.verifyOtp(normalizeMobile(otpMobile), code);
@@ -295,21 +325,34 @@ export default function LoginPage() {
       await handleLoginResult(result);
     } catch (err) {
       const raw = err instanceof ApiClientError ? err.message : "تأیید کد ناموفق بود.";
-      setFormError(friendlyError(raw, "otp-code"));
+      const lower = raw.toLowerCase();
+      if (
+        lower.includes("منقضی") || lower.includes("expired") || lower.includes("یافت نشد")
+        || lower.includes("not found") || (err instanceof ApiClientError && err.statusCode === 401)
+      ) {
+        clearOtpLocalSession();
+        setFormError(
+          lower.includes("نادرست") || lower.includes("wrong") || lower.includes("invalid")
+            ? friendlyError(raw, "otp-code")
+            : "این کد دیگر معتبر نیست. «ارسال مجدد» را بزنید تا کد جدید بگیرید."
+        );
+      } else {
+        setFormError(friendlyError(raw, "otp-code"));
+      }
       setBlockedUntilEdit(true);
       autoSubmitLock.current = false;
       humanPassOnceRef.current = false;
       setOtpFails((prev) => { const next = prev + 1; if (next >= 1) setHumanGateArmed(true); return next; });
     } finally { setOtpVerifyBusy(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [otpCode, otpMobile, timerLeft, blockedUntilEdit, humanGateArmed, otpFails, needHumanCheck]);
+  }, [otpCode, otpMobile, blockedUntilEdit, humanGateArmed, otpFails, needHumanCheck, clearOtpLocalSession]);
 
   const onHumanCheckPass = () => {
     humanPassOnceRef.current = true;
     setNeedHumanCheck(false); setBlockedUntilEdit(false);
     const pending = pendingAfterCheck; setPendingAfterCheck(null);
     if (pending === "password") void runPasswordLogin(getValues());
-    else if (pending === "otp") void doRequestOtpNetwork(normalizeMobile(otpMobile));
+    else if (pending === "otp") void doRequestOtpNetwork(normalizeMobile(otpMobile), true);
     else if (pending === "otp-verify") {
       const code = otpCode.replace(/\D/g, "");
       if (code.length === OTP_LENGTH) void onVerifyOtp(code);
@@ -322,6 +365,7 @@ export default function LoginPage() {
     setOrgBusy(true); setFormError(null);
     try {
       await authService.selectOrganization(preAuth, tenantId);
+      clearOtpLocalSession();
       toast.success("ورود با موفقیت انجام شد");
       goToDashboard();
     } catch (err) {
@@ -331,8 +375,103 @@ export default function LoginPage() {
     } finally { setOrgBusy(false); }
   };
 
-  const switchMode = (next: "password" | "otp") => {
-    setMode(next); setFormError(null); setNeedHumanCheck(false); setPendingAfterCheck(null); setBlockedUntilEdit(false);
+  const switchMode = (next: "password" | "otp" | "forgot") => {
+    setMode(next);
+    setFormError(null);
+    setNeedHumanCheck(false);
+    setPendingAfterCheck(null);
+    setBlockedUntilEdit(false);
+    if (next === "forgot") {
+      setForgotStep("mobile");
+      setForgotMobile("");
+      setForgotCode("");
+      setForgotPassword("");
+      setForgotPassword2("");
+    } else {
+      setForgotStep("idle");
+    }
+  };
+
+  const onSetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    const policyErr = validatePasswordClient(newPassword, {
+      firstName: setPasswordUser?.first_name,
+      lastName: setPasswordUser?.last_name,
+      email: setPasswordUser?.email,
+      mobile: setPasswordUser?.mobile,
+    });
+    if (policyErr) { setFormError(policyErr); return; }
+    if (newPassword !== newPassword2) { setFormError("تکرار رمز با رمز جدید یکسان نیست."); return; }
+    setSetPasswordBusy(true);
+    try {
+      await authService.setPassword(newPassword, newPassword2);
+      setSetPasswordUser(null);
+      setSetPasswordToken(null);
+      setNewPassword("");
+      setNewPassword2("");
+      setMode("password");
+      toast.success("رمز تعیین شد. لطفاً دوباره وارد شوید.");
+    } catch (err) {
+      const raw = err instanceof ApiClientError ? err.message : "تعیین رمز ناموفق بود.";
+      setFormError(raw);
+    } finally {
+      setSetPasswordBusy(false);
+    }
+  };
+
+  const onForgotRequest = async (opts?: { force?: boolean }) => {
+    setFormError(null);
+    const mobile = normalizeMobile(forgotMobile);
+    if (!isValidIranMobile(mobile)) { setFormError("فرمت صحیح: ۰۹۱۲xxxxxxxx"); return; }
+    setForgotMobile(mobile);
+    setForgotBusy(true);
+    try {
+      const res = await authService.forgotPasswordRequest(mobile, { forceResend: opts?.force });
+      const ttlSec = typeof res.expires_in === "number" && res.expires_in > 0 ? res.expires_in : OTP_TIMER_SEC;
+      startOtpSession(mobile, typeof res.debug_code === "string" ? res.debug_code : undefined, Date.now() + ttlSec * 1000);
+      setForgotStep("code");
+    } catch (err) {
+      const raw = err instanceof ApiClientError ? err.message : "ارسال کد ناموفق بود.";
+      const lower = raw.toLowerCase();
+      if (
+        (err instanceof ApiClientError && err.statusCode === 429) ||
+        lower.includes("قبلی") || lower.includes("معتبر") || lower.includes("resend") || lower.includes("مکرر")
+      ) {
+        setForgotStep("code");
+        setFormError(raw || "آخرین کدی که دریافت کردید هنوز معتبر است.");
+      } else {
+        setFormError(friendlyError(raw, "otp-mobile"));
+      }
+    } finally {
+      setForgotBusy(false);
+    }
+  };
+
+  const onForgotConfirm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    const code = forgotCode.replace(/\D/g, "");
+    if (code.length !== OTP_LENGTH) { setFormError("کد را کامل وارد کنید."); return; }
+    const policyErr = validatePasswordClient(forgotPassword, { mobile: forgotMobile });
+    if (policyErr) { setFormError(policyErr); return; }
+    if (forgotPassword !== forgotPassword2) { setFormError("تکرار رمز با رمز جدید یکسان نیست."); return; }
+    setForgotBusy(true);
+    try {
+      await authService.forgotPasswordConfirm(normalizeMobile(forgotMobile), code, forgotPassword, forgotPassword2);
+      setForgotStep("idle");
+      setMode("password");
+      setForgotCode("");
+      setForgotPassword("");
+      setForgotPassword2("");
+      clearOtpLocalSession();
+      toast.success("رمز بازنشانی شد. با رمز جدید وارد شوید.");
+    } catch (err) {
+      const raw = err instanceof ApiClientError ? err.message : "بازنشانی رمز ناموفق بود.";
+      setFormError(raw);
+    } finally {
+      setForgotBusy(false);
+    }
   };
 
   if (!isHydrated) {
@@ -348,6 +487,84 @@ export default function LoginPage() {
             <p className="text-[11px] text-muted-foreground">بارگذاری نشست امن…</p>
             <BreathingDots className="mt-1" />
           </div>
+        </div>
+      </LoginShell>
+    );
+  }
+
+  if (mode === "set-password" && setPasswordToken) {
+    return (
+      <LoginShell showVisual={false}>
+        <div className="flex w-full flex-col gap-4 p-6">
+          <div className="space-y-1">
+            <h1 className="text-base font-semibold">تعیین رمز عبور</h1>
+            <p className="text-xs text-muted-foreground">
+              برای ادامه، یک رمز عبور امن تعیین کنید
+              {setPasswordUser ? (
+                <> ({setPasswordUser.first_name} {setPasswordUser.last_name})</>
+              ) : null}
+            </p>
+            <p className="text-[11px] text-muted-foreground">{PASSWORD_HINT}</p>
+          </div>
+          <ErrorSlot message={formError} />
+          <form onSubmit={(e) => void onSetPasswordSubmit(e)} className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">رمز عبور جدید</Label>
+              <Input type="password" dir="ltr" className="h-10" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">تکرار رمز عبور</Label>
+              <Input type="password" dir="ltr" className="h-10" value={newPassword2} onChange={(e) => setNewPassword2(e.target.value)} autoComplete="new-password" />
+            </div>
+            <ActionButton type="submit" loading={setPasswordBusy} loadingLabel="در حال ذخیره…">ذخیره و ورود مجدد</ActionButton>
+          </form>
+        </div>
+      </LoginShell>
+    );
+  }
+
+  if (mode === "forgot") {
+    return (
+      <LoginShell showVisual={false}>
+        <div className="flex w-full flex-col gap-4 p-6">
+          <div className="space-y-1">
+            <h1 className="text-base font-semibold">بازیابی رمز عبور</h1>
+            <p className="text-xs text-muted-foreground">با شماره موبایل و کد یک‌بارمصرف، رمز جدید تعیین کنید</p>
+          </div>
+          <ErrorSlot message={formError} />
+          {forgotStep === "mobile" || forgotStep === "idle" ? (
+            <form onSubmit={(e) => { e.preventDefault(); void onForgotRequest(); }} className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">شماره موبایل</Label>
+                <Input dir="ltr" className="h-10 tabular-nums" value={displayIdentifier(forgotMobile)} onChange={(e) => setForgotMobile(sanitizeIdentifierInput(e.target.value))} placeholder="0912xxxxxxx" />
+              </div>
+              <ActionButton type="submit" loading={forgotBusy} loadingLabel="در حال ارسال…">ارسال کد تأیید</ActionButton>
+              <button type="button" className="w-full text-center text-xs text-muted-foreground hover:text-foreground" onClick={() => switchMode("password")}>بازگشت به ورود</button>
+            </form>
+          ) : null}
+          {forgotStep === "code" || forgotStep === "password" ? (
+            <form onSubmit={(e) => void onForgotConfirm(e)} className="space-y-3">
+              <p className="text-xs text-muted-foreground">کد به <span dir="ltr" className="font-medium text-foreground">{toFa(forgotMobile)}</span> ارسال شد</p>
+              <div className="space-y-1.5">
+                <Label className="text-xs">کد تأیید</Label>
+                <OtpCodeInput value={forgotCode} onChange={(v) => { setForgotCode(v); setFormError(null); }} disabled={forgotBusy} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">رمز عبور جدید</Label>
+                <Input type="password" dir="ltr" className="h-10" value={forgotPassword} onChange={(e) => setForgotPassword(e.target.value)} autoComplete="new-password" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">تکرار رمز</Label>
+                <Input type="password" dir="ltr" className="h-10" value={forgotPassword2} onChange={(e) => setForgotPassword2(e.target.value)} autoComplete="new-password" />
+              </div>
+              <p className="text-[11px] text-muted-foreground">{PASSWORD_HINT}</p>
+              <div className="flex gap-2">
+                <ActionButton type="submit" loading={forgotBusy} loadingLabel="در حال ذخیره…" className="flex-1">ذخیره رمز جدید</ActionButton>
+                <ResendButton cooldownSec={timerLeft} totalSec={OTP_TIMER_SEC} busy={forgotBusy} onClick={() => void onForgotRequest({ force: true })} />
+              </div>
+              <button type="button" className="w-full text-center text-xs text-muted-foreground hover:text-foreground" onClick={() => switchMode("password")}>بازگشت به ورود</button>
+            </form>
+          ) : null}
         </div>
       </LoginShell>
     );
@@ -395,68 +612,65 @@ export default function LoginPage() {
           <p className="text-xs text-muted-foreground">با رمز عبور یا کد یک‌بارمصرف وارد شوید</p>
         </div>
 
-        <div className="relative grid grid-cols-2 rounded-xl border border-border bg-muted/40 p-1 shadow-inner" role="tablist" aria-label="روش ورود">
-          <span className="pointer-events-none absolute inset-y-1 w-[calc(50%-4px)] rounded-lg bg-background shadow-md ring-1 ring-primary/20 transition-transform duration-300 ease-out"
+        <div className="relative flex h-10 rounded-xl border border-border/80 bg-muted/40 p-1" role="tablist">
+          <span className="pointer-events-none absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-lg bg-background shadow-sm transition-transform duration-200"
             style={{ transform: mode === "password" ? "translateX(0)" : "translateX(calc(-100% - 0px))", right: 4 }} aria-hidden />
           <button type="button" role="tab" aria-selected={mode === "password"} onClick={() => switchMode("password")}
-            className={cn("relative z-10 flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs transition-colors",
+            className={cn("relative z-10 flex flex-1 items-center justify-center gap-1.5 rounded-lg text-xs transition-colors",
               mode === "password" ? "font-semibold text-primary" : "font-medium text-muted-foreground hover:text-foreground")}>
             <KeyRound className={cn("h-3.5 w-3.5", mode === "password" ? "text-primary" : "opacity-70")} />رمز عبور
           </button>
           <button type="button" role="tab" aria-selected={mode === "otp"} onClick={() => switchMode("otp")}
-            className={cn("relative z-10 flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs transition-colors",
+            className={cn("relative z-10 flex flex-1 items-center justify-center gap-1.5 rounded-lg text-xs transition-colors",
               mode === "otp" ? "font-semibold text-primary" : "font-medium text-muted-foreground hover:text-foreground")}>
             <Smartphone className={cn("h-3.5 w-3.5", mode === "otp" ? "text-primary" : "opacity-70")} />کد یک‌بارمصرف
           </button>
         </div>
 
-        {needHumanCheck && (
-          <div className="space-y-2">
-            <HumanSlideCheck onPass={onHumanCheckPass} />
-            <p className="text-center text-[10px] text-muted-foreground">پس از تأیید، همان درخواست ورود ادامه می‌یابد.</p>
-          </div>
-        )}
+        {needHumanCheck ? <HumanSlideCheck onPass={onHumanCheckPass} /> : null}
 
         {!needHumanCheck && mode === "password" ? (
           <form onSubmit={handleSubmit(onPasswordSubmit)} className="flex flex-col gap-3.5" noValidate>
             <div className="space-y-1.5">
-              <Label htmlFor="identifier" className="text-xs font-medium">ایمیل یا موبایل <span className="text-destructive">*</span></Label>
-              <Input id="identifier" dir="ltr" autoComplete="username" className="h-10 text-left text-sm" placeholder={`${toFa("0912")}... یا user@company.com`}
-                name={identifierReg.name} ref={identifierReg.ref} onBlur={identifierReg.onBlur} value={displayIdentifier(identifierValue)}
-                onChange={(e) => { setValue("identifier", sanitizeIdentifierInput(e.target.value), { shouldValidate: false, shouldDirty: true }); markEdited(); }} />
+              <Label htmlFor="identifier" className="text-xs font-medium">ایمیل یا موبایل</Label>
+              <Input id="identifier" autoComplete="username" dir="ltr" className="h-10"
+                {...identifierReg}
+                value={displayIdentifier(identifierValue)}
+                onChange={(e) => { identifierReg.onChange({ target: { name: "identifier", value: sanitizeIdentifierInput(e.target.value) } }); markEdited(); setFormError(null); }}
+              />
               {errors.identifier && <p className="text-[11px] text-destructive">{errors.identifier.message}</p>}
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="password" className="text-xs font-medium">رمز عبور <span className="text-destructive">*</span></Label>
-                <button type="button" className="text-[11px] text-primary hover:underline" onClick={() => toast.message("بازیابی رمز عبور به زودی فعال می‌شود")}>فراموشی رمز؟</button>
+                <Label htmlFor="password" className="text-xs font-medium">رمز عبور</Label>
+                <button type="button" className="text-[11px] text-primary hover:underline" onClick={() => switchMode("forgot")}>فراموشی رمز؟</button>
               </div>
-              <Input id="password" type="password" autoComplete="current-password" dir="ltr" className="h-10 text-left text-sm" placeholder="••••••••"
-                name={passwordReg.name} ref={passwordReg.ref} onBlur={passwordReg.onBlur} value={passwordValue}
-                onChange={(e) => { setValue("password", e.target.value, { shouldValidate: false, shouldDirty: true }); markEdited(); }} />
+              <Input id="password" type="password" autoComplete="current-password" dir="ltr" className="h-10"
+                {...passwordReg}
+                onChange={(e) => { passwordReg.onChange(e); markEdited(); setFormError(null); }}
+              />
               {errors.password && <p className="text-[11px] text-destructive">{errors.password.message}</p>}
             </div>
             <ErrorSlot message={formError} />
-            <div className="pt-1">
-              <ActionButton loading={isSubmitting} loadingLabel="در حال ورود…" disabled={blockedUntilEdit}>ورود به سیستم</ActionButton>
-            </div>
+            <ActionButton loading={isSubmitting} loadingLabel="در حال ورود…" disabled={blockedUntilEdit}>ورود به سیستم</ActionButton>
           </form>
-        ) : !needHumanCheck && otpStep === "mobile" ? (
+        ) : null}
+
+        {!needHumanCheck && mode === "otp" && otpStep === "mobile" ? (
           <form onSubmit={(e) => { e.preventDefault(); void onRequestOtp(); }} className="flex flex-col gap-3.5" noValidate>
             <div className="space-y-1.5">
-              <Label htmlFor="otp-mobile" className="text-xs font-medium">شماره موبایل <span className="text-destructive">*</span></Label>
-              <Input id="otp-mobile" dir="ltr" inputMode="numeric" autoComplete="tel" maxLength={11} className="h-10 text-left text-sm tracking-wide" placeholder={toFa("0912xxxxxxxx")}
-                value={toFa(otpMobile)}
-                onChange={(e) => { setOtpMobile(fromFa(e.target.value).replace(/\D/g, "").slice(0, 11)); setOtpMobileError(null); markEdited(); }}
-                onBlur={() => { if (otpMobile.trim() && !isValidIranMobile(otpMobile)) { setOtpMobileError("فرمت صحیح: ۰۹۱۲xxxxxxxx"); setBlockedUntilEdit(true); } }} />
+              <Label className="text-xs font-medium">شماره موبایل</Label>
+              <Input dir="ltr" className="h-10 tabular-nums" value={displayIdentifier(otpMobile)}
+                onChange={(e) => { setOtpMobile(sanitizeIdentifierInput(e.target.value)); setOtpMobileError(null); markEdited(); setFormError(null); }}
+                placeholder="0912xxxxxxx" />
               {otpMobileError && <p className="text-[11px] text-destructive">{otpMobileError}</p>}
             </div>
             <ErrorSlot message={formError} />
-            <div className="pt-1">
-              <ActionButton loading={otpRequestBusy} loadingLabel="در حال ارسال…" disabled={blockedUntilEdit || !otpMobile.trim()}>دریافت کد تأیید</ActionButton>
-            </div>
+            <ActionButton loading={otpRequestBusy} loadingLabel="در حال ارسال…" disabled={blockedUntilEdit || !otpMobile.trim()}>دریافت کد تأیید</ActionButton>
           </form>
-        ) : !needHumanCheck ? (
+        ) : null}
+
+        {!needHumanCheck && mode === "otp" && otpStep === "code" ? (
           <form onSubmit={(e) => { e.preventDefault(); void onVerifyOtp(); }} className="flex flex-col gap-3.5" noValidate>
             <div className="flex h-11 items-center gap-2 rounded-xl border border-border/80 bg-gradient-to-l from-muted/40 to-muted/10 px-3">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Smartphone className="h-4 w-4" /></span>

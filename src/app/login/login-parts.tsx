@@ -10,7 +10,10 @@ import { cn } from "@/shared/lib/utils";
 import { LoginBackground } from "./login-background";
 
 export const OTP_LENGTH = 6;
-export const OTP_TIMER_SEC = 180;
+/** Align with backend OtpLoginService::TTL_SECONDS (5 minutes). Code validity window. */
+export const OTP_TIMER_SEC = 300;
+/** Minimum seconds between resend clicks (UX). Abuse/force limits are enforced by backend. */
+export const OTP_RESEND_MIN_SEC = 30;
 
 export function toFa(v: string | number) {
   return String(v).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
@@ -72,11 +75,15 @@ export function ActionButton({ loading, loadingLabel, children, className, disab
   );
 }
 
-export function ResendButton({ cooldownSec, totalSec, disabled, busy, onClick }: {
-  cooldownSec: number; totalSec: number; disabled?: boolean; busy?: boolean; onClick: () => void;
+export function ResendButton({ cooldownSec, totalSec, disabled, busy, onClick, minLockSec = OTP_RESEND_MIN_SEC }: {
+  cooldownSec: number; totalSec: number; disabled?: boolean; busy?: boolean; onClick: () => void; minLockSec?: number;
 }) {
-  const locked = cooldownSec > 0;
-  const progress = locked ? 1 - cooldownSec / totalSec : 1;
+  // Only lock for the first minLockSec after send — NOT the full code TTL.
+  // Full 5-minute validity is server-side; force-resend + abuse lock live on backend.
+  const elapsed = Math.max(0, totalSec - cooldownSec);
+  const lockLeft = Math.max(0, minLockSec - elapsed);
+  const locked = lockLeft > 0;
+  const progress = locked ? 1 - lockLeft / minLockSec : 1;
   const r = 18;
   const c = 2 * Math.PI * r;
   const offset = c * (1 - progress);
@@ -110,7 +117,7 @@ export function ResendButton({ cooldownSec, totalSec, disabled, busy, onClick }:
           <span className="absolute inset-0 rounded-full bg-primary/10" style={{ animation: "login-breathe 2s ease-in-out infinite" }} />
         )}
       </span>
-      <span className="tabular-nums">{locked ? `ارسال مجدد · ${formatMmSs(cooldownSec)}` : busy ? "در حال ارسال…" : "ارسال مجدد"}</span>
+      <span className="tabular-nums">{locked ? `ارسال مجدد · ${formatMmSs(lockLeft)}` : busy ? "در حال ارسال…" : "ارسال مجدد"}</span>
     </button>
   );
 }

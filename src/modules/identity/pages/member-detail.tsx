@@ -115,6 +115,7 @@ export function MemberDetailPage() {
   const canViewProfile = usePermission(IdentityPermissions.profileView);
 
   const currentUserId = useAuthStore((s) => s.user?.user_id);
+  const patchUser = useAuthStore((s) => s.patchUser);
 
   const { data, isLoading, isError, error, refetch } = useTenantUser(
     tenantUserId || null
@@ -206,6 +207,16 @@ export function MemberDetailPage() {
           ...(canManageOwner ? { is_owner: isOwner } : {}),
         },
       });
+      // Keep header/session in sync when editing self (no re-login needed)
+      if (isSelf) {
+        const host = emailHost ?? splitEmail(data.user?.email).host;
+        patchUser({
+          first_name: fn,
+          last_name: ln,
+          mobile: mob || null,
+          email: host ? `${local}@${host}` : (data.user?.email ?? ""),
+        });
+      }
       toast.success("اطلاعات ذخیره شد.");
       setEditingIdentity(false);
       void refetch();

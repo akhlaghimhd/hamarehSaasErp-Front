@@ -6,6 +6,8 @@ export { AuthGuard } from "./auth-guard";
 export { GuestGuard } from "./guest-guard";
 export { Can, usePermission, useAnyPermission } from "./can";
 export { IdleLockProvider } from "./idle-lock";
+export { validatePasswordClient, PASSWORD_HINT } from "./password-policy";
+export type { PasswordPolicyContext } from "./password-policy";
 export type {
   AuthUser,
   AuthRole,
