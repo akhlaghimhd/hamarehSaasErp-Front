@@ -1,5 +1,5 @@
-import { CompanyDetailPage } from "@/modules/organization";
+import { CompanyDetailShell } from "@/modules/organization/pages/company-detail-shell";
 
 export default function OrganizationCompanyDetailPage() {
-  return <CompanyDetailPage />;
+  return <CompanyDetailShell />;
 }
