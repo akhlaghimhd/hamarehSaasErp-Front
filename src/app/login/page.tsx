@@ -227,7 +227,7 @@ export default function LoginPage() {
     } catch (err) {
       const raw = err instanceof ApiClientError ? err.message : "ورود ناموفق بود.";
       setFormError(friendlyError(raw, "password"));
-      setBlockedUntilEdit(true);
+      setBlockedUntilEdit(false);
       humanPassOnceRef.current = false;
       setPasswordFails((prev) => {
         const next = prev + 1;
@@ -238,7 +238,9 @@ export default function LoginPage() {
   };
 
   const onPasswordSubmit = async (values: PasswordForm) => {
-    if (needHumanCheck || blockedUntilEdit) return;
+    if (needHumanCheck) return;
+    // Explicit submit must always attempt login (do not silently ignore after a prior error).
+    setBlockedUntilEdit(false);
     if ((humanGateArmed || passwordFails >= 3) && !humanPassOnceRef.current) {
       setHumanGateArmed(true); setPendingAfterCheck("password"); setNeedHumanCheck(true); return;
     }
@@ -404,7 +406,7 @@ export default function LoginPage() {
     if (newPassword !== newPassword2) { setFormError("تکرار رمز با رمز جدید یکسان نیست."); return; }
     setSetPasswordBusy(true);
     try {
-      await authService.setPassword(setPasswordToken, newPassword, newPassword2);
+      await authService.setPassword(newPassword, newPassword2);
       toast.success("رمز عبور ذخیره شد. لطفاً وارد شوید.");
       setMode("password");
       setSetPasswordToken(null);
@@ -657,7 +659,7 @@ export default function LoginPage() {
               {errors.password ? <p className="text-[11px] text-destructive">{errors.password.message}</p> : null}
             </div>
             <ErrorSlot message={formError} />
-            <ActionButton type="submit" loading={isSubmitting} loadingLabel="در حال ورود…" disabled={blockedUntilEdit}>
+            <ActionButton type="submit" loading={isSubmitting} loadingLabel="در حال ورود…" disabled={false}>
               ورود
             </ActionButton>
           </form>
