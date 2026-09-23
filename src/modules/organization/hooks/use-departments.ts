@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { tokenStorage } from "@/api";
 import { departmentService } from "../services/department-service";
 import type {
   CreateDepartmentPayload,
@@ -11,6 +12,11 @@ export function departmentsQueryKey(companyId: string) {
   return ["organization", "companies", companyId, "departments"] as const;
 }
 
+function hasAuthContext(): boolean {
+  if (typeof window === "undefined") return false;
+  return Boolean(tokenStorage.getAccessToken() && tokenStorage.getTenantId());
+}
+
 export function useDepartments(companyId: string | null | undefined) {
   return useQuery({
     queryKey: departmentsQueryKey(companyId ?? ""),
@@ -18,7 +24,7 @@ export function useDepartments(companyId: string | null | undefined) {
       companyId
         ? departmentService.listByCompany(companyId)
         : Promise.resolve([]),
-    enabled: Boolean(companyId),
+    enabled: Boolean(companyId) && hasAuthContext(),
     staleTime: 60_000,
     retry: 1,
   });

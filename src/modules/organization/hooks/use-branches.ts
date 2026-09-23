@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { tokenStorage } from "@/api";
 import { branchService } from "../services/branch-service";
 import type { CreateBranchPayload, UpdateBranchPayload } from "../types";
 
@@ -8,12 +9,17 @@ export function branchesQueryKey(companyId: string) {
   return ["organization", "companies", companyId, "branches"] as const;
 }
 
+function hasAuthContext(): boolean {
+  if (typeof window === "undefined") return false;
+  return Boolean(tokenStorage.getAccessToken() && tokenStorage.getTenantId());
+}
+
 export function useBranches(companyId: string | null | undefined) {
   return useQuery({
     queryKey: branchesQueryKey(companyId ?? ""),
     queryFn: () =>
       companyId ? branchService.listByCompany(companyId) : Promise.resolve([]),
-    enabled: Boolean(companyId),
+    enabled: Boolean(companyId) && hasAuthContext(),
     staleTime: 60_000,
     retry: 1,
   });

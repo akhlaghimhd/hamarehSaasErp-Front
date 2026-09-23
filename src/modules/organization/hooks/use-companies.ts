@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { tokenStorage } from "@/api";
 import { companyService } from "../services/company-service";
 import type { CreateCompanyPayload, UpdateCompanyPayload } from "../types";
 
@@ -10,10 +11,16 @@ export function companyQueryKey(companyId: string) {
   return ["organization", "companies", companyId] as const;
 }
 
+function hasAuthContext(): boolean {
+  if (typeof window === "undefined") return false;
+  return Boolean(tokenStorage.getAccessToken() && tokenStorage.getTenantId());
+}
+
 export function useCompanies() {
   return useQuery({
     queryKey: companiesQueryKey,
     queryFn: () => companyService.list(),
+    enabled: hasAuthContext(),
     staleTime: 60_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
@@ -26,7 +33,7 @@ export function useCompany(companyId: string | null | undefined) {
     queryKey: companyQueryKey(companyId ?? ""),
     queryFn: () =>
       companyId ? companyService.getById(companyId) : Promise.resolve(null),
-    enabled: Boolean(companyId),
+    enabled: Boolean(companyId) && hasAuthContext(),
     staleTime: 60_000,
     retry: 1,
   });
