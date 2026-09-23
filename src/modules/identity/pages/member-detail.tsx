@@ -585,24 +585,18 @@ export function MemberDetailPage() {
         </Card>
 
         <div className="lg:col-span-6">
-          <AssignRolesCard
-            tenantUserId={data.tenant_user_id}
-            userId={data.user_id ?? ""}
-            isOwner={Boolean(data.is_owner)}
-          />
+          <AssignRolesCard userId={data.user_id ?? ""} />
         </div>
         <div className="lg:col-span-6">
-          <AssignScopesCard
-            tenantUserId={data.tenant_user_id}
-            userId={data.user_id ?? ""}
-          />
+          <AssignScopesCard tenantUserId={data.tenant_user_id} />
         </div>
 
         {canViewHistory ? (
           <div className="lg:col-span-12">
             <MembershipHistoryPanel
-              tenantUserId={data.tenant_user_id}
-              query={historyQuery}
+              items={historyQuery.data ?? []}
+              isLoading={historyQuery.isLoading}
+              isError={historyQuery.isError}
             />
           </div>
         ) : null}
