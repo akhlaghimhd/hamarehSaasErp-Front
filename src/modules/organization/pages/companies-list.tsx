@@ -1,5 +1,5 @@
 /**
- * FE-ORG-T01 — فهرست شرکت‌ها
+ * FE-ORG — فهرست شرکت‌ها (P0–P1 fields)
  */
 
 "use client";
@@ -34,7 +34,11 @@ import {
   useCreateCompany,
   useSoftDeleteCompany,
 } from "../hooks/use-companies";
-import { OrganizationPermissions, type CompanyDto } from "../types";
+import {
+  OrganizationPermissions,
+  ENTITY_KIND_LABELS,
+  type CompanyDto,
+} from "../types";
 
 const MSG_LOAD = "بارگذاری فهرست شرکت‌ها ممکن نشد. کمی بعد دوباره تلاش کنید.";
 const MSG_ERR = "انجام این کار ممکن نشد. کمی بعد دوباره تلاش کنید.";
@@ -43,8 +47,13 @@ const MSG_NO_ACCESS = "برای مشاهده این بخش مجوز لازم ر�
 type CreateForm = {
   code: string;
   name: string;
+  legal_name: string;
+  trade_name: string;
   registration_number: string;
   economic_code: string;
+  tax_identifier: string;
+  entity_kind: string;
+  is_primary: boolean;
   is_active: boolean;
 };
 
@@ -66,8 +75,13 @@ export function CompaniesListPage() {
     defaultValues: {
       code: "",
       name: "",
+      legal_name: "",
+      trade_name: "",
       registration_number: "",
       economic_code: "",
+      tax_identifier: "",
+      entity_kind: "OPERATING",
+      is_primary: false,
       is_active: true,
     },
   });
@@ -77,7 +91,7 @@ export function CompaniesListPage() {
     const q = query.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((r) =>
-      [r.code, r.name, r.registration_number, r.economic_code]
+      [r.code, r.name, r.legal_name, r.registration_number, r.economic_code]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
@@ -95,12 +109,19 @@ export function CompaniesListPage() {
       id: "name",
       header: "نام شرکت",
       cell: (row) => (
-        <Link
-          href={`/dashboard/organization/companies/${row.company_id}`}
-          className="font-medium text-primary hover:underline"
-        >
-          {row.name}
-        </Link>
+        <div className="flex flex-col gap-0.5">
+          <Link
+            href={`/dashboard/organization/companies/${row.company_id}`}
+            className="font-medium text-primary hover:underline"
+          >
+            {row.legal_name || row.name}
+          </Link>
+          {row.is_primary ? (
+            <span className="text-[10px] text-amber-700 dark:text-amber-400">
+              شرکت اصلی
+            </span>
+          ) : null}
+        </div>
       ),
     },
     {
@@ -109,6 +130,17 @@ export function CompaniesListPage() {
       cell: (row) => (
         <span className="font-mono text-xs" dir="ltr">
           {row.code}
+        </span>
+      ),
+    },
+    {
+      id: "kind",
+      header: "نوع",
+      cell: (row) => (
+        <span className="text-xs">
+          {ENTITY_KIND_LABELS[row.entity_kind ?? "OPERATING"] ??
+            row.entity_kind ??
+            "—"}
         </span>
       ),
     },
@@ -163,8 +195,13 @@ export function CompaniesListPage() {
       await createMutation.mutateAsync({
         code: values.code.trim(),
         name: values.name.trim(),
+        legal_name: values.legal_name.trim() || values.name.trim(),
+        trade_name: values.trade_name.trim() || null,
         registration_number: values.registration_number.trim() || null,
         economic_code: values.economic_code.trim() || null,
+        tax_identifier: values.tax_identifier.trim() || null,
+        entity_kind: values.entity_kind || "OPERATING",
+        is_primary: values.is_primary,
         is_active: values.is_active,
       });
       toast.success("شرکت ثبت شد");
@@ -172,8 +209,13 @@ export function CompaniesListPage() {
       form.reset({
         code: "",
         name: "",
+        legal_name: "",
+        trade_name: "",
         registration_number: "",
         economic_code: "",
+        tax_identifier: "",
+        entity_kind: "OPERATING",
+        is_primary: false,
         is_active: true,
       });
     } catch (e) {
@@ -204,7 +246,7 @@ export function CompaniesListPage() {
     <div className="space-y-6">
       <PageHeader
         title="شرکت‌ها"
-        description="فهرست شرکت‌های ثبت‌شده در سازمان"
+        description="فهرست شرکت‌های حقوقی و عملیاتی سازمان"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "سازمان", href: "/dashboard/organization" },
@@ -278,10 +320,8 @@ export function CompaniesListPage() {
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent
+          className="max-h-[90vh] overflow-y-auto sm:max-w-lg"
           onInteractOutside={(e) => {
-            if (form.formState.isDirty) e.preventDefault();
-          }}
-          onEscapeKeyDown={(e) => {
             if (form.formState.isDirty) e.preventDefault();
           }}
         >
@@ -289,59 +329,68 @@ export function CompaniesListPage() {
             <DialogTitle>شرکت جدید</DialogTitle>
           </DialogHeader>
           <form onSubmit={onCreate} className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>کد *</Label>
-              <Input
-                className="h-9"
-                dir="ltr"
-                {...form.register("code", { required: true })}
-              />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>کد *</Label>
+                <Input className="h-9" dir="ltr" {...form.register("code", { required: true })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>نام نمایشی *</Label>
+                <Input className="h-9" {...form.register("name", { required: true })} />
+              </div>
             </div>
             <div className="space-y-1.5">
-              <Label>نام *</Label>
-              <Input
-                className="h-9"
-                {...form.register("name", { required: true })}
-              />
+              <Label>نام حقوقی</Label>
+              <Input className="h-9" {...form.register("legal_name")} />
             </div>
             <div className="space-y-1.5">
-              <Label>شماره ثبت</Label>
-              <Input
-                className="h-9"
-                dir="ltr"
-                {...form.register("registration_number")}
-              />
+              <Label>نام تجاری</Label>
+              <Input className="h-9" {...form.register("trade_name")} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>شماره ثبت</Label>
+                <Input className="h-9" dir="ltr" {...form.register("registration_number")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>کد اقتصادی</Label>
+                <Input className="h-9" dir="ltr" {...form.register("economic_code")} />
+              </div>
             </div>
             <div className="space-y-1.5">
-              <Label>کد اقتصادی</Label>
-              <Input
-                className="h-9"
-                dir="ltr"
-                {...form.register("economic_code")}
+              <Label>شناسه مالیاتی</Label>
+              <Input className="h-9" dir="ltr" {...form.register("tax_identifier")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>نوع موجودیت</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                {...form.register("entity_kind")}
+              >
+                <option value="OPERATING">عملیاتی</option>
+                <option value="CONSOLIDATION">تلفیقی</option>
+                <option value="ELIMINATION">حذفی</option>
+              </select>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <Label>شرکت اصلی (Primary)</Label>
+              <Switch
+                checked={form.watch("is_primary")}
+                onCheckedChange={(v) => form.setValue("is_primary", v)}
               />
             </div>
             <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="company-active">فعال</Label>
+              <Label>فعال</Label>
               <Switch
-                id="company-active"
                 checked={form.watch("is_active")}
                 onCheckedChange={(v) => form.setValue("is_active", v)}
               />
             </div>
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setCreateOpen(false)}
-              >
+              <Button type="button" variant="outline" size="sm" onClick={() => setCreateOpen(false)}>
                 انصراف
               </Button>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={createMutation.isPending}
-              >
+              <Button type="submit" size="sm" disabled={createMutation.isPending}>
                 {createMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
