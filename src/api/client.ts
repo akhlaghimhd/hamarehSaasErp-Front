@@ -6,7 +6,7 @@
  * - Inject Authorization: Bearer <access_token>
  * - Inject X-Tenant-ID (required by TenantContextMiddleware)
  * - Normalize Backend error shapes into ApiClientError
- * - Clear auth storage on 401 (session invalid)
+ * - Clear auth storage on 401 (session invalid) only when a token was sent
  * - Limited retry for idempotent network/5xx failures
  * - No business logic; pure transport + contract
  *
@@ -69,6 +69,26 @@ function shouldRetry(error: AxiosError, config?: RetriableConfig): boolean {
   return false;
 }
 
+function humanizeApiMessage(raw: string | undefined, status: number): string {
+  const msg = (raw ?? "").trim();
+  const lower = msg.toLowerCase();
+
+  if (
+    !msg ||
+    lower === "unauthenticated." ||
+    lower === "unauthenticated" ||
+    lower.includes("unauthenticated")
+  ) {
+    return defaultMessageForStatus(status === 401 ? 401 : status || 401);
+  }
+
+  if (lower.includes("unauthorized or missing tenant")) {
+    return "نشست یا شناسه سازمان ناقص است. دوباره وارد شوید.";
+  }
+
+  return msg;
+}
+
 // ---------------------------------------------------------------------------
 // Request: inject token + tenant
 // ---------------------------------------------------------------------------
@@ -123,14 +143,18 @@ apiClient.interceptors.response.use(
     const { status, data } = error.response;
 
     if (status === 401) {
-      // Session invalid — clear local auth; Auth Guard will redirect.
-      // Refresh queue deferred until Backend exposes refresh endpoint.
-      tokenStorage.clearAuth();
+      // Only clear session when a Bearer token was actually sent (real auth failure).
+      const authHeader = config?.headers?.Authorization;
+      const hadToken =
+        typeof authHeader === "string" && authHeader.startsWith("Bearer ");
+      if (hadToken) {
+        tokenStorage.clearAuth();
+      }
     }
 
-    const message =
-      (data && typeof data.message === "string" && data.message) ||
-      defaultMessageForStatus(status);
+    const rawMessage =
+      data && typeof data.message === "string" ? data.message : undefined;
+    const message = humanizeApiMessage(rawMessage, status);
 
     const errors =
       data && data.errors && typeof data.errors === "object"
@@ -152,7 +176,7 @@ function defaultMessageForStatus(status: number): string {
     case 400:
       return "درخواست نامعتبر است.";
     case 401:
-      return "نشست شما منقضی شده یا احراز هویت نشده‌اید.";
+      return "نشست شما منقضی شده یا احراز هویت نشده‌اید. لطفاً دوباره وارد شوید.";
     case 403:
       return "شما مجوز انجام این عملیات را ندارید.";
     case 404:
