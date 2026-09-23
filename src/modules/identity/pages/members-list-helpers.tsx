@@ -8,13 +8,14 @@ import { cn, toFaDigits } from "@/shared/lib/utils";
 import type { TenantUserDto, TenantUserRoleSummaryDto } from "../types";
 
 export type StatusFilter = "all" | "active" | "inactive";
-export type SortKey = "name" | "email" | "mobile" | "status" | "role" | "joined" | "lastChange";
+export type SortKey = "name" | "email" | "mobile" | "status" | "role" | "scope" | "joined" | "lastChange";
 export type SortDir = "asc" | "desc";
 export type ColumnId =
   | "name"
   | "email"
   | "mobile"
   | "role"
+  | "scope"
   | "status"
   | "joined"
   | "lastChange"
@@ -28,13 +29,14 @@ export const COLS: { id: ColumnId; label: string; hideable?: boolean; sort?: Sor
   { id: "email", label: "ایمیل", sort: "email" },
   { id: "mobile", label: "موبایل", sort: "mobile" },
   { id: "role", label: "نقش", sort: "role" },
+  { id: "scope", label: "محدوده", sort: "scope" },
   { id: "status", label: "وضعیت", sort: "status" },
   { id: "joined", label: "تاریخ عضویت", sort: "joined" },
   { id: "lastChange", label: "آخرین تغییر وضعیت", sort: "lastChange" },
   { id: "actions", label: "عملیات", hideable: false },
 ];
 
-export const SKY = "identity.members.columns.v4";
+export const SKY = "identity.members.columns.v5";
 export const DAY_MS = 24 * 60 * 60 * 1000;
 export const RECENT_DAYS = 7;
 
@@ -45,7 +47,6 @@ export function dn(r: TenantUserDto) {
   return n || u.email || "—";
 }
 
-/** Depth from root in role tree (0 = root). Missing parent treated as root. */
 function roleDepth(
   role: TenantUserRoleSummaryDto,
   byId: Map<string, TenantUserRoleSummaryDto>
@@ -58,15 +59,10 @@ function roleDepth(
     d += 1;
     pid = byId.get(pid)?.parent_role_id ?? null;
   }
-  // parent outside assigned set still counts as higher if parent_role_id set
   if (pid && !byId.has(pid)) d += 1;
   return d;
 }
 
-/**
- * Highest role in the tree among assigned roles (closest to root / parent-most).
- * Owner badge is separate; this is role hierarchy only.
- */
 export function pickHighestRole(r: TenantUserDto): TenantUserRoleSummaryDto | null {
   const roles = (r.roles ?? []) as TenantUserRoleSummaryDto[];
   if (!roles.length) return null;
@@ -93,6 +89,13 @@ export function highestRoleName(r: TenantUserDto): string {
     return hr?.name ? `${hr.name}` : "مدیر اصلی";
   }
   return pickHighestRole(r)?.name ?? "—";
+}
+
+export function scopeNames(r: TenantUserDto): string {
+  const scopes = (r.scopes ?? []) as { scope_name?: string | null }[];
+  if (!scopes.length) return "—";
+  const names = scopes.map((s) => s.scope_name?.trim()).filter(Boolean) as string[];
+  return names.length ? names.join("، ") : "—";
 }
 
 export function fd(v?: string | null) {
@@ -173,6 +176,7 @@ export function sv(r: TenantUserDto, k: SortKey): string | number {
   if (k === "email") return (r.user?.email ?? "").toLowerCase();
   if (k === "mobile") return r.user?.mobile ?? "";
   if (k === "role") return highestRoleName(r).toLowerCase();
+  if (k === "scope") return scopeNames(r).toLowerCase();
   if (k === "status") return Number(r.status) === 1 ? 1 : 0;
   if (k === "lastChange") {
     const v = lastChangeAt(r);
