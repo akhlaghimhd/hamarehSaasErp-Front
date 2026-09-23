@@ -1,6 +1,5 @@
 /**
  * FE-ORG — Organization module hub
- * Primary company from is_primary (P1); deep-link branches/depts to HQ.
  */
 
 "use client";
@@ -55,7 +54,7 @@ function HubCardView({
       </div>
       <p className="text-xs text-muted-foreground">{card.description}</p>
       {!card.open ? (
-        <span className="mt-auto text-[10px] text-muted-foreground">به‌زودی — پس از API</span>
+        <span className="mt-auto text-[10px] text-muted-foreground">به‌زودی</span>
       ) : !allowed ? (
         <span className="mt-auto text-[10px] text-amber-700 dark:text-amber-400">
           برای ورود به این بخش مجوز لازم را ندارید
@@ -110,7 +109,7 @@ export function OrganizationHome() {
       description:
         companyCount > 0
           ? `فهرست ${companyCount} شرکت — اصلی، فرعی، تلفیقی`
-          : "شرکت اصلی هنگام عضویت ثبت می‌شود؛ در صورت نیاز شرکت فرعی اضافه کنید",
+          : "شرکت اصلی هنگام عضویت ثبت می‌شود",
       icon: Building2,
       open: true,
     },
@@ -119,8 +118,8 @@ export function OrganizationHome() {
       href: branchesHref,
       title: "شعب / سایت",
       description: primary
-        ? `شعب «${primary.legal_name || primary.name}» (دفتر، کارخانه، انبار)`
-        : "پس از وجود شرکت اصلی، شعب از صفحه جزئیات تعریف می‌شوند",
+        ? `شعب «${primary.legal_name || primary.name}»`
+        : "پس از وجود شرکت اصلی",
       icon: GitBranch,
       open: true,
     },
@@ -130,33 +129,33 @@ export function OrganizationHome() {
       title: "واحدهای سازمانی",
       description: primary
         ? `واحدهای «${primary.legal_name || primary.name}»`
-        : "واحد سازمانی زیر نظر شعبه تعریف می‌شود",
+        : "زیر نظر شعبه",
       icon: Network,
       open: true,
     },
     {
       key: "bu",
-      href: "#",
+      href: "/dashboard/organization/business-units",
       title: "واحد کسب‌وکار",
-      description: "Business Unit و انتساب به شرکت — پس از route بک‌اند",
+      description: "Business Unit و ابعاد مدیریتی",
       icon: Layers,
-      open: false,
+      open: true,
     },
     {
       key: "hierarchy",
-      href: "#",
+      href: "/dashboard/organization/hierarchies",
       title: "سلسله‌مراتب",
-      description: "درخت LEGAL / MANAGEMENT — پس از route بک‌اند",
+      description: "درخت LEGAL / MANAGEMENT / TAX",
       icon: Landmark,
-      open: false,
+      open: true,
     },
     {
       key: "ic",
-      href: "#",
+      href: "/dashboard/organization/intercompany",
       title: "بین‌شرکتی",
-      description: "نقشه شریک و قوانین IC — پس از route بک‌اند",
+      description: "نقشه شریک و قوانین آینه اسناد",
       icon: ArrowLeftRight,
-      open: false,
+      open: true,
     },
   ];
 
@@ -180,8 +179,7 @@ export function OrganizationHome() {
 
       {!isLoading && !primary && canViewCompany ? (
         <div className="rounded-xl border border-dashed border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
-          هنوز شرکت اصلی برای این مستأجر ثبت نشده است. سیدر مالک دمو یا ایجاد شرکت
-          را اجرا کنید.
+          هنوز شرکت اصلی برای این مستأجر ثبت نشده است.
         </div>
       ) : null}
 
