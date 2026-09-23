@@ -1,5 +1,5 @@
 /**
- * FE-ORG-T02 — جزئیات شرکت + مدیریت شعب و واحدها
+ * FE-ORG — جزئیات شرکت + شعب و واحدها (P0–P3 display)
  */
 
 "use client";
@@ -29,7 +29,7 @@ import { Switch } from "@/shared/components/ui/switch";
 import { usePermission } from "@/auth";
 import { ApiClientError } from "@/api";
 import { toFaDigits } from "@/shared/lib/utils";
-import { useCompany, useUpdateCompany } from "../hooks/use-companies";
+import { useCompany, useUpdateCompany, useCompanies } from "../hooks/use-companies";
 import {
   useBranches,
   useCreateBranch,
@@ -42,6 +42,9 @@ import {
 } from "../hooks/use-departments";
 import {
   OrganizationPermissions,
+  ENTITY_KIND_LABELS,
+  BRANCH_KIND_LABELS,
+  STATUS_LABELS,
   type BranchDto,
   type DepartmentDto,
 } from "../types";
@@ -54,16 +57,12 @@ export function CompanyDetailPage() {
   const params = useParams();
   const companyId = typeof params?.id === "string" ? params.id : "";
 
-  // Deep-link from organization hub (#branches / #departments)
   useEffect(() => {
     if (typeof window === "undefined") return;
     const hash = window.location.hash.replace("#", "");
     if (!hash) return;
     const t = window.setTimeout(() => {
-      document.getElementById(hash)?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
+      document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 200);
     return () => window.clearTimeout(t);
   }, [companyId]);
@@ -77,25 +76,16 @@ export function CompanyDetailPage() {
   const canCreateDept = usePermission(OrganizationPermissions.departmentCreate);
   const canDeleteDept = usePermission(OrganizationPermissions.departmentDelete);
 
-  const {
-    data: company,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useCompany(companyId);
+  const { data: company, isLoading, isError, error, refetch } = useCompany(companyId);
+  const { data: allCompanies } = useCompanies();
   const updateCompany = useUpdateCompany();
-  const {
-    data: branches,
-    isLoading: branchesLoading,
-    refetch: refetchBranches,
-  } = useBranches(canViewBranch ? companyId : null);
+  const { data: branches, isLoading: branchesLoading, refetch: refetchBranches } =
+    useBranches(canViewBranch ? companyId : null);
   const createBranch = useCreateBranch(companyId);
   const deleteBranch = useSoftDeleteBranch(companyId);
-  const {
-    data: departments,
-    isLoading: deptsLoading,
-  } = useDepartments(canViewDept ? companyId : null);
+  const { data: departments, isLoading: deptsLoading } = useDepartments(
+    canViewDept ? companyId : null
+  );
   const createDept = useCreateDepartment(companyId);
   const deleteDept = useSoftDeleteDepartment(companyId);
 
@@ -109,23 +99,34 @@ export function CompanyDetailPage() {
     values: {
       code: company?.code ?? "",
       name: company?.name ?? "",
+      legal_name: company?.legal_name ?? "",
+      trade_name: company?.trade_name ?? "",
       registration_number: company?.registration_number ?? "",
       economic_code: company?.economic_code ?? "",
+      tax_identifier: company?.tax_identifier ?? "",
+      entity_kind: company?.entity_kind ?? "OPERATING",
+      is_primary: company?.is_primary ?? false,
+      parent_company_id: company?.parent_company_id ?? "",
+      default_consol_rate_type: company?.default_consol_rate_type ?? "",
       is_active: company?.is_active ?? true,
     },
   });
 
   const branchForm = useForm({
-    defaultValues: { code: "", name: "", address: "", is_active: true },
+    defaultValues: {
+      code: "",
+      name: "",
+      address: "",
+      branch_kind: "OFFICE",
+      is_active: true,
+      supports_shipping: false,
+      supports_receiving: false,
+      is_manufacturing_site: false,
+    },
   });
 
   const deptForm = useForm({
-    defaultValues: {
-      branch_id: "",
-      code: "",
-      name: "",
-      is_active: true,
-    },
+    defaultValues: { branch_id: "", code: "", name: "", is_active: true },
   });
 
   const branchRows = useMemo(() => {
@@ -133,7 +134,7 @@ export function CompanyDetailPage() {
     const q = branchQuery.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((r) =>
-      [r.code, r.name, r.address]
+      [r.code, r.name, r.address, r.branch_kind]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
@@ -156,6 +157,11 @@ export function CompanyDetailPage() {
     return map;
   }, [branches]);
 
+  const parentName = useMemo(() => {
+    if (!company?.parent_company_id) return null;
+    return (allCompanies ?? []).find((c) => c.company_id === company.parent_company_id)?.name;
+  }, [company, allCompanies]);
+
   const branchColumns: DataTableColumn<BranchDto>[] = [
     {
       id: "name",
@@ -172,12 +178,19 @@ export function CompanyDetailPage() {
       ),
     },
     {
+      id: "kind",
+      header: "نوع",
+      cell: (row) => (
+        <span className="text-xs">
+          {BRANCH_KIND_LABELS[row.branch_kind ?? "OFFICE"] ?? row.branch_kind ?? "—"}
+        </span>
+      ),
+    },
+    {
       id: "address",
       header: "آدرس",
       cell: (row) => (
-        <span className="text-xs text-muted-foreground">
-          {row.address || "—"}
-        </span>
+        <span className="text-xs text-muted-foreground">{row.address || "—"}</span>
       ),
     },
     {
@@ -205,9 +218,7 @@ export function CompanyDetailPage() {
                 await deleteBranch.mutateAsync(row.branch_id);
                 toast.success("شعبه حذف شد");
               } catch (e) {
-                toast.error(
-                  e instanceof ApiClientError && e.message ? e.message : MSG_ERR
-                );
+                toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
               }
             }}
           >
@@ -236,9 +247,7 @@ export function CompanyDetailPage() {
       id: "branch",
       header: "شعبه",
       cell: (row) => (
-        <span className="text-xs">
-          {branchNameById.get(row.branch_id) ?? "—"}
-        </span>
+        <span className="text-xs">{branchNameById.get(row.branch_id) ?? "—"}</span>
       ),
     },
     {
@@ -266,9 +275,7 @@ export function CompanyDetailPage() {
                 await deleteDept.mutateAsync(row.department_id);
                 toast.success("واحد حذف شد");
               } catch (e) {
-                toast.error(
-                  e instanceof ApiClientError && e.message ? e.message : MSG_ERR
-                );
+                toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
               }
             }}
           >
@@ -285,8 +292,15 @@ export function CompanyDetailPage() {
         payload: {
           code: values.code.trim(),
           name: values.name.trim(),
+          legal_name: values.legal_name.trim() || values.name.trim(),
+          trade_name: values.trade_name.trim() || null,
           registration_number: values.registration_number.trim() || null,
           economic_code: values.economic_code.trim() || null,
+          tax_identifier: values.tax_identifier.trim() || null,
+          entity_kind: values.entity_kind || "OPERATING",
+          is_primary: values.is_primary,
+          parent_company_id: values.parent_company_id || null,
+          default_consol_rate_type: values.default_consol_rate_type || null,
           is_active: values.is_active,
         },
       });
@@ -294,9 +308,7 @@ export function CompanyDetailPage() {
       setEditOpen(false);
       void refetch();
     } catch (e) {
-      toast.error(
-        e instanceof ApiClientError && e.message ? e.message : MSG_ERR
-      );
+      toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
     }
   });
 
@@ -307,16 +319,27 @@ export function CompanyDetailPage() {
         code: values.code.trim(),
         name: values.name.trim(),
         address: values.address.trim() || null,
+        branch_kind: values.branch_kind || "OFFICE",
+        supports_shipping: values.supports_shipping,
+        supports_receiving: values.supports_receiving,
+        is_manufacturing_site: values.is_manufacturing_site,
         is_active: values.is_active,
       });
       toast.success("شعبه ثبت شد");
       setBranchOpen(false);
-      branchForm.reset({ code: "", name: "", address: "", is_active: true });
+      branchForm.reset({
+        code: "",
+        name: "",
+        address: "",
+        branch_kind: "OFFICE",
+        is_active: true,
+        supports_shipping: false,
+        supports_receiving: false,
+        is_manufacturing_site: false,
+      });
       void refetchBranches();
     } catch (e) {
-      toast.error(
-        e instanceof ApiClientError && e.message ? e.message : MSG_ERR
-      );
+      toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
     }
   });
 
@@ -336,22 +359,14 @@ export function CompanyDetailPage() {
       setDeptOpen(false);
       deptForm.reset({ branch_id: "", code: "", name: "", is_active: true });
     } catch (e) {
-      toast.error(
-        e instanceof ApiClientError && e.message ? e.message : MSG_ERR
-      );
+      toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
     }
   });
 
   if (!canView) {
     return (
       <div className="space-y-6">
-        <PageHeader
-          title="شرکت"
-          breadcrumbs={[
-            { label: "سازمان", href: "/dashboard/organization" },
-            { label: "شرکت" },
-          ]}
-        />
+        <PageHeader title="شرکت" breadcrumbs={[{ label: "سازمان", href: "/dashboard/organization" }, { label: "شرکت" }]} />
         <div className="rounded-xl border border-dashed px-6 py-12 text-center text-sm text-muted-foreground">
           {MSG_NO_ACCESS}
         </div>
@@ -380,15 +395,8 @@ export function CompanyDetailPage() {
           ]}
         />
         <div className="text-sm text-destructive">
-          {error instanceof ApiClientError && error.message
-            ? error.message
-            : MSG_LOAD}
-          <Button
-            variant="outline"
-            size="sm"
-            className="ms-2"
-            onClick={() => void refetch()}
-          >
+          {error instanceof ApiClientError && error.message ? error.message : MSG_LOAD}
+          <Button variant="outline" size="sm" className="ms-2" onClick={() => void refetch()}>
             تلاش مجدد
           </Button>
         </div>
@@ -396,20 +404,28 @@ export function CompanyDetailPage() {
     );
   }
 
+  const displayName = company.legal_name || company.name;
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title={company.name}
+        title={displayName}
         description={
-          <span className="font-mono text-xs" dir="ltr">
-            {company.code}
+          <span className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-mono" dir="ltr">
+              {company.code}
+            </span>
+            {company.is_primary ? <StatusChip label="شرکت اصلی" tone="warning" /> : null}
+            <span className="text-muted-foreground">
+              {ENTITY_KIND_LABELS[company.entity_kind ?? "OPERATING"] ?? company.entity_kind}
+            </span>
           </span>
         }
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "سازمان", href: "/dashboard/organization" },
           { label: "شرکت‌ها", href: "/dashboard/organization/companies" },
-          { label: company.name },
+          { label: displayName },
         ]}
         actions={
           canUpdate ? (
@@ -420,7 +436,11 @@ export function CompanyDetailPage() {
         }
       />
 
-      <div className="grid gap-3 rounded-xl border border-border/80 bg-card p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 rounded-xl border border-border/80 bg-card p-4 text-sm sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div>
+          <div className="text-xs text-muted-foreground">نام تجاری</div>
+          <div>{company.trade_name || "—"}</div>
+        </div>
         <div>
           <div className="text-xs text-muted-foreground">شماره ثبت</div>
           <div dir="ltr">{company.registration_number || "—"}</div>
@@ -430,14 +450,23 @@ export function CompanyDetailPage() {
           <div dir="ltr">{company.economic_code || "—"}</div>
         </div>
         <div>
-          <div className="text-xs text-muted-foreground">وضعیت</div>
+          <div className="text-xs text-muted-foreground">شناسه مالیاتی</div>
+          <div dir="ltr">{company.tax_identifier || "—"}</div>
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground">وضعیت حقوقی</div>
           <div>
-            {company.is_active ? (
-              <StatusChip label="فعال" tone="success" />
-            ) : (
-              <StatusChip label="غیرفعال" tone="neutral" />
-            )}
+            {STATUS_LABELS[company.status ?? (company.is_active ? 1 : 2)] ??
+              (company.is_active ? "فعال" : "غیرفعال")}
           </div>
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground">شرکت والد</div>
+          <div>{parentName || "—"}</div>
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground">نرخ تسعیر پیش‌فرض</div>
+          <div dir="ltr">{company.default_consol_rate_type || "—"}</div>
         </div>
         <div>
           <div className="text-xs text-muted-foreground">نسخه ردیف</div>
@@ -528,44 +557,87 @@ export function CompanyDetailPage() {
       ) : null}
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent
-          onInteractOutside={(e) => {
-            if (editForm.formState.isDirty) e.preventDefault();
-          }}
-        >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>ویرایش شرکت</DialogTitle>
           </DialogHeader>
           <form onSubmit={onEditCompany} className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>کد *</Label>
-              <Input
-                className="h-9"
-                dir="ltr"
-                {...editForm.register("code", { required: true })}
-              />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>کد *</Label>
+                <Input className="h-9" dir="ltr" {...editForm.register("code", { required: true })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>نام نمایشی *</Label>
+                <Input className="h-9" {...editForm.register("name", { required: true })} />
+              </div>
             </div>
             <div className="space-y-1.5">
-              <Label>نام *</Label>
-              <Input
-                className="h-9"
-                {...editForm.register("name", { required: true })}
-              />
+              <Label>نام حقوقی</Label>
+              <Input className="h-9" {...editForm.register("legal_name")} />
             </div>
             <div className="space-y-1.5">
-              <Label>شماره ثبت</Label>
-              <Input
-                className="h-9"
-                dir="ltr"
-                {...editForm.register("registration_number")}
-              />
+              <Label>نام تجاری</Label>
+              <Input className="h-9" {...editForm.register("trade_name")} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>شماره ثبت</Label>
+                <Input className="h-9" dir="ltr" {...editForm.register("registration_number")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>کد اقتصادی</Label>
+                <Input className="h-9" dir="ltr" {...editForm.register("economic_code")} />
+              </div>
             </div>
             <div className="space-y-1.5">
-              <Label>کد اقتصادی</Label>
-              <Input
-                className="h-9"
-                dir="ltr"
-                {...editForm.register("economic_code")}
+              <Label>شناسه مالیاتی</Label>
+              <Input className="h-9" dir="ltr" {...editForm.register("tax_identifier")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>نوع موجودیت</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                {...editForm.register("entity_kind")}
+              >
+                <option value="OPERATING">عملیاتی</option>
+                <option value="CONSOLIDATION">تلفیقی</option>
+                <option value="ELIMINATION">حذفی</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>شرکت والد</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                {...editForm.register("parent_company_id")}
+              >
+                <option value="">— بدون والد —</option>
+                {(allCompanies ?? [])
+                  .filter((c) => c.company_id !== companyId)
+                  .map((c) => (
+                    <option key={c.company_id} value={c.company_id}>
+                      {c.legal_name || c.name} ({c.code})
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>نرخ تسعیر پیش‌فرض</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                {...editForm.register("default_consol_rate_type")}
+              >
+                <option value="">—</option>
+                <option value="CURRENT">CURRENT</option>
+                <option value="AVERAGE">AVERAGE</option>
+                <option value="HISTORICAL">HISTORICAL</option>
+              </select>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <Label>شرکت اصلی</Label>
+              <Switch
+                checked={editForm.watch("is_primary")}
+                onCheckedChange={(v) => editForm.setValue("is_primary", v)}
               />
             </div>
             <div className="flex items-center justify-between gap-2">
@@ -576,20 +648,11 @@ export function CompanyDetailPage() {
               />
             </div>
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setEditOpen(false)}
-              >
+              <Button type="button" variant="outline" size="sm" onClick={() => setEditOpen(false)}>
                 انصراف
               </Button>
               <Button type="submit" size="sm" disabled={updateCompany.isPending}>
-                {updateCompany.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  "ذخیره"
-                )}
+                {updateCompany.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
               </Button>
             </DialogFooter>
           </form>
@@ -597,33 +660,56 @@ export function CompanyDetailPage() {
       </Dialog>
 
       <Dialog open={branchOpen} onOpenChange={setBranchOpen}>
-        <DialogContent
-          onInteractOutside={(e) => {
-            if (branchForm.formState.isDirty) e.preventDefault();
-          }}
-        >
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>شعبه جدید</DialogTitle>
           </DialogHeader>
           <form onSubmit={onCreateBranch} className="space-y-3">
             <div className="space-y-1.5">
               <Label>کد *</Label>
-              <Input
-                className="h-9"
-                dir="ltr"
-                {...branchForm.register("code", { required: true })}
-              />
+              <Input className="h-9" dir="ltr" {...branchForm.register("code", { required: true })} />
             </div>
             <div className="space-y-1.5">
               <Label>نام *</Label>
-              <Input
-                className="h-9"
-                {...branchForm.register("name", { required: true })}
-              />
+              <Input className="h-9" {...branchForm.register("name", { required: true })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>نوع شعبه</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                {...branchForm.register("branch_kind")}
+              >
+                <option value="OFFICE">دفتر</option>
+                <option value="PLANT">کارخانه</option>
+                <option value="WAREHOUSE_SITE">سایت انبار</option>
+                <option value="DISTRIBUTION">توزیع</option>
+                <option value="MIXED">ترکیبی</option>
+              </select>
             </div>
             <div className="space-y-1.5">
               <Label>آدرس</Label>
               <Input className="h-9" {...branchForm.register("address")} />
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <Label>ارسال کالا</Label>
+              <Switch
+                checked={branchForm.watch("supports_shipping")}
+                onCheckedChange={(v) => branchForm.setValue("supports_shipping", v)}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <Label>دریافت کالا</Label>
+              <Switch
+                checked={branchForm.watch("supports_receiving")}
+                onCheckedChange={(v) => branchForm.setValue("supports_receiving", v)}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <Label>سایت تولیدی</Label>
+              <Switch
+                checked={branchForm.watch("is_manufacturing_site")}
+                onCheckedChange={(v) => branchForm.setValue("is_manufacturing_site", v)}
+              />
             </div>
             <div className="flex items-center justify-between gap-2">
               <Label>فعال</Label>
@@ -633,20 +719,11 @@ export function CompanyDetailPage() {
               />
             </div>
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setBranchOpen(false)}
-              >
+              <Button type="button" variant="outline" size="sm" onClick={() => setBranchOpen(false)}>
                 انصراف
               </Button>
               <Button type="submit" size="sm" disabled={createBranch.isPending}>
-                {createBranch.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  "ثبت"
-                )}
+                {createBranch.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ثبت"}
               </Button>
             </DialogFooter>
           </form>
@@ -654,11 +731,7 @@ export function CompanyDetailPage() {
       </Dialog>
 
       <Dialog open={deptOpen} onOpenChange={setDeptOpen}>
-        <DialogContent
-          onInteractOutside={(e) => {
-            if (deptForm.formState.isDirty) e.preventDefault();
-          }}
-        >
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>واحد سازمانی جدید</DialogTitle>
           </DialogHeader>
@@ -666,10 +739,10 @@ export function CompanyDetailPage() {
             <div className="space-y-1.5">
               <Label>شعبه *</Label>
               <select
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                 {...deptForm.register("branch_id", { required: true })}
               >
-                <option value="">انتخاب شعبه…</option>
+                <option value="">انتخاب شعبه</option>
                 {(branches ?? []).map((b) => (
                   <option key={b.branch_id} value={b.branch_id}>
                     {b.name}
@@ -679,18 +752,11 @@ export function CompanyDetailPage() {
             </div>
             <div className="space-y-1.5">
               <Label>کد *</Label>
-              <Input
-                className="h-9"
-                dir="ltr"
-                {...deptForm.register("code", { required: true })}
-              />
+              <Input className="h-9" dir="ltr" {...deptForm.register("code", { required: true })} />
             </div>
             <div className="space-y-1.5">
               <Label>نام *</Label>
-              <Input
-                className="h-9"
-                {...deptForm.register("name", { required: true })}
-              />
+              <Input className="h-9" {...deptForm.register("name", { required: true })} />
             </div>
             <div className="flex items-center justify-between gap-2">
               <Label>فعال</Label>
@@ -700,20 +766,11 @@ export function CompanyDetailPage() {
               />
             </div>
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setDeptOpen(false)}
-              >
+              <Button type="button" variant="outline" size="sm" onClick={() => setDeptOpen(false)}>
                 انصراف
               </Button>
               <Button type="submit" size="sm" disabled={createDept.isPending}>
-                {createDept.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  "ثبت"
-                )}
+                {createDept.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ثبت"}
               </Button>
             </DialogFooter>
           </form>
