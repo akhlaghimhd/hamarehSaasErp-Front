@@ -22,6 +22,13 @@ export interface TenantUserRoleSummaryDto {
   parent_role_id?: string | null;
 }
 
+/** Scope summary attached on members list. */
+export interface TenantUserScopeSummaryDto {
+  scope_id: string;
+  scope_name?: string | null;
+  scope_type?: string | null;
+}
+
 export interface TenantUserDto {
   tenant_user_id: string;
   tenant_id?: string;
@@ -33,6 +40,8 @@ export interface TenantUserDto {
   user?: TenantUserUserDto | null;
   /** Assigned roles (from list API). */
   roles?: TenantUserRoleSummaryDto[];
+  /** Assigned scopes (from list API). */
+  scopes?: TenantUserScopeSummaryDto[];
   [key: string]: unknown;
 }
 
