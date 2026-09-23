@@ -1,4 +1,4 @@
-/** Organization module DTOs — aligned with Backend Layer 5 */
+/** Organization module DTOs — aligned with Backend Layer 5 (P0–P7) */
 
 export type OrganizationPermissionCode =
   | "organization.company.view"
@@ -29,14 +29,41 @@ export const OrganizationPermissions = {
   departmentDelete: "organization.department.delete",
 } as const;
 
+export type EntityKind = "OPERATING" | "CONSOLIDATION" | "ELIMINATION";
+
+export type ConsolRateType = "CURRENT" | "AVERAGE" | "HISTORICAL";
+
+export type BranchKind =
+  | "OFFICE"
+  | "PLANT"
+  | "WAREHOUSE_SITE"
+  | "DISTRIBUTION"
+  | "MIXED";
+
 export type CompanyDto = {
   company_id: string;
   tenant_id: string;
   code: string;
   name: string;
+  legal_name?: string | null;
+  trade_name?: string | null;
+  company_type?: number | null;
   registration_number?: string | null;
+  registration_date?: string | null;
+  registration_place?: string | null;
+  incorporation_country_id?: string | null;
   economic_code?: string | null;
+  tax_identifier?: string | null;
+  national_id?: string | null;
+  vat_registration?: string | null;
   is_active: boolean;
+  status?: number | null;
+  is_primary?: boolean;
+  parent_company_id?: string | null;
+  entity_kind?: EntityKind | string | null;
+  base_currency_id?: string | null;
+  chart_of_accounts_id?: string | null;
+  default_consol_rate_type?: ConsolRateType | string | null;
   row_version?: number;
   created_at?: string | null;
   updated_at?: string | null;
@@ -49,6 +76,12 @@ export type BranchDto = {
   code: string;
   name: string;
   address?: string | null;
+  branch_kind?: BranchKind | string | null;
+  parent_branch_id?: string | null;
+  default_warehouse_id?: string | null;
+  supports_shipping?: boolean;
+  supports_receiving?: boolean;
+  is_manufacturing_site?: boolean;
   is_active: boolean;
   row_version?: number;
   created_at?: string | null;
@@ -58,6 +91,7 @@ export type BranchDto = {
 export type DepartmentDto = {
   department_id: string;
   tenant_id: string;
+  company_id?: string | null;
   branch_id: string;
   parent_department_id?: string | null;
   code: string;
@@ -72,9 +106,25 @@ export type DepartmentDto = {
 export type CreateCompanyPayload = {
   code: string;
   name: string;
+  legal_name?: string | null;
+  trade_name?: string | null;
+  company_type?: number | null;
   registration_number?: string | null;
+  registration_date?: string | null;
+  registration_place?: string | null;
+  incorporation_country_id?: string | null;
   economic_code?: string | null;
+  tax_identifier?: string | null;
+  national_id?: string | null;
+  vat_registration?: string | null;
   is_active?: boolean;
+  status?: number | null;
+  is_primary?: boolean;
+  parent_company_id?: string | null;
+  entity_kind?: EntityKind | string | null;
+  base_currency_id?: string | null;
+  chart_of_accounts_id?: string | null;
+  default_consol_rate_type?: ConsolRateType | string | null;
 };
 
 export type UpdateCompanyPayload = CreateCompanyPayload;
@@ -85,6 +135,12 @@ export type CreateBranchPayload = {
   name: string;
   address?: string | null;
   is_active?: boolean;
+  branch_kind?: BranchKind | string | null;
+  parent_branch_id?: string | null;
+  default_warehouse_id?: string | null;
+  supports_shipping?: boolean;
+  supports_receiving?: boolean;
+  is_manufacturing_site?: boolean;
 };
 
 export type UpdateBranchPayload = {
@@ -92,6 +148,13 @@ export type UpdateBranchPayload = {
   name: string;
   address?: string | null;
   is_active?: boolean;
+  branch_kind?: BranchKind | string | null;
+  parent_branch_id?: string | null;
+  default_warehouse_id?: string | null;
+  supports_shipping?: boolean;
+  supports_receiving?: boolean;
+  is_manufacturing_site?: boolean;
+  company_id?: string | null;
 };
 
 export type CreateDepartmentPayload = {
@@ -109,4 +172,26 @@ export type UpdateDepartmentPayload = {
   parent_department_id?: string | null;
   manager_user_id?: string | null;
   is_active?: boolean;
+  branch_id?: string | null;
+};
+
+export const ENTITY_KIND_LABELS: Record<string, string> = {
+  OPERATING: "عملیاتی",
+  CONSOLIDATION: "تلفیقی",
+  ELIMINATION: "حذفی",
+};
+
+export const BRANCH_KIND_LABELS: Record<string, string> = {
+  OFFICE: "دفتر",
+  PLANT: "کارخانه",
+  WAREHOUSE_SITE: "سایت انبار",
+  DISTRIBUTION: "توزیع",
+  MIXED: "ترکیبی",
+};
+
+export const STATUS_LABELS: Record<number, string> = {
+  1: "فعال",
+  2: "معلق",
+  3: "در حال انحلال",
+  4: "منحل‌شده",
 };
