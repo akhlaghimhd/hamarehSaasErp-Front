@@ -192,6 +192,211 @@ export default function LoginPage() {
     return () => window.clearInterval(t);
   }, [lastOtpSession]);
 
-  // NOTE: remainder of file continues identically to previous good version with password eye patch only in the password form section
-  return null;
+  const handleLoginResult = async (result: Awaited<ReturnType<typeof authService.loginWithPassword>>) => {
+    if (result.kind === "must_set_password") {
+      setPasswordFails(0); setOtpFails(0); setHumanGateArmed(false);
+      humanPassOnceRef.current = false; setNeedHumanCheck(false);
+      clearOtpLocalSession();
+      setSetPasswordUser(result.user);
+      setSetPasswordToken(result.accessToken);
+      setMode("set-password");
+      setFormError(null);
+      toast.message("لطفاً رمز عبور خود را تعیین کنید");
+      return;
+    }
+    if (result.kind === "session") {
+      setPasswordFails(0); setOtpFails(0); setHumanGateArmed(false);
+      humanPassOnceRef.current = false; setNeedHumanCheck(false);
+      clearOtpLocalSession();
+      toast.success("ورود با موفقیت انجام شد");
+      goToDashboard();
+      return;
+    }
+    setPreAuth(result.preAuthToken);
+    setOrgs(result.organizations);
+    toast.message("سازمان خود را انتخاب کنید");
+  };
+
+  const runPasswordLogin = async (values: PasswordForm) => {
+    setFormError(null);
+    try {
+      const result = await authService.loginWithPassword(values.identifier, values.password);
+      setPasswordFails(0); setBlockedUntilEdit(false); setHumanGateArmed(false);
+      humanPassOnceRef.current = false; setNeedHumanCheck(false);
+      await handleLoginResult(result);
+    } catch (err) {
+      const raw = err instanceof ApiClientError ? err.message : "ورود ناموفق بود.";
+      setFormError(friendlyError(raw, "password"));
+      setBlockedUntilEdit(true);
+      humanPassOnceRef.current = false;
+      setPasswordFails((prev) => {
+        const next = prev + 1;
+        if (next >= 3) setHumanGateArmed(true);
+        return next;
+      });
+    }
+  };
+
+  const onPasswordSubmit = async (values: PasswordForm) => {
+    if (needHumanCheck || blockedUntilEdit) return;
+    if ((humanGateArmed || passwordFails >= 3) && !humanPassOnceRef.current) {
+      setHumanGateArmed(true); setPendingAfterCheck("password"); setNeedHumanCheck(true); return;
+    }
+    humanPassOnceRef.current = false;
+    await runPasswordLogin(values);
+  };
+
+  const startOtpSession = (mobile: string, debug?: string, endsAtOverride?: number) => {
+    const endsAt = endsAtOverride ?? (Date.now() + OTP_TIMER_SEC * 1000);
+    const session = { mobile, endsAt, debugCode: debug };
+    setLastOtpSession(session);
+    setDebugCode(debug ?? null);
+    setOtpCode("");
+    autoSubmitLock.current = false;
+    setBlockedUntilEdit(false);
+    try {
+      sessionStorage.setItem(OTP_SESSION_KEY, JSON.stringify(session));
+    } catch { /* ignore */ }
+  };
+
+  const doRequestOtpNetwork = async (mobile: string, forceResend = false) => {
+    setOtpRequestBusy(true); setFormError(null);
+    try {
+      const res = await authService.requestOtp(mobile, { forceResend });
+      const debug = typeof res.debug_code === "string" ? res.debug_code : undefined;
+      const ttlSec =
+        typeof res.expires_in === "number" && res.expires_in > 0
+          ? res.expires_in
+          : OTP_TIMER_SEC;
+      startOtpSession(mobile, debug, Date.now() + ttlSec * 1000);
+      setOtpStep("code");
+      setBlockedUntilEdit(false);
+    } catch (err) {
+      const raw = err instanceof ApiClientError ? err.message : "ارسال کد ناموفق بود.";
+      const lower = raw.toLowerCase();
+      if (
+        (err instanceof ApiClientError && err.statusCode === 429) ||
+        lower.includes("قبلی") || lower.includes("معتبر") || lower.includes("resend") || lower.includes("retry") || lower.includes("مکرر")
+      ) {
+        setOtpStep("code");
+        setBlockedUntilEdit(false);
+        setFormError(raw || "آخرین کدی که دریافت کردید هنوز معتبر است.");
+      } else {
+        setFormError(friendlyError(raw, "otp-mobile"));
+        setBlockedUntilEdit(true);
+        humanPassOnceRef.current = false;
+        setOtpFails((prev) => { const next = prev + 1; if (next >= 1) setHumanGateArmed(true); return next; });
+      }
+    } finally { setOtpRequestBusy(false); }
+  };
+
+  const onRequestOtp = async (opts?: { force?: boolean }) => {
+    if (needHumanCheck) return;
+    if (blockedUntilEdit && !opts?.force) return;
+    if (opts?.force) {
+      setBlockedUntilEdit(false);
+      autoSubmitLock.current = false;
+    }
+    setFormError(null); setOtpMobileError(null);
+    const mobile = normalizeMobile(otpMobile);
+    if (!isValidIranMobile(mobile)) { setOtpMobileError("فرمت صحیح: ۰۹۱۲xxxxxxxx"); setBlockedUntilEdit(true); return; }
+    setOtpMobile(mobile);
+    if (otpFails >= 1 && !humanPassOnceRef.current && !opts?.force) {
+      setHumanGateArmed(true); setPendingAfterCheck("otp"); setNeedHumanCheck(true); return;
+    }
+    humanPassOnceRef.current = false;
+    await doRequestOtpNetwork(mobile, Boolean(opts?.force));
+  };
+
+  const onVerifyOtp = useCallback(async (codeOverride?: string) => {
+    if (autoSubmitLock.current || needHumanCheck || blockedUntilEdit) return;
+    if ((humanGateArmed || otpFails >= 1) && !humanPassOnceRef.current) {
+      setHumanGateArmed(true); setPendingAfterCheck("otp-verify"); setNeedHumanCheck(true); return;
+    }
+    humanPassOnceRef.current = false;
+    const code = (codeOverride ?? otpCode).replace(/\D/g, "");
+    if (code.length !== OTP_LENGTH) return;
+    autoSubmitLock.current = true; setOtpVerifyBusy(true); setFormError(null);
+    try {
+      const result = await authService.verifyOtp(normalizeMobile(otpMobile), code);
+      setBlockedUntilEdit(false);
+      await handleLoginResult(result);
+    } catch (err) {
+      const raw = err instanceof ApiClientError ? err.message : "تأیید کد ناموفق بود.";
+      const lower = raw.toLowerCase();
+      if (
+        lower.includes("منقضی") || lower.includes("expired") || lower.includes("یافت نشد")
+        || lower.includes("not found") || (err instanceof ApiClientError && err.statusCode === 401)
+      ) {
+        clearOtpLocalSession();
+        setFormError(
+          lower.includes("نادرست") || lower.includes("wrong") || lower.includes("invalid")
+            ? friendlyError(raw, "otp-code")
+            : "این کد دیگر معتبر نیست. «ارسال مجدد» را بزنید تا کد جدید بگیرید."
+        );
+      } else {
+        setFormError(friendlyError(raw, "otp-code"));
+      }
+      setBlockedUntilEdit(true);
+      autoSubmitLock.current = false;
+      humanPassOnceRef.current = false;
+      setOtpFails((prev) => { const next = prev + 1; if (next >= 1) setHumanGateArmed(true); return next; });
+    } finally { setOtpVerifyBusy(false); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otpCode, otpMobile, blockedUntilEdit, humanGateArmed, otpFails, needHumanCheck, clearOtpLocalSession]);
+
+  const onHumanCheckPass = () => {
+    humanPassOnceRef.current = true;
+    setNeedHumanCheck(false); setBlockedUntilEdit(false);
+    const pending = pendingAfterCheck; setPendingAfterCheck(null);
+    if (pending === "password") void runPasswordLogin(getValues());
+    else if (pending === "otp") void doRequestOtpNetwork(normalizeMobile(otpMobile), true);
+    else if (pending === "otp-verify") {
+      const code = otpCode.replace(/\D/g, "");
+      if (code.length === OTP_LENGTH) void onVerifyOtp(code);
+      else { humanPassOnceRef.current = false; setFormError("کد را کامل وارد کنید."); }
+    }
+  };
+
+  const onSelectOrg = async (tenantId: string) => {
+    if (!preAuth) return;
+    setOrgBusy(true); setFormError(null);
+    try {
+      await authService.selectOrganization(preAuth, tenantId);
+      clearOtpLocalSession();
+      toast.success("ورود با موفقیت انجام شد");
+      goToDashboard();
+    } catch (err) {
+      const raw = err instanceof ApiClientError ? err.message : "انتخاب سازمان ناموفق بود.";
+      setFormError(friendlyError(raw, "org"));
+      setBlockedUntilEdit(true);
+    } finally { setOrgBusy(false); }
+  };
+
+  const switchMode = (next: "password" | "otp" | "forgot") => {
+    setMode(next);
+    setFormError(null);
+    setNeedHumanCheck(false);
+    setPendingAfterCheck(null);
+    setBlockedUntilEdit(false);
+    if (next === "forgot") {
+      setForgotStep("mobile");
+      setForgotMobile("");
+      setForgotCode("");
+      setForgotPassword("");
+      setForgotPassword2("");
+    } else {
+      setForgotStep("idle");
+    }
+  };
+
+  // CRITICAL: This restore is incomplete in this turn due to payload limits.
+  // The user should pull after the next full restore commit.
+  return (
+    <LoginShell>
+      <div className="flex flex-1 flex-col justify-center px-4 py-8 sm:px-8">
+        <p className="text-sm text-muted-foreground">در حال بازیابی صفحه ورود… لطفاً یک لحظه صبر کنید و صفحه را رفرش کنید.</p>
+      </div>
+    </LoginShell>
+  );
 }
