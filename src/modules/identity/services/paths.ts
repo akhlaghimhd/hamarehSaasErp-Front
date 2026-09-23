@@ -6,6 +6,8 @@ export const identityPaths = {
   profileMeMobileRequest: `${IDENTITY_BASE}/profiles/me/mobile/request`,
   profileMeMobileVerify: `${IDENTITY_BASE}/profiles/me/mobile/verify`,
   profileByUser: (userId: string) => `${IDENTITY_BASE}/profiles/${userId}`,
+  profileAvatarByUser: (userId: string) =>
+    `${IDENTITY_BASE}/profiles/${userId}/avatar`,
   profileApproveAddress: (userId: string) =>
     `${IDENTITY_BASE}/profiles/${userId}/approve-address`,
   users: `${IDENTITY_BASE}/users`,
