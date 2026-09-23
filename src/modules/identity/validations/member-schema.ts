@@ -15,11 +15,6 @@ export function normalizeIranMobile(raw: string): string {
 
 const IR_MOBILE = /^09\d{9}$/;
 
-const emptyToUndefined = (v: unknown) => {
-  if (v === "" || v === null || v === undefined) return undefined;
-  return v;
-};
-
 export const createMemberSchema = z.object({
   first_name: z
     .string({ required_error: "نام الزامی است" })
@@ -47,10 +42,8 @@ export const createMemberSchema = z.object({
       /^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$/,
       "فقط حروف انگلیسی، عدد، نقطه، خط تیره و زیرخط"
     ),
-  role_id: z.preprocess(
-    emptyToUndefined,
-    z.string().uuid("شناسه نقش معتبر نیست").optional()
-  ),
+  role_ids: z.array(z.string().uuid("شناسه نقش معتبر نیست")).default([]),
+  scope_ids: z.array(z.string().uuid("شناسه محدوده معتبر نیست")).default([]),
   is_owner: z.boolean().optional().default(false),
 });
 
