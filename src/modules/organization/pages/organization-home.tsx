@@ -1,9 +1,9 @@
 /**
  * FE-ORG — Organization module hub
  *
- * Product rule: the primary company is created at tenant onboarding (identity of
- * the legal entity). Branches / departments are managed under that company —
- * hub cards deep-link to the primary (or sole) company when available.
+ * Product rule: the primary company is created at tenant onboarding.
+ * - «شرکت‌ها» always opens the list (never auto-redirect to one company).
+ * - «شعب» / «واحدها» deep-link to the primary company when known.
  */
 
 "use client";
@@ -77,7 +77,7 @@ export function OrganizationHome() {
 
   const { data: companies, isLoading } = useCompanies();
 
-  /** Oldest active company acts as primary HQ until explicit is_primary exists. */
+  /** Oldest company acts as primary HQ for deep-links until explicit is_primary exists. */
   const primary = (() => {
     const list = companies ?? [];
     if (list.length === 0) return null;
@@ -87,9 +87,10 @@ export function OrganizationHome() {
     return sorted[0] ?? null;
   })();
 
-  const companyHref = primary
-    ? `/dashboard/organization/companies/${primary.company_id}`
-    : "/dashboard/organization/companies";
+  const companyCount = companies?.length ?? 0;
+
+  // Always the list — never skip to a single company detail.
+  const companyHref = "/dashboard/organization/companies";
 
   const branchesHref = primary
     ? `/dashboard/organization/companies/${primary.company_id}#branches`
@@ -104,9 +105,10 @@ export function OrganizationHome() {
       key: "companies",
       href: companyHref,
       title: "شرکت‌ها",
-      description: primary
-        ? `شرکت اصلی: ${primary.name} — مدیریت و شرکت‌های فرعی`
-        : "شرکت اصلی هنگام عضویت در پلتفرم ثبت می‌شود؛ در صورت نیاز شرکت فرعی اضافه کنید",
+      description:
+        companyCount > 0
+          ? `فهرست ${companyCount} شرکت — شرکت اصلی و شرکت‌های فرعی`
+          : "شرکت اصلی هنگام عضویت در پلتفرم ثبت می‌شود؛ در صورت نیاز شرکت فرعی اضافه کنید",
       icon: Building2,
       open: true,
     },
