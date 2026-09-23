@@ -1,46 +1,28 @@
 /**
  * FE-ORG — Organization module hub
+ *
+ * Product rule: the primary company is created at tenant onboarding (identity of
+ * the legal entity). Branches / departments are managed under that company —
+ * hub cards deep-link to the primary (or sole) company when available.
  */
 
 "use client";
 
 import Link from "next/link";
-import { Building2, GitBranch, Network } from "lucide-react";
+import { Building2, GitBranch, Network, Loader2 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { usePermission } from "@/auth";
+import { useCompanies } from "../hooks/use-companies";
 import { OrganizationPermissions } from "../types";
 
 type HubCard = {
+  key: string;
   href: string;
   title: string;
   description: string;
   icon: typeof Building2;
   open: boolean;
 };
-
-const cards: HubCard[] = [
-  {
-    href: "/dashboard/organization/companies",
-    title: "شرکت‌ها",
-    description: "تعریف و مدیریت شرکت‌های سازمان",
-    icon: Building2,
-    open: true,
-  },
-  {
-    href: "/dashboard/organization/companies",
-    title: "شعب",
-    description: "شعب هر شرکت از صفحه جزئیات شرکت مدیریت می‌شود",
-    icon: GitBranch,
-    open: true,
-  },
-  {
-    href: "/dashboard/organization/companies",
-    title: "واحدهای سازمانی",
-    description: "دپارتمان‌ها از داخل شرکت و شعبه تعریف می‌شوند",
-    icon: Network,
-    open: true,
-  },
-];
 
 function HubCardView({
   card,
@@ -90,24 +72,104 @@ function HubCardView({
 
 export function OrganizationHome() {
   const canViewCompany = usePermission(OrganizationPermissions.companyView);
+  const canViewBranch = usePermission(OrganizationPermissions.branchView);
+  const canViewDept = usePermission(OrganizationPermissions.departmentView);
+
+  const { data: companies, isLoading } = useCompanies();
+
+  /** Oldest active company acts as primary HQ until explicit is_primary exists. */
+  const primary = (() => {
+    const list = companies ?? [];
+    if (list.length === 0) return null;
+    const sorted = [...list].sort((a, b) =>
+      String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""))
+    );
+    return sorted[0] ?? null;
+  })();
+
+  const companyHref = primary
+    ? `/dashboard/organization/companies/${primary.company_id}`
+    : "/dashboard/organization/companies";
+
+  const branchesHref = primary
+    ? `/dashboard/organization/companies/${primary.company_id}#branches`
+    : "/dashboard/organization/companies";
+
+  const deptsHref = primary
+    ? `/dashboard/organization/companies/${primary.company_id}#departments`
+    : "/dashboard/organization/companies";
+
+  const cards: HubCard[] = [
+    {
+      key: "companies",
+      href: companyHref,
+      title: "شرکت‌ها",
+      description: primary
+        ? `شرکت اصلی: ${primary.name} — مدیریت و شرکت‌های فرعی`
+        : "شرکت اصلی هنگام عضویت در پلتفرم ثبت می‌شود؛ در صورت نیاز شرکت فرعی اضافه کنید",
+      icon: Building2,
+      open: true,
+    },
+    {
+      key: "branches",
+      href: branchesHref,
+      title: "شعب",
+      description: primary
+        ? `شعب «${primary.name}» را از صفحه همان شرکت مدیریت کنید`
+        : "پس از وجود شرکت اصلی، شعب از صفحه جزئیات شرکت تعریف می‌شوند",
+      icon: GitBranch,
+      open: true,
+    },
+    {
+      key: "departments",
+      href: deptsHref,
+      title: "واحدهای سازمانی",
+      description: primary
+        ? `واحدهای «${primary.name}» زیر نظر شعب همان شرکت`
+        : "واحد سازمانی زیر نظر شعبه و شرکت تعریف می‌شود",
+      icon: Network,
+      open: true,
+    },
+  ];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="سازمان"
-        description="ساختار سازمانی: شرکت، شعبه و واحد سازمانی"
+        description="ساختار سازمانی: شرکت، شعبه و واحد سازمانی — شرکت اصلی از هویت سازمانی هنگام عضویت می‌آید"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "سازمان" },
         ]}
       />
 
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          در حال بارگذاری ساختار سازمان…
+        </div>
+      ) : null}
+
+      {!isLoading && !primary && canViewCompany ? (
+        <div className="rounded-xl border border-dashed border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+          هنوز شرکت اصلی برای این مستأجر ثبت نشده است. در حالت عادی شرکت
+          حقوقی هنگام عضویت در پلتفرم ساخته می‌شود. برای محیط آزمایشی سیدر
+          مالک دمو را اجرا کنید یا یک شرکت ثبت نمایید.
+        </div>
+      ) : null}
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((card) => (
           <HubCardView
-            key={card.title}
+            key={card.key}
             card={card}
-            allowed={canViewCompany}
+            allowed={
+              card.key === "branches"
+                ? canViewBranch || canViewCompany
+                : card.key === "departments"
+                  ? canViewDept || canViewCompany
+                  : canViewCompany
+            }
           />
         ))}
       </div>
