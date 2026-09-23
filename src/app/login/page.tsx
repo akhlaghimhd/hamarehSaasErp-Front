@@ -629,20 +629,20 @@ export default function LoginPage() {
                 <Label htmlFor="password" className="text-xs font-medium">رمز عبور</Label>
                 <button type="button" className="text-[11px] text-primary hover:underline" onClick={() => switchMode("forgot")}>فراموشی رمز؟</button>
               </div>
-              <div className="relative">
+              <div className="relative" dir="ltr">
                 <Input
                   id="password"
                   type={showPasswordHold ? "text" : "password"}
                   autoComplete="current-password"
                   dir="ltr"
-                  className="h-10 pe-10"
+                  className="h-10 pr-10"
                   {...passwordReg}
                   onChange={(e) => { passwordReg.onChange(e); markEdited(); setFormError(null); }}
                 />
                 <button
                   type="button"
                   tabIndex={-1}
-                  className="absolute end-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                   aria-label="نمایش رمز عبور"
                   onMouseDown={(e) => { e.preventDefault(); setShowPasswordHold(true); }}
                   onMouseUp={() => setShowPasswordHold(false)}
