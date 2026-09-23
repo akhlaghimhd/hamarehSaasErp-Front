@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { Loader2, Plus, Search } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -53,6 +53,20 @@ const MSG_NO_ACCESS = "برای مشاهده این بخش مجوز لازم ر�
 export function CompanyDetailPage() {
   const params = useParams();
   const companyId = typeof params?.id === "string" ? params.id : "";
+
+  // Deep-link from organization hub (#branches / #departments)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash.replace("#", "");
+    if (!hash) return;
+    const t = window.setTimeout(() => {
+      document.getElementById(hash)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 200);
+    return () => window.clearTimeout(t);
+  }, [companyId]);
 
   const canView = usePermission(OrganizationPermissions.companyView);
   const canUpdate = usePermission(OrganizationPermissions.companyUpdate);
@@ -119,7 +133,11 @@ export function CompanyDetailPage() {
     const q = branchQuery.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((r) =>
-      [r.code, r.name, r.address].filter(Boolean).join(" ").toLowerCase().includes(q)
+      [r.code, r.name, r.address]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(q)
     );
   }, [branches, branchQuery]);
 
@@ -327,7 +345,13 @@ export function CompanyDetailPage() {
   if (!canView) {
     return (
       <div className="space-y-6">
-        <PageHeader title="شرکت" breadcrumbs={[{ label: "سازمان", href: "/dashboard/organization" }, { label: "شرکت" }]} />
+        <PageHeader
+          title="شرکت"
+          breadcrumbs={[
+            { label: "سازمان", href: "/dashboard/organization" },
+            { label: "شرکت" },
+          ]}
+        />
         <div className="rounded-xl border border-dashed px-6 py-12 text-center text-sm text-muted-foreground">
           {MSG_NO_ACCESS}
         </div>
@@ -359,7 +383,12 @@ export function CompanyDetailPage() {
           {error instanceof ApiClientError && error.message
             ? error.message
             : MSG_LOAD}
-          <Button variant="outline" size="sm" className="ms-2" onClick={() => void refetch()}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="ms-2"
+            onClick={() => void refetch()}
+          >
             تلاش مجدد
           </Button>
         </div>
@@ -417,7 +446,7 @@ export function CompanyDetailPage() {
       </div>
 
       {canViewBranch ? (
-        <section className="space-y-3">
+        <section id="branches" className="scroll-mt-20 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-semibold">شعب</h2>
             {canCreateBranch ? (
@@ -458,7 +487,7 @@ export function CompanyDetailPage() {
       ) : null}
 
       {canViewDept ? (
-        <section className="space-y-3">
+        <section id="departments" className="scroll-mt-20 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-semibold">واحدهای سازمانی</h2>
             {canCreateDept ? (
@@ -510,19 +539,34 @@ export function CompanyDetailPage() {
           <form onSubmit={onEditCompany} className="space-y-3">
             <div className="space-y-1.5">
               <Label>کد *</Label>
-              <Input className="h-9" dir="ltr" {...editForm.register("code", { required: true })} />
+              <Input
+                className="h-9"
+                dir="ltr"
+                {...editForm.register("code", { required: true })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>نام *</Label>
-              <Input className="h-9" {...editForm.register("name", { required: true })} />
+              <Input
+                className="h-9"
+                {...editForm.register("name", { required: true })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>شماره ثبت</Label>
-              <Input className="h-9" dir="ltr" {...editForm.register("registration_number")} />
+              <Input
+                className="h-9"
+                dir="ltr"
+                {...editForm.register("registration_number")}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>کد اقتصادی</Label>
-              <Input className="h-9" dir="ltr" {...editForm.register("economic_code")} />
+              <Input
+                className="h-9"
+                dir="ltr"
+                {...editForm.register("economic_code")}
+              />
             </div>
             <div className="flex items-center justify-between gap-2">
               <Label>فعال</Label>
@@ -532,11 +576,20 @@ export function CompanyDetailPage() {
               />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" size="sm" onClick={() => setEditOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setEditOpen(false)}
+              >
                 انصراف
               </Button>
               <Button type="submit" size="sm" disabled={updateCompany.isPending}>
-                {updateCompany.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
+                {updateCompany.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "ذخیره"
+                )}
               </Button>
             </DialogFooter>
           </form>
@@ -555,11 +608,18 @@ export function CompanyDetailPage() {
           <form onSubmit={onCreateBranch} className="space-y-3">
             <div className="space-y-1.5">
               <Label>کد *</Label>
-              <Input className="h-9" dir="ltr" {...branchForm.register("code", { required: true })} />
+              <Input
+                className="h-9"
+                dir="ltr"
+                {...branchForm.register("code", { required: true })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>نام *</Label>
-              <Input className="h-9" {...branchForm.register("name", { required: true })} />
+              <Input
+                className="h-9"
+                {...branchForm.register("name", { required: true })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>آدرس</Label>
@@ -573,11 +633,20 @@ export function CompanyDetailPage() {
               />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" size="sm" onClick={() => setBranchOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setBranchOpen(false)}
+              >
                 انصراف
               </Button>
               <Button type="submit" size="sm" disabled={createBranch.isPending}>
-                {createBranch.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ثبت"}
+                {createBranch.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "ثبت"
+                )}
               </Button>
             </DialogFooter>
           </form>
@@ -597,7 +666,7 @@ export function CompanyDetailPage() {
             <div className="space-y-1.5">
               <Label>شعبه *</Label>
               <select
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
                 {...deptForm.register("branch_id", { required: true })}
               >
                 <option value="">انتخاب شعبه…</option>
@@ -610,11 +679,18 @@ export function CompanyDetailPage() {
             </div>
             <div className="space-y-1.5">
               <Label>کد *</Label>
-              <Input className="h-9" dir="ltr" {...deptForm.register("code", { required: true })} />
+              <Input
+                className="h-9"
+                dir="ltr"
+                {...deptForm.register("code", { required: true })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>نام *</Label>
-              <Input className="h-9" {...deptForm.register("name", { required: true })} />
+              <Input
+                className="h-9"
+                {...deptForm.register("name", { required: true })}
+              />
             </div>
             <div className="flex items-center justify-between gap-2">
               <Label>فعال</Label>
@@ -624,11 +700,20 @@ export function CompanyDetailPage() {
               />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" size="sm" onClick={() => setDeptOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setDeptOpen(false)}
+              >
                 انصراف
               </Button>
               <Button type="submit" size="sm" disabled={createDept.isPending}>
-                {createDept.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ثبت"}
+                {createDept.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "ثبت"
+                )}
               </Button>
             </DialogFooter>
           </form>
