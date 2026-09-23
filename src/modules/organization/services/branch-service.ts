@@ -47,6 +47,12 @@ export const branchService = {
         name: payload.name.trim(),
         address: payload.address?.trim() || null,
         is_active: payload.is_active ?? true,
+        branch_kind: payload.branch_kind || "OFFICE",
+        parent_branch_id: payload.parent_branch_id || null,
+        default_warehouse_id: payload.default_warehouse_id || null,
+        supports_shipping: payload.supports_shipping ?? false,
+        supports_receiving: payload.supports_receiving ?? false,
+        is_manufacturing_site: payload.is_manufacturing_site ?? false,
       }
     );
     return unwrapData<BranchDto>(envelope);
@@ -58,6 +64,13 @@ export const branchService = {
       name: payload.name.trim(),
       address: payload.address?.trim() || null,
       is_active: payload.is_active ?? true,
+      branch_kind: payload.branch_kind || undefined,
+      parent_branch_id: payload.parent_branch_id ?? undefined,
+      default_warehouse_id: payload.default_warehouse_id ?? undefined,
+      supports_shipping: payload.supports_shipping,
+      supports_receiving: payload.supports_receiving,
+      is_manufacturing_site: payload.is_manufacturing_site,
+      company_id: payload.company_id ?? undefined,
     });
     return unwrapData<BranchDto>(envelope);
   },
