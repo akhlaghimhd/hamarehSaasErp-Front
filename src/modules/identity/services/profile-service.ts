@@ -51,12 +51,30 @@ export const profileService = {
   },
 
   /**
-   * Load avatar with Authorization header → object URL for <img>.
+   * Load current user avatar with Authorization header → object URL for <img>.
    * Caller must revokeObjectURL when done.
    */
   async fetchAvatarObjectUrl(): Promise<string | null> {
     try {
       const res = await apiClient.get(identityPaths.profileMeAvatar, {
+        responseType: "blob",
+      });
+      if (!(res.data instanceof Blob) || res.data.size === 0) return null;
+      if (res.data.type && res.data.type.includes("json")) return null;
+      return URL.createObjectURL(res.data);
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Load another user's avatar (requires identity.profile.view).
+   * Caller must revokeObjectURL when done.
+   */
+  async fetchAvatarObjectUrlForUser(userId: string): Promise<string | null> {
+    if (!userId) return null;
+    try {
+      const res = await apiClient.get(identityPaths.profileAvatarByUser(userId), {
         responseType: "blob",
       });
       if (!(res.data instanceof Blob) || res.data.size === 0) return null;
