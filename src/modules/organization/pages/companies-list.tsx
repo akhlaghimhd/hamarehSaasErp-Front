@@ -1,12 +1,13 @@
 /**
  * FE-ORG — فهرست شرکت‌ها (P0–P1 fields)
+ * Create form: right-side Sheet drawer.
  */
 
 "use client";
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Loader2, Plus, Search, Building2 } from "lucide-react";
+import { CircleHelp, Loader2, Plus, Search, Building2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/layout/page-header";
@@ -18,14 +19,20 @@ import { StatusChip } from "@/shared/components/data-display/status-chip";
 import { Input } from "@/shared/components/ui/input";
 import { Button } from "@/shared/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/shared/components/ui/sheet";
 import { Label } from "@/shared/components/ui/label";
 import { Switch } from "@/shared/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/shared/components/ui/tooltip";
 import { usePermission } from "@/auth";
 import { ApiClientError } from "@/api";
 import { toFaDigits } from "@/shared/lib/utils";
@@ -37,9 +44,8 @@ import {
 import {
   OrganizationPermissions,
   ENTITY_KIND_LABELS,
-  ENTITY_KIND_DESCRIPTIONS,
   ENTITY_KIND_FIELD_LABEL,
-  ENTITY_KIND_FIELD_HINT,
+  ENTITY_KIND_OPTIONS,
   type CompanyDto,
 } from "../types";
 
@@ -140,7 +146,7 @@ export function CompaniesListPage() {
     },
     {
       id: "kind",
-      header: "نقش در گروه",
+      header: "کاربرد",
       cell: (row) => (
         <span className="text-xs">
           {ENTITY_KIND_LABELS[row.entity_kind ?? "OPERATING"] ??
@@ -323,97 +329,173 @@ export function CompaniesListPage() {
         }
       />
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent
-          className="max-h-[90vh] overflow-y-auto sm:max-w-lg"
-          onInteractOutside={(e) => {
-            if (form.formState.isDirty) e.preventDefault();
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>شرکت جدید</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={onCreate} className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label>کد *</Label>
-                <Input className="h-9" dir="ltr" {...form.register("code", { required: true })} />
+      <Sheet
+        open={createOpen}
+        onOpenChange={(open) => {
+          if (!open && form.formState.isDirty) {
+            if (!window.confirm("تغییرات ذخیره نشده‌اند. فرم بسته شود؟")) return;
+          }
+          setCreateOpen(open);
+        }}
+      >
+        <SheetContent side="right" className="w-full sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>شرکت جدید</SheetTitle>
+          </SheetHeader>
+          <form
+            onSubmit={onCreate}
+            className="flex min-h-0 flex-1 flex-col"
+          >
+            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>کد *</Label>
+                  <Input
+                    className="h-9"
+                    dir="ltr"
+                    {...form.register("code", { required: true })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>نام نمایشی *</Label>
+                  <Input
+                    className="h-9"
+                    {...form.register("name", { required: true })}
+                  />
+                </div>
               </div>
               <div className="space-y-1.5">
-                <Label>نام نمایشی *</Label>
-                <Input className="h-9" {...form.register("name", { required: true })} />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>نام حقوقی</Label>
-              <Input className="h-9" {...form.register("legal_name")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>نام تجاری</Label>
-              <Input className="h-9" {...form.register("trade_name")} />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label>شماره ثبت</Label>
-                <Input className="h-9" dir="ltr" {...form.register("registration_number")} />
+                <Label>نام حقوقی</Label>
+                <Input className="h-9" {...form.register("legal_name")} />
               </div>
               <div className="space-y-1.5">
-                <Label>کد اقتصادی</Label>
-                <Input className="h-9" dir="ltr" {...form.register("economic_code")} />
+                <Label>نام تجاری</Label>
+                <Input className="h-9" {...form.register("trade_name")} />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>شماره ثبت</Label>
+                  <Input
+                    className="h-9"
+                    dir="ltr"
+                    {...form.register("registration_number")}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>کد اقتصادی</Label>
+                  <Input
+                    className="h-9"
+                    dir="ltr"
+                    {...form.register("economic_code")}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>شناسه مالیاتی</Label>
+                <Input
+                  className="h-9"
+                  dir="ltr"
+                  {...form.register("tax_identifier")}
+                />
+              </div>
+
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium leading-none">
+                  {ENTITY_KIND_FIELD_LABEL}
+                </legend>
+                <TooltipProvider delayDuration={200}>
+                  <div className="space-y-1.5">
+                    {ENTITY_KIND_OPTIONS.map((opt) => {
+                      const checked = selectedKind === opt.value;
+                      return (
+                        <label
+                          key={opt.value}
+                          className={
+                            "flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition-colors " +
+                            (checked
+                              ? "border-primary/50 bg-primary/5"
+                              : "border-border/80 hover:bg-muted/40")
+                          }
+                        >
+                          <input
+                            type="radio"
+                            className="mt-1 h-3.5 w-3.5 shrink-0 accent-primary"
+                            value={opt.value}
+                            checked={checked}
+                            onChange={() =>
+                              form.setValue("entity_kind", opt.value, {
+                                shouldDirty: true,
+                              })
+                            }
+                          />
+                          <span className="min-w-0 flex-1 text-sm leading-snug">
+                            {opt.label}
+                          </span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                className="mt-0.5 shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+                                aria-label={`راهنمای ${opt.label}`}
+                                onClick={(e) => e.preventDefault()}
+                              >
+                                <CircleHelp className="h-3.5 w-3.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="top"
+                              className="max-w-[16rem] text-right leading-relaxed"
+                            >
+                              {opt.tooltip}
+                            </TooltipContent>
+                          </Tooltip>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </TooltipProvider>
+              </fieldset>
+
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <Label>شرکت اصلی سازمان</Label>
+                <Switch
+                  checked={form.watch("is_primary")}
+                  onCheckedChange={(v) => form.setValue("is_primary", v)}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <Label>فعال</Label>
+                <Switch
+                  checked={form.watch("is_active")}
+                  onCheckedChange={(v) => form.setValue("is_active", v)}
+                />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>شناسه مالیاتی</Label>
-              <Input className="h-9" dir="ltr" {...form.register("tax_identifier")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>{ENTITY_KIND_FIELD_LABEL}</Label>
-              <select
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                {...form.register("entity_kind")}
+
+            <SheetFooter>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setCreateOpen(false)}
               >
-                <option value="OPERATING">{ENTITY_KIND_LABELS.OPERATING}</option>
-                <option value="CONSOLIDATION">{ENTITY_KIND_LABELS.CONSOLIDATION}</option>
-                <option value="ELIMINATION">{ENTITY_KIND_LABELS.ELIMINATION}</option>
-              </select>
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                {ENTITY_KIND_FIELD_HINT}
-              </p>
-              {ENTITY_KIND_DESCRIPTIONS[selectedKind] ? (
-                <p className="rounded-md border border-border/60 bg-muted/40 px-2.5 py-1.5 text-[11px] leading-relaxed text-muted-foreground">
-                  {ENTITY_KIND_DESCRIPTIONS[selectedKind]}
-                </p>
-              ) : null}
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <Label>شرکت اصلی (Primary)</Label>
-              <Switch
-                checked={form.watch("is_primary")}
-                onCheckedChange={(v) => form.setValue("is_primary", v)}
-              />
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <Label>فعال</Label>
-              <Switch
-                checked={form.watch("is_active")}
-                onCheckedChange={(v) => form.setValue("is_active", v)}
-              />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" size="sm" onClick={() => setCreateOpen(false)}>
                 انصراف
               </Button>
-              <Button type="submit" size="sm" disabled={createMutation.isPending}>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={createMutation.isPending}
+              >
                 {createMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   "ثبت"
                 )}
               </Button>
-            </DialogFooter>
+            </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
