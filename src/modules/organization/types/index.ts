@@ -175,11 +175,27 @@ export type UpdateDepartmentPayload = {
   branch_id?: string | null;
 };
 
+/** Short labels for tables/chips */
 export const ENTITY_KIND_LABELS: Record<string, string> = {
-  OPERATING: "عملیاتی",
-  CONSOLIDATION: "تلفیقی",
-  ELIMINATION: "حذفی",
+  OPERATING: "شرکت عملیاتی",
+  CONSOLIDATION: "سطح تجمیع گروه",
+  ELIMINATION: "حذف معاملات درون‌گروه",
 };
+
+/** One-line help under each option (user-facing) */
+export const ENTITY_KIND_DESCRIPTIONS: Record<string, string> = {
+  OPERATING:
+    "کسب‌وکار واقعی؛ فروش، خرید و عملیات روزمره روی این شرکت ثبت می‌شود. برای بیشتر سازمان‌ها همین گزینه کافی است.",
+  CONSOLIDATION:
+    "ردیف کمکی برای گزارش تجمیعی هلدینگ؛ معمولاً خودش عملیات روزمره ندارد.",
+  ELIMINATION:
+    "فقط برای حذف اثر معاملات بین شرکت‌های هم‌گروه در تلفیق مالی (پیشرفته).",
+};
+
+export const ENTITY_KIND_FIELD_LABEL = "نقش شرکت در گروه";
+
+export const ENTITY_KIND_FIELD_HINT =
+  "اگر یک شرکت معمولی دارید، «شرکت عملیاتی» را انتخاب کنید. دو گزینه دیگر مخصوص هلدینگ و گزارش تلفیقی‌اند و بعداً می‌توانند با پلن اشتراک محدود شوند.";
 
 export const BRANCH_KIND_LABELS: Record<string, string> = {
   OFFICE: "دفتر",
