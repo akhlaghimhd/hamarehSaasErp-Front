@@ -87,6 +87,38 @@ export type CostCenterDto = {
   is_active?: boolean;
 };
 
+export type OwnershipDto = {
+  ownership_id: string;
+  company_id: string;
+  owner_company_id: string;
+  ownership_percent: number;
+  relation_type?: string;
+};
+
+export type SalesOrgDto = {
+  sales_org_id: string;
+  code: string;
+  name: string;
+  company_id?: string | null;
+  is_active?: boolean;
+};
+
+export type PurchOrgDto = {
+  purch_org_id: string;
+  code: string;
+  name: string;
+  company_id?: string | null;
+  is_active?: boolean;
+};
+
+export type ConsolRunDto = {
+  consol_run_id: string;
+  code: string;
+  name: string;
+  status?: string;
+  hierarchy_id?: string | null;
+};
+
 export const businessUnitService = {
   async list(): Promise<BusinessUnitDto[]> {
     const env = await apiGet(organizationPaths.businessUnits);
@@ -110,11 +142,7 @@ export const hierarchyService = {
     const env = await apiGet(organizationPaths.hierarchies);
     return asArray(unwrapData(env));
   },
-  async create(payload: {
-    code: string;
-    name: string;
-    purpose: string;
-  }) {
+  async create(payload: { code: string; name: string; purpose: string }) {
     const env = await apiPost(organizationPaths.hierarchies, payload);
     return unwrapData<HierarchyDto>(env);
   },
@@ -209,11 +237,81 @@ export const costCenterService = {
     const env = await apiGet(organizationPaths.companyCostCenters(companyId));
     return asArray(unwrapData(env));
   },
-  async create(
-    companyId: string,
-    payload: { code: string; name: string }
-  ) {
+  async create(companyId: string, payload: { code: string; name: string }) {
     const env = await apiPost(organizationPaths.companyCostCenters(companyId), payload);
     return unwrapData<CostCenterDto>(env);
+  },
+};
+
+export const ownershipService = {
+  async list(companyId: string): Promise<OwnershipDto[]> {
+    const env = await apiGet(organizationPaths.companyOwnerships(companyId));
+    return asArray(unwrapData(env));
+  },
+  async create(
+    companyId: string,
+    payload: {
+      owner_company_id: string;
+      ownership_percent: number;
+      relation_type?: string;
+    }
+  ) {
+    const env = await apiPost(organizationPaths.companyOwnerships(companyId), payload);
+    return unwrapData<OwnershipDto>(env);
+  },
+  async softDelete(id: string) {
+    await apiDelete(organizationPaths.ownership(id));
+  },
+};
+
+export const salesOrgService = {
+  async list(): Promise<SalesOrgDto[]> {
+    const env = await apiGet(organizationPaths.salesOrganizations);
+    return asArray(unwrapData(env));
+  },
+  async create(payload: { code: string; name: string; company_id?: string }) {
+    const env = await apiPost(organizationPaths.salesOrganizations, payload);
+    return unwrapData<SalesOrgDto>(env);
+  },
+};
+
+export const purchOrgService = {
+  async list(): Promise<PurchOrgDto[]> {
+    const env = await apiGet(organizationPaths.purchasingOrganizations);
+    return asArray(unwrapData(env));
+  },
+  async create(payload: { code: string; name: string; company_id?: string }) {
+    const env = await apiPost(organizationPaths.purchasingOrganizations, payload);
+    return unwrapData<PurchOrgDto>(env);
+  },
+};
+
+export const consolidationService = {
+  async list(): Promise<ConsolRunDto[]> {
+    const env = await apiGet(organizationPaths.consolidationRuns);
+    return asArray(unwrapData(env));
+  },
+  async create(payload: {
+    code: string;
+    name: string;
+    hierarchy_id?: string;
+  }) {
+    const env = await apiPost(organizationPaths.consolidationRuns, payload);
+    return unwrapData<ConsolRunDto>(env);
+  },
+  async snapshot(id: string) {
+    const env = await apiPost(organizationPaths.consolidationSnapshot(id), {});
+    return unwrapData<ConsolRunDto>(env);
+  },
+};
+
+export const structureService = {
+  async applyTemplate(payload: {
+    hq_name?: string;
+    hq_code?: string;
+    create_legal_hierarchy?: boolean;
+  }) {
+    const env = await apiPost(organizationPaths.structureApplyTemplate, payload);
+    return unwrapData(env);
   },
 };

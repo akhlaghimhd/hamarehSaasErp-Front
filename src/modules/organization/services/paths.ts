@@ -15,10 +15,16 @@ export const organizationPaths = {
     `${ORGANIZATION_BASE}/companies/${companyId}/officers`,
   companyCostCenters: (companyId: string) =>
     `${ORGANIZATION_BASE}/companies/${companyId}/cost-centers`,
+  companyOwnerships: (companyId: string) =>
+    `${ORGANIZATION_BASE}/companies/${companyId}/ownerships`,
+  companyFiscalAssignments: (companyId: string) =>
+    `${ORGANIZATION_BASE}/companies/${companyId}/fiscal-assignments`,
   branch: (id: string) => `${ORGANIZATION_BASE}/branches/${id}`,
   department: (id: string) => `${ORGANIZATION_BASE}/departments/${id}`,
   bankAccount: (id: string) => `${ORGANIZATION_BASE}/bank-accounts/${id}`,
   officer: (id: string) => `${ORGANIZATION_BASE}/officers/${id}`,
+  ownership: (id: string) => `${ORGANIZATION_BASE}/ownerships/${id}`,
+  fiscalAssignment: (id: string) => `${ORGANIZATION_BASE}/fiscal-assignments/${id}`,
   businessUnits: `${ORGANIZATION_BASE}/business-units`,
   businessUnitCompanies: (buId: string) =>
     `${ORGANIZATION_BASE}/business-units/${buId}/companies`,
@@ -27,4 +33,14 @@ export const organizationPaths = {
     `${ORGANIZATION_BASE}/hierarchies/${hierarchyId}/nodes`,
   icPartners: `${ORGANIZATION_BASE}/intercompany/partners`,
   icRules: `${ORGANIZATION_BASE}/intercompany/rules`,
+  salesOrganizations: `${ORGANIZATION_BASE}/sales-organizations`,
+  salesOrgAssignments: (id: string) =>
+    `${ORGANIZATION_BASE}/sales-organizations/${id}/assignments`,
+  purchasingOrganizations: `${ORGANIZATION_BASE}/purchasing-organizations`,
+  purchOrgAssignments: (id: string) =>
+    `${ORGANIZATION_BASE}/purchasing-organizations/${id}/assignments`,
+  consolidationRuns: `${ORGANIZATION_BASE}/consolidation-runs`,
+  consolidationSnapshot: (id: string) =>
+    `${ORGANIZATION_BASE}/consolidation-runs/${id}/snapshot`,
+  structureApplyTemplate: `${ORGANIZATION_BASE}/structure/apply-template`,
 } as const;
