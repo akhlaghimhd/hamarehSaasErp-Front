@@ -37,6 +37,9 @@ import {
 import {
   OrganizationPermissions,
   ENTITY_KIND_LABELS,
+  ENTITY_KIND_DESCRIPTIONS,
+  ENTITY_KIND_FIELD_LABEL,
+  ENTITY_KIND_FIELD_HINT,
   type CompanyDto,
 } from "../types";
 
@@ -85,6 +88,8 @@ export function CompaniesListPage() {
       is_active: true,
     },
   });
+
+  const selectedKind = form.watch("entity_kind") || "OPERATING";
 
   const rows = data ?? [];
   const filtered = useMemo(() => {
@@ -135,7 +140,7 @@ export function CompaniesListPage() {
     },
     {
       id: "kind",
-      header: "نوع",
+      header: "نقش در گروه",
       cell: (row) => (
         <span className="text-xs">
           {ENTITY_KIND_LABELS[row.entity_kind ?? "OPERATING"] ??
@@ -362,15 +367,23 @@ export function CompaniesListPage() {
               <Input className="h-9" dir="ltr" {...form.register("tax_identifier")} />
             </div>
             <div className="space-y-1.5">
-              <Label>نوع موجودیت</Label>
+              <Label>{ENTITY_KIND_FIELD_LABEL}</Label>
               <select
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                 {...form.register("entity_kind")}
               >
-                <option value="OPERATING">عملیاتی</option>
-                <option value="CONSOLIDATION">تلفیقی</option>
-                <option value="ELIMINATION">حذفی</option>
+                <option value="OPERATING">{ENTITY_KIND_LABELS.OPERATING}</option>
+                <option value="CONSOLIDATION">{ENTITY_KIND_LABELS.CONSOLIDATION}</option>
+                <option value="ELIMINATION">{ENTITY_KIND_LABELS.ELIMINATION}</option>
               </select>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                {ENTITY_KIND_FIELD_HINT}
+              </p>
+              {ENTITY_KIND_DESCRIPTIONS[selectedKind] ? (
+                <p className="rounded-md border border-border/60 bg-muted/40 px-2.5 py-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                  {ENTITY_KIND_DESCRIPTIONS[selectedKind]}
+                </p>
+              ) : null}
             </div>
             <div className="flex items-center justify-between gap-2">
               <Label>شرکت اصلی (Primary)</Label>
