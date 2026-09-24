@@ -3,11 +3,8 @@
 import { useParams } from "next/navigation";
 import { CompanyDetailPage } from "./company-detail";
 import { CompanyExtendedPanels } from "./company-extended-panels";
+import { CompanyOwnershipPanel } from "./company-ownership-panel";
 
-/**
- * Shell that keeps CompanyDetailPage + bank/officer/cost-center panels.
- * Note: company-detail was briefly corrupted; this shell composes panels safely.
- */
 export function CompanyDetailShell() {
   const params = useParams();
   const companyId = typeof params?.id === "string" ? params.id : "";
@@ -15,7 +12,12 @@ export function CompanyDetailShell() {
   return (
     <div className="space-y-8">
       <CompanyDetailPage />
-      {companyId ? <CompanyExtendedPanels companyId={companyId} /> : null}
+      {companyId ? (
+        <>
+          <CompanyOwnershipPanel companyId={companyId} />
+          <CompanyExtendedPanels companyId={companyId} />
+        </>
+      ) : null}
     </div>
   );
 }

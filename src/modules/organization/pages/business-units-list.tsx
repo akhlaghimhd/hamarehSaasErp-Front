@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, Link2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/layout/page-header";
@@ -18,11 +18,16 @@ import {
 } from "@/shared/components/ui/dialog";
 import { ApiClientError } from "@/api";
 import { businessUnitService } from "../services/org-extended-service";
+import { useCompanies } from "../hooks/use-companies";
 
 export function BusinessUnitsListPage() {
   const qc = useQueryClient();
+  const { data: companies } = useCompanies();
   const [open, setOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [activeBu, setActiveBu] = useState<string | null>(null);
   const form = useForm({ defaultValues: { code: "", name: "", description: "" } });
+  const assignForm = useForm({ defaultValues: { company_id: "", is_primary: false } });
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["org", "business-units"],
@@ -41,11 +46,23 @@ export function BusinessUnitsListPage() {
       toast.error(e instanceof ApiClientError && e.message ? e.message : "خطا"),
   });
 
+  const assign = useMutation({
+    mutationFn: (v: { company_id: string; is_primary: boolean }) =>
+      businessUnitService.assignCompany(activeBu!, v.company_id, v.is_primary),
+    onSuccess: () => {
+      toast.success("شرکت به واحد کسب‌وکار متصل شد");
+      setAssignOpen(false);
+      assignForm.reset({ company_id: "", is_primary: false });
+    },
+    onError: (e) =>
+      toast.error(e instanceof ApiClientError && e.message ? e.message : "خطا"),
+  });
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="واحدهای کسب‌وکار"
-        description="Business Unit مستقل از ساختار حقوقی شرکت"
+        description="Business Unit مستقل از ساختار حقوقی — انتساب شرکت"
         breadcrumbs={[
           { label: "سازمان", href: "/dashboard/organization" },
           { label: "واحد کسب‌وکار" },
@@ -73,13 +90,26 @@ export function BusinessUnitsListPage() {
 
       <ul className="divide-y rounded-xl border">
         {(data ?? []).map((bu) => (
-          <li key={bu.business_unit_id} className="flex items-center justify-between px-4 py-3">
+          <li
+            key={bu.business_unit_id}
+            className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
+          >
             <div>
               <div className="font-medium">{bu.name}</div>
               <div className="font-mono text-xs text-muted-foreground" dir="ltr">
                 {bu.code}
               </div>
             </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setActiveBu(bu.business_unit_id);
+                setAssignOpen(true);
+              }}
+            >
+              <Link2 className="h-3.5 w-3.5" /> انتساب شرکت
+            </Button>
           </li>
         ))}
         {!isLoading && (data ?? []).length === 0 ? (
@@ -117,11 +147,45 @@ export function BusinessUnitsListPage() {
               <Input className="h-9" {...form.register("description")} />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
-                انصراف
-              </Button>
               <Button type="submit" size="sm" disabled={create.isPending}>
                 {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ثبت"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>انتساب شرکت به BU</DialogTitle>
+          </DialogHeader>
+          <form
+            className="space-y-3"
+            onSubmit={assignForm.handleSubmit((v) =>
+              assign.mutate({
+                company_id: v.company_id,
+                is_primary: !!v.is_primary,
+              })
+            )}
+          >
+            <div className="space-y-1.5">
+              <Label>شرکت *</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                {...assignForm.register("company_id", { required: true })}
+              >
+                <option value="">—</option>
+                {(companies ?? []).map((c) => (
+                  <option key={c.company_id} value={c.company_id}>
+                    {c.legal_name || c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <DialogFooter>
+              <Button type="submit" size="sm" disabled={assign.isPending}>
+                {assign.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "اتصال"}
               </Button>
             </DialogFooter>
           </form>
