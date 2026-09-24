@@ -175,27 +175,47 @@ export type UpdateDepartmentPayload = {
   branch_id?: string | null;
 };
 
-/** Short labels for tables/chips */
+/** Short labels for tables / option text */
 export const ENTITY_KIND_LABELS: Record<string, string> = {
   OPERATING: "شرکت عملیاتی",
-  CONSOLIDATION: "سطح تجمیع گروه",
-  ELIMINATION: "حذف معاملات درون‌گروه",
+  CONSOLIDATION: "تجمیع گروه",
+  ELIMINATION: "حذف معاملات داخلی گروه",
 };
 
-/** One-line help under each option (user-facing) */
-export const ENTITY_KIND_DESCRIPTIONS: Record<string, string> = {
+/** Tooltip text per option — end-user language only */
+export const ENTITY_KIND_TOOLTIPS: Record<string, string> = {
   OPERATING:
-    "کسب‌وکار واقعی؛ فروش، خرید و عملیات روزمره روی این شرکت ثبت می‌شود. برای بیشتر سازمان‌ها همین گزینه کافی است.",
+    "روی این شرکت فروش، خرید و کارهای روزمره ثبت می‌شود. انتخاب مناسب برای اکثر سازمان‌ها.",
   CONSOLIDATION:
-    "ردیف کمکی برای گزارش تجمیعی هلدینگ؛ معمولاً خودش عملیات روزمره ندارد.",
+    "برای جمع‌زدن گزارش چند شرکت زیر یک هلدینگ. معمولاً سند عملیاتی روی آن ثبت نمی‌شود.",
   ELIMINATION:
-    "فقط برای حذف اثر معاملات بین شرکت‌های هم‌گروه در تلفیق مالی (پیشرفته).",
+    "برای خنثی‌کردن خرید و فروش بین شرکت‌های یک گروه در گزارش تلفیقی.",
 };
 
-export const ENTITY_KIND_FIELD_LABEL = "نقش شرکت در گروه";
+/** Field title: what the user is choosing */
+export const ENTITY_KIND_FIELD_LABEL = "کاربرد این شرکت";
 
-export const ENTITY_KIND_FIELD_HINT =
-  "اگر یک شرکت معمولی دارید، «شرکت عملیاتی» را انتخاب کنید. دو گزینه دیگر مخصوص هلدینگ و گزارش تلفیقی‌اند و بعداً می‌توانند با پلن اشتراک محدود شوند.";
+export const ENTITY_KIND_OPTIONS: Array<{
+  value: EntityKind;
+  label: string;
+  tooltip: string;
+}> = [
+  {
+    value: "OPERATING",
+    label: ENTITY_KIND_LABELS.OPERATING,
+    tooltip: ENTITY_KIND_TOOLTIPS.OPERATING,
+  },
+  {
+    value: "CONSOLIDATION",
+    label: ENTITY_KIND_LABELS.CONSOLIDATION,
+    tooltip: ENTITY_KIND_TOOLTIPS.CONSOLIDATION,
+  },
+  {
+    value: "ELIMINATION",
+    label: ENTITY_KIND_LABELS.ELIMINATION,
+    tooltip: ENTITY_KIND_TOOLTIPS.ELIMINATION,
+  },
+];
 
 export const BRANCH_KIND_LABELS: Record<string, string> = {
   OFFICE: "دفتر",
