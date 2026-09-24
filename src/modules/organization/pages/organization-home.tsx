@@ -13,6 +13,7 @@ import {
   Layers,
   Landmark,
   ArrowLeftRight,
+  ShoppingCart,
 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { usePermission } from "@/auth";
@@ -155,6 +156,14 @@ export function OrganizationHome() {
       title: "بین‌شرکتی",
       description: "نقشه شریک و قوانین آینه اسناد",
       icon: ArrowLeftRight,
+      open: true,
+    },
+    {
+      key: "salesPurch",
+      href: "/dashboard/organization/sales-purch",
+      title: "فروش و خرید",
+      description: "Sales / Purchasing Organization",
+      icon: ShoppingCart,
       open: true,
     },
   ];
