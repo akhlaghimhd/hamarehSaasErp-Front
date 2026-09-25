@@ -35,6 +35,8 @@ export const organizationPaths = {
     `${ORGANIZATION_BASE}/business-units/${id}/restore`,
   businessUnitCompanies: (buId: string) =>
     `${ORGANIZATION_BASE}/business-units/${buId}/companies`,
+  businessUnitCompany: (buId: string, companyId: string) =>
+    `${ORGANIZATION_BASE}/business-units/${buId}/companies/${companyId}`,
   hierarchies: `${ORGANIZATION_BASE}/hierarchies`,
   hierarchyNodes: (hierarchyId: string) =>
     `${ORGANIZATION_BASE}/hierarchies/${hierarchyId}/nodes`,
