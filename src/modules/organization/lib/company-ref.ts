@@ -34,6 +34,34 @@ export function decodeCompanyRef(ref: string | null | undefined): string | null 
   }
 }
 
-export function companyDetailPath(companyId: string): string {
-  return `/dashboard/organization/companies/${encodeCompanyRef(companyId)}`;
+export type CompanyDetailNavOpts = {
+  /** مسیر برگشت منطقی: branches | departments | companies */
+  from?: "branches" | "departments" | "companies";
+  hash?: string;
+};
+
+export function companyDetailPath(
+  companyId: string,
+  opts?: CompanyDetailNavOpts
+): string {
+  let path = `/dashboard/organization/companies/${encodeCompanyRef(companyId)}`;
+  if (opts?.from && opts.from !== "companies") {
+    path += `?from=${encodeURIComponent(opts.from)}`;
+  }
+  if (opts?.hash) {
+    path += `#${opts.hash}`;
+  }
+  return path;
+}
+
+export function orgListPathFromQuery(
+  from: string | null | undefined
+): { href: string; label: string } {
+  if (from === "branches") {
+    return { href: "/dashboard/organization/branches", label: "شعب" };
+  }
+  if (from === "departments") {
+    return { href: "/dashboard/organization/departments", label: "واحدها" };
+  }
+  return { href: "/dashboard/organization/companies", label: "شرکت‌ها" };
 }
