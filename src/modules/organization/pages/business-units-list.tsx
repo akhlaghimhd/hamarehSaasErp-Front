@@ -129,6 +129,12 @@ export function BusinessUnitsListPage() {
   const [busy, setBusy] = useState(false);
   const form = useForm<BuForm>({ defaultValues: emptyForm() });
 
+  useEffect(() => {
+    if (primaryCompanyId && !selectedCompanyIds.has(primaryCompanyId)) {
+      setPrimaryCompanyId("");
+    }
+  }, [selectedCompanyIds, primaryCompanyId]);
+
   const listQuery = useQuery({
     queryKey: ["org", "business-units", membership],
     queryFn: () => businessUnitService.list({ membership }),
@@ -251,6 +257,23 @@ export function BusinessUnitsListPage() {
         toast.message("واحد غیرفعال را نمی‌توان به شرکت متصل کرد.");
         return;
       }
+      if (companyIds.length > 0 && primaryCompanyId && !companyIds.includes(primaryCompanyId)) {
+        toast.message("شرکت اصلی باید یکی از شرکت‌های متصل باشد.");
+        return;
+      }
+      const prevPrimary = (assignTarget.company_assignments ?? []).find((a) => a.is_primary)?.company_id;
+      const removingPrimary = !!prevPrimary && !companyIds.includes(prevPrimary);
+      if (removingPrimary && companyIds.length > 0 && !primaryCompanyId) {
+        toast.message("شرکت اصلی قطع می‌شود. لطفاً شرکت اصلی جدید را انتخاب کنید.");
+        return;
+      }
+      if (removingPrimary && companyIds.length === 0) {
+        const okLeave = window.confirm("با این کار همهٔ اتصالات این واحد قطع می‌شود و دیگر شرکت اصلی نخواهد داشت. ادامه می‌دهید؟");
+        if (!okLeave) return;
+      } else if (removingPrimary && companyIds.length > 0 && primaryCompanyId) {
+        const okSwap = window.confirm("شرکت اصلی فعلی قطع می‌شود و شرکت انتخاب‌شده به‌عنوان اصلی جدید ثبت می‌شود. ادامه می‌دهید؟");
+        if (!okSwap) return;
+      }
       setBusy(true);
       try {
         const primary = primaryCompanyId && companyIds.includes(primaryCompanyId) ? primaryCompanyId : null;
@@ -276,6 +299,27 @@ export function BusinessUnitsListPage() {
     if (!targets.length) return;
     if (!companyIds.length) { toast.message("حداقل یک شرکت را انتخاب کنید."); return; }
 
+    if (bulkLinkMode === "disconnect") {
+      const affected: string[] = [];
+      for (const bu of targets) {
+        const prim = (bu.company_assignments ?? []).find((a) => a.is_primary)?.company_id;
+        if (prim && companyIds.includes(prim)) affected.push(bu.name || bu.code);
+      }
+      if (affected.length) {
+        const sample = affected.slice(0, 5).join("، ");
+        const more = affected.length > 5 ? ` و ${toFaDigits(affected.length - 5)} مورد دیگر` : "";
+        const ok = window.confirm(
+          `برای ${toFaDigits(affected.length)} واحد، شرکت اصلی در حال قطع است (${sample}${more}). پس از انفصال، در صورت باقی‌ماندن شرکت دیگر، یکی به‌صورت خودکار اصلی می‌شود. ادامه می‌دهید؟`
+        );
+        if (!ok) return;
+      }
+    }
+
+    if (bulkLinkMode === "connect" && primaryCompanyId && !companyIds.includes(primaryCompanyId)) {
+      toast.message("شرکت اصلی باید در فهرست شرکت‌های انتخاب‌شده باشد.");
+      return;
+    }
+
     setBusy(true);
     let ok = 0;
     let skipped = 0;
@@ -287,7 +331,8 @@ export function BusinessUnitsListPage() {
           try {
             if (bulkLinkMode === "connect") {
               if (linked.has(cid)) { skipped += 1; continue; }
-              await businessUnitService.assignCompany(bu.business_unit_id, cid, false);
+              const makePrimary = !!primaryCompanyId && cid === primaryCompanyId;
+              await businessUnitService.assignCompany(bu.business_unit_id, cid, makePrimary);
               ok += 1;
             } else {
               if (!linked.has(cid)) { skipped += 1; continue; }
@@ -624,23 +669,34 @@ export function BusinessUnitsListPage() {
                     })}
                   </div>
                 </div>
-                {assignTarget ? (
+                {(assignTarget || (assignTargets.length > 0 && bulkLinkMode === "connect")) ? (
                   <div className="space-y-1.5">
-                    <Label>شرکت اصلی این واحد (اختیاری)</Label>
-                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={primaryCompanyId} onChange={(e) => setPrimaryCompanyId(e.target.value)}>
-                      <option value="">—</option>
+                    <Label>
+                      {assignTarget ? "شرکت اصلی این واحد" : "شرکت اصلی برای واحدهای انتخاب‌شده"}
+                      {assignTarget ? " (در صورت داشتن اتصال)" : " (اختیاری)"}
+                    </Label>
+                    <select
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      value={primaryCompanyId}
+                      onChange={(e) => setPrimaryCompanyId(e.target.value)}
+                    >
+                      <option value="">— انتخاب نشده —</option>
                       {(companies ?? []).filter((c) => selectedCompanyIds.has(c.company_id)).map((c) => (
                         <option key={c.company_id} value={c.company_id}>{c.legal_name || c.name}</option>
                       ))}
                     </select>
+                    <p className="text-[11px] text-muted-foreground">
+                      {assignTarget
+                        ? "اگر شرکت اصلی فعلی را از فهرست بردارید، باید اصلی جدید انتخاب کنید (مگر اینکه هیچ شرکتی باقی نماند)."
+                        : "در اتصال گروهی، این شرکت برای هر واحد به‌عنوان اصلی ثبت می‌شود (در صورت وصل شدن به همان شرکت)."}
+                    </p>
                   </div>
-                ) : (
+                ) : null}
+                {assignTargets.length > 0 && bulkLinkMode === "disconnect" ? (
                   <p className="text-xs text-muted-foreground">
-                    {bulkLinkMode === "connect"
-                      ? "شرکت‌های تیک‌خورده به واحدهای انتخاب‌شده وصل می‌شوند؛ اتصالات تکراری رد می‌شوند."
-                      : "شرکت‌های تیک‌خورده از واحدهای انتخاب‌شده جدا می‌شوند."}
+                    اگر شرکت اصلی قطع شود، در صورت باقی‌ماندن شرکت دیگر، سیستم به‌صورت خودکار یکی را اصلی می‌کند و قبل از اجرا هشدار می‌دهد.
                   </p>
-                )}
+                ) : null}
               </div>
               <SheetFooter className="gap-2 border-t px-5 py-3">
                 <Button type="button" variant="outline" onClick={() => setAssignOpen(false)}>انصراف</Button>
