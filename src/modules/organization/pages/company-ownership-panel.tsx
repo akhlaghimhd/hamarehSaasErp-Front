@@ -19,7 +19,7 @@ import { ApiClientError } from "@/api";
 import { ownershipService } from "../services/org-extended-service";
 import { useCompanies } from "../hooks/use-companies";
 
-export function CompanyOwnershipPanel({ companyId }: { companyId: string }) {
+export function CompanyOwnershipPanel({ companyId, readOnly = false }: { companyId: string; readOnly?: boolean }) {
   const qc = useQueryClient();
   const { data: companies } = useCompanies();
   const [open, setOpen] = useState(false);
@@ -70,9 +70,13 @@ export function CompanyOwnershipPanel({ companyId }: { companyId: string }) {
     <section id="ownerships" className="scroll-mt-20 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-base font-semibold">مالکیت سهام / روابط گروهی</h2>
-        <Button size="sm" onClick={() => setOpen(true)}>
-          <Plus className="h-4 w-4" /> مالکیت
-        </Button>
+        {readOnly ? (
+          <p className="text-xs text-amber-700 dark:text-amber-400">ثبت غیرفعال (شرکت حذف‌شده/غیرفعال)</p>
+        ) : (
+          <Button size="sm" onClick={() => setOpen(true)}>
+            <Plus className="h-4 w-4" /> مالکیت
+          </Button>
+        )}
       </div>
       {list.isLoading ? (
         <div className="flex gap-2 text-sm text-muted-foreground">
@@ -91,17 +95,19 @@ export function CompanyOwnershipPanel({ companyId }: { companyId: string }) {
                 {o.ownership_percent}% · {o.relation_type ?? "EQUITY"}
               </span>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-destructive"
-              onClick={() => {
-                if (!window.confirm("حذف شود؟")) return;
-                remove.mutate(o.ownership_id);
-              }}
-            >
-              حذف
-            </Button>
+            {!readOnly ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-destructive"
+                onClick={() => {
+                  if (!window.confirm("حذف شود؟")) return;
+                  remove.mutate(o.ownership_id);
+                }}
+              >
+                حذف
+              </Button>
+            ) : null}
           </li>
         ))}
         {!list.isLoading && (list.data ?? []).length === 0 ? (
@@ -111,7 +117,7 @@ export function CompanyOwnershipPanel({ companyId }: { companyId: string }) {
         ) : null}
       </ul>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open && !readOnly} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>ثبت مالکیت</DialogTitle>
