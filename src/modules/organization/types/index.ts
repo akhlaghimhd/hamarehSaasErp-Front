@@ -14,7 +14,9 @@ export type OrganizationPermissionCode =
   | "organization.department.update"
   | "organization.department.delete"
   | "organization.business_unit.view"
-  | "organization.business_unit.manage";
+  | "organization.business_unit.manage"
+  | "organization.hierarchy.view"
+  | "organization.hierarchy.manage";
 
 export const OrganizationPermissions = {
   companyView: "organization.company.view",
@@ -31,6 +33,8 @@ export const OrganizationPermissions = {
   departmentDelete: "organization.department.delete",
   businessUnitView: "organization.business_unit.view",
   businessUnitManage: "organization.business_unit.manage",
+  hierarchyView: "organization.hierarchy.view",
+  hierarchyManage: "organization.hierarchy.manage",
 } as const;
 
 export type EntityKind = "OPERATING" | "CONSOLIDATION" | "ELIMINATION";
@@ -68,7 +72,6 @@ export type CompanyDto = {
   base_currency_id?: string | null;
   chart_of_accounts_id?: string | null;
   default_consol_rate_type?: ConsolRateType | string | null;
-  /** List API withCount */
   branches_count?: number;
   departments_count?: number;
   children_count?: number;
@@ -80,36 +83,33 @@ export type CompanyDto = {
 
 export type BranchDto = {
   branch_id: string;
-  tenant_id: string;
   company_id: string;
   code: string;
   name: string;
   address?: string | null;
+  is_active?: boolean;
   branch_kind?: BranchKind | string | null;
   parent_branch_id?: string | null;
   default_warehouse_id?: string | null;
   supports_shipping?: boolean;
   supports_receiving?: boolean;
   is_manufacturing_site?: boolean;
-  is_active: boolean;
-  row_version?: number;
   created_at?: string | null;
-  updated_at?: string | null;
+  company?: { company_id?: string; name?: string; legal_name?: string | null } | null;
 };
 
 export type DepartmentDto = {
   department_id: string;
-  tenant_id: string;
   company_id?: string | null;
   branch_id: string;
-  parent_department_id?: string | null;
   code: string;
   name: string;
+  parent_department_id?: string | null;
   manager_user_id?: string | null;
-  is_active: boolean;
-  row_version?: number;
+  is_active?: boolean;
   created_at?: string | null;
-  updated_at?: string | null;
+  branch?: { branch_id?: string; name?: string; code?: string } | null;
+  company?: { company_id?: string; name?: string; legal_name?: string | null } | null;
 };
 
 export type CreateCompanyPayload = {
@@ -117,29 +117,21 @@ export type CreateCompanyPayload = {
   name: string;
   legal_name?: string | null;
   trade_name?: string | null;
-  company_type?: number | null;
   registration_number?: string | null;
-  registration_date?: string | null;
-  registration_place?: string | null;
-  incorporation_country_id?: string | null;
   economic_code?: string | null;
   tax_identifier?: string | null;
-  national_id?: string | null;
-  vat_registration?: string | null;
   is_active?: boolean;
   status?: number | null;
   is_primary?: boolean;
   parent_company_id?: string | null;
   entity_kind?: EntityKind | string | null;
-  base_currency_id?: string | null;
-  chart_of_accounts_id?: string | null;
-  default_consol_rate_type?: ConsolRateType | string | null;
 };
 
-export type UpdateCompanyPayload = CreateCompanyPayload;
+export type UpdateCompanyPayload = CreateCompanyPayload & {
+  row_version?: number;
+};
 
 export type CreateBranchPayload = {
-  company_id: string;
   code: string;
   name: string;
   address?: string | null;
@@ -184,14 +176,12 @@ export type UpdateDepartmentPayload = {
   branch_id?: string | null;
 };
 
-/** Short labels for tables / option text */
 export const ENTITY_KIND_LABELS: Record<string, string> = {
   OPERATING: "شرکت عملیاتی",
   CONSOLIDATION: "تجمیع گروه",
   ELIMINATION: "حذف معاملات داخلی گروه",
 };
 
-/** Tooltip text per option — end-user language only */
 export const ENTITY_KIND_TOOLTIPS: Record<string, string> = {
   OPERATING:
     "روی این شرکت فروش، خرید و کارهای روزمره ثبت می‌شود. انتخاب مناسب برای اکثر سازمان‌ها.",
@@ -201,7 +191,6 @@ export const ENTITY_KIND_TOOLTIPS: Record<string, string> = {
     "برای خنثی‌کردن خرید و فروش بین شرکت‌های یک گروه در گزارش تلفیقی.",
 };
 
-/** Field title: what the user is choosing */
 export const ENTITY_KIND_FIELD_LABEL = "کاربرد این شرکت";
 
 export const ENTITY_KIND_OPTIONS: Array<{
