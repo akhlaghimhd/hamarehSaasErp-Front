@@ -7,6 +7,8 @@ import type {
   UpdateBranchPayload,
 } from "../types";
 
+export type BranchListFilter = "active" | "deleted";
+
 function unwrapData<T>(envelope: unknown): T {
   if (envelope && typeof envelope === "object" && "data" in envelope) {
     return (envelope as ApiSuccessResponse<T>).data;
@@ -23,8 +25,14 @@ function asArray<T>(data: T[] | { data?: T[] } | null | undefined): T[] {
 }
 
 export const branchService = {
-  async listByCompany(companyId: string): Promise<BranchDto[]> {
-    const envelope = await apiGet(organizationPaths.companyBranches(companyId));
+  async listByCompany(
+    companyId: string,
+    membership: BranchListFilter = "active"
+  ): Promise<BranchDto[]> {
+    const q = membership === "deleted" ? "?membership=deleted" : "?membership=active";
+    const envelope = await apiGet(
+      `${organizationPaths.companyBranches(companyId)}${q}`
+    );
     return asArray(unwrapData<BranchDto[] | { data?: BranchDto[] }>(envelope));
   },
 
@@ -77,5 +85,10 @@ export const branchService = {
 
   async softDelete(branchId: string): Promise<void> {
     await apiDelete(organizationPaths.branch(branchId));
+  },
+
+  async restore(branchId: string): Promise<BranchDto> {
+    const envelope = await apiPost(organizationPaths.branchRestore(branchId), {});
+    return unwrapData<BranchDto>(envelope);
   },
 };

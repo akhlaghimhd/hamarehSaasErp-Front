@@ -21,6 +21,7 @@ export const organizationPaths = {
   companyFiscalAssignments: (companyId: string) =>
     `${ORGANIZATION_BASE}/companies/${companyId}/fiscal-assignments`,
   branch: (id: string) => `${ORGANIZATION_BASE}/branches/${id}`,
+  branchRestore: (id: string) => `${ORGANIZATION_BASE}/branches/${id}/restore`,
   department: (id: string) => `${ORGANIZATION_BASE}/departments/${id}`,
   bankAccount: (id: string) => `${ORGANIZATION_BASE}/bank-accounts/${id}`,
   officer: (id: string) => `${ORGANIZATION_BASE}/officers/${id}`,

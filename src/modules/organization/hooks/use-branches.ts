@@ -2,11 +2,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { tokenStorage } from "@/api";
-import { branchService } from "../services/branch-service";
+import { branchService, type BranchListFilter } from "../services/branch-service";
 import type { CreateBranchPayload, UpdateBranchPayload } from "../types";
 
-export function branchesQueryKey(companyId: string) {
-  return ["organization", "companies", companyId, "branches"] as const;
+export function branchesQueryKey(companyId: string, membership: BranchListFilter = "active") {
+  return ["organization", "companies", companyId, "branches", membership] as const;
 }
 
 function hasAuthContext(): boolean {
@@ -14,23 +14,43 @@ function hasAuthContext(): boolean {
   return Boolean(tokenStorage.getAccessToken() && tokenStorage.getTenantId());
 }
 
-export function useBranches(companyId: string | null | undefined) {
+export function useBranches(
+  companyId: string | null | undefined,
+  membership: BranchListFilter = "active"
+) {
   return useQuery({
-    queryKey: branchesQueryKey(companyId ?? ""),
+    queryKey: branchesQueryKey(companyId ?? "", membership),
     queryFn: () =>
-      companyId ? branchService.listByCompany(companyId) : Promise.resolve([]),
+      companyId
+        ? branchService.listByCompany(companyId, membership)
+        : Promise.resolve([]),
     enabled: Boolean(companyId) && hasAuthContext(),
     staleTime: 60_000,
     retry: 1,
   });
 }
 
+function invalidateBranchLists(qc: ReturnType<typeof useQueryClient>, companyId?: string) {
+  if (companyId) {
+    void qc.invalidateQueries({
+      queryKey: ["organization", "companies", companyId, "branches"],
+    });
+  } else {
+    void qc.invalidateQueries({
+      predicate: (q) =>
+        Array.isArray(q.queryKey) &&
+        q.queryKey[0] === "organization" &&
+        q.queryKey[3] === "branches",
+    });
+  }
+}
+
 export function useCreateBranch(companyId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: CreateBranchPayload) => branchService.create(payload),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: branchesQueryKey(companyId) });
+    onSuccess: (_data, variables) => {
+      invalidateBranchLists(qc, variables.company_id || companyId);
     },
   });
 }
@@ -45,8 +65,8 @@ export function useUpdateBranch(companyId: string) {
       branchId: string;
       payload: UpdateBranchPayload;
     }) => branchService.update(branchId, payload),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: branchesQueryKey(companyId) });
+    onSuccess: (_data, variables) => {
+      invalidateBranchLists(qc, variables.payload.company_id || companyId);
     },
   });
 }
@@ -56,7 +76,17 @@ export function useSoftDeleteBranch(companyId: string) {
   return useMutation({
     mutationFn: (branchId: string) => branchService.softDelete(branchId),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: branchesQueryKey(companyId) });
+      invalidateBranchLists(qc, companyId);
+    },
+  });
+}
+
+export function useRestoreBranch(companyId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (branchId: string) => branchService.restore(branchId),
+    onSuccess: () => {
+      invalidateBranchLists(qc, companyId);
     },
   });
 }
