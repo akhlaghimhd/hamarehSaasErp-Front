@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowDown, ArrowUp, ArrowUpDown, Columns3, GitBranch, Loader2, Pencil, Plus,
+  ArrowDown, ArrowUp, ArrowUpDown, CircleHelp, Columns3, GitBranch, Loader2, Pencil, Plus,
   Power, PowerOff, RotateCcw, Search, Trash2, X,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -21,7 +21,12 @@ import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/shared/components/ui/dropdown-menu";
-import { TooltipProvider } from "@/shared/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/shared/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/components/ui/table";
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/shared/components/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
@@ -347,32 +352,180 @@ export function BranchesListPage() {
   };
 
   const formFields = (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="branch-company">شرکت *</Label>
-        <select id="branch-company" className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" {...form.register("company_id", { required: true })} disabled={Boolean(editing)}>
+        <select
+          id="branch-company"
+          className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+          {...form.register("company_id", { required: true })}
+          disabled={Boolean(editing)}
+        >
           <option value="">— انتخاب شرکت —</option>
           {companyList.map((c) => (
-            <option key={c.company_id} value={c.company_id}>{c.legal_name || c.name}{c.is_primary ? " (اصلی)" : ""}</option>
+            <option key={c.company_id} value={c.company_id}>
+              {c.legal_name || c.name}
+              {c.is_primary ? " (اصلی)" : ""}
+            </option>
           ))}
         </select>
       </div>
+
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5"><Label>کد *</Label><Input className="h-9" dir="ltr" {...form.register("code", { required: true })} /></div>
-        <div className="space-y-1.5"><Label>نام *</Label><Input className="h-9" {...form.register("name", { required: true })} /></div>
+        <div className="space-y-1.5">
+          <Label htmlFor="branch-code">کد *</Label>
+          <Input id="branch-code" className="h-9" dir="ltr" {...form.register("code", { required: true })} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="branch-name">نام *</Label>
+          <Input id="branch-name" className="h-9" {...form.register("name", { required: true })} />
+        </div>
       </div>
-      <div className="space-y-1.5"><Label>آدرس</Label><Input className="h-9" {...form.register("address")} /></div>
+
       <div className="space-y-1.5">
-        <Label>نوع شعبه</Label>
-        <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" {...form.register("branch_kind")}>
-          {Object.entries(BRANCH_KIND_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        <Label htmlFor="branch-address">آدرس</Label>
+        <Input id="branch-address" className="h-9" {...form.register("address")} />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="branch-kind">نوع شعبه</Label>
+        <select
+          id="branch-kind"
+          className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+          {...form.register("branch_kind")}
+        >
+          {Object.entries(BRANCH_KIND_LABELS).map(([k, v]) => (
+            <option key={k} value={k}>{v}</option>
+          ))}
         </select>
       </div>
-      <div className="space-y-3 rounded-lg border p-3">
-        <div className="flex items-center justify-between gap-2"><Label>فعال</Label><Switch checked={form.watch("is_active")} onCheckedChange={(v) => form.setValue("is_active", v, { shouldDirty: true })} /></div>
-        <div className="flex items-center justify-between gap-2"><Label>ارسال کالا</Label><Switch checked={form.watch("supports_shipping")} onCheckedChange={(v) => form.setValue("supports_shipping", v, { shouldDirty: true })} /></div>
-        <div className="flex items-center justify-between gap-2"><Label>دریافت کالا</Label><Switch checked={form.watch("supports_receiving")} onCheckedChange={(v) => form.setValue("supports_receiving", v, { shouldDirty: true })} /></div>
-        <div className="flex items-center justify-between gap-2"><Label>سایت تولید</Label><Switch checked={form.watch("is_manufacturing_site")} onCheckedChange={(v) => form.setValue("is_manufacturing_site", v, { shouldDirty: true })} /></div>
+
+      <div className="space-y-3 rounded-lg border border-border/80 p-3">
+        <p className="text-xs font-medium text-muted-foreground">وضعیت و قابلیت‌ها</p>
+
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-center gap-1.5 text-start text-sm"
+            onClick={() => form.setValue("is_active", !form.getValues("is_active"), { shouldDirty: true })}
+          >
+            <span>فعال</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className="inline-flex shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  aria-label="راهنمای فعال"
+                >
+                  <CircleHelp className="h-3.5 w-3.5" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[14rem] text-right leading-relaxed">
+                اگر خاموش باشد، شعبه در عملیات روزمره قابل استفاده نیست.
+              </TooltipContent>
+            </Tooltip>
+          </button>
+          <Switch
+            checked={form.watch("is_active")}
+            onCheckedChange={(v) => form.setValue("is_active", v, { shouldDirty: true })}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-center gap-1.5 text-start text-sm"
+            onClick={() => form.setValue("supports_shipping", !form.getValues("supports_shipping"), { shouldDirty: true })}
+          >
+            <span>ارسال کالا</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className="inline-flex shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  aria-label="راهنمای ارسال کالا"
+                >
+                  <CircleHelp className="h-3.5 w-3.5" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[14rem] text-right leading-relaxed">
+                از این شعبه می‌توان کالا برای مشتری یا محل دیگر ارسال کرد.
+              </TooltipContent>
+            </Tooltip>
+          </button>
+          <Switch
+            checked={form.watch("supports_shipping")}
+            onCheckedChange={(v) => form.setValue("supports_shipping", v, { shouldDirty: true })}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-center gap-1.5 text-start text-sm"
+            onClick={() => form.setValue("supports_receiving", !form.getValues("supports_receiving"), { shouldDirty: true })}
+          >
+            <span>دریافت کالا</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className="inline-flex shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  aria-label="راهنمای دریافت کالا"
+                >
+                  <CircleHelp className="h-3.5 w-3.5" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[14rem] text-right leading-relaxed">
+                این شعبه می‌تواند ورودی کالا (خرید یا انتقال) را بپذیرد.
+              </TooltipContent>
+            </Tooltip>
+          </button>
+          <Switch
+            checked={form.watch("supports_receiving")}
+            onCheckedChange={(v) => form.setValue("supports_receiving", v, { shouldDirty: true })}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-center gap-1.5 text-start text-sm"
+            onClick={() => form.setValue("is_manufacturing_site", !form.getValues("is_manufacturing_site"), { shouldDirty: true })}
+          >
+            <span>سایت تولید</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className="inline-flex shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  aria-label="راهنمای سایت تولید"
+                >
+                  <CircleHelp className="h-3.5 w-3.5" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[14rem] text-right leading-relaxed">
+                محل تولید یا مونتاژ است؛ در برنامه‌ریزی تولید دیده می‌شود.
+              </TooltipContent>
+            </Tooltip>
+          </button>
+          <Switch
+            checked={form.watch("is_manufacturing_site")}
+            onCheckedChange={(v) => form.setValue("is_manufacturing_site", v, { shouldDirty: true })}
+          />
+        </div>
       </div>
     </div>
   );
@@ -666,7 +819,7 @@ export function BranchesListPage() {
           <SheetContent className="flex w-full flex-col sm:max-w-lg" side="right" onInteractOutside={(e) => { if (isDirty) e.preventDefault(); }} onEscapeKeyDown={(e) => { if (isDirty) e.preventDefault(); }}>
             <SheetHeader><SheetTitle>شعبه جدید</SheetTitle></SheetHeader>
             <form className="flex min-h-0 flex-1 flex-col" onSubmit={onCreate}>
-              <div className="flex-1 overflow-y-auto px-1 py-3">{formFields}</div>
+              <div className="flex-1 space-y-4 overflow-y-auto px-1 py-2">{formFields}</div>
               <SheetFooter>
                 <Button type="button" variant="outline" size="sm" onClick={forceCloseCreate}>انصراف</Button>
                 <Button type="submit" size="sm" disabled={createMutation.isPending}>
@@ -681,7 +834,7 @@ export function BranchesListPage() {
           <SheetContent className="flex w-full flex-col sm:max-w-lg" side="right" onInteractOutside={(e) => { if (isDirty) e.preventDefault(); }} onEscapeKeyDown={(e) => { if (isDirty) e.preventDefault(); }}>
             <SheetHeader><SheetTitle>ویرایش شعبه</SheetTitle></SheetHeader>
             <form className="flex min-h-0 flex-1 flex-col" onSubmit={onEdit}>
-              <div className="flex-1 overflow-y-auto px-1 py-3">{formFields}</div>
+              <div className="flex-1 space-y-4 overflow-y-auto px-1 py-2">{formFields}</div>
               <SheetFooter>
                 <Button type="button" variant="outline" size="sm" onClick={forceCloseEdit}>انصراف</Button>
                 <Button type="submit" size="sm" disabled={updateMutation.isPending}>
