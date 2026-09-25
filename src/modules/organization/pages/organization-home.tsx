@@ -95,12 +95,8 @@ export function OrganizationHome() {
 
   const companyCount = companies?.length ?? 0;
   const companyHref = "/dashboard/organization/companies";
-  const branchesHref = primary
-    ? `/dashboard/organization/companies/${primary.company_id}#branches`
-    : companyHref;
-  const deptsHref = primary
-    ? `/dashboard/organization/companies/${primary.company_id}#departments`
-    : companyHref;
+  const branchesHref = "/dashboard/organization/branches";
+  const deptsHref = "/dashboard/organization/departments";
 
   const cards: HubCard[] = [
     {
@@ -118,9 +114,10 @@ export function OrganizationHome() {
       key: "branches",
       href: branchesHref,
       title: "شعب / سایت",
-      description: primary
-        ? `شعب «${primary.legal_name || primary.name}»`
-        : "پس از وجود شرکت اصلی",
+      description:
+        companyCount > 0
+          ? "فهرست شعب همه شرکت‌ها — با فیلتر شرکت"
+          : "پس از وجود شرکت",
       icon: GitBranch,
       open: true,
     },
@@ -128,9 +125,10 @@ export function OrganizationHome() {
       key: "departments",
       href: deptsHref,
       title: "واحدهای سازمانی",
-      description: primary
-        ? `واحدهای «${primary.legal_name || primary.name}»`
-        : "زیر نظر شعبه",
+      description:
+        companyCount > 0
+          ? "فهرست واحدهای همه شرکت‌ها — با فیلتر شرکت"
+          : "زیر نظر شعبه",
       icon: Network,
       open: true,
     },

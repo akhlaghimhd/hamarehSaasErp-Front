@@ -5,6 +5,8 @@
 export { OrganizationHome } from "./pages/organization-home";
 export { CompaniesListPage } from "./pages/companies-list";
 export { CompanyDetailPage } from "./pages/company-detail";
+export { BranchesListPage } from "./pages/branches-list";
+export { DepartmentsListPage } from "./pages/departments-list";
 export { companyService } from "./services/company-service";
 export { branchService } from "./services/branch-service";
 export { departmentService } from "./services/department-service";
