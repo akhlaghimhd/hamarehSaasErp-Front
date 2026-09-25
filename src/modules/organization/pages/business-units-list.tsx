@@ -47,6 +47,10 @@ type SortKey = "name" | "code" | "status" | "created" | "companies";
 type SortDir = "asc" | "desc";
 type ColumnId = "name" | "code" | "companies" | "status" | "created" | "actions";
 type BulkKind = "activate" | "deactivate" | "delete" | "restore";
+type LinkConfirm =
+  | { kind: "leave_all" }
+  | { kind: "swap_primary" }
+  | { kind: "bulk_disconnect_primary"; names: string[] };
 type BuForm = { code: string; name: string; description: string; is_active: boolean };
 
 const COLS: { id: ColumnId; label: string; hideable?: boolean; sort?: SortKey }[] = [
@@ -126,6 +130,7 @@ export function BusinessUnitsListPage() {
   const [bulkLinkMode, setBulkLinkMode] = useState<"connect" | "disconnect">("connect");
   const [primaryCompanyId, setPrimaryCompanyId] = useState("");
   const [confirm, setConfirm] = useState<null | { kind: BulkKind; targets: BusinessUnitDto[] }>(null);
+  const [linkConfirm, setLinkConfirm] = useState<LinkConfirm | null>(null);
   const [busy, setBusy] = useState(false);
   const form = useForm<BuForm>({ defaultValues: emptyForm() });
 
@@ -248,9 +253,10 @@ export function BusinessUnitsListPage() {
     } finally { setBusy(false); }
   }
 
-  async function submitAssign() {
+  async function submitAssign(opts?: { skipLinkConfirm?: boolean }) {
     if (!canManage) return;
     const companyIds = [...selectedCompanyIds];
+    const skip = !!opts?.skipLinkConfirm;
 
     if (assignTarget && assignTargets.length === 0) {
       if (assignTarget.is_active === false) {
@@ -267,12 +273,13 @@ export function BusinessUnitsListPage() {
         toast.message("شرکت اصلی قطع می‌شود. لطفاً شرکت اصلی جدید را انتخاب کنید.");
         return;
       }
-      if (removingPrimary && companyIds.length === 0) {
-        const okLeave = window.confirm("با این کار همهٔ اتصالات این واحد قطع می‌شود و دیگر شرکت اصلی نخواهد داشت. ادامه می‌دهید؟");
-        if (!okLeave) return;
-      } else if (removingPrimary && companyIds.length > 0 && primaryCompanyId) {
-        const okSwap = window.confirm("شرکت اصلی فعلی قطع می‌شود و شرکت انتخاب‌شده به‌عنوان اصلی جدید ثبت می‌شود. ادامه می‌دهید؟");
-        if (!okSwap) return;
+      if (!skip && removingPrimary && companyIds.length === 0) {
+        setLinkConfirm({ kind: "leave_all" });
+        return;
+      }
+      if (!skip && removingPrimary && companyIds.length > 0 && primaryCompanyId) {
+        setLinkConfirm({ kind: "swap_primary" });
+        return;
       }
       setBusy(true);
       try {
@@ -288,6 +295,7 @@ export function BusinessUnitsListPage() {
           toast.success(parts.join(" و ") + " ثبت شد.");
         }
         setAssignOpen(false);
+        setLinkConfirm(null);
         await qc.invalidateQueries({ queryKey: ["org", "business-units"] });
       } catch (e) {
         toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
@@ -299,19 +307,15 @@ export function BusinessUnitsListPage() {
     if (!targets.length) return;
     if (!companyIds.length) { toast.message("حداقل یک شرکت را انتخاب کنید."); return; }
 
-    if (bulkLinkMode === "disconnect") {
+    if (!skip && bulkLinkMode === "disconnect") {
       const affected: string[] = [];
       for (const bu of targets) {
         const prim = (bu.company_assignments ?? []).find((a) => a.is_primary)?.company_id;
         if (prim && companyIds.includes(prim)) affected.push(bu.name || bu.code);
       }
       if (affected.length) {
-        const sample = affected.slice(0, 5).join("، ");
-        const more = affected.length > 5 ? ` و ${toFaDigits(affected.length - 5)} مورد دیگر` : "";
-        const ok = window.confirm(
-          `برای ${toFaDigits(affected.length)} واحد، شرکت اصلی در حال قطع است (${sample}${more}). پس از انفصال، در صورت باقی‌ماندن شرکت دیگر، یکی به‌صورت خودکار اصلی می‌شود. ادامه می‌دهید؟`
-        );
-        if (!ok) return;
+        setLinkConfirm({ kind: "bulk_disconnect_primary", names: affected });
+        return;
       }
     }
 
@@ -347,6 +351,7 @@ export function BusinessUnitsListPage() {
         setAssignOpen(false);
         setAssignTargets([]);
         setSelected(new Set());
+        setLinkConfirm(null);
         await qc.invalidateQueries({ queryKey: ["org", "business-units"] });
       } else if (skipped) {
         toast.message(bulkLinkMode === "connect"
@@ -729,6 +734,46 @@ export function BusinessUnitsListPage() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setConfirm(null)}>انصراف</Button>
               <Button variant={confirm?.kind === "delete" ? "destructive" : "default"} disabled={busy} onClick={() => void runBulk()}>
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "تأیید"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!linkConfirm} onOpenChange={(o) => !o && setLinkConfirm(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {linkConfirm?.kind === "leave_all"
+                  ? "قطع همهٔ اتصالات"
+                  : linkConfirm?.kind === "swap_primary"
+                    ? "تغییر شرکت اصلی"
+                    : "قطع شرکت اصلی"}
+              </DialogTitle>
+              <DialogDescription>
+                {linkConfirm?.kind === "leave_all"
+                  ? "با این کار همهٔ اتصالات این واحد قطع می‌شود و دیگر شرکت اصلی نخواهد داشت. ادامه می‌دهید؟"
+                  : linkConfirm?.kind === "swap_primary"
+                    ? "شرکت اصلی فعلی قطع می‌شود و شرکت انتخاب‌شده به‌عنوان اصلی جدید ثبت می‌شود. ادامه می‌دهید؟"
+                    : linkConfirm?.kind === "bulk_disconnect_primary"
+                      ? (() => {
+                          const names = linkConfirm.names;
+                          const sample = names.slice(0, 5).join("، ");
+                          const more = names.length > 5 ? ` و ${toFaDigits(names.length - 5)} مورد دیگر` : "";
+                          return `برای ${toFaDigits(names.length)} واحد، شرکت اصلی در حال قطع است (${sample}${more}). پس از انفصال، در صورت باقی‌ماندن شرکت دیگر، یکی به‌صورت خودکار اصلی می‌شود. ادامه می‌دهید؟`;
+                        })()
+                      : null}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setLinkConfirm(null)}>انصراف</Button>
+              <Button
+                disabled={busy}
+                onClick={() => {
+                  setLinkConfirm(null);
+                  void submitAssign({ skipLinkConfirm: true });
+                }}
+              >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "تأیید"}
               </Button>
             </DialogFooter>
