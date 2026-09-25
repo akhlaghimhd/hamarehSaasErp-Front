@@ -22,6 +22,7 @@ export function PageHeader({
   breadcrumbs,
   backHref,
   showBack,
+  icon,
   className,
 }: {
   title: string;
@@ -32,6 +33,8 @@ export function PageHeader({
   backHref?: string;
   /** Force show/hide. Default: true when back target exists or history can go back. */
   showBack?: boolean;
+  /** Optional module icon (same as hub card) so user knows which section they are in */
+  icon?: ReactNode;
   className?: string;
 }) {
   const router = useRouter();
@@ -72,6 +75,11 @@ export function PageHeader({
                 </button>
               )
             ) : null}
+            {icon ? (
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                {icon}
+              </div>
+            ) : null}
             <h1 className="text-xl font-semibold tracking-tight md:text-2xl">
               {title}
             </h1>
@@ -80,7 +88,7 @@ export function PageHeader({
             <p
               className={cn(
                 "text-sm text-muted-foreground",
-                shouldShowBack && "ps-10"
+                (shouldShowBack || icon) && "ps-10"
               )}
             >
               {description}
