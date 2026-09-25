@@ -7,6 +7,8 @@ import type {
   UpdateCompanyPayload,
 } from "../types";
 
+export type CompanyListFilter = "active" | "deleted";
+
 function unwrapData<T>(envelope: unknown): T {
   if (envelope && typeof envelope === "object" && "data" in envelope) {
     return (envelope as ApiSuccessResponse<T>).data;
@@ -49,8 +51,9 @@ function companyBody(payload: CreateCompanyPayload | UpdateCompanyPayload) {
 }
 
 export const companyService = {
-  async list(): Promise<CompanyDto[]> {
-    const envelope = await apiGet(organizationPaths.companies);
+  async list(membership: CompanyListFilter = "active"): Promise<CompanyDto[]> {
+    const q = membership === "deleted" ? "?membership=deleted" : "?membership=active";
+    const envelope = await apiGet(`${organizationPaths.companies}${q}`);
     return asArray(unwrapData<CompanyDto[] | { data?: CompanyDto[] }>(envelope));
   },
 
@@ -79,5 +82,10 @@ export const companyService = {
 
   async softDelete(companyId: string): Promise<void> {
     await apiDelete(organizationPaths.company(companyId));
+  },
+
+  async restore(companyId: string): Promise<CompanyDto> {
+    const envelope = await apiPost(organizationPaths.companyRestore(companyId), {});
+    return unwrapData<CompanyDto>(envelope);
   },
 };
