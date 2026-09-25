@@ -48,13 +48,54 @@ export type ColumnId =
 export type BulkKind = "activate" | "deactivate" | "delete" | "restore";
 export type ConfirmState = null | { kind: BulkKind; count: number; targets: CompanyDto[] };
 
-export const RESTORE_ONE_MSG = "شرکت بازگردانی شد.";
+export const RESTORE_ONE_MSG = "شرکت بازگردانی شد و غیرفعال باقی ماند.";
 export const BULK_SUCCESS: Record<BulkKind, (n: number) => string> = {
-  activate: (n) => `${toFaDigits(n)} شرکت فعال شد.`,
-  deactivate: (n) => `${toFaDigits(n)} شرکت غیرفعال شد.`,
-  delete: (n) => `${toFaDigits(n)} شرکت حذف نرم شد.`,
-  restore: (n) => `${toFaDigits(n)} شرکت بازگردانی شد.`,
+  activate: (n) => (n === 1 ? "۱ شرکت فعال شد." : `${toFaDigits(n)} شرکت فعال شد.`),
+  deactivate: (n) => (n === 1 ? "۱ شرکت غیرفعال شد." : `${toFaDigits(n)} شرکت غیرفعال شد.`),
+  delete: (n) => (n === 1 ? "۱ شرکت حذف شد." : `${toFaDigits(n)} شرکت حذف شد.`),
+  restore: (n) =>
+    n === 1
+      ? "۱ شرکت بازگردانی شد و غیرفعال باقی ماند."
+      : `${toFaDigits(n)} شرکت بازگردانی شد و غیرفعال باقی ماندند.`,
 };
+
+export function confirmTitle(kind: BulkKind, count: number): string {
+  if (kind === "delete") return count === 1 ? "تأیید حذف شرکت" : "تأیید حذف شرکت‌ها";
+  if (kind === "restore") return count === 1 ? "تأیید بازگردانی شرکت" : "تأیید بازگردانی شرکت‌ها";
+  if (kind === "activate") return count === 1 ? "تأیید فعال‌سازی" : "تأیید فعال‌سازی گروهی";
+  return count === 1 ? "تأیید غیرفعال‌سازی" : "تأیید غیرفعال‌سازی گروهی";
+}
+
+export function confirmBody(kind: BulkKind, count: number): string {
+  const n = toFaDigits(count);
+  if (kind === "delete") {
+    if (count === 1) {
+      return "این شرکت حذف می‌شود. سوابق حفظ می‌شود و بعداً از فهرست «حذف‌شده‌ها» قابل بازگردانی است.";
+    }
+    return `${n} شرکت انتخاب‌شده حذف می‌شوند. سوابق حفظ می‌شود و بعداً از فهرست «حذف‌شده‌ها» قابل بازگردانی است.`;
+  }
+  if (kind === "restore") {
+    if (count === 1) {
+      return "شرکت به فهرست جاری برمی‌گردد و تا زمان فعال‌سازی دستی، غیرفعال می‌ماند.";
+    }
+    return `${n} شرکت به فهرست جاری برمی‌گردند و تا زمان فعال‌سازی دستی، غیرفعال می‌مانند.`;
+  }
+  if (kind === "activate") {
+    return count === 1
+      ? "این شرکت فعال می‌شود."
+      : `${n} شرکت غیرفعال انتخاب‌شده فعال می‌شوند.`;
+  }
+  return count === 1
+    ? "این شرکت (و در صورت نیاز زیرمجموعه‌هایش) غیرفعال می‌شود."
+    : `${n} شرکت فعال انتخاب‌شده (غیر از شرکت اصلی) و زیرمجموعه‌هایشان غیرفعال می‌شوند.`;
+}
+
+export function confirmActionLabel(kind: BulkKind): string {
+  if (kind === "delete") return "حذف";
+  if (kind === "restore") return "بازگردانی";
+  if (kind === "activate") return "فعال‌سازی";
+  return "غیرفعال‌سازی";
+}
 
 export const COLS: { id: ColumnId; label: string; hideable?: boolean; sort?: SortKey }[] = [
   { id: "name", label: "نام شرکت", hideable: false, sort: "name" },
