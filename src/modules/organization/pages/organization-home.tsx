@@ -5,6 +5,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Building2,
   GitBranch,
@@ -32,9 +33,11 @@ type HubCard = {
 function HubCardView({
   card,
   allowed,
+  active,
 }: {
   card: HubCard;
   allowed: boolean;
+  active?: boolean;
 }) {
   const Icon = card.icon;
   const interactive = card.open && allowed;
@@ -43,15 +46,30 @@ function HubCardView({
     <div
       className={
         interactive
-          ? "group flex h-full flex-col gap-2 rounded-xl border border-border/80 bg-card p-4 shadow-[var(--shadow-xs)] transition hover:border-primary/40 hover:shadow-[var(--shadow-sm)]"
+          ? [
+              "group flex h-full flex-col gap-2 rounded-xl border bg-card p-4 shadow-[var(--shadow-xs)] transition",
+              active
+                ? "border-primary bg-primary/5 ring-2 ring-primary/30 shadow-[var(--shadow-sm)]"
+                : "border-border/80 hover:border-primary/40 hover:shadow-[var(--shadow-sm)]",
+            ].join(" ")
           : "flex h-full flex-col gap-2 rounded-xl border border-dashed border-border/70 bg-muted/20 p-4 opacity-80"
       }
     >
       <div className="flex items-center gap-2">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <div
+          className={[
+            "flex h-9 w-9 items-center justify-center rounded-lg",
+            active ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary",
+          ].join(" ")}
+        >
           <Icon className="h-4 w-4" />
         </div>
         <div className="font-medium">{card.title}</div>
+        {active ? (
+          <span className="ms-auto rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary">
+            صفحه جاری
+          </span>
+        ) : null}
       </div>
       <p className="text-xs text-muted-foreground">{card.description}</p>
       {!card.open ? (
@@ -66,7 +84,7 @@ function HubCardView({
 
   if (interactive) {
     return (
-      <Link href={card.href} className="block">
+      <Link href={card.href} className="block" aria-current={active ? "page" : undefined}>
         {body}
       </Link>
     );
@@ -76,6 +94,7 @@ function HubCardView({
 }
 
 export function OrganizationHome() {
+  const pathname = usePathname();
   const canViewCompany = usePermission(OrganizationPermissions.companyView);
   const canViewBranch = usePermission(OrganizationPermissions.branchView);
   const canViewDept = usePermission(OrganizationPermissions.departmentView);
@@ -188,19 +207,26 @@ export function OrganizationHome() {
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {cards.map((card) => (
-          <HubCardView
-            key={card.key}
-            card={card}
-            allowed={
-              card.key === "branches"
-                ? canViewBranch || canViewCompany
-                : card.key === "departments"
-                  ? canViewDept || canViewCompany
-                  : canViewCompany
-            }
-          />
-        ))}
+        {cards.map((card) => {
+          const active =
+            pathname === card.href ||
+            (card.href !== "/dashboard/organization" &&
+              pathname.startsWith(card.href + "/"));
+          return (
+            <HubCardView
+              key={card.key}
+              card={card}
+              active={active}
+              allowed={
+                card.key === "branches"
+                  ? canViewBranch || canViewCompany
+                  : card.key === "departments"
+                    ? canViewDept || canViewCompany
+                    : canViewCompany
+              }
+            />
+          );
+        })}
       </div>
     </div>
   );
