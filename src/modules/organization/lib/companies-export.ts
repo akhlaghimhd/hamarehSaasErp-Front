@@ -183,7 +183,7 @@ export function exportCompaniesPdf(
 </head>
 <body>
   <h1>فهرست شرکت‌های سازمان</h1>
-  <p>تاریخ تهیه: ${escapeHtml(formatJalaliDateTime(new Date().toISOString()))} · تعداد: ${toFaDigits(rows.length)}</p>
+  <p>تاریخ تهیه: ${"${"}escapeHtml(formatJalaliDateTime(new Date().toISOString()))} · تعداد: ${"${"}toFaDigits(rows.length)}</p>
   <table>
     <thead>
       <tr>
@@ -191,7 +191,7 @@ export function exportCompaniesPdf(
         <th>شعب</th><th>واحد</th><th>زیرمجموعه</th><th>وضعیت</th><th>ایجاد</th>
       </tr>
     </thead>
-    <tbody>${body}</tbody>
+    <tbody>${"${"}body}</tbody>
   </table>
   <script>
     document.fonts.ready.then(function () {
