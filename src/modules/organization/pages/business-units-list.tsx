@@ -139,6 +139,7 @@ export function BusinessUnitsListPage() {
   const [editing, setEditing] = useState<BusinessUnitDto | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<BusinessUnitDto | null>(null);
+  const [assignTargets, setAssignTargets] = useState<BusinessUnitDto[]>([]);
   const [confirm, setConfirm] = useState<null | { kind: BulkKind; targets: BusinessUnitDto[] }>(null);
   const [busy, setBusy] = useState(false);
 
@@ -235,6 +236,15 @@ export function BusinessUnitsListPage() {
 
   function openAssign(row: BusinessUnitDto) {
     setAssignTarget(row);
+    setAssignTargets([]);
+    assignForm.reset({ company_id: "", is_primary: false });
+    setAssignOpen(true);
+  }
+
+  function openAssignBulk(targets: BusinessUnitDto[]) {
+    if (!targets.length) return;
+    setAssignTarget(null);
+    setAssignTargets(targets);
     assignForm.reset({ company_id: "", is_primary: false });
     setAssignOpen(true);
   }
@@ -270,17 +280,42 @@ export function BusinessUnitsListPage() {
   }
 
   async function submitAssign(v: AssignForm) {
-    if (!assignTarget || !canManage) return;
+    if (!canManage) return;
+    const targets =
+      assignTargets.length > 0
+        ? assignTargets
+        : assignTarget
+          ? [assignTarget]
+          : [];
+    if (!targets.length) return;
     setBusy(true);
+    let ok = 0;
     try {
-      await businessUnitService.assignCompany(
-        assignTarget.business_unit_id,
-        v.company_id,
-        !!v.is_primary
-      );
-      toast.success("شرکت به واحد کسب‌وکار متصل شد");
-      setAssignOpen(false);
-      await qc.invalidateQueries({ queryKey: ["org", "business-units"] });
+      for (const tRow of targets) {
+        try {
+          await businessUnitService.assignCompany(
+            tRow.business_unit_id,
+            v.company_id,
+            !!v.is_primary && targets.length === 1
+          );
+          ok += 1;
+        } catch {
+          /* continue */
+        }
+      }
+      if (ok) {
+        toast.success(
+          ok === 1
+            ? "شرکت به واحد کسب‌وکار متصل شد"
+            : `${toFaDigits(ok)} واحد به شرکت متصل شد`
+        );
+        setAssignOpen(false);
+        setAssignTargets([]);
+        setSelected(new Set());
+        await qc.invalidateQueries({ queryKey: ["org", "business-units"] });
+      } else {
+        toast.error(MSG_ERR);
+      }
     } catch (e) {
       toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
     } finally {
@@ -448,6 +483,15 @@ export function BusinessUnitsListPage() {
                 <Button size="sm" variant="outline" className="h-8" disabled={busy} onClick={() => requestBulk("deactivate", rows.filter((r) => selected.has(r.business_unit_id) && r.is_active !== false))}>
                   <PowerOff className="h-3.5 w-3.5" /> غیرفعال‌سازی
                 </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  disabled={busy}
+                  onClick={() => openAssignBulk(rows.filter((r) => selected.has(r.business_unit_id)))}
+                >
+                  <Link2 className="h-3.5 w-3.5" /> اتصال به شرکت
+                </Button>
                 <Button size="sm" variant="destructive" className="h-8" disabled={busy} onClick={() => requestBulk("delete", rows.filter((r) => selected.has(r.business_unit_id)))}>
                   <Trash2 className="h-3.5 w-3.5" /> حذف
                 </Button>
@@ -479,19 +523,15 @@ export function BusinessUnitsListPage() {
             </div>
           ) : filtered.length === 0 ? (
             <EmptyState
+              icon={Layers}
               title={membership === "deleted" ? "حذف‌شده‌ای نیست" : "واحد کسب‌وکاری ثبت نشده"}
               description={
                 membership === "deleted"
                   ? "موردی در سطل حذف نیست."
                   : "برای شروع، اولین واحد کسب‌وکار را ثبت کنید."
               }
-              action={
-                canManage && membership === "active" ? (
-                  <Button size="sm" onClick={openCreate}>
-                    <Plus className="h-4 w-4" /> واحد جدید
-                  </Button>
-                ) : undefined
-              }
+              actionLabel={canManage && membership === "active" ? "واحد جدید" : undefined}
+              onAction={canManage && membership === "active" ? openCreate : undefined}
             />
           ) : (
             <Table>
@@ -683,7 +723,13 @@ export function BusinessUnitsListPage() {
         <Sheet open={assignOpen} onOpenChange={setAssignOpen}>
           <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
             <SheetHeader>
-              <SheetTitle>اتصال شرکت به «{assignTarget?.name}»</SheetTitle>
+              <SheetTitle>
+                {assignTargets.length > 1
+                  ? `اتصال شرکت به ${toFaDigits(assignTargets.length)} واحد`
+                  : assignTargets.length === 1
+                    ? `اتصال شرکت به «${assignTargets[0].name}»`
+                    : `اتصال شرکت به «${assignTarget?.name ?? ""}»`}
+              </SheetTitle>
             </SheetHeader>
             <form className="flex flex-1 flex-col" onSubmit={assignForm.handleSubmit(submitAssign)}>
               <div className="flex-1 space-y-4 px-5 py-4">
@@ -701,25 +747,31 @@ export function BusinessUnitsListPage() {
                     ))}
                   </select>
                 </div>
-                <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
-                  <button
-                    type="button"
-                    className="flex items-center gap-1.5 text-sm"
-                    onClick={() => assignForm.setValue("is_primary", !assignForm.watch("is_primary"))}
-                  >
-                    شرکت اصلی این واحد
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <CircleHelp className="h-3.5 w-3.5 text-muted-foreground" onClick={(e) => e.stopPropagation()} />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">اگر چند شرکت به این واحد وصل شود، یکی به‌عنوان اصلی مشخص می‌شود</TooltipContent>
-                    </Tooltip>
-                  </button>
-                  <Switch
-                    checked={assignForm.watch("is_primary")}
-                    onCheckedChange={(v) => assignForm.setValue("is_primary", !!v)}
-                  />
-                </div>
+                {assignTargets.length <= 1 ? (
+                  <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 text-sm"
+                      onClick={() => assignForm.setValue("is_primary", !assignForm.watch("is_primary"))}
+                    >
+                      شرکت اصلی این واحد
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <CircleHelp className="h-3.5 w-3.5 text-muted-foreground" onClick={(e) => e.stopPropagation()} />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">اگر چند شرکت به این واحد وصل شود، یکی به‌عنوان اصلی مشخص می‌شود</TooltipContent>
+                      </Tooltip>
+                    </button>
+                    <Switch
+                      checked={assignForm.watch("is_primary")}
+                      onCheckedChange={(v) => assignForm.setValue("is_primary", !!v)}
+                    />
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    برای اتصال گروهی، شرکت انتخاب‌شده به همهٔ واحدهای انتخاب‌شده وصل می‌شود. تعیین «اصلی» را بعداً از روی هر ردیف انجام دهید.
+                  </p>
+                )}
               </div>
               <SheetFooter className="gap-2 border-t px-5 py-3">
                 <Button type="button" variant="outline" onClick={() => setAssignOpen(false)}>انصراف</Button>
