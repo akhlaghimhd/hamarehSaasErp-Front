@@ -176,6 +176,20 @@ export const businessUnitService = {
     });
     return unwrapData(env);
   },
+  async unassignCompany(buId: string, companyId: string) {
+    await apiDelete(organizationPaths.businessUnitCompany(buId, companyId));
+  },
+  async syncCompanies(
+    buId: string,
+    companyIds: string[],
+    primaryCompanyId?: string | null
+  ) {
+    const env = await apiPut(organizationPaths.businessUnitCompanies(buId), {
+      company_ids: companyIds,
+      primary_company_id: primaryCompanyId || null,
+    });
+    return unwrapData<{ attached: number; detached: number }>(env);
+  },
 };
 
 export const hierarchyService = {
