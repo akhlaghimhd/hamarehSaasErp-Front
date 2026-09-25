@@ -23,6 +23,8 @@ export const organizationPaths = {
   branch: (id: string) => `${ORGANIZATION_BASE}/branches/${id}`,
   branchRestore: (id: string) => `${ORGANIZATION_BASE}/branches/${id}/restore`,
   department: (id: string) => `${ORGANIZATION_BASE}/departments/${id}`,
+  departmentRestore: (id: string) =>
+    `${ORGANIZATION_BASE}/departments/${id}/restore`,
   bankAccount: (id: string) => `${ORGANIZATION_BASE}/bank-accounts/${id}`,
   officer: (id: string) => `${ORGANIZATION_BASE}/officers/${id}`,
   ownership: (id: string) => `${ORGANIZATION_BASE}/ownerships/${id}`,
