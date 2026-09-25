@@ -93,7 +93,6 @@ export function OrganizationHome() {
     return sorted[0] ?? null;
   })();
 
-  const companyCount = companies?.length ?? 0;
   const companyHref = "/dashboard/organization/companies";
   const branchesHref = "/dashboard/organization/branches";
   const deptsHref = "/dashboard/organization/departments";
@@ -104,9 +103,7 @@ export function OrganizationHome() {
       href: companyHref,
       title: "شرکت‌ها",
       description:
-        companyCount > 0
-          ? `فهرست ${companyCount} شرکت — اصلی، فرعی، تلفیقی`
-          : "شرکت اصلی هنگام عضویت ثبت می‌شود",
+        "فهرست و مشخصات حقوقی شرکت‌های سازمان؛ پایهٔ تعریف ساختار و مالکیت",
       icon: Building2,
       open: true,
     },
@@ -115,9 +112,7 @@ export function OrganizationHome() {
       href: branchesHref,
       title: "شعب / سایت",
       description:
-        companyCount > 0
-          ? "فهرست شعب همه شرکت‌ها — با فیلتر شرکت"
-          : "پس از وجود شرکت",
+        "مکان‌های فعالیت مثل دفتر، کارخانه و سایت انبار زیر هر شرکت",
       icon: GitBranch,
       open: true,
     },
@@ -126,9 +121,7 @@ export function OrganizationHome() {
       href: deptsHref,
       title: "واحدهای سازمانی",
       description:
-        companyCount > 0
-          ? "فهرست واحدهای همه شرکت‌ها — با فیلتر شرکت"
-          : "زیر نظر شعبه",
+        "واحدهای داخلی سازمان زیر شعبه‌ها برای چیدمان نیروی انسانی و مسئولیت",
       icon: Network,
       open: true,
     },
@@ -136,7 +129,8 @@ export function OrganizationHome() {
       key: "bu",
       href: "/dashboard/organization/business-units",
       title: "واحد کسب‌وکار",
-      description: "Business Unit و ابعاد مدیریتی",
+      description:
+        "بخش‌بندی مدیریتی مستقل از ساختار حقوقی برای گزارش و کنترل عملکرد",
       icon: Layers,
       open: true,
     },
@@ -144,7 +138,8 @@ export function OrganizationHome() {
       key: "hierarchy",
       href: "/dashboard/organization/hierarchies",
       title: "سلسله‌مراتب",
-      description: "درخت LEGAL / MANAGEMENT / TAX",
+      description:
+        "درخت روابط شرکت‌ها از نظر حقوقی، مدیریتی و مالیاتی",
       icon: Landmark,
       open: true,
     },
@@ -152,7 +147,8 @@ export function OrganizationHome() {
       key: "ic",
       href: "/dashboard/organization/intercompany",
       title: "بین‌شرکتی",
-      description: "نقشه شریک و قوانین آینه اسناد",
+      description:
+        "تعریف شرکای گروه و قواعد ثبت معامله بین شرکت‌های یک سازمان",
       icon: ArrowLeftRight,
       open: true,
     },
@@ -160,7 +156,8 @@ export function OrganizationHome() {
       key: "salesPurch",
       href: "/dashboard/organization/sales-purch",
       title: "فروش و خرید",
-      description: "Sales / Purchasing Organization",
+      description:
+        "سازمان‌دهی مسیر فروش و خرید برای عملیات بازرگانی روزمره",
       icon: ShoppingCart,
       open: true,
     },
