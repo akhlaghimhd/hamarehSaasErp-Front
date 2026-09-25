@@ -7,6 +7,8 @@ import type {
   UpdateDepartmentPayload,
 } from "../types";
 
+export type DepartmentListFilter = "active" | "deleted";
+
 function unwrapData<T>(envelope: unknown): T {
   if (envelope && typeof envelope === "object" && "data" in envelope) {
     return (envelope as ApiSuccessResponse<T>).data;
@@ -23,8 +25,14 @@ function asArray<T>(data: T[] | { data?: T[] } | null | undefined): T[] {
 }
 
 export const departmentService = {
-  async listByCompany(companyId: string): Promise<DepartmentDto[]> {
-    const envelope = await apiGet(organizationPaths.companyDepartments(companyId));
+  async listByCompany(
+    companyId: string,
+    membership: DepartmentListFilter = "active"
+  ): Promise<DepartmentDto[]> {
+    const qs = membership === "deleted" ? "?membership=deleted" : "";
+    const envelope = await apiGet(
+      `${organizationPaths.companyDepartments(companyId)}${qs}`
+    );
     return asArray(
       unwrapData<DepartmentDto[] | { data?: DepartmentDto[] }>(envelope)
     );
@@ -59,17 +67,24 @@ export const departmentService = {
     departmentId: string,
     payload: UpdateDepartmentPayload
   ): Promise<DepartmentDto> {
-    const envelope = await apiPut(organizationPaths.department(departmentId), {
+    const body: Record<string, unknown> = {
       code: payload.code.trim(),
       name: payload.name.trim(),
       parent_department_id: payload.parent_department_id || null,
       manager_user_id: payload.manager_user_id || null,
       is_active: payload.is_active ?? true,
-    });
+    };
+    if (payload.branch_id) body.branch_id = payload.branch_id;
+    const envelope = await apiPut(organizationPaths.department(departmentId), body);
     return unwrapData<DepartmentDto>(envelope);
   },
 
   async softDelete(departmentId: string): Promise<void> {
     await apiDelete(organizationPaths.department(departmentId));
+  },
+
+  async restore(departmentId: string): Promise<DepartmentDto> {
+    const envelope = await apiPost(organizationPaths.departmentRestore(departmentId), {});
+    return unwrapData<DepartmentDto>(envelope);
   },
 };
