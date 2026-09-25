@@ -3,7 +3,7 @@
  */
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronDown, ChevronLeft, GitBranch, Loader2, Network, Plus, Search,
@@ -275,8 +275,8 @@ export function HierarchiesListPage() {
               {filtered.map((h) => {
                 const open = expandedId === h.hierarchy_id;
                 return (
-                  <>
-                    <TableRow key={h.hierarchy_id}>
+                  <Fragment key={h.hierarchy_id}>
+                    <TableRow>
                       <TableCell>
                         <button
                           type="button"
@@ -305,7 +305,7 @@ export function HierarchiesListPage() {
                       </TableCell>
                     </TableRow>
                     {open ? (
-                      <TableRow key={`${h.hierarchy_id}-nodes`} className="bg-muted/30">
+                      <TableRow className="bg-muted/30">
                         <TableCell colSpan={6} className="p-3">
                           {nodesQuery.isLoading ? (
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -341,7 +341,7 @@ export function HierarchiesListPage() {
                         </TableCell>
                       </TableRow>
                     ) : null}
-                  </>
+                  </Fragment>
                 );
               })}
             </TableBody>
