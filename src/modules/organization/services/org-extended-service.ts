@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiDelete } from "@/api";
+import { apiGet, apiPost, apiPut, apiDelete } from "@/api";
 import type { ApiSuccessResponse } from "@/api/types";
 import { organizationPaths } from "./paths";
 
@@ -17,12 +17,27 @@ function asArray<T>(data: T[] | { data?: T[] } | null | undefined): T[] {
   return [];
 }
 
+export type BusinessUnitCompanyAssignmentDto = {
+  assignment_id?: string;
+  company_id: string;
+  is_primary?: boolean;
+  is_active?: boolean;
+  company?: {
+    company_id?: string;
+    name?: string;
+    legal_name?: string | null;
+  } | null;
+};
+
 export type BusinessUnitDto = {
   business_unit_id: string;
   code: string;
   name: string;
   description?: string | null;
   is_active?: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+  company_assignments?: BusinessUnitCompanyAssignmentDto[];
 };
 
 export type HierarchyDto = {
@@ -120,12 +135,38 @@ export type ConsolRunDto = {
 };
 
 export const businessUnitService = {
-  async list(): Promise<BusinessUnitDto[]> {
-    const env = await apiGet(organizationPaths.businessUnits);
+  async list(opts?: { membership?: "active" | "deleted" }): Promise<BusinessUnitDto[]> {
+    const membership = opts?.membership ?? "active";
+    const q = membership === "deleted" ? "?membership=deleted" : "";
+    const env = await apiGet(`${organizationPaths.businessUnits}${q}`);
     return asArray(unwrapData(env));
   },
-  async create(payload: { code: string; name: string; description?: string }) {
+  async create(payload: {
+    code: string;
+    name: string;
+    description?: string;
+    is_active?: boolean;
+  }) {
     const env = await apiPost(organizationPaths.businessUnits, payload);
+    return unwrapData<BusinessUnitDto>(env);
+  },
+  async update(
+    id: string,
+    payload: {
+      code: string;
+      name: string;
+      description?: string;
+      is_active?: boolean;
+    }
+  ) {
+    const env = await apiPut(organizationPaths.businessUnit(id), payload);
+    return unwrapData<BusinessUnitDto>(env);
+  },
+  async softDelete(id: string) {
+    await apiDelete(organizationPaths.businessUnit(id));
+  },
+  async restore(id: string) {
+    const env = await apiPost(organizationPaths.businessUnitRestore(id), {});
     return unwrapData<BusinessUnitDto>(env);
   },
   async assignCompany(buId: string, companyId: string, isPrimary = false) {
