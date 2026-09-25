@@ -36,6 +36,7 @@ import {
 import { usePermission } from "@/auth";
 import { ApiClientError } from "@/api";
 import { toFaDigits } from "@/shared/lib/utils";
+import { decodeCompanyRef } from "../lib/company-ref";
 import { useCompany, useUpdateCompany, useCompanies } from "../hooks/use-companies";
 import {
   useBranches,
@@ -64,7 +65,8 @@ const MSG_NO_ACCESS = "برای مشاهده این بخش مجوز لازم ر�
 
 export function CompanyDetailPage() {
   const params = useParams();
-  const companyId = typeof params?.id === "string" ? params.id : "";
+  const companyId =
+    decodeCompanyRef(typeof params?.id === "string" ? params.id : "") ?? "";
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -542,7 +544,7 @@ export function CompanyDetailPage() {
             loading={deptsLoading}
             isFiltered={deptQuery.trim().length > 0}
             emptyTitle="واحدی ثبت نشده"
-            emptyDescription="اولین واحد سازمانی را ثبت کنید."
+            emptyDescription="اولین واحد سازمانی این شرکت را ثبت کنید."
             emptySearchTitle="نتیجه‌ای پیدا نشد"
             emptySearchDescription="عبارت جستجو را تغییر دهید."
             page={1}
@@ -573,12 +575,12 @@ export function CompanyDetailPage() {
           <form onSubmit={onEditCompany} className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label>کد *</Label>
-                <Input className="h-9" dir="ltr" {...editForm.register("code", { required: true })} />
+                <Label>کد</Label>
+                <Input className="h-9" dir="ltr" {...editForm.register("code")} />
               </div>
               <div className="space-y-1.5">
-                <Label>نام نمایشی *</Label>
-                <Input className="h-9" {...editForm.register("name", { required: true })} />
+                <Label>نام</Label>
+                <Input className="h-9" {...editForm.register("name")} />
               </div>
             </div>
             <div className="space-y-1.5">
@@ -603,63 +605,33 @@ export function CompanyDetailPage() {
               <Label>شناسه مالیاتی</Label>
               <Input className="h-9" dir="ltr" {...editForm.register("tax_identifier")} />
             </div>
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium leading-none">
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1">
                 {ENTITY_KIND_FIELD_LABEL}
-              </legend>
-              <TooltipProvider delayDuration={200}>
-                <div className="space-y-1.5">
-                  {ENTITY_KIND_OPTIONS.map((opt) => {
-                    const checked =
-                      (editForm.watch("entity_kind") || "OPERATING") === opt.value;
-                    return (
-                      <label
-                        key={opt.value}
-                        className={
-                          "flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition-colors " +
-                          (checked
-                            ? "border-primary/50 bg-primary/5"
-                            : "border-border/80 hover:bg-muted/40")
-                        }
-                      >
-                        <input
-                          type="radio"
-                          className="mt-1 h-3.5 w-3.5 shrink-0 accent-primary"
-                          value={opt.value}
-                          checked={checked}
-                          onChange={() =>
-                            editForm.setValue("entity_kind", opt.value, {
-                              shouldDirty: true,
-                            })
-                          }
-                        />
-                        <span className="min-w-0 flex-1 text-sm leading-snug">
-                          {opt.label}
-                        </span>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              className="mt-0.5 shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
-                              aria-label={`راهنمای ${opt.label}`}
-                              onClick={(e) => e.preventDefault()}
-                            >
-                              <CircleHelp className="h-3.5 w-3.5" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent
-                            side="top"
-                            className="max-w-[16rem] text-right leading-relaxed"
-                          >
-                            {opt.tooltip}
-                          </TooltipContent>
-                        </Tooltip>
-                      </label>
-                    );
-                  })}
-                </div>
-              </TooltipProvider>
-            </fieldset>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="text-muted-foreground">
+                        <CircleHelp className="h-3.5 w-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs">
+                      نقش شرکت در گروه: عملیاتی، تلفیقی یا حذف
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                {...editForm.register("entity_kind")}
+              >
+                {ENTITY_KIND_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="space-y-1.5">
               <Label>شرکت والد</Label>
               <select
@@ -671,42 +643,36 @@ export function CompanyDetailPage() {
                   .filter((c) => c.company_id !== companyId)
                   .map((c) => (
                     <option key={c.company_id} value={c.company_id}>
-                      {c.legal_name || c.name} ({c.code})
+                      {c.legal_name || c.name}
                     </option>
                   ))}
               </select>
             </div>
             <div className="space-y-1.5">
               <Label>نرخ تسعیر پیش‌فرض</Label>
-              <select
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                {...editForm.register("default_consol_rate_type")}
-              >
-                <option value="">—</option>
-                <option value="CURRENT">CURRENT</option>
-                <option value="AVERAGE">AVERAGE</option>
-                <option value="HISTORICAL">HISTORICAL</option>
-              </select>
+              <Input className="h-9" dir="ltr" {...editForm.register("default_consol_rate_type")} />
             </div>
-            <div className="flex items-center justify-between gap-2">
-              <Label>شرکت اصلی</Label>
+            <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+              <Label htmlFor="edit-primary">شرکت اصلی</Label>
               <Switch
+                id="edit-primary"
                 checked={editForm.watch("is_primary")}
                 onCheckedChange={(v) => editForm.setValue("is_primary", v)}
               />
             </div>
-            <div className="flex items-center justify-between gap-2">
-              <Label>فعال</Label>
+            <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+              <Label htmlFor="edit-active">فعال</Label>
               <Switch
+                id="edit-active"
                 checked={editForm.watch("is_active")}
                 onCheckedChange={(v) => editForm.setValue("is_active", v)}
               />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" size="sm" onClick={() => setEditOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
                 انصراف
               </Button>
-              <Button type="submit" size="sm" disabled={updateCompany.isPending}>
+              <Button type="submit" disabled={updateCompany.isPending}>
                 {updateCompany.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
               </Button>
             </DialogFooter>
@@ -715,18 +681,24 @@ export function CompanyDetailPage() {
       </Dialog>
 
       <Dialog open={branchOpen} onOpenChange={setBranchOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>شعبه جدید</DialogTitle>
           </DialogHeader>
           <form onSubmit={onCreateBranch} className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>کد *</Label>
-              <Input className="h-9" dir="ltr" {...branchForm.register("code", { required: true })} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>کد</Label>
+                <Input className="h-9" dir="ltr" {...branchForm.register("code")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>نام</Label>
+                <Input className="h-9" {...branchForm.register("name")} />
+              </div>
             </div>
             <div className="space-y-1.5">
-              <Label>نام *</Label>
-              <Input className="h-9" {...branchForm.register("name", { required: true })} />
+              <Label>آدرس</Label>
+              <Input className="h-9" {...branchForm.register("address")} />
             </div>
             <div className="space-y-1.5">
               <Label>نوع شعبه</Label>
@@ -734,50 +706,46 @@ export function CompanyDetailPage() {
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                 {...branchForm.register("branch_kind")}
               >
-                <option value="OFFICE">دفتر</option>
-                <option value="PLANT">کارخانه</option>
-                <option value="WAREHOUSE_SITE">سایت انبار</option>
-                <option value="DISTRIBUTION">توزیع</option>
-                <option value="MIXED">ترکیبی</option>
+                {Object.entries(BRANCH_KIND_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
               </select>
             </div>
-            <div className="space-y-1.5">
-              <Label>آدرس</Label>
-              <Input className="h-9" {...branchForm.register("address")} />
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <Label>ارسال کالا</Label>
-              <Switch
-                checked={branchForm.watch("supports_shipping")}
-                onCheckedChange={(v) => branchForm.setValue("supports_shipping", v)}
-              />
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <Label>دریافت کالا</Label>
-              <Switch
-                checked={branchForm.watch("supports_receiving")}
-                onCheckedChange={(v) => branchForm.setValue("supports_receiving", v)}
-              />
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <Label>سایت تولیدی</Label>
-              <Switch
-                checked={branchForm.watch("is_manufacturing_site")}
-                onCheckedChange={(v) => branchForm.setValue("is_manufacturing_site", v)}
-              />
-            </div>
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between rounded-lg border px-3 py-2">
               <Label>فعال</Label>
               <Switch
                 checked={branchForm.watch("is_active")}
                 onCheckedChange={(v) => branchForm.setValue("is_active", v)}
               />
             </div>
+            <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+              <Label>پشتیبانی ارسال</Label>
+              <Switch
+                checked={branchForm.watch("supports_shipping")}
+                onCheckedChange={(v) => branchForm.setValue("supports_shipping", v)}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+              <Label>پشتیبانی دریافت</Label>
+              <Switch
+                checked={branchForm.watch("supports_receiving")}
+                onCheckedChange={(v) => branchForm.setValue("supports_receiving", v)}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+              <Label>سایت تولیدی</Label>
+              <Switch
+                checked={branchForm.watch("is_manufacturing_site")}
+                onCheckedChange={(v) => branchForm.setValue("is_manufacturing_site", v)}
+              />
+            </div>
             <DialogFooter>
-              <Button type="button" variant="outline" size="sm" onClick={() => setBranchOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => setBranchOpen(false)}>
                 انصراف
               </Button>
-              <Button type="submit" size="sm" disabled={createBranch.isPending}>
+              <Button type="submit" disabled={createBranch.isPending}>
                 {createBranch.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ثبت"}
               </Button>
             </DialogFooter>
@@ -786,18 +754,18 @@ export function CompanyDetailPage() {
       </Dialog>
 
       <Dialog open={deptOpen} onOpenChange={setDeptOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>واحد سازمانی جدید</DialogTitle>
           </DialogHeader>
           <form onSubmit={onCreateDept} className="space-y-3">
             <div className="space-y-1.5">
-              <Label>شعبه *</Label>
+              <Label>شعبه</Label>
               <select
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                {...deptForm.register("branch_id", { required: true })}
+                {...deptForm.register("branch_id")}
               >
-                <option value="">انتخاب شعبه</option>
+                <option value="">انتخاب شعبه…</option>
                 {(branches ?? []).map((b) => (
                   <option key={b.branch_id} value={b.branch_id}>
                     {b.name}
@@ -805,15 +773,17 @@ export function CompanyDetailPage() {
                 ))}
               </select>
             </div>
-            <div className="space-y-1.5">
-              <Label>کد *</Label>
-              <Input className="h-9" dir="ltr" {...deptForm.register("code", { required: true })} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>کد</Label>
+                <Input className="h-9" dir="ltr" {...deptForm.register("code")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>نام</Label>
+                <Input className="h-9" {...deptForm.register("name")} />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>نام *</Label>
-              <Input className="h-9" {...deptForm.register("name", { required: true })} />
-            </div>
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between rounded-lg border px-3 py-2">
               <Label>فعال</Label>
               <Switch
                 checked={deptForm.watch("is_active")}
@@ -821,10 +791,10 @@ export function CompanyDetailPage() {
               />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" size="sm" onClick={() => setDeptOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => setDeptOpen(false)}>
                 انصراف
               </Button>
-              <Button type="submit" size="sm" disabled={createDept.isPending}>
+              <Button type="submit" disabled={createDept.isPending}>
                 {createDept.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ثبت"}
               </Button>
             </DialogFooter>
