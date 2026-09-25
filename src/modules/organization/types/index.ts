@@ -12,7 +12,9 @@ export type OrganizationPermissionCode =
   | "organization.department.view"
   | "organization.department.create"
   | "organization.department.update"
-  | "organization.department.delete";
+  | "organization.department.delete"
+  | "organization.business_unit.view"
+  | "organization.business_unit.manage";
 
 export const OrganizationPermissions = {
   companyView: "organization.company.view",
@@ -27,6 +29,8 @@ export const OrganizationPermissions = {
   departmentCreate: "organization.department.create",
   departmentUpdate: "organization.department.update",
   departmentDelete: "organization.department.delete",
+  businessUnitView: "organization.business_unit.view",
+  businessUnitManage: "organization.business_unit.manage",
 } as const;
 
 export type EntityKind = "OPERATING" | "CONSOLIDATION" | "ELIMINATION";

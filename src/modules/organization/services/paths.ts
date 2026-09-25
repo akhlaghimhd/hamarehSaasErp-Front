@@ -30,6 +30,9 @@ export const organizationPaths = {
   ownership: (id: string) => `${ORGANIZATION_BASE}/ownerships/${id}`,
   fiscalAssignment: (id: string) => `${ORGANIZATION_BASE}/fiscal-assignments/${id}`,
   businessUnits: `${ORGANIZATION_BASE}/business-units`,
+  businessUnit: (id: string) => `${ORGANIZATION_BASE}/business-units/${id}`,
+  businessUnitRestore: (id: string) =>
+    `${ORGANIZATION_BASE}/business-units/${id}/restore`,
   businessUnitCompanies: (buId: string) =>
     `${ORGANIZATION_BASE}/business-units/${buId}/companies`,
   hierarchies: `${ORGANIZATION_BASE}/hierarchies`,
