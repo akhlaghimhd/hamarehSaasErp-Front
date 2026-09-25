@@ -1,5 +1,6 @@
 /**
  * FE-ORG — فهرست سلسله‌مراتب سازمانی
+ * گره‌ها با نام موجودیت نمایش داده می‌شوند (نه شناسه دیتابیس).
  */
 "use client";
 
@@ -21,10 +22,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/components/ui/table";
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/shared/components/ui/sheet";
 import { usePermission } from "@/auth";
-import { ApiClientError, tokenStorage } from "@/api";
+import { apiGet, ApiClientError, tokenStorage } from "@/api";
+import type { ApiSuccessResponse } from "@/api/types";
 import { cn, toFaDigits } from "@/shared/lib/utils";
 import { useCompanies } from "../hooks/use-companies";
-import { hierarchyService, type HierarchyDto, type HierarchyNodeDto } from "../services/org-extended-service";
+import {
+  businessUnitService,
+  hierarchyService,
+  type HierarchyDto,
+  type HierarchyNodeDto,
+} from "../services/org-extended-service";
+import { organizationPaths } from "../services/paths";
 import { OrganizationPermissions } from "../types";
 
 const MSG_ERR = "انجام این کار ممکن نشد. کمی بعد دوباره تلاش کنید.";
@@ -48,6 +56,8 @@ const ENTITY_LABEL: Record<string, string> = {
 type HierForm = { code: string; name: string; purpose: string };
 type NodeForm = { entity_type: string; entity_id: string; parent_node_id: string };
 
+type CatalogItem = { id: string; label: string; sub?: string };
+
 function hasAuthContext(): boolean {
   if (typeof window === "undefined") return false;
   return Boolean(tokenStorage.getAccessToken() && tokenStorage.getTenantId());
@@ -56,6 +66,17 @@ function hasAuthContext(): boolean {
 function purposeLabel(p?: string) {
   if (!p) return "—";
   return PURPOSE_LABEL[p] ?? p;
+}
+
+function unwrapList<T>(envelope: unknown): T[] {
+  if (envelope && typeof envelope === "object" && "data" in envelope) {
+    const d = (envelope as ApiSuccessResponse<T[] | { data?: T[] }>).data;
+    if (Array.isArray(d)) return d;
+    if (d && typeof d === "object" && Array.isArray((d as { data?: T[] }).data)) {
+      return (d as { data: T[] }).data;
+    }
+  }
+  return Array.isArray(envelope) ? (envelope as T[]) : [];
 }
 
 export function HierarchiesListPage() {
@@ -68,6 +89,7 @@ export function HierarchiesListPage() {
     usePermission(OrganizationPermissions.companyUpdate);
 
   const { data: companies } = useCompanies();
+
   const [search, setSearch] = useState("");
   const [purposeFilter, setPurposeFilter] = useState<string>("all");
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -95,6 +117,118 @@ export function HierarchiesListPage() {
     enabled: !!expandedId && hasAuthContext(),
   });
 
+  const buQuery = useQuery({
+    queryKey: ["org", "business-units", "active"],
+    queryFn: () => businessUnitService.list({ membership: "active" }),
+    enabled: canView && hasAuthContext(),
+    staleTime: 60_000,
+  });
+
+  /** شعب + واحدهای سازمانی + مراکز هزینه از همه شرکت‌ها (برای برچسب و فرم) */
+  const structureCatalog = useQuery({
+    queryKey: ["org", "hierarchy-structure-catalog", (companies ?? []).map((c) => c.company_id).join(",")],
+    queryFn: async () => {
+      const list = companies ?? [];
+      const branches: CatalogItem[] = [];
+      const departments: CatalogItem[] = [];
+      const costCenters: CatalogItem[] = [];
+
+      await Promise.all(
+        list.map(async (c) => {
+          const cName = c.legal_name || c.name || "";
+          try {
+            const brEnv = await apiGet(organizationPaths.companyBranches(c.company_id));
+            for (const b of unwrapList<{ branch_id: string; name?: string; code?: string }>(brEnv)) {
+              branches.push({
+                id: b.branch_id,
+                label: b.name || b.code || b.branch_id,
+                sub: cName,
+              });
+            }
+          } catch { /* skip */ }
+          try {
+            const depEnv = await apiGet(organizationPaths.companyDepartments(c.company_id));
+            for (const d of unwrapList<{ department_id: string; name?: string; code?: string }>(depEnv)) {
+              departments.push({
+                id: d.department_id,
+                label: d.name || d.code || d.department_id,
+                sub: cName,
+              });
+            }
+          } catch { /* skip */ }
+          try {
+            const ccEnv = await apiGet(organizationPaths.companyCostCenters(c.company_id));
+            for (const cc of unwrapList<{ cost_center_id: string; name?: string; code?: string }>(ccEnv)) {
+              costCenters.push({
+                id: cc.cost_center_id,
+                label: cc.name || cc.code || cc.cost_center_id,
+                sub: cName,
+              });
+            }
+          } catch { /* skip */ }
+        })
+      );
+
+      return { branches, departments, costCenters };
+    },
+    enabled: canView && hasAuthContext() && (companies ?? []).length > 0,
+    staleTime: 60_000,
+  });
+
+  const companyCatalog: CatalogItem[] = useMemo(
+    () =>
+      (companies ?? []).map((c) => ({
+        id: c.company_id,
+        label: c.legal_name || c.name || c.code,
+        sub: c.code,
+      })),
+    [companies]
+  );
+
+  const buCatalog: CatalogItem[] = useMemo(
+    () =>
+      (buQuery.data ?? []).map((b) => ({
+        id: b.business_unit_id,
+        label: b.name || b.code,
+        sub: b.code,
+      })),
+    [buQuery.data]
+  );
+
+  const entityCatalog = useMemo(() => {
+    return {
+      COMPANY: companyCatalog,
+      BRANCH: structureCatalog.data?.branches ?? [],
+      DEPARTMENT: structureCatalog.data?.departments ?? [],
+      BUSINESS_UNIT: buCatalog,
+      COST_CENTER: structureCatalog.data?.costCenters ?? [],
+    } as Record<string, CatalogItem[]>;
+  }, [companyCatalog, buCatalog, structureCatalog.data]);
+
+  function resolveEntityLabel(entityType: string, entityId: string): string {
+    const hit = (entityCatalog[entityType] ?? []).find((x) => x.id === entityId);
+    if (hit) return hit.label;
+    return `${ENTITY_LABEL[entityType] ?? entityType}`;
+  }
+
+  function resolveEntitySub(entityType: string, entityId: string): string | undefined {
+    const hit = (entityCatalog[entityType] ?? []).find((x) => x.id === entityId);
+    return hit?.sub;
+  }
+
+  const nodeById = useMemo(() => {
+    const map = new Map<string, HierarchyNodeDto>();
+    for (const n of nodesQuery.data ?? []) map.set(n.node_id, n);
+    return map;
+  }, [nodesQuery.data]);
+
+  function parentCaption(node: HierarchyNodeDto): string | null {
+    if (!node.parent_node_id) return null;
+    const parent = nodeById.get(node.parent_node_id);
+    if (!parent) return "زیرمجموعه";
+    return `زیر ${resolveEntityLabel(parent.entity_type, parent.entity_id)}`;
+  }
+
   const rows = listQuery.data ?? [];
 
   const filtered = useMemo(() => {
@@ -120,9 +254,10 @@ export function HierarchiesListPage() {
   function openAddNode(h: HierarchyDto) {
     setActiveHierarchy(h);
     setExpandedId(h.hierarchy_id);
+    const firstCompany = companyCatalog[0]?.id ?? "";
     nodeForm.reset({
       entity_type: "COMPANY",
-      entity_id: companies?.[0]?.company_id ?? "",
+      entity_id: firstCompany,
       parent_node_id: "",
     });
     setNodeSheetOpen(true);
@@ -174,13 +309,8 @@ export function HierarchiesListPage() {
     setExpandedId((prev) => (prev === id ? null : id));
   }
 
-  function entityName(node: HierarchyNodeDto): string {
-    if (node.entity_type === "COMPANY") {
-      const c = (companies ?? []).find((x) => x.company_id === node.entity_id);
-      if (c) return c.legal_name || c.name || node.entity_id.slice(0, 8);
-    }
-    return `${ENTITY_LABEL[node.entity_type] ?? node.entity_type} · ${node.entity_id.slice(0, 8)}…`;
-  }
+  const watchedType = nodeForm.watch("entity_type");
+  const optionsForType = entityCatalog[watchedType] ?? [];
 
   if (!canView) {
     return (
@@ -307,7 +437,7 @@ export function HierarchiesListPage() {
                     {open ? (
                       <TableRow className="bg-muted/30">
                         <TableCell colSpan={6} className="p-3">
-                          {nodesQuery.isLoading ? (
+                          {nodesQuery.isLoading || structureCatalog.isLoading || buQuery.isLoading ? (
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Loader2 className="h-4 w-4 animate-spin" /> در حال بارگذاری گره‌ها…
                             </div>
@@ -318,24 +448,30 @@ export function HierarchiesListPage() {
                               {(nodesQuery.data ?? [])
                                 .slice()
                                 .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-                                .map((n) => (
-                                  <li
-                                    key={n.node_id}
-                                    className="flex flex-wrap items-center gap-2 rounded-md border bg-background px-3 py-1.5"
-                                  >
-                                    <span className="text-xs text-muted-foreground">
-                                      {ENTITY_LABEL[n.entity_type] ?? n.entity_type}
-                                    </span>
-                                    <span className="font-medium">{entityName(n)}</span>
-                                    {n.parent_node_id ? (
-                                      <span className="text-xs text-muted-foreground">
-                                        (زیر گره {n.parent_node_id.slice(0, 6)}…)
+                                .map((n) => {
+                                  const name = resolveEntityLabel(n.entity_type, n.entity_id);
+                                  const sub = resolveEntitySub(n.entity_type, n.entity_id);
+                                  const parentTxt = parentCaption(n);
+                                  return (
+                                    <li
+                                      key={n.node_id}
+                                      className="flex flex-wrap items-center gap-2 rounded-md border bg-background px-3 py-1.5"
+                                    >
+                                      <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                                        {ENTITY_LABEL[n.entity_type] ?? n.entity_type}
                                       </span>
-                                    ) : (
-                                      <span className="text-xs text-emerald-600">ریشه</span>
-                                    )}
-                                  </li>
-                                ))}
+                                      <span className="font-medium">{name}</span>
+                                      {sub ? (
+                                        <span className="text-xs text-muted-foreground">{sub}</span>
+                                      ) : null}
+                                      {parentTxt ? (
+                                        <span className="text-xs text-muted-foreground">({parentTxt})</span>
+                                      ) : (
+                                        <span className="text-xs text-emerald-600">ریشه</span>
+                                      )}
+                                    </li>
+                                  );
+                                })}
                             </ul>
                           )}
                         </TableCell>
@@ -403,7 +539,11 @@ export function HierarchiesListPage() {
                 <Label>نوع موجودیت</Label>
                 <select
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  {...nodeForm.register("entity_type")}
+                  {...nodeForm.register("entity_type", {
+                    onChange: () => {
+                      nodeForm.setValue("entity_id", "");
+                    },
+                  })}
                 >
                   {Object.entries(ENTITY_LABEL).map(([k, v]) => (
                     <option key={k} value={k}>{v}</option>
@@ -412,29 +552,20 @@ export function HierarchiesListPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>موجودیت *</Label>
-                {nodeForm.watch("entity_type") === "COMPANY" ? (
-                  <select
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    {...nodeForm.register("entity_id", { required: true })}
-                  >
-                    <option value="">انتخاب شرکت</option>
-                    {(companies ?? []).map((c) => (
-                      <option key={c.company_id} value={c.company_id}>
-                        {c.legal_name || c.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <Input
-                    dir="ltr"
-                    className="h-9"
-                    placeholder="شناسه موجودیت (UUID)"
-                    {...nodeForm.register("entity_id", { required: true })}
-                  />
-                )}
-                {nodeForm.watch("entity_type") !== "COMPANY" ? (
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  {...nodeForm.register("entity_id", { required: true })}
+                >
+                  <option value="">انتخاب کنید</option>
+                  {optionsForType.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label}{item.sub ? ` — ${item.sub}` : ""}
+                    </option>
+                  ))}
+                </select>
+                {optionsForType.length === 0 ? (
                   <p className="text-[11px] text-muted-foreground">
-                    فعلاً انتخاب سریع فقط برای شرکت فعال است؛ برای بقیه شناسه را وارد کنید.
+                    موردی برای این نوع ثبت نشده است.
                   </p>
                 ) : null}
               </div>
@@ -447,7 +578,9 @@ export function HierarchiesListPage() {
                   <option value="">— ریشه —</option>
                   {(nodesQuery.data ?? []).map((n) => (
                     <option key={n.node_id} value={n.node_id}>
-                      {ENTITY_LABEL[n.entity_type] ?? n.entity_type} · {n.node_id.slice(0, 8)}
+                      {ENTITY_LABEL[n.entity_type] ?? n.entity_type}
+                      {" · "}
+                      {resolveEntityLabel(n.entity_type, n.entity_id)}
                     </option>
                   ))}
                 </select>
