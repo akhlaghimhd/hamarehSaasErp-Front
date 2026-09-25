@@ -344,7 +344,7 @@ export function BusinessUnitsListPage() {
             { label: "سازمان", href: "/dashboard/organization" },
             { label: "واحد کسب‌وکار" },
           ]}
-          icon={Layers}
+          icon={<Layers className="h-4 w-4" />}
         />
         <EmptyState title="دسترسی ندارید" description="برای مشاهده این بخش مجوز لازم را ندارید." />
       </div>
@@ -363,7 +363,7 @@ export function BusinessUnitsListPage() {
             { label: "سازمان", href: "/dashboard/organization" },
             { label: "واحد کسب‌وکار" },
           ]}
-          icon={Layers}
+          icon={<Layers className="h-4 w-4" />}
           actions={
             canManage && membership === "active" ? (
               <Button size="sm" onClick={openCreate}>
@@ -571,7 +571,10 @@ export function BusinessUnitsListPage() {
                       ) : null}
                       {visibleCols.has("status") ? (
                         <TableCell>
-                          <StatusChip status={r.is_active !== false ? "active" : "inactive"} />
+                          <StatusChip
+                            label={r.is_active !== false ? "فعال" : "غیرفعال"}
+                            tone={r.is_active !== false ? "success" : "neutral"}
+                          />
                         </TableCell>
                       ) : null}
                       {visibleCols.has("created") ? (
