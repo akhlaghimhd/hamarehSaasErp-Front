@@ -15,6 +15,7 @@ export {
   useCreateCompany,
   useUpdateCompany,
   useSoftDeleteCompany,
+  useRestoreCompany,
   companiesQueryKey,
 } from "./hooks/use-companies";
 export {
