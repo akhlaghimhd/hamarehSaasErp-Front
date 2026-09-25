@@ -375,7 +375,10 @@ export function CompaniesListPage() {
   const runBulk = async (kind: BulkKind, targets: CompanyDto[]) => {
     cancelRef.current = false;
     const filtered = filterTargetsForKind(kind, targets);
-    if (filtered.length === 0) { setConfirm(null); return; }
+    if (filtered.length === 0) {
+      setConfirm(null);
+      return;
+    }
     setBulkBusy(true);
     setBulkProgress({ done: 0, total: filtered.length });
     let ok = 0;
@@ -457,6 +460,659 @@ export function CompaniesListPage() {
     if (fail) toast.error(`${toFaDigits(fail)} مورد انجام نشد`);
   };
 
-  // CONTINUED_IN_NEXT_PUSH - partial to avoid truncation
-  return null;
+  if (!canView) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="شرکت‌ها" breadcrumbs={[{ label: "سازمان", href: "/dashboard/organization" }, { label: "شرکت‌ها" }]} />
+        <div className="rounded-xl border border-dashed px-6 py-12 text-center text-sm text-muted-foreground">{MSG_NO_ACCESS}</div>
+      </div>
+    );
+  }
+
+  return (
+    <TooltipProvider delayDuration={200}>
+      <div className="flex min-h-0 flex-col gap-3">
+        <PageHeader
+          title="شرکت‌ها"
+          description="فهرست شرکت‌های سازمان — ویرایش، فعال‌سازی و مدیریت ساختار"
+          breadcrumbs={[
+            { label: "داشبورد", href: "/dashboard" },
+            { label: "سازمان", href: "/dashboard/organization" },
+            { label: "شرکت‌ها" },
+          ]}
+          actions={
+            canCreate ? (
+              <Button size="sm" className="h-8 gap-1.5" onClick={openCreate}>
+                <Plus className="h-4 w-4" />
+                شرکت جدید
+              </Button>
+            ) : null
+          }
+        />
+
+        {isError ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            <p className="font-medium">بارگذاری فهرست ممکن نشد</p>
+            <p className="mt-1 text-xs">{error instanceof ApiClientError && error.message ? error.message : MSG_LOAD}</p>
+            <Button variant="outline" size="sm" className="mt-3 h-8" onClick={() => void refetch()}>
+              تلاش مجدد
+            </Button>
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[12rem] flex-1 sm:max-w-sm">
+            <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className={cn("h-8 ps-8 text-sm", query && "pe-8")}
+              placeholder="نام، کد، شماره ثبت…"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setPage(1);
+              }}
+            />
+            {query ? (
+              <button
+                type="button"
+                className="absolute end-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted"
+                aria-label="پاک کردن جستجو"
+                onClick={() => {
+                  setQuery("");
+                  setPage(1);
+                }}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+          </div>
+          <Select value={membershipFilter} onValueChange={(v) => setMembershipFilter(v as CompanyListFilter)}>
+            <SelectTrigger className="h-8 w-[10rem]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">شرکت‌های جاری</SelectItem>
+              <SelectItem value="deleted">شرکت‌های حذف‌شده</SelectItem>
+            </SelectContent>
+          </Select>
+          {!isDeletedView ? (
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => {
+                setStatusFilter(v as StatusFilter);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="h-8 w-[8.5rem]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">همه وضعیت‌ها</SelectItem>
+                <SelectItem value="active">فعال</SelectItem>
+                <SelectItem value="inactive">غیرفعال</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : null}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5">
+                <Columns3 className="h-3.5 w-3.5" />
+                ستون‌ها
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>نمایش ستون‌ها</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {COLS.filter((c) => c.hideable !== false).map((c) => (
+                <DropdownMenuItem
+                  key={c.id}
+                  className="gap-2"
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setVisible((p) => ({ ...p, [c.id]: !p[c.id] }));
+                  }}
+                >
+                  <Checkbox checked={visible[c.id]} className="pointer-events-none" />
+                  <span>{c.label}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5">
+                <Download className="h-3.5 w-3.5" />
+                خروجی
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>{exportLabel}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="gap-2" onSelect={() => exportCompaniesExcel(exportTarget, parentMap)}>
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                اکسل
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onSelect={() => exportCompaniesPdf(exportTarget, parentMap)}>
+                <FileText className="h-3.5 w-3.5" />
+                PDF / چاپ
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {isFetching && !isLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
+        </div>
+
+        {selected.size > 0 || bulkBusy ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted/30 px-3 py-2">
+            <span className="text-xs text-muted-foreground">
+              {bulkBusy
+                ? `در حال انجام… ${toFaDigits(bulkProgress.done)} / ${toFaDigits(bulkProgress.total)}`
+                : `${toFaDigits(selected.size)} مورد انتخاب‌شده`}
+            </span>
+            {bulkBusy ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7"
+                onClick={() => {
+                  cancelRef.current = true;
+                  toast.message("توقف درخواست شد؛ مورد جاری تمام می‌شود، بقیه لغو و موارد انجام‌شده بازگردانی می‌شوند.");
+                }}
+              >
+                توقف
+              </Button>
+            ) : isDeletedView ? (
+              <Button type="button" size="sm" className="h-7 gap-1" onClick={() => requestBulk("restore", selectedRows)}>
+                <RotateCcw className="h-3.5 w-3.5" />
+                بازگردانی
+              </Button>
+            ) : (
+              <>
+                {canUpdate ? (
+                  <>
+                    <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => requestBulk("activate", selectedRows)}>
+                      فعال‌سازی
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => requestBulk("deactivate", selectedRows)}>
+                      غیرفعال‌سازی
+                    </Button>
+                  </>
+                ) : null}
+                {canDelete ? (
+                  <Button type="button" size="sm" variant="destructive" className="h-7" onClick={() => requestBulk("delete", selectedRows)}>
+                    حذف
+                  </Button>
+                ) : null}
+              </>
+            )}
+            {!bulkBusy ? (
+              <Button type="button" size="sm" variant="ghost" className="h-7" onClick={() => setSelected(new Set())}>
+                لغو انتخاب
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+
+        <Dialog open={!!confirm} onOpenChange={(open) => { if (!open && !bulkBusy) setConfirm(null); }}>
+          <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => { if (bulkBusy) e.preventDefault(); }}>
+            <DialogHeader>
+              <DialogTitle>{confirm ? confirmTitle(confirm.kind, confirm.count) : ""}</DialogTitle>
+              <DialogDescription className="text-right leading-relaxed">
+                {confirm ? confirmBody(confirm.kind, confirm.count) : ""}
+              </DialogDescription>
+            </DialogHeader>
+            {bulkBusy ? (
+              <p className="text-xs text-muted-foreground">
+                در حال انجام… {toFaDigits(bulkProgress.done)} از {toFaDigits(bulkProgress.total)}
+              </p>
+            ) : null}
+            <DialogFooter className="gap-2 sm:gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (bulkBusy) {
+                    cancelRef.current = true;
+                    toast.message("درخواست توقف ثبت شد؛ عملیات جاری تمام می‌شود، بقیه انجام نمی‌شود و موارد انجام‌شده بازگردانی می‌شوند.");
+                  } else {
+                    setConfirm(null);
+                  }
+                }}
+              >
+                {bulkBusy ? "توقف" : "انصراف"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={confirm?.kind === "delete" ? "destructive" : "default"}
+                disabled={bulkBusy || !confirm}
+                onClick={() => confirm && void runBulk(confirm.kind, confirm.targets)}
+              >
+                {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : confirm ? confirmActionLabel(confirm.kind) : null}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border">
+          {isLoading ? (
+            <div className="space-y-2 p-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : pageRows.length === 0 ? (
+            <EmptyState
+              icon={Building2}
+              title={isFiltered ? "نتیجه‌ای پیدا نشد" : isDeletedView ? "شرکت حذف‌شده‌ای نیست" : "شرکتی ثبت نشده"}
+              description={isFiltered ? "عبارت جستجو یا فیلتر را تغییر دهید." : "اولین شرکت را ثبت کنید."}
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-10 px-2">
+                    <Checkbox
+                      checked={allPageSelected ? true : somePageSelected ? "indeterminate" : false}
+                      onCheckedChange={(v) => {
+                        setSelected((prev) => {
+                          const n = new Set(prev);
+                          if (v) pageIds.forEach((id) => n.add(id));
+                          else pageIds.forEach((id) => n.delete(id));
+                          return n;
+                        });
+                      }}
+                      aria-label="انتخاب صفحه"
+                    />
+                  </TableHead>
+                  {COLS.map((col) =>
+                    visible[col.id] === false ? null : (
+                      <TableHead key={col.id} className="px-2 text-xs">
+                        {col.sort ? (
+                          <button type="button" className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort(col.sort!)}>
+                            {col.label}
+                            <SortIcon k={col.sort} />
+                          </button>
+                        ) : (
+                          col.label
+                        )}
+                      </TableHead>
+                    )
+                  )}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pageRows.map((row) => (
+                  <TableRow key={row.company_id} data-state={selected.has(row.company_id) ? "selected" : undefined}>
+                    <TableCell className="px-2">
+                      <Checkbox
+                        checked={selected.has(row.company_id)}
+                        onCheckedChange={(v) => {
+                          setSelected((prev) => {
+                            const n = new Set(prev);
+                            if (v) n.add(row.company_id);
+                            else n.delete(row.company_id);
+                            return n;
+                          });
+                        }}
+                        aria-label={`انتخاب ${displayName(row)}`}
+                      />
+                    </TableCell>
+                    {visible.name !== false ? (
+                      <TableCell className="px-2">
+                        <div className="flex flex-col gap-0.5">
+                          <Link href={companyDetailPath(row.company_id)} className="font-medium hover:underline">
+                            {displayName(row)}
+                          </Link>
+                          {row.is_primary ? <span className="text-[10px] text-amber-700 dark:text-amber-400">شرکت اصلی</span> : null}
+                        </div>
+                      </TableCell>
+                    ) : null}
+                    {visible.code !== false ? (
+                      <TableCell className="px-2 font-mono text-xs" dir="ltr">
+                        {row.code}
+                      </TableCell>
+                    ) : null}
+                    {visible.kind !== false ? (
+                      <TableCell className="px-2 text-xs">{ENTITY_KIND_LABELS[row.entity_kind ?? "OPERATING"] ?? row.entity_kind ?? "—"}</TableCell>
+                    ) : null}
+                    {visible.reg !== false ? (
+                      <TableCell className="px-2 text-xs text-muted-foreground" dir="ltr">
+                        {row.registration_number || "—"}
+                      </TableCell>
+                    ) : null}
+                    {visible.parent !== false ? (
+                      <TableCell className="px-2 text-xs">{row.parent_company_id ? parentMap.get(row.parent_company_id) ?? "—" : "—"}</TableCell>
+                    ) : null}
+                    {visible.branches !== false ? (
+                      <TableCell className="px-2 text-xs tabular-nums">{toFaDigits(Number(row.branches_count ?? 0))}</TableCell>
+                    ) : null}
+                    {visible.departments !== false ? (
+                      <TableCell className="px-2 text-xs tabular-nums">{toFaDigits(Number(row.departments_count ?? 0))}</TableCell>
+                    ) : null}
+                    {visible.children !== false ? (
+                      <TableCell className="px-2 text-xs tabular-nums">{toFaDigits(Number(row.children_count ?? 0))}</TableCell>
+                    ) : null}
+                    {visible.status !== false ? (
+                      <TableCell className="px-2">
+                        {row.is_active !== false ? <StatusChip label="فعال" tone="success" /> : <StatusChip label="غیرفعال" tone="neutral" />}
+                      </TableCell>
+                    ) : null}
+                    {visible.created !== false ? (
+                      <TableCell className="px-2 text-xs text-muted-foreground">{fd(row.created_at)}</TableCell>
+                    ) : null}
+                    {visible.actions !== false ? (
+                      <TableCell className="px-2">
+                        <div className="flex items-center gap-0.5">
+                          <IconAction label="مشاهده" onClick={() => { window.location.href = companyDetailPath(row.company_id); }}>
+                            <Eye className="h-3.5 w-3.5" />
+                          </IconAction>
+                          {isDeletedView ? (
+                            <IconAction label="بازگردانی" onClick={() => void restoreOne(row)}>
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            </IconAction>
+                          ) : (
+                            <>
+                              {canUpdate ? (
+                                <IconAction label="ویرایش" onClick={() => openEdit(row)}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </IconAction>
+                              ) : null}
+                              {canUpdate ? (
+                                row.is_active !== false ? (
+                                  <IconAction label="غیرفعال‌سازی" onClick={() => requestDeactivate(row)}>
+                                    <PowerOff className="h-3.5 w-3.5" />
+                                  </IconAction>
+                                ) : (
+                                  <IconAction label="فعال‌سازی" onClick={() => void activateOne(row)}>
+                                    <Power className="h-3.5 w-3.5" />
+                                  </IconAction>
+                                )
+                              ) : null}
+                              {canDelete ? (
+                                <IconAction label="حذف" variant="destructive" onClick={() => requestDelete(row)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </IconAction>
+                              ) : null}
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    ) : null}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+
+        {total > 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span>
+              {toFaDigits(total)} مورد · صفحه {toFaDigits(safePage)} از {toFaDigits(totalPages)}
+            </span>
+            <div className="flex items-center gap-2">
+              <Select
+                value={String(pageSize)}
+                onValueChange={(v) => {
+                  setPageSize(Number(v));
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="h-8 w-[4.5rem]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[10, 20, 50, 100].map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {toFaDigits(n)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button type="button" variant="outline" size="sm" className="h-8" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                قبلی
+              </Button>
+              <Button type="button" variant="outline" size="sm" className="h-8" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                بعدی
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        <Sheet
+          open={createOpen}
+          onOpenChange={(open) => {
+            if (!open) forceCloseCreate();
+            else setCreateOpen(true);
+          }}
+        >
+          <SheetContent
+            className="flex w-full flex-col sm:max-w-md"
+            side="left"
+            onInteractOutside={(e) => {
+              if (isDirty) e.preventDefault();
+            }}
+            onEscapeKeyDown={(e) => {
+              if (isDirty) e.preventDefault();
+            }}
+          >
+            <SheetHeader>
+              <SheetTitle>شرکت جدید</SheetTitle>
+            </SheetHeader>
+            <form className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-1" onSubmit={onCreate}>
+              <div className="space-y-3 py-2">
+                <div className="space-y-1.5">
+                  <Label>کد</Label>
+                  <Input className="h-9" dir="ltr" {...form.register("code", { required: true })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>نام</Label>
+                  <Input className="h-9" {...form.register("name", { required: true })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>نام حقوقی</Label>
+                  <Input className="h-9" {...form.register("legal_name")} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>نام تجاری</Label>
+                  <Input className="h-9" {...form.register("trade_name")} />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <Label>شماره ثبت</Label>
+                    <Input className="h-9" dir="ltr" {...form.register("registration_number")} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>کد اقتصادی</Label>
+                    <Input className="h-9" dir="ltr" {...form.register("economic_code")} />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>شناسه مالیاتی</Label>
+                  <Input className="h-9" dir="ltr" {...form.register("tax_identifier")} />
+                </div>
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-medium">{ENTITY_KIND_FIELD_LABEL}</legend>
+                  <div className="space-y-1.5">
+                    {ENTITY_KIND_OPTIONS.map((opt) => (
+                      <label key={opt.value} className="flex cursor-pointer items-start gap-2 rounded-lg border border-border/80 px-3 py-2 hover:bg-muted/40">
+                        <input
+                          type="radio"
+                          className="mt-1"
+                          checked={selectedKind === opt.value}
+                          onChange={() => form.setValue("entity_kind", opt.value, { shouldDirty: true })}
+                        />
+                        <span className="min-w-0 flex-1 text-sm leading-snug">{opt.label}</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="mt-0.5 shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+                              aria-label={`راهنمای ${opt.label}`}
+                              onClick={(e) => e.preventDefault()}
+                            >
+                              <CircleHelp className="h-3.5 w-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[16rem] text-right leading-relaxed">
+                            {opt.tooltip}
+                          </TooltipContent>
+                        </Tooltip>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <div className="space-y-1.5">
+                  <Label>شرکت والد</Label>
+                  <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" {...form.register("parent_company_id")}>
+                    <option value="">— بدون والد —</option>
+                    {rows.map((c) => (
+                      <option key={c.company_id} value={c.company_id}>
+                        {displayName(c)} ({c.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <Label>شرکت اصلی سازمان</Label>
+                  <Switch checked={form.watch("is_primary")} onCheckedChange={(v) => form.setValue("is_primary", v, { shouldDirty: true })} />
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>فعال</Label>
+                  <Switch checked={form.watch("is_active")} onCheckedChange={(v) => form.setValue("is_active", v, { shouldDirty: true })} />
+                </div>
+              </div>
+              <SheetFooter>
+                <Button type="button" variant="outline" size="sm" onClick={forceCloseCreate}>
+                  انصراف
+                </Button>
+                <Button type="submit" size="sm" disabled={createMutation.isPending}>
+                  {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ثبت"}
+                </Button>
+              </SheetFooter>
+            </form>
+          </SheetContent>
+        </Sheet>
+
+        <Sheet
+          open={editOpen}
+          onOpenChange={(open) => {
+            if (!open) forceCloseEdit();
+            else setEditOpen(true);
+          }}
+        >
+          <SheetContent
+            className="flex w-full flex-col sm:max-w-md"
+            side="left"
+            onInteractOutside={(e) => {
+              if (isDirty) e.preventDefault();
+            }}
+            onEscapeKeyDown={(e) => {
+              if (isDirty) e.preventDefault();
+            }}
+          >
+            <SheetHeader>
+              <SheetTitle>ویرایش شرکت</SheetTitle>
+            </SheetHeader>
+            <form className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-1" onSubmit={onEdit}>
+              <div className="space-y-3 py-2">
+                <div className="space-y-1.5">
+                  <Label>کد</Label>
+                  <Input className="h-9" dir="ltr" {...form.register("code", { required: true })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>نام</Label>
+                  <Input className="h-9" {...form.register("name", { required: true })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>نام حقوقی</Label>
+                  <Input className="h-9" {...form.register("legal_name")} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>نام تجاری</Label>
+                  <Input className="h-9" {...form.register("trade_name")} />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <Label>شماره ثبت</Label>
+                    <Input className="h-9" dir="ltr" {...form.register("registration_number")} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>کد اقتصادی</Label>
+                    <Input className="h-9" dir="ltr" {...form.register("economic_code")} />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>شناسه مالیاتی</Label>
+                  <Input className="h-9" dir="ltr" {...form.register("tax_identifier")} />
+                </div>
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-medium">{ENTITY_KIND_FIELD_LABEL}</legend>
+                  <div className="space-y-1.5">
+                    {ENTITY_KIND_OPTIONS.map((opt) => (
+                      <label key={opt.value} className="flex cursor-pointer items-start gap-2 rounded-lg border border-border/80 px-3 py-2 hover:bg-muted/40">
+                        <input
+                          type="radio"
+                          className="mt-1"
+                          checked={selectedKind === opt.value}
+                          onChange={() => form.setValue("entity_kind", opt.value, { shouldDirty: true })}
+                        />
+                        <span className="min-w-0 flex-1 text-sm leading-snug">{opt.label}</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="mt-0.5 shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+                              aria-label={`راهنمای ${opt.label}`}
+                              onClick={(e) => e.preventDefault()}
+                            >
+                              <CircleHelp className="h-3.5 w-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[16rem] text-right leading-relaxed">
+                            {opt.tooltip}
+                          </TooltipContent>
+                        </Tooltip>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <div className="space-y-1.5">
+                  <Label>شرکت والد</Label>
+                  <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" {...form.register("parent_company_id")}>
+                    <option value="">— بدون والد —</option>
+                    {rows
+                      .filter((c) => c.company_id !== editing?.company_id)
+                      .map((c) => (
+                        <option key={c.company_id} value={c.company_id}>
+                          {displayName(c)} ({c.code})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <Label>شرکت اصلی سازمان</Label>
+                  <Switch checked={form.watch("is_primary")} onCheckedChange={(v) => form.setValue("is_primary", v, { shouldDirty: true })} />
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>فعال</Label>
+                  <Switch checked={form.watch("is_active")} onCheckedChange={(v) => form.setValue("is_active", v, { shouldDirty: true })} />
+                </div>
+              </div>
+              <SheetFooter>
+                <Button type="button" variant="outline" size="sm" onClick={forceCloseEdit}>
+                  انصراف
+                </Button>
+                <Button type="submit" size="sm" disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
+                </Button>
+              </SheetFooter>
+            </form>
+          </SheetContent>
+        </Sheet>
+      </div>
+    </TooltipProvider>
+  );
 }
