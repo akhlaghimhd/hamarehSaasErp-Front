@@ -277,6 +277,7 @@ export function BranchesListPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<BranchRow | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<BranchRow | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const form = useForm<BranchForm>({ defaultValues: emptyForm() });
   const isDirty = form.formState.isDirty;
@@ -293,8 +294,10 @@ export function BranchesListPage() {
     })),
   });
 
-  const isLoading =
-    companiesLoading || branchQueries.some((q) => q.isLoading || q.isFetching);
+  const isInitialLoading =
+    companiesLoading ||
+    (companyList.length > 0 && branchQueries.every((q) => q.isLoading && !q.data));
+  const isRefreshing = branchQueries.some((q) => q.isFetching && !q.isLoading);
   const isError = branchQueries.some((q) => q.isError);
 
   const allRows: BranchRow[] = useMemo(() => {
@@ -401,9 +404,7 @@ export function BranchesListPage() {
 
   const openCreate = () => {
     const base = emptyForm();
-    if (companyFilter !== ALL) {
-      base.company_id = companyFilter;
-    }
+    if (companyFilter !== ALL) base.company_id = companyFilter;
     form.reset(base);
     setEditing(null);
     setCreateOpen(true);
@@ -514,6 +515,39 @@ export function BranchesListPage() {
     }
   };
 
+  const restoreSelected = async () => {
+    if (selectedRows.length === 0) return;
+    setBulkBusy(true);
+    const companyIds = new Set<string>();
+    let ok = 0;
+    let fail = 0;
+    for (const row of selectedRows) {
+      try {
+        await branchService.restore(row.branch_id);
+        companyIds.add(row.company_id);
+        ok += 1;
+      } catch {
+        fail += 1;
+      }
+    }
+    setSelected(new Set());
+    for (const cid of companyIds) {
+      invalidateBranchLists(cid);
+    }
+    setBulkBusy(false);
+    if (ok > 0 && fail === 0) {
+      toast.success(
+        ok === 1
+          ? "۱ شعبه بازگردانی شد و غیرفعال باقی ماند."
+          : `${toFaDigits(ok)} شعبه بازگردانی شد و غیرفعال باقی ماندند.`
+      );
+    } else if (ok > 0) {
+      toast.success(`${toFaDigits(ok)} بازگردانی شد؛ ${toFaDigits(fail)} ناموفق.`);
+    } else {
+      toast.error(MSG_ERR);
+    }
+  };
+
   const doDelete = async () => {
     if (!confirmDelete) return;
     try {
@@ -535,23 +569,14 @@ export function BranchesListPage() {
     <div className="space-y-5">
       <div className="space-y-1.5">
         <Label htmlFor="branch-company">شرکت *</Label>
-        <select
-          id="branch-company"
-          className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-          {...form.register("company_id", { required: true })}
-          disabled={Boolean(editing)}
-        >
+        <select id="branch-company" className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" {...form.register("company_id", { required: true })} disabled={Boolean(editing)}>
           <option value="">— انتخاب شرکت —</option>
           {companyList.map((c) => (
             <option key={c.company_id} value={c.company_id}>
-              {c.legal_name || c.name}
-              {c.is_primary ? " (اصلی)" : ""}
+              {c.legal_name || c.name}{c.is_primary ? " (اصلی)" : ""}
             </option>
           ))}
         </select>
-        {editing ? (
-          <p className="text-[11px] text-muted-foreground">شرکت پس از ثبت قابل تغییر از این فرم نیست.</p>
-        ) : null}
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
@@ -569,88 +594,35 @@ export function BranchesListPage() {
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="branch-kind">نوع شعبه</Label>
-        <select
-          id="branch-kind"
-          className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-          {...form.register("branch_kind")}
-        >
+        <select id="branch-kind" className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" {...form.register("branch_kind")}>
           {Object.entries(BRANCH_KIND_LABELS).map(([k, label]) => (
-            <option key={k} value={k}>
-              {label}
-            </option>
+            <option key={k} value={k}>{label}</option>
           ))}
         </select>
       </div>
       <div className="space-y-3 rounded-xl border border-border/80 bg-muted/20 p-3">
         <p className="text-xs font-medium text-muted-foreground">ویژگی‌ها و وضعیت</p>
-        <div className="flex items-center justify-between gap-3">
-          <button
-            type="button"
-            className="flex min-w-0 flex-1 items-center gap-1.5 text-start"
-            onClick={() => form.setValue("is_active", !form.getValues("is_active"), { shouldDirty: true })}
-          >
-            <span className="text-sm font-medium">فعال</span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="inline-flex shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground" onClick={(e) => e.stopPropagation()} aria-label="راهنمای فعال">
-                  <CircleHelp className="h-3.5 w-3.5" />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-[16rem] text-right leading-relaxed">
-                اگر غیرفعال باشد، این شعبه در عملیات روزمره قابل انتخاب نیست.
-              </TooltipContent>
-            </Tooltip>
-          </button>
-          <Switch checked={form.watch("is_active")} onCheckedChange={(v) => form.setValue("is_active", v, { shouldDirty: true })} />
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <button type="button" className="flex min-w-0 flex-1 items-center gap-1.5 text-start" onClick={() => form.setValue("supports_shipping", !form.getValues("supports_shipping"), { shouldDirty: true })}>
-            <span className="text-sm font-medium">قابل ارسال</span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="inline-flex shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground" onClick={(e) => e.stopPropagation()} aria-label="راهنمای قابل ارسال">
-                  <CircleHelp className="h-3.5 w-3.5" />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-[16rem] text-right leading-relaxed">
-                از این محل می‌توان کالا را برای مشتری یا شعبه دیگر ارسال کرد (انبار خروجی / بارگیری).
-              </TooltipContent>
-            </Tooltip>
-          </button>
-          <Switch checked={form.watch("supports_shipping")} onCheckedChange={(v) => form.setValue("supports_shipping", v, { shouldDirty: true })} />
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <button type="button" className="flex min-w-0 flex-1 items-center gap-1.5 text-start" onClick={() => form.setValue("supports_receiving", !form.getValues("supports_receiving"), { shouldDirty: true })}>
-            <span className="text-sm font-medium">قابل دریافت</span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="inline-flex shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground" onClick={(e) => e.stopPropagation()} aria-label="راهنمای قابل دریافت">
-                  <CircleHelp className="h-3.5 w-3.5" />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-[16rem] text-right leading-relaxed">
-                در این محل می‌توان محموله خرید یا انتقال را تحویل گرفت (انبار ورودی / تخلیه).
-              </TooltipContent>
-            </Tooltip>
-          </button>
-          <Switch checked={form.watch("supports_receiving")} onCheckedChange={(v) => form.setValue("supports_receiving", v, { shouldDirty: true })} />
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <button type="button" className="flex min-w-0 flex-1 items-center gap-1.5 text-start" onClick={() => form.setValue("is_manufacturing_site", !form.getValues("is_manufacturing_site"), { shouldDirty: true })}>
-            <span className="text-sm font-medium">سایت تولیدی</span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="inline-flex shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground" onClick={(e) => e.stopPropagation()} aria-label="راهنمای سایت تولیدی">
-                  <CircleHelp className="h-3.5 w-3.5" />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-[16rem] text-right leading-relaxed">
-                این محل خط تولید یا کارگاه دارد و برای برنامه‌ریزی ساخت و مصرف مواد استفاده می‌شود.
-              </TooltipContent>
-            </Tooltip>
-          </button>
-          <Switch checked={form.watch("is_manufacturing_site")} onCheckedChange={(v) => form.setValue("is_manufacturing_site", v, { shouldDirty: true })} />
-        </div>
+        {([
+          ["is_active", "فعال", "اگر غیرفعال باشد، این شعبه در عملیات روزمره قابل انتخاب نیست."],
+          ["supports_shipping", "قابل ارسال", "از این محل می‌توان کالا را برای مشتری یا شعبه دیگر ارسال کرد."],
+          ["supports_receiving", "قابل دریافت", "در این محل می‌توان محموله خرید یا انتقال را تحویل گرفت."],
+          ["is_manufacturing_site", "سایت تولیدی", "این محل خط تولید یا کارگاه دارد."],
+        ] as const).map(([key, label, help]) => (
+          <div key={key} className="flex items-center justify-between gap-3">
+            <button type="button" className="flex min-w-0 flex-1 items-center gap-1.5 text-start" onClick={() => form.setValue(key, !form.getValues(key), { shouldDirty: true })}>
+              <span className="text-sm font-medium">{label}</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex shrink-0 rounded-full p-0.5 text-muted-foreground" onClick={(e) => e.stopPropagation()} aria-label={`راهنمای ${label}`}>
+                    <CircleHelp className="h-3.5 w-3.5" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[16rem] text-right leading-relaxed">{help}</TooltipContent>
+              </Tooltip>
+            </button>
+            <Switch checked={form.watch(key)} onCheckedChange={(v) => form.setValue(key, v, { shouldDirty: true })} />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -694,15 +666,7 @@ export function BranchesListPage() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[12rem] flex-1 sm:max-w-sm">
             <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className={cn("h-8 ps-8 text-sm", query && "pe-8")}
-              placeholder="نام، کد، شرکت…"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setPage(1);
-              }}
-            />
+            <Input className={cn("h-8 ps-8 text-sm", query && "pe-8")} placeholder="نام، کد، شرکت…" value={query} onChange={(e) => { setQuery(e.target.value); setPage(1); }} />
             {query ? (
               <button type="button" className="absolute end-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted" aria-label="پاک کردن جستجو" onClick={() => { setQuery(""); setPage(1); }}>
                 <X className="h-3.5 w-3.5" />
@@ -710,30 +674,18 @@ export function BranchesListPage() {
             ) : null}
           </div>
           <Select value={companyFilter} onValueChange={(v) => { setCompanyFilter(v); setPage(1); }}>
-            <SelectTrigger className="h-8 w-[12rem]">
-              <SelectValue placeholder="شرکت" />
-            </SelectTrigger>
+            <SelectTrigger className="h-8 w-[12rem]"><SelectValue placeholder="شرکت" /></SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>همه شرکت‌ها</SelectItem>
               {companyList.map((c) => (
                 <SelectItem key={c.company_id} value={c.company_id}>
-                  {c.legal_name || c.name}
-                  {c.is_primary ? " (اصلی)" : ""}
+                  {c.legal_name || c.name}{c.is_primary ? " (اصلی)" : ""}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Select
-            value={membershipFilter}
-            onValueChange={(v) => {
-              setMembershipFilter(v as BranchListFilter);
-              setSelected(new Set());
-              setPage(1);
-            }}
-          >
-            <SelectTrigger className="h-8 w-[10rem]">
-              <SelectValue />
-            </SelectTrigger>
+          <Select value={membershipFilter} onValueChange={(v) => { setMembershipFilter(v as BranchListFilter); setSelected(new Set()); setPage(1); }}>
+            <SelectTrigger className="h-8 w-[10rem]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="active">شعب جاری</SelectItem>
               <SelectItem value="deleted">شعب حذف‌شده</SelectItem>
@@ -741,9 +693,7 @@ export function BranchesListPage() {
           </Select>
           {!isDeletedView ? (
             <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as StatusFilter); setPage(1); }}>
-              <SelectTrigger className="h-8 w-[8.5rem]">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="h-8 w-[8.5rem]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">همه وضعیت‌ها</SelectItem>
                 <SelectItem value="active">فعال</SelectItem>
@@ -753,10 +703,7 @@ export function BranchesListPage() {
           ) : null}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5">
-                <Columns3 className="h-3.5 w-3.5" />
-                ستون‌ها
-              </Button>
+              <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5"><Columns3 className="h-3.5 w-3.5" />ستون‌ها</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel>نمایش ستون‌ها</DropdownMenuLabel>
@@ -771,26 +718,15 @@ export function BranchesListPage() {
           </DropdownMenu>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5">
-                <Download className="h-3.5 w-3.5" />
-                خروجی
-              </Button>
+              <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5"><Download className="h-3.5 w-3.5" />خروجی</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>
-                {selected.size > 0
-                  ? `خروجی انتخاب‌شده‌ها (${toFaDigits(selected.size)})`
-                  : `خروجی فهرست فعلی (${toFaDigits(total)})`}
+                {selected.size > 0 ? `خروجی انتخاب‌شده‌ها (${toFaDigits(selected.size)})` : `خروجی فهرست فعلی (${toFaDigits(total)})`}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="gap-2" onSelect={() => exportExcel(exportTarget)}>
-                <FileSpreadsheet className="h-3.5 w-3.5" />
-                اکسل
-              </DropdownMenuItem>
-              <DropdownMenuItem className="gap-2" onSelect={() => exportPdf(exportTarget)}>
-                <FileText className="h-3.5 w-3.5" />
-                چاپ / پی‌دی‌اف
-              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onSelect={() => exportExcel(exportTarget)}><FileSpreadsheet className="h-3.5 w-3.5" />اکسل</DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onSelect={() => exportPdf(exportTarget)}><FileText className="h-3.5 w-3.5" />چاپ / پی‌دی‌اف</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -798,14 +734,20 @@ export function BranchesListPage() {
         {selected.size > 0 ? (
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted/30 px-3 py-2">
             <span className="text-xs text-muted-foreground">{toFaDigits(selected.size)} مورد انتخاب‌شده</span>
-            <Button type="button" size="sm" variant="ghost" className="h-7" onClick={() => setSelected(new Set())}>
+            {isDeletedView && canUpdate ? (
+              <Button type="button" size="sm" className="h-7 gap-1.5" disabled={bulkBusy} onClick={() => void restoreSelected()}>
+                {bulkBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                بازگردانی گروهی
+              </Button>
+            ) : null}
+            <Button type="button" size="sm" variant="ghost" className="h-7" disabled={bulkBusy} onClick={() => setSelected(new Set())}>
               لغو انتخاب
             </Button>
           </div>
         ) : null}
 
-        <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border">
-          {isLoading ? (
+        <div className={cn("min-h-0 flex-1 overflow-auto rounded-xl border border-border transition-opacity", isRefreshing && !isInitialLoading && "opacity-70")}>
+          {isInitialLoading ? (
             <div className="space-y-2 p-4">{Array.from({ length: 8 }).map((_, i) => (<Skeleton key={i} className="h-10 w-full" />))}</div>
           ) : pageRows.length === 0 ? (
             <EmptyState
@@ -836,12 +778,9 @@ export function BranchesListPage() {
                       <TableHead key={col.id} className="px-2 text-xs">
                         {col.sort ? (
                           <button type="button" className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort(col.sort!)}>
-                            {col.label}
-                            <SortIcon k={col.sort} />
+                            {col.label}<SortIcon k={col.sort} />
                           </button>
-                        ) : (
-                          col.label
-                        )}
+                        ) : col.label}
                       </TableHead>
                     )
                   )}
@@ -902,25 +841,17 @@ export function BranchesListPage() {
                           ) : (
                             <>
                               {canUpdate ? (
-                                <IconAction label="ویرایش" onClick={() => openEdit(row)}>
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </IconAction>
+                                <IconAction label="ویرایش" onClick={() => openEdit(row)}><Pencil className="h-3.5 w-3.5" /></IconAction>
                               ) : null}
                               {canUpdate ? (
                                 row.is_active !== false ? (
-                                  <IconAction label="غیرفعال‌سازی" onClick={() => void setActive(row, false)}>
-                                    <PowerOff className="h-3.5 w-3.5" />
-                                  </IconAction>
+                                  <IconAction label="غیرفعال‌سازی" onClick={() => void setActive(row, false)}><PowerOff className="h-3.5 w-3.5" /></IconAction>
                                 ) : (
-                                  <IconAction label="فعال‌سازی" onClick={() => void setActive(row, true)}>
-                                    <Power className="h-3.5 w-3.5" />
-                                  </IconAction>
+                                  <IconAction label="فعال‌سازی" onClick={() => void setActive(row, true)}><Power className="h-3.5 w-3.5" /></IconAction>
                                 )
                               ) : null}
                               {canDelete ? (
-                                <IconAction label="حذف" variant="destructive" onClick={() => setConfirmDelete(row)}>
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </IconAction>
+                                <IconAction label="حذف" variant="destructive" onClick={() => setConfirmDelete(row)}><Trash2 className="h-3.5 w-3.5" /></IconAction>
                               ) : null}
                             </>
                           )}
@@ -956,9 +887,7 @@ export function BranchesListPage() {
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>تأیید حذف شعبه</DialogTitle>
-              <DialogDescription className="text-right leading-relaxed">
-                شعبه «{confirmDelete?.name}» حذف می‌شود. سوابق حفظ می‌شود.
-              </DialogDescription>
+              <DialogDescription className="text-right leading-relaxed">شعبه «{confirmDelete?.name}» حذف می‌شود. سوابق حفظ می‌شود.</DialogDescription>
             </DialogHeader>
             <DialogFooter className="gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setConfirmDelete(null)}>انصراف</Button>
