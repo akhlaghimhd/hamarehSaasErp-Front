@@ -64,6 +64,10 @@ export type CompanyDto = {
   base_currency_id?: string | null;
   chart_of_accounts_id?: string | null;
   default_consol_rate_type?: ConsolRateType | string | null;
+  /** List API withCount */
+  branches_count?: number;
+  departments_count?: number;
+  children_count?: number;
   row_version?: number;
   created_at?: string | null;
   updated_at?: string | null;
