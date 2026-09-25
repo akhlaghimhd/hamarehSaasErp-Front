@@ -43,10 +43,10 @@ export function formatJalaliDateTime(value?: string | null): string {
 
 function escapeHtml(s: string) {
   return String(s)
-    .replace(/&/g, "&")
-    .replace(/</g, "<")
-    .replace(/>/g, ">")
-    .replace(/"/g, """);
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function downloadArrayBuffer(filename: string, data: ArrayBuffer, mime: string) {
@@ -148,6 +148,9 @@ export function exportCompaniesPdf(
     })
     .join("");
 
+  const stamp = escapeHtml(formatJalaliDateTime(new Date().toISOString()));
+  const count = toFaDigits(rows.length);
+
   const html = `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -183,7 +186,7 @@ export function exportCompaniesPdf(
 </head>
 <body>
   <h1>فهرست شرکت‌های سازمان</h1>
-  <p>تاریخ تهیه: ${"${"}escapeHtml(formatJalaliDateTime(new Date().toISOString()))} · تعداد: ${"${"}toFaDigits(rows.length)}</p>
+  <p>تاریخ تهیه: ${stamp} · تعداد: ${count}</p>
   <table>
     <thead>
       <tr>
@@ -191,7 +194,7 @@ export function exportCompaniesPdf(
         <th>شعب</th><th>واحد</th><th>زیرمجموعه</th><th>وضعیت</th><th>ایجاد</th>
       </tr>
     </thead>
-    <tbody>${"${"}body}</tbody>
+    <tbody>${body}</tbody>
   </table>
   <script>
     document.fonts.ready.then(function () {
