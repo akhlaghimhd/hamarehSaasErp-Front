@@ -2,14 +2,20 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { tokenStorage } from "@/api";
-import { departmentService } from "../services/department-service";
+import {
+  departmentService,
+  type DepartmentListFilter,
+} from "../services/department-service";
 import type {
   CreateDepartmentPayload,
   UpdateDepartmentPayload,
 } from "../types";
 
-export function departmentsQueryKey(companyId: string) {
-  return ["organization", "companies", companyId, "departments"] as const;
+export function departmentsQueryKey(
+  companyId: string,
+  membership: DepartmentListFilter = "active"
+) {
+  return ["organization", "companies", companyId, "departments", membership] as const;
 }
 
 function hasAuthContext(): boolean {
@@ -17,12 +23,33 @@ function hasAuthContext(): boolean {
   return Boolean(tokenStorage.getAccessToken() && tokenStorage.getTenantId());
 }
 
-export function useDepartments(companyId: string | null | undefined) {
+function invalidateDepartmentLists(
+  qc: ReturnType<typeof useQueryClient>,
+  companyId?: string
+) {
+  if (companyId) {
+    void qc.invalidateQueries({
+      queryKey: ["organization", "companies", companyId, "departments"],
+    });
+  } else {
+    void qc.invalidateQueries({
+      predicate: (q) =>
+        Array.isArray(q.queryKey) &&
+        q.queryKey[0] === "organization" &&
+        q.queryKey[3] === "departments",
+    });
+  }
+}
+
+export function useDepartments(
+  companyId: string | null | undefined,
+  membership: DepartmentListFilter = "active"
+) {
   return useQuery({
-    queryKey: departmentsQueryKey(companyId ?? ""),
+    queryKey: departmentsQueryKey(companyId ?? "", membership),
     queryFn: () =>
       companyId
-        ? departmentService.listByCompany(companyId)
+        ? departmentService.listByCompany(companyId, membership)
         : Promise.resolve([]),
     enabled: Boolean(companyId) && hasAuthContext(),
     staleTime: 60_000,
@@ -36,7 +63,7 @@ export function useCreateDepartment(companyId: string) {
     mutationFn: (payload: CreateDepartmentPayload) =>
       departmentService.create(companyId, payload),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: departmentsQueryKey(companyId) });
+      invalidateDepartmentLists(qc, companyId);
     },
   });
 }
@@ -52,7 +79,7 @@ export function useUpdateDepartment(companyId: string) {
       payload: UpdateDepartmentPayload;
     }) => departmentService.update(departmentId, payload),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: departmentsQueryKey(companyId) });
+      invalidateDepartmentLists(qc, companyId);
     },
   });
 }
@@ -63,7 +90,18 @@ export function useSoftDeleteDepartment(companyId: string) {
     mutationFn: (departmentId: string) =>
       departmentService.softDelete(departmentId),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: departmentsQueryKey(companyId) });
+      invalidateDepartmentLists(qc, companyId);
+    },
+  });
+}
+
+export function useRestoreDepartment(companyId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (departmentId: string) =>
+      departmentService.restore(departmentId),
+    onSuccess: () => {
+      invalidateDepartmentLists(qc, companyId);
     },
   });
 }
