@@ -1,7 +1,9 @@
 /**
- * FE-ORG companies list implementation entry.
- * Full page lives in companies-list.tsx (single source of truth).
+ * FE-ORG companies list — re-export will be replaced with full page.
  */
 "use client";
 
-export { CompaniesListPage } from "./companies-list";
+// Temporary stub until full page content is restored on this path.
+export function CompaniesListPage() {
+  return null;
+}
