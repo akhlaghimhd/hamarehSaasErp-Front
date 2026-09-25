@@ -1,13 +1,15 @@
 /**
- * FE-ORG — فهرست سلسله‌مراتب سازمانی
- * گره‌ها با نام موجودیت نمایش داده می‌شوند (نه شناسه دیتابیس).
+ * FE-ORG — سلسله‌مراتب (Smart Hierarchy Product Law v1.0)
+ * ساده: بدون اجبار به طراحی درخت
+ * استاندارد+: نمای ساختار سیستمی + نام موجودیت‌ها
+ * پیشرفته: افزودن گره دستی با انتخاب نام
  */
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ChevronDown, ChevronLeft, GitBranch, Loader2, Network, Plus, Search,
+  ChevronDown, ChevronLeft, GitBranch, Info, Loader2, Network, Plus, Search, Sparkles,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -34,6 +36,7 @@ import {
 } from "../services/org-extended-service";
 import { organizationPaths } from "../services/paths";
 import { OrganizationPermissions } from "../types";
+import Link from "next/link";
 
 const MSG_ERR = "انجام این کار ممکن نشد. کمی بعد دوباره تلاش کنید.";
 
@@ -43,6 +46,14 @@ const PURPOSE_LABEL: Record<string, string> = {
   TAX: "مالیاتی",
   ESTABLISHMENT: "استقرار",
   CUSTOM: "سفارشی",
+};
+
+const PURPOSE_HINT: Record<string, string> = {
+  LEGAL: "از روی شرکت‌ها و رابطهٔ مادر/زیرمجموعه ساخته می‌شود",
+  ESTABLISHMENT: "از روی شرکت و شعبه‌های هر شرکت ساخته می‌شود",
+  MANAGEMENT: "نمای مدیریتی (در صورت وجود داده)",
+  TAX: "در نسخهٔ فعلی به‌صورت خودکار اجباری نیست",
+  CUSTOM: "معمولاً بر اساس واحدهای کسب‌وکار",
 };
 
 const ENTITY_LABEL: Record<string, string> = {
@@ -55,8 +66,9 @@ const ENTITY_LABEL: Record<string, string> = {
 
 type HierForm = { code: string; name: string; purpose: string };
 type NodeForm = { entity_type: string; entity_id: string; parent_node_id: string };
-
 type CatalogItem = { id: string; label: string; sub?: string };
+/** simple | standard | advanced — قانون محصول v1 */
+type HierarchyTier = "simple" | "standard" | "advanced";
 
 function hasAuthContext(): boolean {
   if (typeof window === "undefined") return false;
@@ -124,7 +136,6 @@ export function HierarchiesListPage() {
     staleTime: 60_000,
   });
 
-  /** شعب + واحدهای سازمانی + مراکز هزینه از همه شرکت‌ها (برای برچسب و فرم) */
   const structureCatalog = useQuery({
     queryKey: ["org", "hierarchy-structure-catalog", (companies ?? []).map((c) => c.company_id).join(",")],
     queryFn: async () => {
@@ -132,16 +143,19 @@ export function HierarchiesListPage() {
       const branches: CatalogItem[] = [];
       const departments: CatalogItem[] = [];
       const costCenters: CatalogItem[] = [];
+      let branchCount = 0;
 
       await Promise.all(
         list.map(async (c) => {
           const cName = c.legal_name || c.name || "";
           try {
             const brEnv = await apiGet(organizationPaths.companyBranches(c.company_id));
-            for (const b of unwrapList<{ branch_id: string; name?: string; code?: string }>(brEnv)) {
+            const brs = unwrapList<{ branch_id: string; name?: string; code?: string }>(brEnv);
+            branchCount += brs.length;
+            for (const b of brs) {
               branches.push({
                 id: b.branch_id,
-                label: b.name || b.code || b.branch_id,
+                label: b.name || b.code || "شعبه",
                 sub: cName,
               });
             }
@@ -151,7 +165,7 @@ export function HierarchiesListPage() {
             for (const d of unwrapList<{ department_id: string; name?: string; code?: string }>(depEnv)) {
               departments.push({
                 id: d.department_id,
-                label: d.name || d.code || d.department_id,
+                label: d.name || d.code || "واحد",
                 sub: cName,
               });
             }
@@ -161,7 +175,7 @@ export function HierarchiesListPage() {
             for (const cc of unwrapList<{ cost_center_id: string; name?: string; code?: string }>(ccEnv)) {
               costCenters.push({
                 id: cc.cost_center_id,
-                label: cc.name || cc.code || cc.cost_center_id,
+                label: cc.name || cc.code || "مرکز هزینه",
                 sub: cName,
               });
             }
@@ -169,11 +183,27 @@ export function HierarchiesListPage() {
         })
       );
 
-      return { branches, departments, costCenters };
+      return { branches, departments, costCenters, branchCount };
     },
     enabled: canView && hasAuthContext() && (companies ?? []).length > 0,
     staleTime: 60_000,
   });
+
+  const companyCount = (companies ?? []).length;
+  const branchCount = structureCatalog.data?.branchCount ?? 0;
+  const buCount = (buQuery.data ?? []).length;
+
+  /**
+   * تا آماده‌شدن API فیچرپک: سطح از روی دادهٔ واقعی تخمین زده می‌شود.
+   * simple: حداکثر یک شرکت و حداکثر یک شعبه
+   * advanced: چند شرکت یا چند واحد کسب‌وکار (امکان گره دستی)
+   * standard: چند شعبه یا بیش از ساختار حداقلی
+   */
+  const tier: HierarchyTier = useMemo(() => {
+    if (companyCount <= 1 && branchCount <= 1 && buCount <= 1) return "simple";
+    if (companyCount > 1 || buCount > 1) return "advanced";
+    return "standard";
+  }, [companyCount, branchCount, buCount]);
 
   const companyCatalog: CatalogItem[] = useMemo(
     () =>
@@ -208,12 +238,11 @@ export function HierarchiesListPage() {
   function resolveEntityLabel(entityType: string, entityId: string): string {
     const hit = (entityCatalog[entityType] ?? []).find((x) => x.id === entityId);
     if (hit) return hit.label;
-    return `${ENTITY_LABEL[entityType] ?? entityType}`;
+    return ENTITY_LABEL[entityType] ?? "مورد"
   }
 
   function resolveEntitySub(entityType: string, entityId: string): string | undefined {
-    const hit = (entityCatalog[entityType] ?? []).find((x) => x.id === entityId);
-    return hit?.sub;
+    return (entityCatalog[entityType] ?? []).find((x) => x.id === entityId)?.sub;
   }
 
   const nodeById = useMemo(() => {
@@ -246,18 +275,31 @@ export function HierarchiesListPage() {
     return list;
   }, [rows, purposeFilter, search]);
 
+  const allowCreateHierarchy = canManage && tier === "advanced";
+  const allowAddNode = canManage && (tier === "advanced" || tier === "standard");
+
   function openCreate() {
-    form.reset({ code: "", name: "", purpose: "LEGAL" });
+    if (!allowCreateHierarchy) {
+      toast.message("در این سطح، درخت‌ها توسط سیستم از روی شرکت و شعبه ساخته می‌شوند.");
+      return;
+    }
+    form.reset({ code: "", name: "", purpose: "CUSTOM" });
     setSheetOpen(true);
   }
 
   function openAddNode(h: HierarchyDto) {
+    if (!allowAddNode) {
+      toast.message("برای تغییر ساختار، شرکت یا شعبه را از همان بخش‌ها ویرایش کنید.");
+      return;
+    }
+    if (tier === "standard") {
+      toast.message("گره‌های سیستمی از روی شرکت و شعبه می‌آیند. افزودن دستی بیشتر برای حالت پیشرفته است.");
+    }
     setActiveHierarchy(h);
     setExpandedId(h.hierarchy_id);
-    const firstCompany = companyCatalog[0]?.id ?? "";
     nodeForm.reset({
       entity_type: "COMPANY",
-      entity_id: firstCompany,
+      entity_id: companyCatalog[0]?.id ?? "",
       parent_node_id: "",
     });
     setNodeSheetOpen(true);
@@ -295,7 +337,7 @@ export function HierarchiesListPage() {
         entity_id: v.entity_id,
         parent_node_id: v.parent_node_id || null,
       });
-      toast.success("گره به سلسله‌مراتب افزوده شد");
+      toast.success("به نقشه افزوده شد");
       setNodeSheetOpen(false);
       await qc.invalidateQueries({ queryKey: ["org", "hierarchy-nodes", activeHierarchy.hierarchy_id] });
     } catch (e) {
@@ -317,7 +359,7 @@ export function HierarchiesListPage() {
       <div className="space-y-6">
         <PageHeader
           title="سلسله‌مراتب"
-          description="نقشه‌های درختی برای ساختار حقوقی، مدیریتی و استقرار"
+          description="نقشهٔ ساختار سازمان"
           breadcrumbs={[
             { label: "سازمان", href: "/dashboard/organization" },
             { label: "سلسله‌مراتب" },
@@ -329,26 +371,85 @@ export function HierarchiesListPage() {
     );
   }
 
+  /* ——— سطح ساده: بدون اجبار طراحی درخت ——— */
+  if (tier === "simple" && !structureCatalog.isLoading && !listQuery.isLoading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="سلسله‌مراتب"
+          description="در سازمان تک‌خطی نیازی به تنظیم درخت نیست"
+          breadcrumbs={[
+            { label: "سازمان", href: "/dashboard/organization" },
+            { label: "سلسله‌مراتب" },
+          ]}
+          icon={<Network className="h-4 w-4" />}
+        />
+        <div className="rounded-xl border bg-card p-6 md:p-8">
+          <div className="mx-auto flex max-w-lg flex-col items-start gap-3 text-start">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-700">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <h2 className="text-lg font-semibold">ساختار شما ساده است — سیستم خودش مدیریت می‌کند</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              با یک شرکت (و در صورت نیاز یک محل استقرار)، لازم نیست درخت حقوقی یا استقرار را دستی بچینید.
+              کار روزمره را از بخش شرکت و شعبه انجام دهید. وقتی چند شرکت یا چند شعبه داشته باشید،
+              نقشه‌های ساختاری به‌صورت خودکار از روی همان داده‌ها ساخته و اینجا دیده می‌شوند.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button asChild size="sm" variant="default">
+                <Link href="/dashboard/organization/companies">رفتن به شرکت‌ها</Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/dashboard/organization">بازگشت به سازمان</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const showSkeleton = listQuery.isLoading && !listQuery.data;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="سلسله‌مراتب"
-        description="تعریف درخت‌های موازی با هدف حقوقی، مدیریتی، مالیاتی یا استقرار"
+        description={
+          tier === "advanced"
+            ? "نقشه‌های ساختاری سیستم‌ساز + امکان تکمیل دستی"
+            : "نمای ساختار؛ درخت‌ها از روی شرکت و شعبه ساخته می‌شوند"
+        }
         breadcrumbs={[
           { label: "سازمان", href: "/dashboard/organization" },
           { label: "سلسله‌مراتب" },
         ]}
         icon={<Network className="h-4 w-4" />}
         actions={
-          canManage ? (
+          allowCreateHierarchy ? (
             <Button size="sm" onClick={openCreate}>
-              <Plus className="h-4 w-4" /> سلسله‌مراتب جدید
+              <Plus className="h-4 w-4" /> نقشهٔ سفارشی
             </Button>
           ) : null
         }
       />
+
+      <div className="flex gap-3 rounded-lg border border-sky-200/80 bg-sky-50/80 px-3 py-2.5 text-sm text-sky-950 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 opacity-80" />
+        <div className="space-y-1 leading-relaxed">
+          <p>
+            {tier === "advanced"
+              ? "بخشی از این نقشه‌ها را سیستم از روی شرکت، شعبه و واحد کسب‌وکار می‌سازد. می‌توانید گره دستی هم اضافه کنید؛ برای تغییر رابطهٔ واقعی (مثلاً شرکتِ یک شعبه) همان فرم شعبه یا شرکت را ویرایش کنید."
+              : "این صفحه بیشتر «نمای ساختار» است. با ایجاد یا جابه‌جایی شرکت و شعبه، درخت حقوقی و استقرار باید با داده هم‌خوان بماند. ویرایش روزمره را از بخش شرکت و شعبه انجام دهید تا پشتیبانی و گزارش‌ها پایدار بمانند."}
+          </p>
+          <p className="text-xs opacity-80">
+            سطح فعلی بر اساس دادهٔ سازمان شما:{" "}
+            {tier === "advanced" ? "چندبعدی (امکان تکمیل دستی)" : "استاندارد (عمدتاً سیستمی)"}
+            {" · "}
+            {toFaDigits(companyCount)} شرکت · {toFaDigits(branchCount)} شعبه
+          </p>
+        </div>
+      </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[200px] flex-1">
@@ -384,10 +485,10 @@ export function HierarchiesListPage() {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={Network}
-            title="سلسله‌مراتبی ثبت نشده"
-            description="برای شروع، اولین درخت سازمانی را ثبت کنید."
-            actionLabel={canManage ? "سلسله‌مراتب جدید" : undefined}
-            onAction={canManage ? openCreate : undefined}
+            title="هنوز نقشه‌ای ساخته نشده"
+            description="با تکمیل شرکت و شعبه، نقشه‌های حقوقی و استقرار به‌تدریج توسط سیستم پر می‌شوند. در حالت پیشرفته می‌توانید نقشهٔ سفارشی هم تعریف کنید."
+            actionLabel={allowCreateHierarchy ? "نقشهٔ سفارشی" : undefined}
+            onAction={allowCreateHierarchy ? openCreate : undefined}
           />
         ) : (
           <Table>
@@ -398,7 +499,7 @@ export function HierarchiesListPage() {
                 <TableHead>کد</TableHead>
                 <TableHead>هدف</TableHead>
                 <TableHead>وضعیت</TableHead>
-                <TableHead className="w-[120px]">عملیات</TableHead>
+                <TableHead className="w-[130px]">عملیات</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -412,12 +513,17 @@ export function HierarchiesListPage() {
                           type="button"
                           className="rounded p-1 hover:bg-muted"
                           onClick={() => toggleExpand(h.hierarchy_id)}
-                          aria-label={open ? "بستن گره‌ها" : "نمایش گره‌ها"}
+                          aria-label={open ? "بستن" : "نمایش اعضا"}
                         >
                           {open ? <ChevronDown className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
                         </button>
                       </TableCell>
-                      <TableCell className="font-medium">{h.name}</TableCell>
+                      <TableCell>
+                        <div className="font-medium">{h.name}</div>
+                        {PURPOSE_HINT[h.purpose] ? (
+                          <div className="mt-0.5 text-[11px] text-muted-foreground">{PURPOSE_HINT[h.purpose]}</div>
+                        ) : null}
+                      </TableCell>
                       <TableCell className="font-mono text-xs" dir="ltr">{h.code}</TableCell>
                       <TableCell>{purposeLabel(h.purpose)}</TableCell>
                       <TableCell>
@@ -427,11 +533,13 @@ export function HierarchiesListPage() {
                         />
                       </TableCell>
                       <TableCell>
-                        {canManage ? (
+                        {allowAddNode && tier === "advanced" ? (
                           <Button size="sm" variant="outline" className="h-8" onClick={() => openAddNode(h)}>
-                            <GitBranch className="h-3.5 w-3.5" /> افزودن گره
+                            <GitBranch className="h-3.5 w-3.5" /> افزودن
                           </Button>
-                        ) : null}
+                        ) : (
+                          <span className="text-xs text-muted-foreground">نمای سیستمی</span>
+                        )}
                       </TableCell>
                     </TableRow>
                     {open ? (
@@ -439,10 +547,12 @@ export function HierarchiesListPage() {
                         <TableCell colSpan={6} className="p-3">
                           {nodesQuery.isLoading || structureCatalog.isLoading || buQuery.isLoading ? (
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Loader2 className="h-4 w-4 animate-spin" /> در حال بارگذاری گره‌ها…
+                              <Loader2 className="h-4 w-4 animate-spin" /> در حال بارگذاری…
                             </div>
                           ) : (nodesQuery.data ?? []).length === 0 ? (
-                            <p className="text-sm text-muted-foreground">هنوز گره‌ای ثبت نشده است.</p>
+                            <p className="text-sm text-muted-foreground">
+                              عضوی ثبت نشده. با تکمیل شرکت و شعبه، همگام‌سازی سیستم این بخش را پر می‌کند.
+                            </p>
                           ) : (
                             <ul className="space-y-1 text-sm">
                               {(nodesQuery.data ?? [])
@@ -461,9 +571,7 @@ export function HierarchiesListPage() {
                                         {ENTITY_LABEL[n.entity_type] ?? n.entity_type}
                                       </span>
                                       <span className="font-medium">{name}</span>
-                                      {sub ? (
-                                        <span className="text-xs text-muted-foreground">{sub}</span>
-                                      ) : null}
+                                      {sub ? <span className="text-xs text-muted-foreground">{sub}</span> : null}
                                       {parentTxt ? (
                                         <span className="text-xs text-muted-foreground">({parentTxt})</span>
                                       ) : (
@@ -486,16 +594,19 @@ export function HierarchiesListPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        {toFaDigits(filtered.length)} سلسله‌مراتب
+        {toFaDigits(filtered.length)} نقشه
       </p>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent side="right" className="flex w-full flex-col sm:max-w-lg">
           <SheetHeader>
-            <SheetTitle>سلسله‌مراتب جدید</SheetTitle>
+            <SheetTitle>نقشهٔ سفارشی</SheetTitle>
           </SheetHeader>
           <form className="flex flex-1 flex-col" onSubmit={form.handleSubmit(submitHier)}>
             <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+              <p className="text-xs text-muted-foreground">
+                نقشه‌های حقوقی و استقرار را ترجیحاً سیستم می‌سازد. این فرم برای نقشهٔ اضافی (مثلاً سفارشی) است.
+              </p>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>کد *</Label>
@@ -531,18 +642,16 @@ export function HierarchiesListPage() {
       <Sheet open={nodeSheetOpen} onOpenChange={setNodeSheetOpen}>
         <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
           <SheetHeader>
-            <SheetTitle>افزودن گره به «{activeHierarchy?.name}»</SheetTitle>
+            <SheetTitle>افزودن به «{activeHierarchy?.name}»</SheetTitle>
           </SheetHeader>
           <form className="flex flex-1 flex-col" onSubmit={nodeForm.handleSubmit(submitNode)}>
             <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
               <div className="space-y-1.5">
-                <Label>نوع موجودیت</Label>
+                <Label>نوع</Label>
                 <select
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                   {...nodeForm.register("entity_type", {
-                    onChange: () => {
-                      nodeForm.setValue("entity_id", "");
-                    },
+                    onChange: () => nodeForm.setValue("entity_id", ""),
                   })}
                 >
                   {Object.entries(ENTITY_LABEL).map(([k, v]) => (
@@ -551,7 +660,7 @@ export function HierarchiesListPage() {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label>موجودیت *</Label>
+                <Label>مورد *</Label>
                 <select
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                   {...nodeForm.register("entity_id", { required: true })}
@@ -564,13 +673,11 @@ export function HierarchiesListPage() {
                   ))}
                 </select>
                 {optionsForType.length === 0 ? (
-                  <p className="text-[11px] text-muted-foreground">
-                    موردی برای این نوع ثبت نشده است.
-                  </p>
+                  <p className="text-[11px] text-muted-foreground">موردی برای این نوع ثبت نشده است.</p>
                 ) : null}
               </div>
               <div className="space-y-1.5">
-                <Label>گره والد (اختیاری)</Label>
+                <Label>زیرمجموعهٔ (اختیاری)</Label>
                 <select
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                   {...nodeForm.register("parent_node_id")}
