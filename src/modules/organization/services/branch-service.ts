@@ -30,10 +30,18 @@ export const branchService = {
     membership: BranchListFilter = "active"
   ): Promise<BranchDto[]> {
     const q = membership === "deleted" ? "?membership=deleted" : "?membership=active";
-    const envelope = await apiGet(
-      `${organizationPaths.companyBranches(companyId)}${q}`
-    );
-    return asArray(unwrapData<BranchDto[] | { data?: BranchDto[] }>(envelope));
+    try {
+      const envelope = await apiGet(
+        `${organizationPaths.companyBranches(companyId)}${q}`
+      );
+      return asArray(unwrapData<BranchDto[] | { data?: BranchDto[] }>(envelope));
+    } catch (e) {
+      // Scope یا نبود شرکت نباید کل صفحه شعب را بشکند
+      if (e instanceof ApiClientError && (e.statusCode === 403 || e.statusCode === 404)) {
+        return [];
+      }
+      throw e;
+    }
   },
 
   async getById(branchId: string): Promise<BranchDto | null> {
