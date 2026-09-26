@@ -3,13 +3,14 @@
  * ساده: بدون اجبار به طراحی درخت
  * استاندارد+: نمای ساختار سیستمی + نام موجودیت‌ها
  * پیشرفته: افزودن گره دستی با انتخاب نام
+ * + نمای درختی تصویری روی هر سرشاخه
  */
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useCallback, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ChevronDown, ChevronLeft, GitBranch, Info, Loader2, Network, Plus, Search, Sparkles,
+  ChevronDown, ChevronLeft, Download, GitBranch, Info, Loader2, Network, Plus, Search, Sparkles, Trees,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -37,6 +38,7 @@ import {
 import { organizationPaths } from "../services/paths";
 import { OrganizationPermissions } from "../types";
 import Link from "next/link";
+import { buildTreeModels, HierarchyTreeDiagram } from "./hierarchies-tree-helpers";
 
 const MSG_ERR = "انجام این کار ممکن نشد. کمی بعد دوباره تلاش کنید.";
 
@@ -67,7 +69,6 @@ const ENTITY_LABEL: Record<string, string> = {
 type HierForm = { code: string; name: string; purpose: string };
 type NodeForm = { entity_type: string; entity_id: string; parent_node_id: string };
 type CatalogItem = { id: string; label: string; sub?: string };
-/** simple | standard | advanced — قانون محصول v1 */
 type HierarchyTier = "simple" | "standard" | "advanced";
 
 function hasAuthContext(): boolean {
@@ -108,7 +109,9 @@ export function HierarchiesListPage() {
   const [nodeSheetOpen, setNodeSheetOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [activeHierarchy, setActiveHierarchy] = useState<HierarchyDto | null>(null);
+  const [treeViewHierarchy, setTreeViewHierarchy] = useState<HierarchyDto | null>(null);
   const [busy, setBusy] = useState(false);
+  const treeCaptureRef = useRef<HTMLDivElement | null>(null);
 
   const form = useForm<HierForm>({
     defaultValues: { code: "", name: "", purpose: "LEGAL" },
@@ -127,6 +130,13 @@ export function HierarchiesListPage() {
     queryKey: ["org", "hierarchy-nodes", expandedId],
     queryFn: () => hierarchyService.listNodes(expandedId!),
     enabled: !!expandedId && hasAuthContext(),
+  });
+
+  const treeViewId = treeViewHierarchy?.hierarchy_id ?? null;
+  const treeNodesQuery = useQuery({
+    queryKey: ["org", "hierarchy-nodes", treeViewId, "tree-view"],
+    queryFn: () => hierarchyService.listNodes(treeViewId!),
+    enabled: !!treeViewId && hasAuthContext(),
   });
 
   const buQuery = useQuery({
@@ -193,12 +203,6 @@ export function HierarchiesListPage() {
   const branchCount = structureCatalog.data?.branchCount ?? 0;
   const buCount = (buQuery.data ?? []).length;
 
-  /**
-   * تا آماده‌شدن API فیچرپک: سطح از روی دادهٔ واقعی تخمین زده می‌شود.
-   * simple: حداکثر یک شرکت و حداکثر یک شعبه
-   * advanced: چند شرکت یا چند واحد کسب‌وکار (امکان گره دستی)
-   * standard: چند شعبه یا بیش از ساختار حداقلی
-   */
   const tier: HierarchyTier = useMemo(() => {
     if (companyCount <= 1 && branchCount <= 1 && buCount <= 1) return "simple";
     if (companyCount > 1 || buCount > 1) return "advanced";
@@ -250,6 +254,41 @@ export function HierarchiesListPage() {
     for (const n of nodesQuery.data ?? []) map.set(n.node_id, n);
     return map;
   }, [nodesQuery.data]);
+
+  const treeRoots = useMemo(() => {
+    return buildTreeModels(
+      treeNodesQuery.data ?? [],
+      ENTITY_LABEL,
+      resolveEntityLabel,
+      resolveEntitySub,
+    );
+  }, [treeNodesQuery.data, entityCatalog]);
+
+  const downloadTreeImage = useCallback(() => {
+    const el = treeCaptureRef.current;
+    if (!el || !treeViewHierarchy) {
+      toast.message("هنوز چیزی برای ذخیره آماده نیست.");
+      return;
+    }
+    const title = treeViewHierarchy.name || treeViewHierarchy.code || "tree";
+    const w = Math.max(el.scrollWidth, 480);
+    const h = Math.max(el.scrollHeight, 200);
+    const svg =
+      `<?xml version="1.0" encoding="UTF-8"?>` +
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${w + 40}" height="${h + 40}">` +
+      `<foreignObject width="100%" height="100%">` +
+      `<div xmlns="http://www.w3.org/1999/xhtml" style="direction:rtl;font-family:Tahoma,'Segoe UI',sans-serif;padding:16px;background:#f8fafc;color:#0f172a;">` +
+      el.innerHTML +
+      `</div></foreignObject></svg>`;
+    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${String(title).replace(/[/\\?%*:|"<>]/g, "-")}-tree.svg`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("فایل تصویر درخت ذخیره شد");
+  }, [treeViewHierarchy]);
 
   function parentCaption(node: HierarchyNodeDto): string | null {
     if (!node.parent_node_id) return null;
@@ -371,7 +410,6 @@ export function HierarchiesListPage() {
     );
   }
 
-  /* ——— سطح ساده: بدون اجبار طراحی درخت ——— */
   if (tier === "simple" && !structureCatalog.isLoading && !listQuery.isLoading) {
     return (
       <div className="space-y-6">
@@ -485,7 +523,7 @@ export function HierarchiesListPage() {
               <TableHead>کد</TableHead>
               <TableHead>هدف</TableHead>
               <TableHead>وضعیت</TableHead>
-              <TableHead className="w-[120px]">عملیات</TableHead>
+              <TableHead className="w-[200px]">عملیات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -535,18 +573,27 @@ export function HierarchiesListPage() {
                           />
                         </TableCell>
                         <TableCell>
-                          {allowAddNode && tier === "advanced" ? (
+                          <div className="flex flex-wrap items-center gap-1.5">
                             <Button
                               size="sm"
-                              variant="outline"
+                              variant="secondary"
                               className="h-8"
-                              onClick={() => openAddNode(h)}
+                              onClick={() => setTreeViewHierarchy(h)}
                             >
-                              <GitBranch className="h-3.5 w-3.5" /> افزودن
+                              <Trees className="h-3.5 w-3.5" />
+                              نمای درختی
                             </Button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">نمای سیستمی</span>
-                          )}
+                            {allowAddNode && tier === "advanced" ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8"
+                                onClick={() => openAddNode(h)}
+                              >
+                                <GitBranch className="h-3.5 w-3.5" /> افزودن
+                              </Button>
+                            ) : null}
+                          </div>
                         </TableCell>
                       </TableRow>
                       {open ? (
@@ -726,6 +773,66 @@ export function HierarchiesListPage() {
               </Button>
             </SheetFooter>
           </form>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet
+        open={!!treeViewHierarchy}
+        onOpenChange={(o) => {
+          if (!o) setTreeViewHierarchy(null);
+        }}
+      >
+        <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-xl md:max-w-2xl">
+          <SheetHeader className="border-b px-5 py-4 text-start">
+            <SheetTitle className="flex items-center gap-2">
+              <Trees className="h-4 w-4 text-primary" />
+              نمای درختی
+              {treeViewHierarchy ? (
+                <span className="text-sm font-normal text-muted-foreground">
+                  — {treeViewHierarchy.name}
+                </span>
+              ) : null}
+            </SheetTitle>
+            {treeViewHierarchy ? (
+              <p className="text-xs text-muted-foreground">
+                {purposeLabel(treeViewHierarchy.purpose)}
+                {PURPOSE_HINT[treeViewHierarchy.purpose]
+                  ? ` · ${PURPOSE_HINT[treeViewHierarchy.purpose]}`
+                  : ""}
+              </p>
+            ) : null}
+          </SheetHeader>
+          <div className="flex-1 overflow-auto px-5 py-4">
+            {treeNodesQuery.isLoading || structureCatalog.isLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> در حال بارگذاری درخت…
+              </div>
+            ) : (
+              <div ref={treeCaptureRef} className="rounded-xl border bg-muted/20 p-4">
+                <HierarchyTreeDiagram roots={treeRoots} />
+              </div>
+            )}
+          </div>
+          <SheetFooter className="gap-2 border-t px-5 py-3 sm:justify-start">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={treeNodesQuery.isLoading || treeRoots.length === 0}
+              onClick={downloadTreeImage}
+            >
+              <Download className="h-4 w-4" />
+              ذخیره تصویر
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setTreeViewHierarchy(null)}
+            >
+              بستن
+            </Button>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
     </div>
