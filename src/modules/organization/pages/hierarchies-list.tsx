@@ -1,6 +1,5 @@
 /**
- * FE-ORG — سلسله‌مراتب (Smart Hierarchy Product Law v1.0)
- * درخت خوانا · انتخاب آبشاری · حذف/بازگردانی · پیش‌نمایش بازنشانی
+ * FE-ORG — سلسله‌مراتب
  */
 "use client";
 
@@ -46,14 +45,6 @@ const PURPOSE_LABEL: Record<string, string> = {
   CUSTOM: "سفارشی",
 };
 
-const PURPOSE_HINT: Record<string, string> = {
-  LEGAL: "از روی شرکت‌ها و رابطهٔ مادر/زیرمجموعه ساخته می‌شود",
-  ESTABLISHMENT: "از روی شرکت و شعبه‌های هر شرکت ساخته می‌شود",
-  MANAGEMENT: "نمای مدیریتی (در صورت وجود داده)",
-  TAX: "در نسخهٔ فعلی به‌صورت خودکار اجباری نیست",
-  CUSTOM: "معمولاً بر اساس واحدهای کسب‌وکار",
-};
-
 const ENTITY_LABEL: Record<string, string> = {
   COMPANY: "شرکت",
   BRANCH: "شعبه",
@@ -89,34 +80,26 @@ function hasAuthContext(): boolean {
 }
 
 function purposeLabel(p?: string) {
-  if (!p) return "—";
-  return PURPOSE_LABEL[p] ?? p;
+  return p ? PURPOSE_LABEL[p] ?? p : "—";
 }
 
 function unwrapList<T>(envelope: unknown): T[] {
   if (envelope && typeof envelope === "object" && "data" in envelope) {
     const d = (envelope as ApiSuccessResponse<T[] | { data?: T[] }>).data;
     if (Array.isArray(d)) return d;
-    if (d && typeof d === "object" && Array.isArray((d as { data?: T[] }).data)) {
-      return (d as { data: T[] }).data;
-    }
+    if (d && typeof d === "object" && Array.isArray((d as { data?: T[] }).data)) return (d as { data: T[] }).data;
   }
   return Array.isArray(envelope) ? (envelope as T[]) : [];
 }
 
 export function HierarchiesListPage() {
   const qc = useQueryClient();
-  const canView =
-    usePermission(OrganizationPermissions.hierarchyView) ||
-    usePermission(OrganizationPermissions.companyView);
-  const canManage =
-    usePermission(OrganizationPermissions.hierarchyManage) ||
-    usePermission(OrganizationPermissions.companyUpdate);
-
+  const canView = usePermission(OrganizationPermissions.hierarchyView) || usePermission(OrganizationPermissions.companyView);
+  const canManage = usePermission(OrganizationPermissions.hierarchyManage) || usePermission(OrganizationPermissions.companyUpdate);
   const { data: companies } = useCompanies();
 
   const [search, setSearch] = useState("");
-  const [purposeFilter, setPurposeFilter] = useState<string>("all");
+  const [purposeFilter, setPurposeFilter] = useState("all");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [nodeSheetOpen, setNodeSheetOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -131,13 +114,10 @@ export function HierarchiesListPage() {
     has_changes: boolean;
     summary: Record<string, number>;
     items: { kind: string; message: string }[];
-    items_truncated?: boolean;
   } | null>(null);
 
-  const form = useForm<HierForm>({ defaultValues: { code: "", name: "", purpose: "LEGAL" } });
-  const nodeForm = useForm<NodeForm>({
-    defaultValues: { entity_type: "COMPANY", entity_id: "", parent_node_id: "" },
-  });
+  const form = useForm<HierForm>({ defaultValues: { code: "", name: "", purpose: "CUSTOM" } });
+  const nodeForm = useForm<NodeForm>({ defaultValues: { entity_type: "COMPANY", entity_id: "", parent_node_id: "" } });
 
   const listQuery = useQuery({
     queryKey: ["org", "hierarchies", membership],
@@ -170,21 +150,18 @@ export function HierarchiesListPage() {
         list.map(async (c) => {
           const cName = c.legal_name || c.name || "";
           try {
-            const brEnv = await apiGet(organizationPaths.companyBranches(c.company_id));
-            const brs = unwrapList<{ branch_id: string; name?: string; code?: string }>(brEnv);
+            const brs = unwrapList<{ branch_id: string; name?: string; code?: string }>(await apiGet(organizationPaths.companyBranches(c.company_id)));
             branchCount += brs.length;
             for (const b of brs) branches.push({ id: b.branch_id, label: b.name || b.code || "شعبه", sub: cName });
-          } catch { /* skip */ }
+          } catch { /* */ }
           try {
-            const depEnv = await apiGet(organizationPaths.companyDepartments(c.company_id));
-            for (const d of unwrapList<{ department_id: string; name?: string; code?: string }>(depEnv))
+            for (const d of unwrapList<{ department_id: string; name?: string; code?: string }>(await apiGet(organizationPaths.companyDepartments(c.company_id))))
               departments.push({ id: d.department_id, label: d.name || d.code || "واحد", sub: cName });
-          } catch { /* skip */ }
+          } catch { /* */ }
           try {
-            const ccEnv = await apiGet(organizationPaths.companyCostCenters(c.company_id));
-            for (const cc of unwrapList<{ cost_center_id: string; name?: string; code?: string }>(ccEnv))
+            for (const cc of unwrapList<{ cost_center_id: string; name?: string; code?: string }>(await apiGet(organizationPaths.companyCostCenters(c.company_id))))
               costCenters.push({ id: cc.cost_center_id, label: cc.name || cc.code || "مرکز هزینه", sub: cName });
-          } catch { /* skip */ }
+          } catch { /* */ }
         })
       );
       return { branches, departments, costCenters, branchCount };
@@ -196,7 +173,6 @@ export function HierarchiesListPage() {
   const companyCount = (companies ?? []).length;
   const branchCount = structureCatalog.data?.branchCount ?? 0;
   const buCount = (buQuery.data ?? []).length;
-
   const tier: HierarchyTier = useMemo(() => {
     if (companyCount <= 1 && branchCount <= 1 && buCount <= 1) return "simple";
     if (companyCount > 1 || buCount > 1) return "advanced";
@@ -225,9 +201,6 @@ export function HierarchiesListPage() {
 
   function resolveEntityLabel(entityType: string, entityId: string): string {
     return (entityCatalog[entityType] ?? []).find((x) => x.id === entityId)?.label ?? ENTITY_LABEL[entityType] ?? "مورد";
-  }
-  function resolveEntitySub(entityType: string, entityId: string): string | undefined {
-    return (entityCatalog[entityType] ?? []).find((x) => x.id === entityId)?.sub;
   }
 
   const indentedNodes = useMemo(() => {
@@ -290,84 +263,12 @@ export function HierarchiesListPage() {
     let list = [...rows];
     if (purposeFilter !== "all") list = list.filter((r) => r.purpose === purposeFilter);
     const q = search.trim().toLowerCase();
-    if (q) {
-      list = list.filter(
-        (r) =>
-          (r.name ?? "").toLowerCase().includes(q) ||
-          (r.code ?? "").toLowerCase().includes(q) ||
-          purposeLabel(r.purpose).includes(q)
-      );
-    }
+    if (q) list = list.filter((r) => (r.name ?? "").toLowerCase().includes(q) || (r.code ?? "").toLowerCase().includes(q) || purposeLabel(r.purpose).includes(q));
     return list;
   }, [rows, purposeFilter, search]);
 
   const allowCreateHierarchy = canManage && tier === "advanced";
   const allowAddNode = canManage && (tier === "advanced" || tier === "standard") && membership === "active";
-
-  function openCreate() {
-    if (!allowCreateHierarchy) {
-      toast.message("در این سطح، درخت‌ها توسط سیستم از روی شرکت و شعبه ساخته می‌شوند.");
-      return;
-    }
-    form.reset({ code: "", name: "", purpose: "CUSTOM" });
-    setSheetOpen(true);
-  }
-
-  function openAddNode(h: HierarchyDto) {
-    if (!allowAddNode) {
-      toast.message("برای تغییر ساختار، شرکت یا شعبه را از همان بخش‌ها ویرایش کنید.");
-      return;
-    }
-    setActiveHierarchy(h);
-    setExpandedId(h.hierarchy_id);
-    const allowed = PURPOSE_ENTITY_TYPES[h.purpose] ?? ["COMPANY"];
-    nodeForm.reset({ entity_type: allowed[0] ?? "COMPANY", entity_id: "", parent_node_id: "" });
-    setNodeSheetOpen(true);
-  }
-
-  async function submitHier(v: HierForm) {
-    if (!canManage) return;
-    setBusy(true);
-    try {
-      await hierarchyService.create({ code: v.code.trim(), name: v.name.trim(), purpose: v.purpose });
-      toast.success("سلسله‌مراتب ثبت شد");
-      setSheetOpen(false);
-      await qc.invalidateQueries({ queryKey: ["org", "hierarchies"] });
-    } catch (e) {
-      toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function submitNode(v: NodeForm) {
-    if (!canManage || !activeHierarchy) return;
-    if (!v.entity_id) {
-      toast.message("موجودیت را انتخاب کنید.");
-      return;
-    }
-    setBusy(true);
-    try {
-      await hierarchyService.addNode(activeHierarchy.hierarchy_id, {
-        entity_type: v.entity_type,
-        entity_id: v.entity_id,
-        parent_node_id: v.parent_node_id || null,
-      });
-      toast.success("به نقشه افزوده شد");
-      setNodeSheetOpen(false);
-      await qc.invalidateQueries({ queryKey: ["org", "hierarchy-nodes", activeHierarchy.hierarchy_id] });
-    } catch (e) {
-      toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function toggleExpand(id: string) {
-    setExpandedId((prev) => (prev === id ? null : id));
-    setSelectedNodeIds([]);
-    setNodeMembership("active");
-  }
 
   async function openRebuildPreview() {
     if (!canManage) return;
@@ -376,9 +277,7 @@ export function HierarchiesListPage() {
       const preview = await hierarchyService.previewRebuild();
       setRebuildPreview(preview);
       setRebuildOpen(true);
-      if (!preview?.has_changes) {
-        toast.message("تفاوتی با حالت پلتفرم نیست؛ بازنشانی لازم نیست.");
-      }
+      if (!preview?.has_changes) toast.message("تفاوتی با حالت پلتفرم نیست.");
     } catch (e) {
       toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
     } finally {
@@ -390,28 +289,55 @@ export function HierarchiesListPage() {
     if (!canManage) return;
     if (rebuildPreview && !rebuildPreview.has_changes) {
       setRebuildOpen(false);
-      toast.message("بازنشانی انجام نشد؛ تغییری نبود.");
       return;
     }
     setBusy(true);
     try {
       const data = await hierarchyService.rebuild();
-      if (data?.skipped) {
-        toast.message("بازنشانی لازم نبود؛ ساختار هم‌تراز است.");
-      } else {
-        const r = data?.rebuild;
-        toast.success(
-          r
-            ? `بازنشانی انجام شد: ${toFaDigits(r.companies ?? 0)} شرکت · ${toFaDigits(r.branches ?? 0)} شعبه`
-            : "درخت‌های سیستمی با دادهٔ سازمان هم‌تراز شدند"
-        );
+      if (data?.skipped) toast.message("بازنشانی لازم نبود.");
+      else {
+        const r = data?.rebuild as { companies?: number; branches?: number; custom_removed?: number } | undefined;
+        toast.success(r ? `بازنشانی روز‌اول: ${toFaDigits(r.companies ?? 0)} شرکت · ${toFaDigits(r.branches ?? 0)} شعبه · سفارشی حذف‌شده ${toFaDigits(r.custom_removed ?? 0)}` : "هم‌تراز شد");
       }
       setRebuildOpen(false);
       setRebuildPreview(null);
       setMembership("active");
-      setNodeMembership("active");
       await qc.invalidateQueries({ queryKey: ["org", "hierarchies"] });
       await qc.invalidateQueries({ queryKey: ["org", "hierarchy-nodes"] });
+    } catch (e) {
+      toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitHier(v: HierForm) {
+    if (!canManage) return;
+    setBusy(true);
+    try {
+      await hierarchyService.create({ code: v.code.trim(), name: v.name.trim(), purpose: v.purpose });
+      toast.success("ثبت شد");
+      setSheetOpen(false);
+      await qc.invalidateQueries({ queryKey: ["org", "hierarchies"] });
+    } catch (e) {
+      toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitNode(v: NodeForm) {
+    if (!canManage || !activeHierarchy || !v.entity_id) return;
+    setBusy(true);
+    try {
+      await hierarchyService.addNode(activeHierarchy.hierarchy_id, {
+        entity_type: v.entity_type,
+        entity_id: v.entity_id,
+        parent_node_id: v.parent_node_id || null,
+      });
+      toast.success("افزوده شد");
+      setNodeSheetOpen(false);
+      await qc.invalidateQueries({ queryKey: ["org", "hierarchy-nodes", activeHierarchy.hierarchy_id] });
     } catch (e) {
       toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
     } finally {
@@ -429,7 +355,7 @@ export function HierarchiesListPage() {
         else if (action === "delete") await hierarchyService.softDelete(id);
         else await hierarchyService.restore(id);
       }
-      toast.success("روی درخت‌های انتخاب‌شده اعمال شد");
+      toast.success("اعمال شد");
       setSelectedHierIds([]);
       await qc.invalidateQueries({ queryKey: ["org", "hierarchies"] });
     } catch (e) {
@@ -443,8 +369,8 @@ export function HierarchiesListPage() {
     if (!canManage || selectedNodeIds.length === 0) return;
     setBusy(true);
     try {
-      const res = await hierarchyService.bulkNodes(selectedNodeIds, action);
-      toast.success(`اعمال شد (${toFaDigits(res?.affected ?? selectedNodeIds.length)})`);
+      await hierarchyService.bulkNodes(selectedNodeIds, action);
+      toast.success("اعمال شد");
       setSelectedNodeIds([]);
       await qc.invalidateQueries({ queryKey: ["org", "hierarchy-nodes", expandedId] });
     } catch (e) {
@@ -454,57 +380,39 @@ export function HierarchiesListPage() {
     }
   }
 
-  async function restoreSelectedNodes() {
-    if (!canManage || selectedNodeIds.length === 0) return;
-    setBusy(true);
-    try {
-      for (const id of selectedNodeIds) await hierarchyService.restoreNode(id);
-      toast.success("گره‌ها بازگردانی شدند");
-      setSelectedNodeIds([]);
-      setNodeMembership("active");
-      await qc.invalidateQueries({ queryKey: ["org", "hierarchy-nodes"] });
-    } catch (e) {
-      toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const watchedType = nodeForm.watch("entity_type");
-  const optionsForType = entityCatalog[watchedType] ?? [];
-
   if (!canView) {
     return (
       <div className="space-y-6">
-        <PageHeader title="سلسله‌مراتب" description="نقشهٔ ساختار سازمان" breadcrumbs={[{ label: "سازمان", href: "/dashboard/organization" }, { label: "سلسله‌مراتب" }]} icon={<Network className="h-4 w-4" />} />
-        <EmptyState title="دسترسی ندارید" description="برای مشاهده این بخش مجوز لازم را ندارید." />
+        <PageHeader title="سلسله‌مراتب" description="نقشه سازمان" breadcrumbs={[{ label: "سازمان", href: "/dashboard/organization" }, { label: "سلسله‌مراتب" }]} icon={<Network className="h-4 w-4" />} />
+        <EmptyState title="دسترسی ندارید" description="مجوز مشاهده ندارید." />
       </div>
     );
   }
 
-  if (tier === "simple" && !structureCatalog.isLoading && !listQuery.isLoading && membership === "active") {
+  // فقط وقتی هیچ درختی نیست و سطح ساده است، پیام ساده نشان بده — جدول را قایم نکن
+  if (tier === "simple" && !structureCatalog.isLoading && !listQuery.isLoading && membership === "active" && rows.length === 0) {
     return (
       <div className="space-y-6">
         <PageHeader title="سلسله‌مراتب" description="سازمان تک‌خطی" breadcrumbs={[{ label: "سازمان", href: "/dashboard/organization" }, { label: "سلسله‌مراتب" }]} icon={<Network className="h-4 w-4" />} />
-        <div className="rounded-xl border bg-card p-6">
-          <div className="flex max-w-lg flex-col gap-3">
-            <Sparkles className="h-5 w-5 text-emerald-600" />
-            <h2 className="text-lg font-semibold">ساختار ساده — سیستم خودش مدیریت می‌کند</h2>
-            <p className="text-sm text-muted-foreground">با یک شرکت، درخت را دستی نچینید. از بخش شرکت و شعبه کار کنید.</p>
-            <Button asChild size="sm"><Link href="/dashboard/organization/companies">شرکت‌ها</Link></Button>
-          </div>
+        <div className="rounded-xl border bg-card p-6 space-y-3">
+          <Sparkles className="h-5 w-5 text-emerald-600" />
+          <h2 className="text-lg font-semibold">هنوز درخت سیستمی نیست</h2>
+          <p className="text-sm text-muted-foreground">بازنشانی از سازمان را بزنید تا از روی شرکت و شعبه ساخته شود.</p>
+          {canManage ? <Button size="sm" disabled={busy} onClick={openRebuildPreview}>بازنشانی از سازمان</Button> : null}
         </div>
       </div>
     );
   }
 
   const showSkeleton = listQuery.isLoading && !listQuery.data;
+  const watchedType = nodeForm.watch("entity_type");
+  const optionsForType = entityCatalog[watchedType] ?? [];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="سلسله‌مراتب"
-        description="نقشهٔ ساختار: ریشه → شاخه اصلی → زیرشاخه"
+        description="پایه پلتفرم = شرکت و شعبه. بازنشانی = روز اول از روی باکس‌ها."
         breadcrumbs={[{ label: "سازمان", href: "/dashboard/organization" }, { label: "سلسله‌مراتب" }]}
         icon={<Network className="h-4 w-4" />}
         actions={
@@ -516,7 +424,9 @@ export function HierarchiesListPage() {
               </Button>
             ) : null}
             {allowCreateHierarchy ? (
-              <Button size="sm" onClick={openCreate}><Plus className="h-4 w-4" /> نقشهٔ سفارشی</Button>
+              <Button size="sm" onClick={() => { form.reset({ code: "", name: "", purpose: "CUSTOM" }); setSheetOpen(true); }}>
+                <Plus className="h-4 w-4" /> سفارشی
+              </Button>
             ) : null}
           </div>
         }
@@ -524,63 +434,47 @@ export function HierarchiesListPage() {
 
       <div className="flex gap-3 rounded-lg border border-sky-200/80 bg-sky-50/80 px-3 py-2.5 text-sm dark:border-sky-900 dark:bg-sky-950/40">
         <Info className="mt-0.5 h-4 w-4 shrink-0" />
-        <div className="space-y-1 text-sm leading-relaxed">
-          <p><strong>ریشه:</strong> بالاترین سطح بدون والد. <strong>شاخه اصلی:</strong> سطح یک. <strong>زیرشاخه:</strong> سطوح عمیق‌تر.</p>
-          <p className="text-xs opacity-80">انتخاب والد، فرزندان را هم انتخاب می‌کند. بازنشانی فقط درخت‌های سیستمی را از شرکت/شعبه هم‌تراز می‌کند.</p>
-        </div>
+        <p className="leading-relaxed">
+          درخت‌های <strong>حقوقی</strong> و <strong>استقرار</strong> از شرکت و شعبه ساخته می‌شوند.
+          بازنشانی درخت‌های سفارشی و گره‌های دستی را برمی‌دارد و فقط پایه را از باکس‌ها می‌سازد.
+        </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex rounded-md border p-0.5 text-xs">
-          <button type="button" className={cn("rounded px-2.5 py-1", membership === "active" ? "bg-primary text-primary-foreground" : "text-muted-foreground")} onClick={() => { setMembership("active"); setSelectedHierIds([]); }}>درخت‌های فعال</button>
-          <button type="button" className={cn("rounded px-2.5 py-1", membership === "deleted" ? "bg-primary text-primary-foreground" : "text-muted-foreground")} onClick={() => { setMembership("deleted"); setSelectedHierIds([]); }}>درخت‌های حذف‌شده</button>
+          <button type="button" className={cn("rounded px-2.5 py-1", membership === "active" ? "bg-primary text-primary-foreground" : "text-muted-foreground")} onClick={() => { setMembership("active"); setSelectedHierIds([]); }}>فعال</button>
+          <button type="button" className={cn("rounded px-2.5 py-1", membership === "deleted" ? "bg-primary text-primary-foreground" : "text-muted-foreground")} onClick={() => { setMembership("deleted"); setSelectedHierIds([]); }}>حذف‌شده</button>
         </div>
         {canManage && selectedHierIds.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <span>{toFaDigits(selectedHierIds.length)} درخت</span>
+          <div className="flex flex-wrap gap-1.5 text-xs">
             {membership === "active" ? (
               <>
                 <Button size="sm" variant="outline" className="h-7" disabled={busy} onClick={() => runHierAction("activate")}>فعال</Button>
                 <Button size="sm" variant="outline" className="h-7" disabled={busy} onClick={() => runHierAction("deactivate")}>غیرفعال</Button>
-                <Button size="sm" variant="destructive" className="h-7" disabled={busy} onClick={() => runHierAction("delete")}>حذف نرم</Button>
+                <Button size="sm" variant="destructive" className="h-7" disabled={busy} onClick={() => runHierAction("delete")}>حذف</Button>
               </>
             ) : (
               <Button size="sm" variant="outline" className="h-7" disabled={busy} onClick={() => runHierAction("restore")}>بازگردانی</Button>
             )}
-            <Button size="sm" variant="ghost" className="h-7" onClick={() => setSelectedHierIds([])}>لغو</Button>
           </div>
         ) : null}
         <div className="relative min-w-[160px] flex-1">
           <Search className="absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input className="h-9 ps-9" placeholder="جستجو…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Select value={purposeFilter} onValueChange={setPurposeFilter}>
-          <SelectTrigger className="h-9 w-[150px]"><SelectValue placeholder="هدف" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">همه اهداف</SelectItem>
-            {Object.entries(PURPOSE_LABEL).map(([k, v]) => (
-              <SelectItem key={k} value={k}>{v}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="overflow-hidden rounded-xl border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-8" />
-              <TableHead className="w-10" />
-              <TableHead>نام درخت</TableHead>
-              <TableHead>کد</TableHead>
-              <TableHead>هدف</TableHead>
-              <TableHead>وضعیت</TableHead>
-              <TableHead className="w-[120px]">عملیات</TableHead>
+              <TableHead className="w-8" /><TableHead className="w-10" />
+              <TableHead>نام</TableHead><TableHead>کد</TableHead><TableHead>هدف</TableHead><TableHead>وضعیت</TableHead><TableHead className="w-[100px]">عملیات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {showSkeleton
-              ? Array.from({ length: 4 }).map((_, i) => (
+              ? Array.from({ length: 3 }).map((_, i) => (
                   <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
                 ))
               : filtered.map((h) => {
@@ -590,122 +484,54 @@ export function HierarchiesListPage() {
                       <TableRow>
                         <TableCell>
                           {canManage ? (
-                            <input
-                              type="checkbox"
-                              className="h-3.5 w-3.5"
-                              checked={selectedHierIds.includes(h.hierarchy_id)}
-                              onChange={() =>
-                                setSelectedHierIds((prev) =>
-                                  prev.includes(h.hierarchy_id)
-                                    ? prev.filter((x) => x !== h.hierarchy_id)
-                                    : [...prev, h.hierarchy_id]
-                                )
-                              }
-                            />
+                            <input type="checkbox" className="h-3.5 w-3.5" checked={selectedHierIds.includes(h.hierarchy_id)} onChange={() => setSelectedHierIds((p) => p.includes(h.hierarchy_id) ? p.filter((x) => x !== h.hierarchy_id) : [...p, h.hierarchy_id])} />
                           ) : null}
                         </TableCell>
                         <TableCell>
-                          <button type="button" className="rounded p-1 hover:bg-muted" onClick={() => toggleExpand(h.hierarchy_id)}>
+                          <button type="button" className="rounded p-1 hover:bg-muted" onClick={() => { setExpandedId(open ? null : h.hierarchy_id); setSelectedNodeIds([]); setNodeMembership("active"); }}>
                             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
                           </button>
                         </TableCell>
-                        <TableCell>
-                          <div className="font-medium">{h.name}</div>
-                          {PURPOSE_HINT[h.purpose] ? <div className="mt-0.5 text-[11px] text-muted-foreground">{PURPOSE_HINT[h.purpose]}</div> : null}
-                        </TableCell>
+                        <TableCell className="font-medium">{h.name}</TableCell>
                         <TableCell className="font-mono text-xs" dir="ltr">{h.code}</TableCell>
                         <TableCell>{purposeLabel(h.purpose)}</TableCell>
-                        <TableCell>
-                          <StatusChip label={h.is_active !== false ? "فعال" : "غیرفعال"} tone={h.is_active !== false ? "success" : "neutral"} />
-                        </TableCell>
+                        <TableCell><StatusChip label={h.is_active !== false ? "فعال" : "غیرفعال"} tone={h.is_active !== false ? "success" : "neutral"} /></TableCell>
                         <TableCell>
                           {allowAddNode ? (
-                            <Button size="sm" variant="outline" className="h-8" onClick={() => openAddNode(h)}>
+                            <Button size="sm" variant="outline" className="h-8" onClick={() => { setActiveHierarchy(h); setExpandedId(h.hierarchy_id); nodeForm.reset({ entity_type: (PURPOSE_ENTITY_TYPES[h.purpose] ?? ["COMPANY"])[0] ?? "COMPANY", entity_id: "", parent_node_id: "" }); setNodeSheetOpen(true); }}>
                               <GitBranch className="h-3.5 w-3.5" /> افزودن
                             </Button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">{membership === "deleted" ? "حذف‌شده" : "—"}</span>
-                          )}
+                          ) : <span className="text-xs text-muted-foreground">—</span>}
                         </TableCell>
                       </TableRow>
                       {open ? (
                         <TableRow className="bg-muted/30">
                           <TableCell colSpan={7} className="p-3">
                             {nodesQuery.isLoading ? (
-                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Loader2 className="h-4 w-4 animate-spin" /> بارگذاری…
-                              </div>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> بارگذاری…</div>
+                            ) : indentedNodes.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">گره‌ای نیست — بازنشانی از سازمان را بزنید.</p>
                             ) : (
-                              <div className="space-y-2">
-                                <div className="flex rounded-md border p-0.5 text-[11px] w-fit">
-                                  <button type="button" className={cn("rounded px-2 py-0.5", nodeMembership === "active" ? "bg-primary text-primary-foreground" : "text-muted-foreground")} onClick={() => { setNodeMembership("active"); setSelectedNodeIds([]); }}>گره‌های فعال</button>
-                                  <button type="button" className={cn("rounded px-2 py-0.5", nodeMembership === "deleted" ? "bg-primary text-primary-foreground" : "text-muted-foreground")} onClick={() => { setNodeMembership("deleted"); setSelectedNodeIds([]); }}>گره‌های حذف‌شده</button>
-                                </div>
-                                {canManage && selectedNodeIds.length > 0 ? (
-                                  <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-2 py-1.5 text-xs">
-                                    <span>{toFaDigits(selectedNodeIds.length)} مورد</span>
-                                    {nodeMembership === "active" ? (
-                                      <>
-                                        <Button size="sm" variant="outline" className="h-7" disabled={busy} onClick={() => runBulkNodes("activate")}>فعال</Button>
-                                        <Button size="sm" variant="outline" className="h-7" disabled={busy} onClick={() => runBulkNodes("deactivate")}>غیرفعال</Button>
-                                        <Button size="sm" variant="destructive" className="h-7" disabled={busy} onClick={() => runBulkNodes("delete")}>حذف نرم</Button>
-                                      </>
-                                    ) : (
-                                      <Button size="sm" variant="outline" className="h-7" disabled={busy} onClick={restoreSelectedNodes}>بازگردانی</Button>
-                                    )}
-                                    <Button size="sm" variant="ghost" className="h-7" onClick={() => setSelectedNodeIds([])}>لغو</Button>
-                                  </div>
-                                ) : null}
-                                {indentedNodes.length === 0 ? (
-                                  <p className="text-sm text-muted-foreground">
-                                    {nodeMembership === "deleted" ? "گره حذف‌شده‌ای نیست." : "گره‌ای نیست — بازنشانی از سازمان را بزنید."}
-                                  </p>
-                                ) : (
-                                  <ul className="space-y-1 text-sm">
-                                    {indentedNodes.map(({ node: n, depth }) => {
-                                      const name = resolveEntityLabel(n.entity_type, n.entity_id);
-                                      const sub = resolveEntitySub(n.entity_type, n.entity_id);
-                                      const isRoot = !n.parent_node_id;
-                                      const checked = selectedNodeIds.includes(n.node_id);
-                                      return (
-                                        <li
-                                          key={n.node_id}
-                                          className={cn(
-                                            "flex flex-wrap items-center gap-2 rounded-md border bg-background px-3 py-1.5",
-                                            depth > 0 && "border-s-2 border-s-primary/30",
-                                            isRoot && "border-primary/40 bg-primary/5",
-                                            n.is_active === false && "opacity-60"
-                                          )}
-                                          style={{ marginInlineStart: depth * 20 }}
-                                        >
-                                          {canManage ? (
-                                            <input
-                                              type="checkbox"
-                                              className="h-3.5 w-3.5"
-                                              checked={checked}
-                                              onChange={() => toggleNodeSelect(n.node_id, !checked)}
-                                            />
-                                          ) : null}
-                                          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
-                                            {ENTITY_LABEL[n.entity_type] ?? n.entity_type}
-                                          </span>
-                                          <span className="font-medium">{name}</span>
-                                          {sub ? <span className="text-xs text-muted-foreground">{sub}</span> : null}
-                                          {isRoot ? (
-                                            <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[11px] text-emerald-700">ریشه درخت</span>
-                                          ) : depth === 1 ? (
-                                            <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[11px] text-sky-700">شاخه اصلی</span>
-                                          ) : (
-                                            <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">زیرشاخه · سطح {toFaDigits(depth)}</span>
-                                          )}
-                                          {n.is_active === false ? <span className="text-xs text-amber-600">غیرفعال</span> : null}
-                                        </li>
-                                      );
-                                    })}
-                                  </ul>
-                                )}
-                              </div>
+                              <ul className="space-y-1 text-sm">
+                                {indentedNodes.map(({ node: n, depth }) => (
+                                  <li key={n.node_id} className={cn("flex flex-wrap items-center gap-2 rounded-md border bg-background px-3 py-1.5", depth > 0 && "border-s-2 border-s-primary/30")} style={{ marginInlineStart: depth * 20 }}>
+                                    {canManage ? (
+                                      <input type="checkbox" className="h-3.5 w-3.5" checked={selectedNodeIds.includes(n.node_id)} onChange={() => toggleNodeSelect(n.node_id, !selectedNodeIds.includes(n.node_id))} />
+                                    ) : null}
+                                    <span className="text-[11px] text-muted-foreground">{ENTITY_LABEL[n.entity_type] ?? n.entity_type}</span>
+                                    <span className="font-medium">{resolveEntityLabel(n.entity_type, n.entity_id)}</span>
+                                    {!n.parent_node_id ? <span className="text-[11px] text-emerald-700">ریشه</span> : null}
+                                  </li>
+                                ))}
+                              </ul>
                             )}
+                            {canManage && selectedNodeIds.length > 0 ? (
+                              <div className="mt-2 flex gap-2">
+                                <Button size="sm" variant="outline" className="h-7" disabled={busy} onClick={() => runBulkNodes("activate")}>فعال</Button>
+                                <Button size="sm" variant="outline" className="h-7" disabled={busy} onClick={() => runBulkNodes("deactivate")}>غیرفعال</Button>
+                                <Button size="sm" variant="destructive" className="h-7" disabled={busy} onClick={() => runBulkNodes("delete")}>حذف</Button>
+                              </div>
+                            ) : null}
                           </TableCell>
                         </TableRow>
                       ) : null}
@@ -716,28 +542,39 @@ export function HierarchiesListPage() {
         </Table>
       </div>
 
+      <Sheet open={rebuildOpen} onOpenChange={setRebuildOpen}>
+        <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
+          <SheetHeader className="border-b px-5 py-4 text-start"><SheetTitle>پیش‌نمایش بازنشانی (روز اول)</SheetTitle></SheetHeader>
+          <div className="flex-1 space-y-3 overflow-auto px-5 py-4 text-sm">
+            <p className="text-muted-foreground">فقط درخت سیستمی از شرکت/شعبه. سفارشی‌ها حذف می‌شوند.</p>
+            {rebuildPreview ? (
+              <ul className="space-y-1.5">
+                {rebuildPreview.items.map((it, i) => (
+                  <li key={i} className="rounded-md border px-3 py-1.5 text-xs">{it.message}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+          <SheetFooter className="gap-2 border-t px-5 py-3">
+            <Button type="button" variant="outline" onClick={() => setRebuildOpen(false)}>انصراف</Button>
+            <Button type="button" disabled={busy || !rebuildPreview?.has_changes} onClick={confirmRebuild}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "تأیید و بازنشانی"}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
           <form onSubmit={form.handleSubmit(submitHier)} className="flex h-full flex-col">
-            <SheetHeader className="border-b px-5 py-4 text-start"><SheetTitle>نقشهٔ سفارشی</SheetTitle></SheetHeader>
+            <SheetHeader className="border-b px-5 py-4 text-start"><SheetTitle>درخت سفارشی</SheetTitle></SheetHeader>
             <div className="flex-1 space-y-4 overflow-auto px-5 py-4">
-              <div className="space-y-1.5"><Label>کد *</Label><Input dir="ltr" {...form.register("code", { required: true })} /></div>
-              <div className="space-y-1.5"><Label>نام *</Label><Input {...form.register("name", { required: true })} /></div>
-              <div className="space-y-1.5">
-                <Label>هدف</Label>
-                <Select value={form.watch("purpose")} onValueChange={(v) => form.setValue("purpose", v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(PURPOSE_LABEL).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>{v}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <div className="space-y-1.5"><Label>کد</Label><Input dir="ltr" {...form.register("code", { required: true })} /></div>
+              <div className="space-y-1.5"><Label>نام</Label><Input {...form.register("name", { required: true })} /></div>
             </div>
             <SheetFooter className="gap-2 border-t px-5 py-3">
               <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>انصراف</Button>
-              <Button type="submit" disabled={busy || !canManage}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "ثبت"}</Button>
+              <Button type="submit" disabled={busy}>ثبت</Button>
             </SheetFooter>
           </form>
         </SheetContent>
@@ -746,108 +583,41 @@ export function HierarchiesListPage() {
       <Sheet open={nodeSheetOpen} onOpenChange={setNodeSheetOpen}>
         <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
           <form onSubmit={nodeForm.handleSubmit(submitNode)} className="flex h-full flex-col">
-            <SheetHeader className="border-b px-5 py-4 text-start"><SheetTitle>افزودن به نقشه</SheetTitle></SheetHeader>
+            <SheetHeader className="border-b px-5 py-4 text-start"><SheetTitle>افزودن گره</SheetTitle></SheetHeader>
             <div className="flex-1 space-y-4 overflow-auto px-5 py-4">
               <div className="space-y-1.5">
-                <Label>نوع *</Label>
+                <Label>نوع</Label>
                 <Select value={nodeForm.watch("entity_type")} onValueChange={(v) => { nodeForm.setValue("entity_type", v); nodeForm.setValue("entity_id", ""); }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {Object.entries(ENTITY_LABEL)
-                      .filter(([k]) => {
-                        const purpose = activeHierarchy?.purpose ?? "CUSTOM";
-                        const byPurpose = PURPOSE_ENTITY_TYPES[purpose] ?? Object.keys(ENTITY_LABEL);
-                        if (!byPurpose.includes(k)) return false;
-                        const parentId = nodeForm.watch("parent_node_id");
-                        if (!parentId) {
-                          if (["LEGAL", "TAX", "ESTABLISHMENT"].includes(purpose)) return k === "COMPANY";
-                          return true;
-                        }
-                        const parent = (nodesQuery.data ?? []).find((n) => n.node_id === parentId);
-                        if (!parent) return byPurpose.includes(k);
-                        const allowedUnder = PARENT_CHILD_TYPES[parent.entity_type] ?? [];
-                        return allowedUnder.includes(k) && byPurpose.includes(k);
-                      })
-                      .map(([k, v]) => (
-                        <SelectItem key={k} value={k}>{v}</SelectItem>
-                      ))}
+                      .filter(([k]) => (PURPOSE_ENTITY_TYPES[activeHierarchy?.purpose ?? "CUSTOM"] ?? Object.keys(ENTITY_LABEL)).includes(k))
+                      .map(([k, v]) => (<SelectItem key={k} value={k}>{v}</SelectItem>))}
                   </SelectContent>
                 </Select>
-                <p className="text-[11px] text-muted-foreground">فقط انواع مجاز برای هدف و والد انتخاب‌شده نمایش داده می‌شود.</p>
               </div>
               <div className="space-y-1.5">
-                <Label>مورد *</Label>
-                <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" {...nodeForm.register("entity_id", { required: true })}>
-                  <option value="">انتخاب کنید</option>
-                  {optionsForType.map((item) => (
-                    <option key={item.id} value={item.id}>{item.label}{item.sub ? ` — ${item.sub}` : ""}</option>
-                  ))}
+                <Label>مورد</Label>
+                <select className="flex h-9 w-full rounded-md border px-3 text-sm" {...nodeForm.register("entity_id", { required: true })}>
+                  <option value="">انتخاب</option>
+                  {optionsForType.map((item) => (<option key={item.id} value={item.id}>{item.label}</option>))}
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label>والد (اختیاری)</Label>
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  خالی = <strong>ریشه درخت</strong>. معمولاً ریشه یک شرکت است.
-                </p>
-                <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" {...nodeForm.register("parent_node_id")}>
-                  <option value="">— ریشه (بدون والد) —</option>
+                <Label>والد (خالی = ریشه)</Label>
+                <select className="flex h-9 w-full rounded-md border px-3 text-sm" {...nodeForm.register("parent_node_id")}>
+                  <option value="">— ریشه —</option>
                   {(nodesQuery.data ?? []).map((n) => (
-                    <option key={n.node_id} value={n.node_id}>
-                      {ENTITY_LABEL[n.entity_type] ?? n.entity_type} · {resolveEntityLabel(n.entity_type, n.entity_id)}
-                    </option>
+                    <option key={n.node_id} value={n.node_id}>{ENTITY_LABEL[n.entity_type]} · {resolveEntityLabel(n.entity_type, n.entity_id)}</option>
                   ))}
                 </select>
               </div>
             </div>
             <SheetFooter className="gap-2 border-t px-5 py-3">
               <Button type="button" variant="outline" onClick={() => setNodeSheetOpen(false)}>انصراف</Button>
-              <Button type="submit" disabled={busy || !canManage}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "افزودن"}</Button>
+              <Button type="submit" disabled={busy}>افزودن</Button>
             </SheetFooter>
           </form>
-        </SheetContent>
-      </Sheet>
-
-      <Sheet open={rebuildOpen} onOpenChange={setRebuildOpen}>
-        <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
-          <SheetHeader className="border-b px-5 py-4 text-start">
-            <SheetTitle>پیش‌نمایش بازنشانی درخت‌های سیستمی</SheetTitle>
-          </SheetHeader>
-          <div className="flex-1 space-y-3 overflow-auto px-5 py-4 text-sm">
-            <p className="text-muted-foreground leading-relaxed">
-              فقط درخت‌های سیستمی (حقوقی / استقرار / محصول) از روی شرکت و شعبه هم‌تراز می‌شوند.
-              درخت‌های سفارشی دست نخورده می‌مانند.
-            </p>
-            {rebuildPreview ? (
-              <>
-                {!rebuildPreview.has_changes ? (
-                  <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
-                    تفاوتی نیست — بازنشانی انجام نمی‌شود.
-                  </p>
-                ) : (
-                  <ul className="space-y-1.5">
-                    {rebuildPreview.items.map((it, i) => (
-                      <li key={i} className="rounded-md border bg-card px-3 py-1.5 text-xs leading-relaxed">
-                        {it.message}
-                      </li>
-                    ))}
-                    {rebuildPreview.items_truncated ? (
-                      <li className="text-xs text-muted-foreground">… موارد بیشتری هم وجود دارد.</li>
-                    ) : null}
-                  </ul>
-                )}
-              </>
-            ) : (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" /> در حال مقایسه…
-              </div>
-            )}
-          </div>
-          <SheetFooter className="gap-2 border-t px-5 py-3">
-            <Button type="button" variant="outline" onClick={() => setRebuildOpen(false)}>انصراف</Button>
-            <Button type="button" disabled={busy || !rebuildPreview?.has_changes} onClick={confirmRebuild}>
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "تأیید و بازنشانی"}
-            </Button>
-          </SheetFooter>
         </SheetContent>
       </Sheet>
     </div>
