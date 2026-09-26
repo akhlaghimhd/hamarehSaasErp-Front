@@ -38,8 +38,22 @@ export const organizationPaths = {
   businessUnitCompany: (buId: string, companyId: string) =>
     `${ORGANIZATION_BASE}/business-units/${buId}/companies/${companyId}`,
   hierarchies: `${ORGANIZATION_BASE}/hierarchies`,
+  hierarchy: (id: string) => `${ORGANIZATION_BASE}/hierarchies/${id}`,
+  hierarchyRestore: (id: string) =>
+    `${ORGANIZATION_BASE}/hierarchies/${id}/restore`,
+  hierarchyActive: (id: string) =>
+    `${ORGANIZATION_BASE}/hierarchies/${id}/active`,
   hierarchyNodes: (hierarchyId: string) =>
     `${ORGANIZATION_BASE}/hierarchies/${hierarchyId}/nodes`,
+  hierarchyHealth: `${ORGANIZATION_BASE}/hierarchies/health`,
+  hierarchyRebuild: `${ORGANIZATION_BASE}/hierarchies/rebuild`,
+  hierarchyNodesBulk: `${ORGANIZATION_BASE}/hierarchies/nodes/bulk`,
+  hierarchyNode: (nodeId: string) =>
+    `${ORGANIZATION_BASE}/hierarchies/nodes/${nodeId}`,
+  hierarchyNodeRestore: (nodeId: string) =>
+    `${ORGANIZATION_BASE}/hierarchies/nodes/${nodeId}/restore`,
+  hierarchyNodeActive: (nodeId: string) =>
+    `${ORGANIZATION_BASE}/hierarchies/nodes/${nodeId}/active`,
   icPartners: `${ORGANIZATION_BASE}/intercompany/partners`,
   icRules: `${ORGANIZATION_BASE}/intercompany/rules`,
   salesOrganizations: `${ORGANIZATION_BASE}/sales-organizations`,
