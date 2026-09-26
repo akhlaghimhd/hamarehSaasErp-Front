@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut, apiDelete } from "@/api";
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from "@/api";
 import type { ApiSuccessResponse } from "@/api/types";
 import { organizationPaths } from "./paths";
 
@@ -55,6 +55,8 @@ export type HierarchyNodeDto = {
   entity_type: string;
   entity_id: string;
   sort_order?: number;
+  is_active?: boolean;
+  deleted_at?: string | null;
 };
 
 export type IcPartnerDto = {
@@ -193,16 +195,34 @@ export const businessUnitService = {
 };
 
 export const hierarchyService = {
-  async list(): Promise<HierarchyDto[]> {
-    const env = await apiGet(organizationPaths.hierarchies);
+  async list(opts?: { membership?: "active" | "deleted" }): Promise<HierarchyDto[]> {
+    const membership = opts?.membership ?? "active";
+    const q = membership === "deleted" ? "?membership=deleted" : "";
+    const env = await apiGet(`${organizationPaths.hierarchies}${q}`);
     return asArray(unwrapData(env));
   },
   async create(payload: { code: string; name: string; purpose: string }) {
     const env = await apiPost(organizationPaths.hierarchies, payload);
     return unwrapData<HierarchyDto>(env);
   },
-  async listNodes(hierarchyId: string): Promise<HierarchyNodeDto[]> {
-    const env = await apiGet(organizationPaths.hierarchyNodes(hierarchyId));
+  async softDelete(id: string) {
+    await apiDelete(organizationPaths.hierarchy(id));
+  },
+  async restore(id: string) {
+    const env = await apiPost(organizationPaths.hierarchyRestore(id), {});
+    return unwrapData<HierarchyDto>(env);
+  },
+  async setActive(id: string, is_active: boolean) {
+    const env = await apiPatch(organizationPaths.hierarchyActive(id), { is_active });
+    return unwrapData<HierarchyDto>(env);
+  },
+  async listNodes(
+    hierarchyId: string,
+    opts?: { membership?: "active" | "deleted" }
+  ): Promise<HierarchyNodeDto[]> {
+    const membership = opts?.membership ?? "active";
+    const q = membership === "deleted" ? "?membership=deleted" : "";
+    const env = await apiGet(`${organizationPaths.hierarchyNodes(hierarchyId)}${q}`);
     return asArray(unwrapData(env));
   },
   async addNode(
@@ -216,6 +236,32 @@ export const hierarchyService = {
   ) {
     const env = await apiPost(organizationPaths.hierarchyNodes(hierarchyId), payload);
     return unwrapData<HierarchyNodeDto>(env);
+  },
+  async softDeleteNode(nodeId: string) {
+    await apiDelete(organizationPaths.hierarchyNode(nodeId));
+  },
+  async restoreNode(nodeId: string) {
+    const env = await apiPost(organizationPaths.hierarchyNodeRestore(nodeId), {});
+    return unwrapData<HierarchyNodeDto>(env);
+  },
+  async setNodeActive(nodeId: string, is_active: boolean) {
+    const env = await apiPatch(organizationPaths.hierarchyNodeActive(nodeId), { is_active });
+    return unwrapData<HierarchyNodeDto>(env);
+  },
+  async bulkNodes(nodeIds: string[], action: "activate" | "deactivate" | "delete") {
+    const env = await apiPost(organizationPaths.hierarchyNodesBulk, {
+      node_ids: nodeIds,
+      action,
+    });
+    return unwrapData<{ affected: number; action: string }>(env);
+  },
+  async rebuild() {
+    const env = await apiPost(organizationPaths.hierarchyRebuild, {});
+    return unwrapData(env);
+  },
+  async health() {
+    const env = await apiGet(organizationPaths.hierarchyHealth);
+    return unwrapData(env);
   },
 };
 
