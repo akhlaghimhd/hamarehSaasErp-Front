@@ -24,34 +24,56 @@ function asArray<T>(data: T[] | { data?: T[] } | null | undefined): T[] {
   return [];
 }
 
-/**
- * Soft-fail for list surfaces: scope/permission gaps must not red-banner the page.
- * Mutation endpoints still throw.
- */
+/** Soft-fail only for per-company segments in aggregate fallback. */
 function softListError(e: unknown): BranchDto[] {
   if (e instanceof ApiClientError) {
-    // 401 is handled by client (session clear); still avoid hard page failure
     if ([0, 401, 403, 404, 422, 500, 502, 503].includes(e.statusCode)) {
       return [];
     }
   }
-  // unknown — still degrade for aggregate list UX
   return [];
 }
 
 export const branchService = {
   /**
    * Tenant-wide list (preferred for /dashboard/organization/branches).
-   * Backend: GET /organization/branches?membership=active|deleted
+   * Throws on hard failures so the page can show retry — does NOT swallow to [].
    */
   async listAll(membership: BranchListFilter = "active"): Promise<BranchDto[]> {
     const q = membership === "deleted" ? "?membership=deleted" : "?membership=active";
+    const envelope = await apiGet(`${organizationPaths.branches}${q}`);
+    return asArray(unwrapData<BranchDto[] | { data?: BranchDto[] }>(envelope));
+  },
+
+  /**
+   * Prefer tenant-wide endpoint; if empty/fails, aggregate per-company lists.
+   * Ensures global Branches page shows data even when GET /branches is missing
+   * or scope-filtered empty while company-nested routes still return rows.
+   */
+  async listAllOrByCompanies(
+    companyIds: string[],
+    membership: BranchListFilter = "active"
+  ): Promise<BranchDto[]> {
     try {
-      const envelope = await apiGet(`${organizationPaths.branches}${q}`);
-      return asArray(unwrapData<BranchDto[] | { data?: BranchDto[] }>(envelope));
-    } catch (e) {
-      return softListError(e);
+      const all = await this.listAll(membership);
+      if (all.length > 0) return all;
+      // Empty from tenant-wide may be legitimate OR silent scope gap — try company nest
+      if (companyIds.length === 0) return all;
+    } catch {
+      // fall through to per-company
+      if (companyIds.length === 0) throw new Error("branches_list_failed");
     }
+
+    const chunks = await Promise.all(
+      companyIds.map((id) => this.listByCompany(id, membership))
+    );
+    const byId = new Map<string, BranchDto>();
+    for (const list of chunks) {
+      for (const b of list) {
+        if (b?.branch_id) byId.set(b.branch_id, b);
+      }
+    }
+    return Array.from(byId.values());
   },
 
   async listByCompany(
@@ -66,7 +88,6 @@ export const branchService = {
       );
       return asArray(unwrapData<BranchDto[] | { data?: BranchDto[] }>(envelope));
     } catch (e) {
-      // Scope یا نبود شرکت نباید کل صفحه شعب را بشکند
       return softListError(e);
     }
   },

@@ -19,10 +19,18 @@ function hasAuthContext(): boolean {
   return Boolean(tokenStorage.getAccessToken() && tokenStorage.getTenantId());
 }
 
-export function useAllBranches(membership: BranchListFilter = "active") {
+/**
+ * Global branches list with automatic fallback to per-company aggregation
+ * when tenant-wide endpoint returns empty or fails.
+ */
+export function useAllBranches(
+  membership: BranchListFilter = "active",
+  companyIds: string[] = []
+) {
+  const idsKey = companyIds.slice().sort().join(",");
   return useQuery({
-    queryKey: allBranchesQueryKey(membership),
-    queryFn: () => branchService.listAll(membership),
+    queryKey: [...allBranchesQueryKey(membership), idsKey] as const,
+    queryFn: () => branchService.listAllOrByCompanies(companyIds, membership),
     enabled: hasAuthContext(),
     staleTime: 30_000,
     retry: 1,
