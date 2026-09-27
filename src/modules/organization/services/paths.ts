@@ -47,6 +47,8 @@ export const organizationPaths = {
     `${ORGANIZATION_BASE}/hierarchies/${id}/active`,
   hierarchyNodes: (hierarchyId: string) =>
     `${ORGANIZATION_BASE}/hierarchies/${hierarchyId}/nodes`,
+  hierarchyNodesReorder: (hierarchyId: string) =>
+    `${ORGANIZATION_BASE}/hierarchies/${hierarchyId}/nodes/reorder`,
   hierarchyHealth: `${ORGANIZATION_BASE}/hierarchies/health`,
   hierarchyRebuild: `${ORGANIZATION_BASE}/hierarchies/rebuild`,
   hierarchyRebuildPreview: `${ORGANIZATION_BASE}/hierarchies/rebuild/preview`,
