@@ -1,5 +1,5 @@
 /**
- * FE-ORG — فهرست سراسری شعب (tenant-wide list; soft-fail)
+ * FE-ORG — فهرست سراسری شعب (tenant-wide list + per-company fallback)
  */
 "use client";
 
@@ -87,7 +87,10 @@ export function BranchesListPage() {
     isLoading: branchesLoading,
     isError,
     refetch: refetchBranches,
-  } = useAllBranches(membershipFilter);
+  } = useAllBranches(
+    membershipFilter,
+    companyList.map((c) => c.company_id)
+  );
 
   const isInitialLoading = companiesLoading || (hasAuthContext() && branchesLoading && !branchesData);
 
@@ -272,7 +275,7 @@ export function BranchesListPage() {
       {isInitialLoading ? (
         <div className="space-y-2">{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
       ) : pageRows.length === 0 ? (
-        <EmptyState title="شعبه‌ای یافت نشد" description="با فیلترهای فعلی موردی نیست یا هنوز شعبه‌ای ثبت نشده." />
+        <EmptyState title="شعبه‌ای یافت نشد" description="با فیلترهای فعلی موردی نیست یا هنوز شعبه‌ای ثبت نشده. از دکمه «شعبه جدید» یکی ثبت کنید یا در جزئیات شرکت، تب شعب را بررسی کنید." />
       ) : (
         <div className="overflow-x-auto rounded-xl border">
           <Table>
