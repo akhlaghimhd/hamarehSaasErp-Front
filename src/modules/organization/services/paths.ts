@@ -8,6 +8,8 @@ export const organizationPaths = {
   companyRestore: (id: string) => `${ORGANIZATION_BASE}/companies/${id}/restore`,
   companyBranches: (companyId: string) =>
     `${ORGANIZATION_BASE}/companies/${companyId}/branches`,
+  /** Tenant-wide branches list (no company nest) */
+  branches: `${ORGANIZATION_BASE}/branches`,
   companyDepartments: (companyId: string) =>
     `${ORGANIZATION_BASE}/companies/${companyId}/departments`,
   companyBankAccounts: (companyId: string) =>

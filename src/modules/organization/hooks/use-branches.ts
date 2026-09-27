@@ -9,9 +9,24 @@ export function branchesQueryKey(companyId: string, membership: BranchListFilter
   return ["organization", "companies", companyId, "branches", membership] as const;
 }
 
+/** Tenant-wide branches list key (single request for global Branches page). */
+export function allBranchesQueryKey(membership: BranchListFilter = "active") {
+  return ["organization", "branches", membership] as const;
+}
+
 function hasAuthContext(): boolean {
   if (typeof window === "undefined") return false;
   return Boolean(tokenStorage.getAccessToken() && tokenStorage.getTenantId());
+}
+
+export function useAllBranches(membership: BranchListFilter = "active") {
+  return useQuery({
+    queryKey: allBranchesQueryKey(membership),
+    queryFn: () => branchService.listAll(membership),
+    enabled: hasAuthContext(),
+    staleTime: 30_000,
+    retry: 1,
+  });
 }
 
 export function useBranches(
@@ -31,6 +46,7 @@ export function useBranches(
 }
 
 function invalidateBranchLists(qc: ReturnType<typeof useQueryClient>, companyId?: string) {
+  void qc.invalidateQueries({ queryKey: ["organization", "branches"] });
   if (companyId) {
     void qc.invalidateQueries({
       queryKey: ["organization", "companies", companyId, "branches"],

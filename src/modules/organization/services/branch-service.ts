@@ -24,11 +24,41 @@ function asArray<T>(data: T[] | { data?: T[] } | null | undefined): T[] {
   return [];
 }
 
+/**
+ * Soft-fail for list surfaces: scope/permission gaps must not red-banner the page.
+ * Mutation endpoints still throw.
+ */
+function softListError(e: unknown): BranchDto[] {
+  if (e instanceof ApiClientError) {
+    // 401 is handled by client (session clear); still avoid hard page failure
+    if ([0, 401, 403, 404, 422, 500, 502, 503].includes(e.statusCode)) {
+      return [];
+    }
+  }
+  // unknown — still degrade for aggregate list UX
+  return [];
+}
+
 export const branchService = {
+  /**
+   * Tenant-wide list (preferred for /dashboard/organization/branches).
+   * Backend: GET /organization/branches?membership=active|deleted
+   */
+  async listAll(membership: BranchListFilter = "active"): Promise<BranchDto[]> {
+    const q = membership === "deleted" ? "?membership=deleted" : "?membership=active";
+    try {
+      const envelope = await apiGet(`${organizationPaths.branches}${q}`);
+      return asArray(unwrapData<BranchDto[] | { data?: BranchDto[] }>(envelope));
+    } catch (e) {
+      return softListError(e);
+    }
+  },
+
   async listByCompany(
     companyId: string,
     membership: BranchListFilter = "active"
   ): Promise<BranchDto[]> {
+    if (!companyId) return [];
     const q = membership === "deleted" ? "?membership=deleted" : "?membership=active";
     try {
       const envelope = await apiGet(
@@ -37,10 +67,7 @@ export const branchService = {
       return asArray(unwrapData<BranchDto[] | { data?: BranchDto[] }>(envelope));
     } catch (e) {
       // Scope یا نبود شرکت نباید کل صفحه شعب را بشکند
-      if (e instanceof ApiClientError && (e.statusCode === 403 || e.statusCode === 404)) {
-        return [];
-      }
-      throw e;
+      return softListError(e);
     }
   },
 
