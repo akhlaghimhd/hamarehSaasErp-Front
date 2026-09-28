@@ -59,7 +59,6 @@ export type HierarchyNodeDto = {
   parent_node_id?: string | null;
   entity_type: string;
   entity_id: string;
-  /** Human label from backend (Product Law: never show raw UUID in UI) */
   entity_label?: string | null;
   entity_code?: string | null;
   node_origin?: "SYSTEM" | "MANUAL" | string;
@@ -72,8 +71,15 @@ export type IcPartnerDto = {
   ic_partner_id: string;
   from_company_id: string;
   to_company_id: string;
+  from_company_name?: string | null;
+  from_company_code?: string | null;
+  to_company_name?: string | null;
+  to_company_code?: string | null;
+  partner_customer_id?: string | null;
+  partner_vendor_id?: string | null;
   is_active?: boolean;
   notes?: string | null;
+  row_version?: number;
 };
 
 export type IcRuleDto = {
@@ -84,6 +90,15 @@ export type IcRuleDto = {
   target_doc_type: string;
   auto_create_mirror?: boolean;
   is_active?: boolean;
+  notes?: string | null;
+  row_version?: number;
+};
+
+export type IcDocumentTypeDto = {
+  code: string;
+  label_fa: string;
+  label_en?: string;
+  domain?: string;
 };
 
 export type BankAccountDto = {
@@ -315,6 +330,10 @@ export const hierarchyService = {
 };
 
 export const intercompanyService = {
+  async listDocumentTypes(): Promise<IcDocumentTypeDto[]> {
+    const env = await apiGet(organizationPaths.icDocumentTypes);
+    return asArray(unwrapData(env));
+  },
   async listPartners(): Promise<IcPartnerDto[]> {
     const env = await apiGet(organizationPaths.icPartners);
     return asArray(unwrapData(env));
@@ -322,10 +341,30 @@ export const intercompanyService = {
   async createPartner(payload: {
     from_company_id: string;
     to_company_id: string;
+    partner_customer_id?: string;
+    partner_vendor_id?: string;
     notes?: string;
+    is_active?: boolean;
   }) {
     const env = await apiPost(organizationPaths.icPartners, payload);
     return unwrapData<IcPartnerDto>(env);
+  },
+  async updatePartner(
+    id: string,
+    payload: {
+      from_company_id?: string;
+      to_company_id?: string;
+      partner_customer_id?: string | null;
+      partner_vendor_id?: string | null;
+      notes?: string | null;
+      is_active?: boolean;
+    }
+  ) {
+    const env = await apiPut(organizationPaths.icPartner(id), payload);
+    return unwrapData<IcPartnerDto>(env);
+  },
+  async deletePartner(id: string) {
+    await apiDelete(organizationPaths.icPartner(id));
   },
   async listRules(): Promise<IcRuleDto[]> {
     const env = await apiGet(organizationPaths.icRules);
@@ -337,9 +376,29 @@ export const intercompanyService = {
     source_doc_type: string;
     target_doc_type: string;
     auto_create_mirror?: boolean;
+    is_active?: boolean;
+    notes?: string;
   }) {
     const env = await apiPost(organizationPaths.icRules, payload);
     return unwrapData<IcRuleDto>(env);
+  },
+  async updateRule(
+    id: string,
+    payload: {
+      code?: string;
+      name?: string;
+      source_doc_type?: string;
+      target_doc_type?: string;
+      auto_create_mirror?: boolean;
+      is_active?: boolean;
+      notes?: string | null;
+    }
+  ) {
+    const env = await apiPut(organizationPaths.icRule(id), payload);
+    return unwrapData<IcRuleDto>(env);
+  },
+  async deleteRule(id: string) {
+    await apiDelete(organizationPaths.icRule(id));
   },
 };
 
