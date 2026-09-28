@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Trash2, Power } from "lucide-react";
+import { Loader2, Plus, Trash2, Power, AlertCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/layout/page-header";
@@ -183,18 +183,50 @@ export function IntercompanyPage() {
       <div className="rounded-xl border bg-muted/30 px-4 py-3 text-sm leading-7 text-muted-foreground">
         <p className="font-medium text-foreground">این صفحه چیست؟</p>
         <p>
-          وقتی چند شرکت حقوقی در یک مستأجر دارید و با هم معامله می‌کنند، سیستم باید بداند
-          <strong className="text-foreground"> کدام شرکت با کدام شریک است</strong> و
-          <strong className="text-foreground"> چه نوع سندی در شرکت مقابل آینه شود</strong>.
+          وقتی چند شرکت حقوقی در یک مستأجر دارید و با هم معامله می‌کنند، سیستم باید بداند{" "}
+          <strong className="text-foreground">کدام شرکت با کدام شریک است</strong> و{" "}
+          <strong className="text-foreground">چه نوع سندی در شرکت مقابل آینه شود</strong>.
         </p>
         <p className="mt-2">
-          اینجا فقط <strong className="text-foreground">پیکربندی</strong> است. صدور خودکار
-          فاکتور، حساب Due-to/Due-from، حذف درون‌گروهی (Elimination) و تسویه در ماژول‌های
-          فروش/خرید و حسابداری پیاده‌سازی می‌شوند و از همین نقشه و قوانین استفاده می‌کنند.
+          فاز فعلی (<span dir="ltr" className="font-mono text-xs">Org-IC-P1</span>) فقط{" "}
+          <strong className="text-foreground">پیکربندی</strong> است. صدور خودکار سند، حساب
+          Due-to/Due-from، حذف درون‌گروهی و تسویه در فازهای بعدی ماژول‌های حسابداری و فروش/خرید
+          تکمیل می‌شود.
         </p>
         <p className="mt-2 text-xs">
-          نمونه جریان: شرکت A به شرکت B می‌فروشد → شریک A→B + قانون SO→PO → موتور فروش بعداً
+          نمونه جریان هدف: شرکت A به B می‌فروشد → شریک A→B + قانون SO→PO → موتور فروش (فاز بعد)
           سفارش خرید را در B می‌سازد.
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm leading-6">
+        <div className="mb-2 flex items-start gap-2 font-medium text-amber-800 dark:text-amber-200">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>یادآوری تکمیل در فازهای بعدی (عمداً اینجا نیست)</span>
+        </div>
+        <ul className="list-inside list-disc space-y-1 text-muted-foreground">
+          <li>
+            <strong className="text-foreground">Acc-IC-P1 (حسابداری):</strong> حساب‌های طلب/بدهی
+            درون‌گروه، سند journal بین‌شرکتی، حذف (Elimination) در تجمیع، گزارش تطبیق، چندارزی
+          </li>
+          <li>
+            <strong className="text-foreground">Ops-IC-P1 (فروش/خرید):</strong> ساخت خودکار سند
+            آینه بر اساس قوانین، اتصال مشتری/فروشندهٔ آینه (Business Partner)
+          </li>
+          <li>
+            <strong className="text-foreground">Platform:</strong> اعمال فلگ فروش{" "}
+            <span dir="ltr" className="font-mono text-xs">
+              org.intercompany
+            </span>{" "}
+            روی API و کارت هاب
+          </li>
+          <li>
+            <strong className="text-foreground">پیشرفته (بعد از baseline):</strong> Netting، Transfer
+            Pricing، انتقال موجودی بین‌شرکتی، مانیتور زنجیره ارزش
+          </li>
+        </ul>
+        <p className="mt-2 text-xs text-muted-foreground">
+          مرجع اسناد: ADR-ORG-002 و ORG_Intercompany_Status_and_Debt_v1.0 در مخزن hamareh-erp-docs.
         </p>
       </div>
 
@@ -274,7 +306,8 @@ export function IntercompanyPage() {
           <div>
             <h2 className="text-base font-semibold">قوانین آینه اسناد</h2>
             <p className="text-xs text-muted-foreground">
-              نوع سند مبدأ در یک شرکت → نوع سند هدف در شرکت شریک (موتور عملیاتی بعداً اجرا می‌کند)
+              نوع سند مبدأ → نوع سند هدف. فلگ «ساخت خودکار» برای موتور فروش/خرید در فاز Ops-IC
+              ذخیره می‌شود و الان اجرا نمی‌شود.
             </p>
           </div>
           <Button size="sm" onClick={() => setRuleOpen(true)}>
@@ -294,7 +327,9 @@ export function IntercompanyPage() {
                 </span>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {labelDoc(r.source_doc_type)} → {labelDoc(r.target_doc_type)}
-                  {r.auto_create_mirror ? " · ساخت خودکار آینه" : " · فقط نگاشت"}
+                  {r.auto_create_mirror
+                    ? " · ساخت خودکار (فاز بعد)"
+                    : " · فقط نگاشت"}
                   {!r.is_active ? " · غیرفعال" : ""}
                 </p>
               </div>
@@ -384,6 +419,10 @@ export function IntercompanyPage() {
               <Label>یادداشت</Label>
               <Input className="h-9" {...partnerForm.register("notes")} />
             </div>
+            <p className="text-xs text-muted-foreground">
+              لینک مشتری/فروشندهٔ آینه (Business Partner) در فاز Ops-IC پس از آماده‌شدن Master Data
+              اضافه می‌شود.
+            </p>
             <DialogFooter>
               <Button type="submit" size="sm" disabled={createPartner.isPending}>
                 {createPartner.isPending ? (
@@ -460,7 +499,7 @@ export function IntercompanyPage() {
             </div>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" {...ruleForm.register("auto_create_mirror")} />
-              ساخت خودکار سند آینه (وقتی موتور فروش/خرید آماده باشد)
+              ساخت خودکار سند آینه (ذخیره برای فاز Ops — الان اجرا نمی‌شود)
             </label>
             <div className="space-y-1.5">
               <Label>یادداشت</Label>
