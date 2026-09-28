@@ -59,8 +59,11 @@ export const organizationPaths = {
     `${ORGANIZATION_BASE}/hierarchies/nodes/${nodeId}/restore`,
   hierarchyNodeActive: (nodeId: string) =>
     `${ORGANIZATION_BASE}/hierarchies/nodes/${nodeId}/active`,
+  icDocumentTypes: `${ORGANIZATION_BASE}/intercompany/document-types`,
   icPartners: `${ORGANIZATION_BASE}/intercompany/partners`,
+  icPartner: (id: string) => `${ORGANIZATION_BASE}/intercompany/partners/${id}`,
   icRules: `${ORGANIZATION_BASE}/intercompany/rules`,
+  icRule: (id: string) => `${ORGANIZATION_BASE}/intercompany/rules/${id}`,
   salesOrganizations: `${ORGANIZATION_BASE}/sales-organizations`,
   salesOrgAssignments: (id: string) =>
     `${ORGANIZATION_BASE}/sales-organizations/${id}/assignments`,
