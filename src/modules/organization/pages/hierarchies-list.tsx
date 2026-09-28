@@ -1,1 +1,2 @@
-PLACEHOLDER_WILL_FAIL
+/** PLACEHOLDER - loading */
+export function HierarchiesListPage() { return null; }
