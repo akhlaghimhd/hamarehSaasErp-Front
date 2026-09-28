@@ -65,11 +65,36 @@ export const organizationPaths = {
   icRules: `${ORGANIZATION_BASE}/intercompany/rules`,
   icRule: (id: string) => `${ORGANIZATION_BASE}/intercompany/rules/${id}`,
   salesOrganizations: `${ORGANIZATION_BASE}/sales-organizations`,
+  salesOrganization: (id: string) =>
+    `${ORGANIZATION_BASE}/sales-organizations/${id}`,
+  salesOrgRestore: (id: string) =>
+    `${ORGANIZATION_BASE}/sales-organizations/${id}/restore`,
   salesOrgAssignments: (id: string) =>
     `${ORGANIZATION_BASE}/sales-organizations/${id}/assignments`,
+  salesOrgAssignment: (assignmentId: string) =>
+    `${ORGANIZATION_BASE}/sales-org-assignments/${assignmentId}`,
   purchasingOrganizations: `${ORGANIZATION_BASE}/purchasing-organizations`,
+  purchasingOrganization: (id: string) =>
+    `${ORGANIZATION_BASE}/purchasing-organizations/${id}`,
+  purchOrgRestore: (id: string) =>
+    `${ORGANIZATION_BASE}/purchasing-organizations/${id}/restore`,
   purchOrgAssignments: (id: string) =>
     `${ORGANIZATION_BASE}/purchasing-organizations/${id}/assignments`,
+  purchOrgAssignment: (assignmentId: string) =>
+    `${ORGANIZATION_BASE}/purch-org-assignments/${assignmentId}`,
+  distributionChannels: `${ORGANIZATION_BASE}/distribution-channels`,
+  distributionChannel: (id: string) =>
+    `${ORGANIZATION_BASE}/distribution-channels/${id}`,
+  productDivisions: `${ORGANIZATION_BASE}/product-divisions`,
+  productDivision: (id: string) =>
+    `${ORGANIZATION_BASE}/product-divisions/${id}`,
+  salesAreas: `${ORGANIZATION_BASE}/sales-areas`,
+  salesArea: (id: string) => `${ORGANIZATION_BASE}/sales-areas/${id}`,
+  salesOffices: `${ORGANIZATION_BASE}/sales-offices`,
+  salesOffice: (id: string) => `${ORGANIZATION_BASE}/sales-offices/${id}`,
+  salesOfficeGroups: (officeId: string) =>
+    `${ORGANIZATION_BASE}/sales-offices/${officeId}/groups`,
+  salesGroup: (id: string) => `${ORGANIZATION_BASE}/sales-groups/${id}`,
   consolidationRuns: `${ORGANIZATION_BASE}/consolidation-runs`,
   consolidationSnapshot: (id: string) =>
     `${ORGANIZATION_BASE}/consolidation-runs/${id}/snapshot`,
