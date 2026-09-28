@@ -23,7 +23,13 @@ import {
 } from "../services/org-extended-service";
 import { salesStructureService } from "../services/sales-structure-service";
 
-type TabId = "sales" | "purch" | "channels" | "divisions" | "areas";
+type TabId =
+  | "sales"
+  | "purch"
+  | "channels"
+  | "divisions"
+  | "areas"
+  | "offices";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "sales", label: "سازمان فروش" },
@@ -31,13 +37,22 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "channels", label: "کانال توزیع" },
   { id: "divisions", label: "دیویژن" },
   { id: "areas", label: "ناحیه فروش" },
+  { id: "offices", label: "دفتر / گروه" },
 ];
 
 export function SalesPurchOrgsPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<TabId>("sales");
   const [open, setOpen] = useState(false);
-  const form = useForm({ defaultValues: { code: "", name: "", is_reference: false } });
+  const [groupOfficeId, setGroupOfficeId] = useState<string | null>(null);
+  const form = useForm({
+    defaultValues: {
+      code: "",
+      name: "",
+      is_reference: false,
+      sales_org_id: "",
+    },
+  });
   const areaForm = useForm({
     defaultValues: {
       sales_org_id: "",
@@ -47,6 +62,7 @@ export function SalesPurchOrgsPage() {
       name: "",
     },
   });
+  const groupForm = useForm({ defaultValues: { code: "", name: "" } });
 
   const sales = useQuery({
     queryKey: ["org", "sales-orgs"],
@@ -67,6 +83,10 @@ export function SalesPurchOrgsPage() {
   const areas = useQuery({
     queryKey: ["org", "sales-areas"],
     queryFn: () => salesStructureService.listSalesAreas(),
+  });
+  const offices = useQuery({
+    queryKey: ["org", "sales-offices"],
+    queryFn: () => salesStructureService.listOffices(),
   });
 
   const inv = () => {
@@ -125,6 +145,30 @@ export function SalesPurchOrgsPage() {
     },
     onError: onErr,
   });
+  const createOffice = useMutation({
+    mutationFn: salesStructureService.createOffice,
+    onSuccess: () => {
+      inv();
+      toast.success("دفتر فروش ثبت شد");
+      setOpen(false);
+      form.reset();
+    },
+    onError: onErr,
+  });
+  const createGroup = useMutation({
+    mutationFn: (p: { officeId: string; code: string; name: string }) =>
+      salesStructureService.createGroup(p.officeId, {
+        code: p.code,
+        name: p.name,
+      }),
+    onSuccess: () => {
+      inv();
+      toast.success("گروه فروش ثبت شد");
+      setGroupOfficeId(null);
+      groupForm.reset();
+    },
+    onError: onErr,
+  });
 
   const delSales = useMutation({
     mutationFn: salesOrgService.softDelete,
@@ -151,6 +195,16 @@ export function SalesPurchOrgsPage() {
     onSuccess: inv,
     onError: onErr,
   });
+  const delOffice = useMutation({
+    mutationFn: salesStructureService.softDeleteOffice,
+    onSuccess: inv,
+    onError: onErr,
+  });
+  const delGroup = useMutation({
+    mutationFn: salesStructureService.softDeleteGroup,
+    onSuccess: inv,
+    onError: onErr,
+  });
 
   const selectCls =
     "flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm";
@@ -159,7 +213,7 @@ export function SalesPurchOrgsPage() {
     <div className="space-y-6">
       <PageHeader
         title="سازمان فروش و خرید"
-        description="ساختار رقابتی: Sales/Purch Org، کانال، دیویژن، Sales Area (بدون موتور سفارش)"
+        description="ساختار رقابتی: Sales/Purch Org، کانال، دیویژن، Sales Area، دفتر و گروه"
         breadcrumbs={[
           { label: "سازمان", href: "/dashboard/organization" },
           { label: "فروش و خرید" },
@@ -359,6 +413,84 @@ export function SalesPurchOrgsPage() {
         </ul>
       )}
 
+      {tab === "offices" && (
+        <ul className="divide-y rounded-xl border">
+          {(offices.data ?? []).map((o) => (
+            <li key={o.sales_office_id} className="px-4 py-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span>
+                  <span className="font-medium">{o.name}</span>{" "}
+                  <span
+                    className="font-mono text-xs text-muted-foreground"
+                    dir="ltr"
+                  >
+                    {o.code}
+                  </span>
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      groupForm.reset();
+                      setGroupOfficeId(o.sales_office_id);
+                    }}
+                  >
+                    + گروه
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive"
+                    onClick={() =>
+                      confirm("حذف دفتر؟") && delOffice.mutate(o.sales_office_id)
+                    }
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              {(o.groups ?? []).length > 0 && (
+                <ul className="mt-2 mr-4 space-y-1 border-r pr-3">
+                  {(o.groups ?? []).map((g) => (
+                    <li
+                      key={g.sales_group_id}
+                      className="flex items-center justify-between text-xs text-muted-foreground"
+                    >
+                      <span>
+                        {g.name}{" "}
+                        <span className="font-mono" dir="ltr">
+                          ({g.code})
+                        </span>
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-destructive"
+                        onClick={() =>
+                          confirm("حذف گروه؟") &&
+                          delGroup.mutate(g.sales_group_id)
+                        }
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+          {!offices.isLoading && !(offices.data ?? []).length && (
+            <li className="px-4 py-6 text-center text-sm text-muted-foreground">
+              دفتری ثبت نشده است.
+            </li>
+          )}
+        </ul>
+      )}
+
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
@@ -371,7 +503,9 @@ export function SalesPurchOrgsPage() {
                     ? "کانال"
                     : tab === "divisions"
                       ? "دیویژن"
-                      : "ناحیه فروش"}
+                      : tab === "offices"
+                        ? "دفتر فروش"
+                        : "ناحیه فروش"}
             </DialogTitle>
           </DialogHeader>
           {tab === "areas" ? (
@@ -405,7 +539,9 @@ export function SalesPurchOrgsPage() {
                 <Label>کانال *</Label>
                 <select
                   className={selectCls}
-                  {...areaForm.register("distribution_channel_id", { required: true })}
+                  {...areaForm.register("distribution_channel_id", {
+                    required: true,
+                  })}
                 >
                   <option value="">—</option>
                   {(channels.data ?? []).map((c) => (
@@ -459,7 +595,12 @@ export function SalesPurchOrgsPage() {
                 else if (tab === "purch")
                   createPurch.mutate({ ...p, is_reference: v.is_reference });
                 else if (tab === "channels") createChannel.mutate(p);
-                else createDivision.mutate(p);
+                else if (tab === "divisions") createDivision.mutate(p);
+                else if (tab === "offices")
+                  createOffice.mutate({
+                    ...p,
+                    sales_org_id: v.sales_org_id || null,
+                  });
               })}
             >
               <div className="space-y-1.5">
@@ -472,13 +613,29 @@ export function SalesPurchOrgsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>نام *</Label>
-                <Input className="h-9" {...form.register("name", { required: true })} />
+                <Input
+                  className="h-9"
+                  {...form.register("name", { required: true })}
+                />
               </div>
               {tab === "purch" && (
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" {...form.register("is_reference")} /> سازمان خرید
-                  مرجع
+                  <input type="checkbox" {...form.register("is_reference")} />{" "}
+                  سازمان خرید مرجع
                 </label>
+              )}
+              {tab === "offices" && (
+                <div className="space-y-1.5">
+                  <Label>سازمان فروش (اختیاری)</Label>
+                  <select className={selectCls} {...form.register("sales_org_id")}>
+                    <option value="">—</option>
+                    {(sales.data ?? []).map((s) => (
+                      <option key={s.sales_org_id} value={s.sales_org_id}>
+                        {s.name} ({s.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               )}
               <DialogFooter>
                 <Button
@@ -488,13 +645,15 @@ export function SalesPurchOrgsPage() {
                     createSales.isPending ||
                     createPurch.isPending ||
                     createChannel.isPending ||
-                    createDivision.isPending
+                    createDivision.isPending ||
+                    createOffice.isPending
                   }
                 >
                   {createSales.isPending ||
                   createPurch.isPending ||
                   createChannel.isPending ||
-                  createDivision.isPending ? (
+                  createDivision.isPending ||
+                  createOffice.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     "ثبت"
@@ -503,6 +662,53 @@ export function SalesPurchOrgsPage() {
               </DialogFooter>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!groupOfficeId}
+        onOpenChange={(v) => !v && setGroupOfficeId(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>گروه فروش جدید</DialogTitle>
+          </DialogHeader>
+          <form
+            className="space-y-3"
+            onSubmit={groupForm.handleSubmit((v) => {
+              if (!groupOfficeId) return;
+              createGroup.mutate({
+                officeId: groupOfficeId,
+                code: v.code.trim(),
+                name: v.name.trim(),
+              });
+            })}
+          >
+            <div className="space-y-1.5">
+              <Label>کد *</Label>
+              <Input
+                dir="ltr"
+                className="h-9"
+                {...groupForm.register("code", { required: true })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>نام *</Label>
+              <Input
+                className="h-9"
+                {...groupForm.register("name", { required: true })}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="submit" size="sm" disabled={createGroup.isPending}>
+                {createGroup.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "ثبت"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
