@@ -137,12 +137,22 @@ export type OwnershipDto = {
   relation_type?: string;
 };
 
+export type OrgAssignmentDto = {
+  assignment_id: string;
+  company_id?: string | null;
+  branch_id?: string | null;
+  is_active?: boolean;
+  sales_org_id?: string;
+  purch_org_id?: string;
+};
+
 export type SalesOrgDto = {
   sales_org_id: string;
   code: string;
   name: string;
   company_id?: string | null;
   is_active?: boolean;
+  assignments?: OrgAssignmentDto[];
 };
 
 export type PurchOrgDto = {
@@ -152,6 +162,7 @@ export type PurchOrgDto = {
   company_id?: string | null;
   is_active?: boolean;
   is_reference?: boolean;
+  assignments?: OrgAssignmentDto[];
 };
 
 export type ConsolRunDto = {
@@ -493,6 +504,20 @@ export const salesOrgService = {
   async softDelete(id: string) {
     await apiDelete(organizationPaths.salesOrganization(id));
   },
+  async listAssignments(salesOrgId: string): Promise<OrgAssignmentDto[]> {
+    const env = await apiGet(organizationPaths.salesOrgAssignments(salesOrgId));
+    return asArray(unwrapData(env));
+  },
+  async assign(
+    salesOrgId: string,
+    payload: { company_id?: string | null; branch_id?: string | null }
+  ) {
+    const env = await apiPost(organizationPaths.salesOrgAssignments(salesOrgId), payload);
+    return unwrapData<OrgAssignmentDto>(env);
+  },
+  async unassign(assignmentId: string) {
+    await apiDelete(organizationPaths.salesOrgAssignment(assignmentId));
+  },
 };
 
 export const purchOrgService = {
@@ -513,6 +538,20 @@ export const purchOrgService = {
   },
   async softDelete(id: string) {
     await apiDelete(organizationPaths.purchasingOrganization(id));
+  },
+  async listAssignments(purchOrgId: string): Promise<OrgAssignmentDto[]> {
+    const env = await apiGet(organizationPaths.purchOrgAssignments(purchOrgId));
+    return asArray(unwrapData(env));
+  },
+  async assign(
+    purchOrgId: string,
+    payload: { company_id?: string | null; branch_id?: string | null }
+  ) {
+    const env = await apiPost(organizationPaths.purchOrgAssignments(purchOrgId), payload);
+    return unwrapData<OrgAssignmentDto>(env);
+  },
+  async unassign(assignmentId: string) {
+    await apiDelete(organizationPaths.purchOrgAssignment(assignmentId));
   },
 };
 
