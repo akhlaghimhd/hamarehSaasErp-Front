@@ -4,7 +4,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Search, ShieldAlert } from "lucide-react";
+import { Loader2, Plus, Search, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import {
@@ -14,9 +14,19 @@ import {
 import { StatusChip } from "@/shared/components/data-display/status-chip";
 import { Input } from "@/shared/components/ui/input";
 import { Button } from "@/shared/components/ui/button";
+import { Label } from "@/shared/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog";
 import { ApiClientError } from "@/api";
 import { usePermission } from "@/auth";
 import { IdentityPermissions } from "../types";
+import { useTenantUsers } from "../hooks/use-tenant-users";
+import { useRoles } from "../hooks/use-roles";
 import {
   privilegedAccessService,
   type PrivilegedGrantDto,
@@ -31,11 +41,54 @@ const STATUS_LABEL: Record<string, string> = {
   EXPIRED: "منقضی",
 };
 
+function shortId(id?: string | null): string {
+  if (!id) return "—";
+  return id.length > 10 ? `${id.slice(0, 8)}…` : id;
+}
+
 export function PrivilegedAccessListPage() {
   const canView = usePermission(IdentityPermissions.privilegedView);
   const canApprove = usePermission(IdentityPermissions.privilegedApprove);
+  const canRequest = usePermission(IdentityPermissions.privilegedRequest);
   const qc = useQueryClient();
   const [q, setQ] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [userId, setUserId] = useState("");
+  const [roleId, setRoleId] = useState("");
+  const [reason, setReason] = useState("");
+  const [durationMinutes, setDurationMinutes] = useState("60");
+
+  const { data: members = [] } = useTenantUsers("active");
+  const { data: roles = [] } = useRoles();
+
+  const privilegedRoles = useMemo(() => {
+    const flagged = roles.filter((r) => Boolean(r.is_privileged));
+    return flagged.length > 0 ? flagged : roles;
+  }, [roles]);
+
+  const userLabel = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of members) {
+      const uid = String(m.user_id ?? "");
+      if (!uid) continue;
+      const name =
+        m.user?.display_name ||
+        [m.user?.first_name, m.user?.last_name].filter(Boolean).join(" ") ||
+        m.user?.email ||
+        m.user?.mobile ||
+        shortId(uid);
+      map.set(uid, name);
+    }
+    return map;
+  }, [members]);
+
+  const roleLabel = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of roles) {
+      map.set(r.tenant_role_id, r.name || r.code || shortId(r.tenant_role_id));
+    }
+    return map;
+  }, [roles]);
 
   const { data = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ["identity", "privileged-access"],
@@ -43,10 +96,31 @@ export function PrivilegedAccessListPage() {
     enabled: canView,
   });
 
+  const requestMut = useMutation({
+    mutationFn: () =>
+      privilegedAccessService.request({
+        user_id: userId,
+        tenant_role_id: roleId,
+        reason: reason.trim(),
+        duration_minutes: Math.max(5, Math.min(480, Number(durationMinutes) || 60)),
+      }),
+    onSuccess: () => {
+      toast.success("درخواست دسترسی اضطراری ثبت شد");
+      setCreateOpen(false);
+      setUserId("");
+      setRoleId("");
+      setReason("");
+      setDurationMinutes("60");
+      void qc.invalidateQueries({ queryKey: ["identity", "privileged-access"] });
+    },
+    onError: (e) =>
+      toast.error(e instanceof ApiClientError ? e.message : "ثبت درخواست ناموفق بود"),
+  });
+
   const approveMut = useMutation({
     mutationFn: (id: string) => privilegedAccessService.approve(id),
     onSuccess: () => {
-      toast.success("درخواست تأیید شد");
+      toast.success("درخواست تأیید و فعال شد");
       void qc.invalidateQueries({ queryKey: ["identity", "privileged-access"] });
     },
     onError: (e) =>
@@ -76,12 +150,14 @@ export function PrivilegedAccessListPage() {
   const rows = useMemo(() => {
     const term = q.trim().toLowerCase();
     if (!term) return data;
-    return data.filter((r) =>
-      [r.status, r.reason, r.user_id, r.tenant_role_id].some((v) =>
+    return data.filter((r) => {
+      const u = userLabel.get(String(r.user_id ?? "")) ?? "";
+      const role = roleLabel.get(String(r.tenant_role_id ?? "")) ?? "";
+      return [u, role, r.status, r.reason, r.user_id, r.tenant_role_id].some((v) =>
         String(v ?? "").toLowerCase().includes(term)
-      )
-    );
-  }, [data, q]);
+      );
+    });
+  }, [data, q, userLabel, roleLabel]);
 
   const columns: DataTableColumn<PrivilegedGrantDto>[] = [
     {
@@ -103,19 +179,38 @@ export function PrivilegedAccessListPage() {
     {
       id: "user",
       header: "کاربر",
-      cell: (r) => (
-        <span dir="ltr" className="font-mono text-[11px]">
-          {String(r.user_id ?? "—").slice(0, 8)}…
-        </span>
-      ),
+      cell: (r) => {
+        const id = String(r.user_id ?? "");
+        return (
+          <div className="min-w-0">
+            <div className="text-sm font-medium">{userLabel.get(id) ?? shortId(id)}</div>
+            <div dir="ltr" className="font-mono text-[10px] text-muted-foreground">
+              {shortId(id)}
+            </div>
+          </div>
+        );
+      },
     },
     {
       id: "role",
       header: "نقش",
+      cell: (r) => {
+        const id = String(r.tenant_role_id ?? "");
+        return (
+          <div className="min-w-0">
+            <div className="text-sm font-medium">{roleLabel.get(id) ?? shortId(id)}</div>
+            <div dir="ltr" className="font-mono text-[10px] text-muted-foreground">
+              {shortId(id)}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: "duration",
+      header: "مدت (دقیقه)",
       cell: (r) => (
-        <span dir="ltr" className="font-mono text-[11px]">
-          {String(r.tenant_role_id ?? "—").slice(0, 8)}…
-        </span>
+        <span className="tabular-nums text-xs">{r.duration_minutes ?? "—"}</span>
       ),
     },
     {
@@ -166,7 +261,7 @@ export function PrivilegedAccessListPage() {
               </Button>
             </>
           ) : null}
-          {canApprove && (r.status === "ACTIVE" || r.status === "APPROVED") ? (
+          {canApprove && r.status === "ACTIVE" ? (
             <Button
               type="button"
               size="sm"
@@ -202,6 +297,19 @@ export function PrivilegedAccessListPage() {
           { label: "دسترسی اضطراری" },
         ]}
         icon={<ShieldAlert className="h-5 w-5" />}
+        actions={
+          canRequest || canApprove ? (
+            <Button
+              type="button"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setCreateOpen(true)}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              درخواست جدید
+            </Button>
+          ) : null
+        }
       />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -210,7 +318,7 @@ export function PrivilegedAccessListPage() {
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="جستجو…"
+            placeholder="جستجو نام کاربر یا نقش…"
             className="ps-8 h-9"
           />
         </div>
@@ -238,6 +346,111 @@ export function PrivilegedAccessListPage() {
           emptySearchTitle="نتیجه‌ای پیدا نشد."
         />
       )}
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>درخواست دسترسی اضطراری</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="pa-user">کاربر</Label>
+              <select
+                id="pa-user"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
+                disabled={requestMut.isPending}
+              >
+                <option value="">انتخاب کاربر…</option>
+                {members.map((m) => {
+                  const uid = String(m.user_id ?? "");
+                  if (!uid) return null;
+                  return (
+                    <option key={uid} value={uid}>
+                      {userLabel.get(uid) ?? shortId(uid)}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="pa-role">نقش ممتاز</Label>
+              <select
+                id="pa-role"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={roleId}
+                onChange={(e) => setRoleId(e.target.value)}
+                disabled={requestMut.isPending}
+              >
+                <option value="">انتخاب نقش…</option>
+                {privilegedRoles.map((r) => (
+                  <option key={r.tenant_role_id} value={r.tenant_role_id}>
+                    {r.name || r.code}
+                    {r.is_privileged ? " (ممتاز)" : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-muted-foreground">
+                فقط نقش‌هایی که is_privileged دارند از سمت سرور پذیرفته می‌شوند.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="pa-duration">مدت (دقیقه، حداکثر ۴۸۰)</Label>
+              <Input
+                id="pa-duration"
+                type="number"
+                min={5}
+                max={480}
+                value={durationMinutes}
+                onChange={(e) => setDurationMinutes(e.target.value)}
+                disabled={requestMut.isPending}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="pa-reason">دلیل (حداقل ۵ کاراکتر)</Label>
+              <Input
+                id="pa-reason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="مثال: رفع حادثه تولید…"
+                disabled={requestMut.isPending}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={requestMut.isPending}
+              onClick={() => setCreateOpen(false)}
+            >
+              انصراف
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={
+                requestMut.isPending ||
+                !userId ||
+                !roleId ||
+                reason.trim().length < 5
+              }
+              onClick={() => void requestMut.mutateAsync()}
+            >
+              {requestMut.isPending ? (
+                <>
+                  <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />
+                  در حال ثبت…
+                </>
+              ) : (
+                "ثبت درخواست"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
