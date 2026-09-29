@@ -195,7 +195,7 @@ export function SodRulesListPage() {
       cell: (r) => (
         <StatusChip
           label={r.enforcement === "WARN" ? "هشدار" : "مسدود"}
-          tone={r.enforcement === "WARN" ? "warning" : "destructive"}
+          tone={r.enforcement === "WARN" ? "warning" : "danger"}
         />
       ),
     },
