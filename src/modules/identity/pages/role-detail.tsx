@@ -1,11 +1,12 @@
-/** FE-P1-T13/T14 — جزئیات نقش، زیرنقش‌ها و تخصیص مجوز */
+/** FE-P1-T13/T14 — جزئیات نقش، زیرنقش‌ها و تخصیص مجوز + is_privileged */
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Loader2, Plus } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Loader2, Plus, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import {
@@ -24,11 +25,14 @@ import {
   useAssignPermissionsToRole,
   useRole,
   useUpdateRole,
+  rolesQueryKey,
+  roleQueryKey,
 } from "../hooks/use-roles";
 import { usePermissions } from "../hooks/use-permissions";
 import { IdentityPermissions } from "../types";
 import { MSG_GENERIC_ERROR, MSG_NO_ACCESS } from "../lib/ui-copy";
 import { RoleCreateDrawer } from "../components/role-create-drawer";
+import { privilegedAccessService } from "../services/privileged-access-service";
 import { toFaDigits } from "@/shared/lib/utils";
 
 export function RoleDetailPage() {
@@ -43,13 +47,16 @@ export function RoleDetailPage() {
   const canAssignPerms = usePermission(
     IdentityPermissions.roleAssignPermissions
   );
+  const canMarkPrivileged = usePermission(IdentityPermissions.privilegedApprove);
 
+  const qc = useQueryClient();
   const { data: role, isLoading, isError, error, refetch } = useRole(roleId || null);
   const { data: allPerms } = usePermissions();
   const updateMutation = useUpdateRole();
   const assignMutation = useAssignPermissionsToRole();
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [privPending, setPrivPending] = useState(false);
 
   const linkedIds = useMemo(() => {
     const fromRel = (role?.permissions ?? [])
@@ -102,6 +109,29 @@ export function RoleDetailPage() {
       toast.error(
         e instanceof ApiClientError && e.message ? e.message : MSG_GENERIC_ERROR
       );
+    }
+  };
+
+  const onTogglePrivileged = async () => {
+    if (!role) return;
+    const next = !Boolean(role.is_privileged);
+    setPrivPending(true);
+    try {
+      await privilegedAccessService.markRole(role.tenant_role_id, next);
+      toast.success(
+        next
+          ? "نقش به‌عنوان ممتاز (break-glass) علامت خورد"
+          : "علامت ممتاز از نقش برداشته شد"
+      );
+      void qc.invalidateQueries({ queryKey: rolesQueryKey });
+      void qc.invalidateQueries({ queryKey: roleQueryKey(role.tenant_role_id) });
+      void refetch();
+    } catch (e) {
+      toast.error(
+        e instanceof ApiClientError && e.message ? e.message : MSG_GENERIC_ERROR
+      );
+    } finally {
+      setPrivPending(false);
     }
   };
 
@@ -188,6 +218,9 @@ export function RoleDetailPage() {
               ) : (
                 <StatusChip label="غیرفعال" tone="neutral" />
               )}
+              {role.is_privileged ? (
+                <StatusChip label="ممتاز (Privileged)" tone="warning" />
+              ) : null}
               {role.parent?.name || role.parent_role_id ? (
                 <span className="text-muted-foreground">
                   والد:{" "}
@@ -206,6 +239,48 @@ export function RoleDetailPage() {
                 </span>
               ) : (
                 <span className="text-muted-foreground">نقش ریشه (بدون والد)</span>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4" />
+                دسترسی اضطراری (Break-glass)
+              </CardTitle>
+              <CardDescription>
+                فقط نقش‌های علامت‌خورده به‌عنوان ممتاز می‌توانند در مسیر Privileged
+                Access درخواست شوند. تخصیص عادی این نقش همچنان از مسیر نقش‌های کاربر
+                انجام می‌شود.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-center gap-3">
+              {role.is_privileged ? (
+                <StatusChip label="این نقش ممتاز است" tone="warning" />
+              ) : (
+                <StatusChip label="ممتاز نیست" tone="neutral" />
+              )}
+              {canMarkPrivileged ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={privPending}
+                  onClick={() => void onTogglePrivileged()}
+                >
+                  {privPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : role.is_privileged ? (
+                    "برداشتن علامت ممتاز"
+                  ) : (
+                    "علامت‌گذاری به‌عنوان ممتاز"
+                  )}
+                </Button>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  برای تغییر این وضعیت به مجوز identity.privileged.approve نیاز است.
+                </p>
               )}
             </CardContent>
           </Card>

@@ -1,6 +1,7 @@
 import { apiGet, apiPost } from "@/api";
 import type { ApiSuccessResponse } from "@/api/types";
 import { identityPaths } from "./paths";
+import type { RoleDto } from "./role-service";
 
 export type PrivilegedGrantDto = {
   grant_id: string;
@@ -64,5 +65,14 @@ export const privilegedAccessService = {
       reason: reason ?? null,
     });
     return unwrapData<PrivilegedGrantDto>(envelope);
+  },
+
+  /** Mark / unmark a role as privileged (break-glass eligible). */
+  async markRole(tenantRoleId: string, isPrivileged: boolean): Promise<RoleDto> {
+    const envelope = await apiPost(identityPaths.privilegedMarkRole, {
+      tenant_role_id: tenantRoleId,
+      is_privileged: isPrivileged,
+    });
+    return unwrapData<RoleDto>(envelope);
   },
 };
