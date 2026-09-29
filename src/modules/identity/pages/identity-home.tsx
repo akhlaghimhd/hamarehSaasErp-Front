@@ -5,7 +5,15 @@
 "use client";
 
 import Link from "next/link";
-import { UserRound, Users, Shield, KeyRound, Scan } from "lucide-react";
+import {
+  UserRound,
+  Users,
+  Shield,
+  KeyRound,
+  Scan,
+  ClipboardCheck,
+  ShieldAlert,
+} from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { usePermission } from "@/auth";
 import { IdentityPermissions } from "../types";
@@ -52,6 +60,20 @@ const cards: HubCard[] = [
     title: "محدوده دسترسی",
     description: "تعیین محدوده کار مثل شعبه یا واحد سازمانی",
     icon: Scan,
+    open: true,
+  },
+  {
+    href: "/dashboard/identity/access-certifications",
+    title: "بازبینی دسترسی",
+    description: "کمپین‌های بررسی دوره‌ای نقش و مجوز",
+    icon: ClipboardCheck,
+    open: true,
+  },
+  {
+    href: "/dashboard/identity/privileged-access",
+    title: "دسترسی اضطراری",
+    description: "درخواست و تأیید نقش‌های حساس زمان‌دار",
+    icon: ShieldAlert,
     open: true,
   },
 ];
@@ -107,6 +129,8 @@ export function IdentityHome() {
   const canViewRoles = usePermission(IdentityPermissions.roleView);
   const canViewPermissions = usePermission(IdentityPermissions.permissionView);
   const canViewScopes = usePermission(IdentityPermissions.scopeView);
+  const canViewAccessCert = usePermission(IdentityPermissions.accessCertView);
+  const canViewPrivileged = usePermission(IdentityPermissions.privilegedView);
 
   const allowedByHref: Record<string, boolean> = {
     "/dashboard/identity/me": true,
@@ -114,6 +138,8 @@ export function IdentityHome() {
     "/dashboard/identity/roles": canViewRoles,
     "/dashboard/identity/permissions": canViewPermissions,
     "/dashboard/identity/scopes": canViewScopes,
+    "/dashboard/identity/access-certifications": canViewAccessCert,
+    "/dashboard/identity/privileged-access": canViewPrivileged,
   };
 
   return (

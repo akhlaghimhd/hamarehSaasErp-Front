@@ -38,9 +38,7 @@ export interface TenantUserDto {
   joined_at?: string | null;
   left_at?: string | null;
   user?: TenantUserUserDto | null;
-  /** Assigned roles (from list API). */
   roles?: TenantUserRoleSummaryDto[];
-  /** Assigned scopes (from list API). */
   scopes?: TenantUserScopeSummaryDto[];
   [key: string]: unknown;
 }
@@ -100,6 +98,12 @@ export const IdentityPermissions = {
   scopeView: "identity.scope.view",
   scopeAssign: "identity.scope.assign",
   membershipHistoryView: "identity.membership_history.view",
+  accessCertView: "identity.access_cert.view",
+  accessCertManage: "identity.access_cert.manage",
+  accessCertCertify: "identity.access_cert.certify",
+  privilegedView: "identity.privileged.view",
+  privilegedRequest: "identity.privileged.request",
+  privilegedApprove: "identity.privileged.approve",
 } as const;
 
 export type IdentityPermissionCode =

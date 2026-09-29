@@ -154,7 +154,7 @@ export function AccessCertificationsListPage() {
           { label: "هویت و دسترسی", href: "/dashboard/identity" },
           { label: "بازبینی دسترسی" },
         ]}
-        icon={ClipboardCheck}
+        icon={<ClipboardCheck className="h-5 w-5" />}
       />
 
       <div className="flex flex-wrap items-center gap-2">

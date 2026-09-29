@@ -201,7 +201,7 @@ export function PrivilegedAccessListPage() {
           { label: "هویت و دسترسی", href: "/dashboard/identity" },
           { label: "دسترسی اضطراری" },
         ]}
-        icon={ShieldAlert}
+        icon={<ShieldAlert className="h-5 w-5" />}
       />
 
       <div className="flex flex-wrap items-center gap-2">
