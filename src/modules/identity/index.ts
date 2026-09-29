@@ -14,12 +14,14 @@ export { ScopesListPage } from "./pages/scopes-list";
 export { AccessCertificationsListPage } from "./pages/access-certifications-list";
 export { PrivilegedAccessListPage } from "./pages/privileged-access-list";
 export { RoleAssignmentRequestsListPage } from "./pages/role-assignment-requests-list";
+export { SodRulesListPage } from "./pages/sod-rules-list";
 export { profileService } from "./services/profile-service";
 export { tenantUserService } from "./services/tenant-user-service";
 export { roleService } from "./services/role-service";
 export { permissionService } from "./services/permission-service";
 export { scopeService } from "./services/scope-service";
 export { membershipHistoryService } from "./services/membership-history-service";
+export { sodService } from "./services/sod-service";
 export { identityPaths } from "./services/paths";
 export {
   useProfileMe,

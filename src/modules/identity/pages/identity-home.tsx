@@ -14,6 +14,7 @@ import {
   ClipboardCheck,
   ShieldAlert,
   GitPullRequestArrow,
+  Scale,
 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { usePermission } from "@/auth";
@@ -61,6 +62,13 @@ const cards: HubCard[] = [
     title: "محدوده دسترسی",
     description: "تعیین محدوده کار مثل شعبه یا واحد سازمانی",
     icon: Scan,
+    open: true,
+  },
+  {
+    href: "/dashboard/identity/sod-rules",
+    title: "تفکیک وظایف (SoD)",
+    description: "قوانین تعارض نقش و ارزیابی پیش از تخصیص",
+    icon: Scale,
     open: true,
   },
   {
@@ -140,6 +148,7 @@ export function IdentityHome() {
   const canViewAccessCert = usePermission(IdentityPermissions.accessCertView);
   const canViewPrivileged = usePermission(IdentityPermissions.privilegedView);
   const canViewRoleAssign = usePermission(IdentityPermissions.roleView);
+  const canViewSod = usePermission(IdentityPermissions.sodView);
 
   const allowedByHref: Record<string, boolean> = {
     "/dashboard/identity/me": true,
@@ -147,6 +156,7 @@ export function IdentityHome() {
     "/dashboard/identity/roles": canViewRoles,
     "/dashboard/identity/permissions": canViewPermissions,
     "/dashboard/identity/scopes": canViewScopes,
+    "/dashboard/identity/sod-rules": canViewSod,
     "/dashboard/identity/access-certifications": canViewAccessCert,
     "/dashboard/identity/privileged-access": canViewPrivileged,
     "/dashboard/identity/role-assignment-requests": canViewRoleAssign,
