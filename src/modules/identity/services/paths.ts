@@ -29,4 +29,9 @@ export const identityPaths = {
   membershipHistories: `${IDENTITY_BASE}/membership-histories`,
   membershipHistoryByUser: (tenantUserId: string) =>
     `${IDENTITY_BASE}/membership-histories/user/${tenantUserId}`,
+  // ID-W1-04 MFA
+  mfaStatus: `${IDENTITY_BASE}/auth/mfa/status`,
+  mfaEnable: `${IDENTITY_BASE}/auth/mfa/enable`,
+  mfaConfirm: `${IDENTITY_BASE}/auth/mfa/confirm`,
+  mfaDisable: `${IDENTITY_BASE}/auth/mfa/disable`,
 } as const;
