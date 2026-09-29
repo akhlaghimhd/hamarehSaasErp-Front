@@ -13,6 +13,7 @@ import {
   Scan,
   ClipboardCheck,
   ShieldAlert,
+  GitPullRequestArrow,
 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { usePermission } from "@/auth";
@@ -76,6 +77,13 @@ const cards: HubCard[] = [
     icon: ShieldAlert,
     open: true,
   },
+  {
+    href: "/dashboard/identity/role-assignment-requests",
+    title: "تأیید تخصیص نقش",
+    description: "صف درخواست‌های در انتظار تأیید نقش",
+    icon: GitPullRequestArrow,
+    open: true,
+  },
 ];
 
 function HubCardView({
@@ -131,6 +139,7 @@ export function IdentityHome() {
   const canViewScopes = usePermission(IdentityPermissions.scopeView);
   const canViewAccessCert = usePermission(IdentityPermissions.accessCertView);
   const canViewPrivileged = usePermission(IdentityPermissions.privilegedView);
+  const canViewRoleAssign = usePermission(IdentityPermissions.roleView);
 
   const allowedByHref: Record<string, boolean> = {
     "/dashboard/identity/me": true,
@@ -140,6 +149,7 @@ export function IdentityHome() {
     "/dashboard/identity/scopes": canViewScopes,
     "/dashboard/identity/access-certifications": canViewAccessCert,
     "/dashboard/identity/privileged-access": canViewPrivileged,
+    "/dashboard/identity/role-assignment-requests": canViewRoleAssign,
   };
 
   return (

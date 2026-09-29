@@ -51,4 +51,9 @@ export const identityPaths = {
   privilegedDeny: (id: string) => `${IDENTITY_BASE}/privileged-access/${id}/deny`,
   privilegedRevoke: (id: string) =>
     `${IDENTITY_BASE}/privileged-access/${id}/revoke`,
+  roleAssignmentRequests: `${IDENTITY_BASE}/role-assignment-requests`,
+  roleAssignmentApprove: (id: string) =>
+    `${IDENTITY_BASE}/role-assignment-requests/${id}/approve`,
+  roleAssignmentReject: (id: string) =>
+    `${IDENTITY_BASE}/role-assignment-requests/${id}/reject`,
 } as const;

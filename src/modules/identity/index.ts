@@ -13,6 +13,7 @@ export { PermissionsListPage } from "./pages/permissions-list";
 export { ScopesListPage } from "./pages/scopes-list";
 export { AccessCertificationsListPage } from "./pages/access-certifications-list";
 export { PrivilegedAccessListPage } from "./pages/privileged-access-list";
+export { RoleAssignmentRequestsListPage } from "./pages/role-assignment-requests-list";
 export { profileService } from "./services/profile-service";
 export { tenantUserService } from "./services/tenant-user-service";
 export { roleService } from "./services/role-service";
