@@ -1,5 +1,6 @@
 /**
  * FE-ORG — Organization module hub
+ * Feature packs (PLT-W1): multi_company / multi_branch / multi_business_unit / custom_org_hierarchy
  */
 
 "use client";
@@ -19,6 +20,11 @@ import {
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { usePermission } from "@/auth";
 import { useCompanies } from "../hooks/use-companies";
+import {
+  FEATURE_PACK_CODES,
+  useFeatureEntitlements,
+} from "../hooks/use-feature-packs";
+import { featureEntitlementsService } from "../services/feature-entitlements-service";
 import { OrganizationPermissions } from "../types";
 
 type HubCard = {
@@ -28,6 +34,8 @@ type HubCard = {
   description: string;
   icon: typeof Building2;
   open: boolean;
+  /** When pack missing: still navigable for single-entity path, but show note */
+  packHint?: string | null;
 };
 
 function HubCardView({
@@ -78,6 +86,10 @@ function HubCardView({
         <span className="mt-auto text-[10px] text-amber-700 dark:text-amber-400">
           برای ورود به این بخش مجوز لازم را ندارید
         </span>
+      ) : card.packHint ? (
+        <span className="mt-auto text-[10px] text-amber-700 dark:text-amber-400">
+          {card.packHint}
+        </span>
       ) : null}
     </div>
   );
@@ -100,6 +112,28 @@ export function OrganizationHomePage() {
   const canViewDept = usePermission(OrganizationPermissions.departmentView);
 
   const { data: companies, isLoading } = useCompanies();
+  const {
+    data: entitlements,
+    isLoading: packsLoading,
+  } = useFeatureEntitlements();
+
+  const hasMultiCompany = featureEntitlementsService.isEnabled(
+    entitlements,
+    FEATURE_PACK_CODES.multiCompany
+  );
+  const hasMultiBranch = featureEntitlementsService.isEnabled(
+    entitlements,
+    FEATURE_PACK_CODES.multiBranch
+  );
+  const hasMultiBu = featureEntitlementsService.isEnabled(
+    entitlements,
+    FEATURE_PACK_CODES.multiBusinessUnit
+  );
+  const hasCustomHierarchy = featureEntitlementsService.isEnabled(
+    entitlements,
+    FEATURE_PACK_CODES.customOrgHierarchy
+  );
+
   const list = companies ?? [];
   const primary =
     list.find((c) => c.is_primary) ??
@@ -118,6 +152,9 @@ export function OrganizationHomePage() {
         "شرکت‌های حقوقی گروه؛ شرکت اصلی و زیرمجموعه‌ها",
       icon: Building2,
       open: true,
+      packHint: !packsLoading && !hasMultiCompany
+        ? "بسته multi_company غیرفعال: فقط شرکت اصلی (ایجاد شرکت دوم مسدود)"
+        : null,
     },
     {
       key: "branches",
@@ -127,6 +164,9 @@ export function OrganizationHomePage() {
         "مکان‌های فعالیت مثل دفتر، کارخانه و سایت انبار زیر هر شرکت",
       icon: GitBranch,
       open: true,
+      packHint: !packsLoading && !hasMultiBranch
+        ? "بسته multi_branch غیرفعال: مسیر تک‌شعبه (HQ پیش‌فرض)"
+        : null,
     },
     {
       key: "departments",
@@ -144,7 +184,11 @@ export function OrganizationHomePage() {
       description:
         "بخش‌بندی مدیریتی مستقل از ساختار حقوقی برای گزارش و کنترل عملکرد",
       icon: Layers,
+      // Independent sellable pack — without it, card stays visible but marked locked for create UX
       open: true,
+      packHint: !packsLoading && !hasMultiBu
+        ? "بسته multi_business_unit لازم است؛ بدون آن ایجاد BU مسدود است"
+        : null,
     },
     {
       key: "hierarchy",
@@ -154,6 +198,9 @@ export function OrganizationHomePage() {
         "نمای ساختار؛ در سازمان ساده لازم نیست. با چند شرکت یا شعبه، نقشه را سیستم می‌سازد",
       icon: Landmark,
       open: true,
+      packHint: !packsLoading && !hasCustomHierarchy
+        ? "درخت CUSTOM نیاز به بسته custom_org_hierarchy دارد؛ SYS همچنان همگام می‌شود"
+        : null,
     },
     {
       key: "ic",
@@ -186,7 +233,7 @@ export function OrganizationHomePage() {
         ]}
       />
 
-      {isLoading ? (
+      {isLoading || packsLoading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           در حال بارگذاری ساختار سازمان…
