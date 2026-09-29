@@ -16,6 +16,13 @@ export type PrivilegedGrantDto = {
   [key: string]: unknown;
 };
 
+export type RequestPrivilegedGrantPayload = {
+  user_id: string;
+  tenant_role_id: string;
+  reason: string;
+  duration_minutes?: number;
+};
+
 function unwrapData<T>(envelope: unknown): T {
   if (envelope && typeof envelope === "object" && "data" in envelope) {
     return (envelope as ApiSuccessResponse<T>).data;
@@ -35,18 +42,27 @@ export const privilegedAccessService = {
     return [];
   },
 
+  async request(payload: RequestPrivilegedGrantPayload): Promise<PrivilegedGrantDto> {
+    const envelope = await apiPost(identityPaths.privilegedRequest, payload);
+    return unwrapData<PrivilegedGrantDto>(envelope);
+  },
+
   async approve(id: string): Promise<PrivilegedGrantDto> {
     const envelope = await apiPost(identityPaths.privilegedApprove(id), {});
     return unwrapData<PrivilegedGrantDto>(envelope);
   },
 
-  async deny(id: string): Promise<PrivilegedGrantDto> {
-    const envelope = await apiPost(identityPaths.privilegedDeny(id), {});
+  async deny(id: string, note?: string | null): Promise<PrivilegedGrantDto> {
+    const envelope = await apiPost(identityPaths.privilegedDeny(id), {
+      note: note ?? null,
+    });
     return unwrapData<PrivilegedGrantDto>(envelope);
   },
 
-  async revoke(id: string): Promise<PrivilegedGrantDto> {
-    const envelope = await apiPost(identityPaths.privilegedRevoke(id), {});
+  async revoke(id: string, reason?: string | null): Promise<PrivilegedGrantDto> {
+    const envelope = await apiPost(identityPaths.privilegedRevoke(id), {
+      reason: reason ?? null,
+    });
     return unwrapData<PrivilegedGrantDto>(envelope);
   },
 };

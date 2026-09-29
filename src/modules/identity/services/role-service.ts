@@ -22,6 +22,8 @@ export interface RoleDto {
   description?: string | null;
   status?: number;
   is_system_default?: boolean;
+  /** ID-W2-02 — break-glass / privileged role flag */
+  is_privileged?: boolean;
   row_version?: number;
   created_at?: string;
   updated_at?: string;
