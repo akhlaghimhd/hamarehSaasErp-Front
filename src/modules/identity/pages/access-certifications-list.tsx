@@ -182,7 +182,14 @@ export function AccessCertificationsListPage() {
           {error instanceof ApiClientError ? error.message : "خطا در بارگذاری"}
         </p>
       ) : (
-        <DataTable columns={columns} data={rows} emptyMessage="کمپینی ثبت نشده است." />
+        <DataTable
+          columns={columns}
+          data={rows}
+          getRowKey={(r) => r.campaign_id}
+          isFiltered={q.trim().length > 0}
+          emptyTitle="کمپینی ثبت نشده است."
+          emptySearchTitle="نتیجه‌ای پیدا نشد."
+        />
       )}
     </div>
   );

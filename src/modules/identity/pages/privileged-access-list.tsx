@@ -229,7 +229,14 @@ export function PrivilegedAccessListPage() {
           {error instanceof ApiClientError ? error.message : "خطا در بارگذاری"}
         </p>
       ) : (
-        <DataTable columns={columns} data={rows} emptyMessage="درخواستی ثبت نشده است." />
+        <DataTable
+          columns={columns}
+          data={rows}
+          getRowKey={(r) => r.grant_id}
+          isFiltered={q.trim().length > 0}
+          emptyTitle="درخواستی ثبت نشده است."
+          emptySearchTitle="نتیجه‌ای پیدا نشد."
+        />
       )}
     </div>
   );
