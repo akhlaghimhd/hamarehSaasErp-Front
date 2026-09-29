@@ -57,4 +57,7 @@ export const identityPaths = {
     `${IDENTITY_BASE}/role-assignment-requests/${id}/approve`,
   roleAssignmentReject: (id: string) =>
     `${IDENTITY_BASE}/role-assignment-requests/${id}/reject`,
+  sodRules: `${IDENTITY_BASE}/sod-rules`,
+  sodRule: (id: string) => `${IDENTITY_BASE}/sod-rules/${id}`,
+  sodEvaluate: `${IDENTITY_BASE}/sod-rules/evaluate`,
 } as const;

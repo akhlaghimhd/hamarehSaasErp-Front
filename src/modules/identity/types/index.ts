@@ -104,6 +104,8 @@ export const IdentityPermissions = {
   privilegedView: "identity.privileged.view",
   privilegedRequest: "identity.privileged.request",
   privilegedApprove: "identity.privileged.approve",
+  sodView: "identity.sod.view",
+  sodManage: "identity.sod.manage",
 } as const;
 
 export type IdentityPermissionCode =
