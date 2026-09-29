@@ -29,9 +29,26 @@ export const identityPaths = {
   membershipHistories: `${IDENTITY_BASE}/membership-histories`,
   membershipHistoryByUser: (tenantUserId: string) =>
     `${IDENTITY_BASE}/membership-histories/user/${tenantUserId}`,
-  // ID-W1-04 MFA
   mfaStatus: `${IDENTITY_BASE}/auth/mfa/status`,
   mfaEnable: `${IDENTITY_BASE}/auth/mfa/enable`,
   mfaConfirm: `${IDENTITY_BASE}/auth/mfa/confirm`,
   mfaDisable: `${IDENTITY_BASE}/auth/mfa/disable`,
+  accessCertifications: `${IDENTITY_BASE}/access-certifications`,
+  accessCertification: (id: string) =>
+    `${IDENTITY_BASE}/access-certifications/${id}`,
+  accessCertificationOpen: (id: string) =>
+    `${IDENTITY_BASE}/access-certifications/${id}/open`,
+  accessCertificationItems: (id: string) =>
+    `${IDENTITY_BASE}/access-certifications/${id}/items`,
+  accessCertificationComplete: (id: string) =>
+    `${IDENTITY_BASE}/access-certifications/${id}/complete`,
+  accessCertifyItem: (itemId: string) =>
+    `${IDENTITY_BASE}/access-certifications/items/${itemId}/certify`,
+  privilegedAccess: `${IDENTITY_BASE}/privileged-access`,
+  privilegedRequest: `${IDENTITY_BASE}/privileged-access/request`,
+  privilegedApprove: (id: string) =>
+    `${IDENTITY_BASE}/privileged-access/${id}/approve`,
+  privilegedDeny: (id: string) => `${IDENTITY_BASE}/privileged-access/${id}/deny`,
+  privilegedRevoke: (id: string) =>
+    `${IDENTITY_BASE}/privileged-access/${id}/revoke`,
 } as const;
