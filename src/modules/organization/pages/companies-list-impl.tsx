@@ -1,6 +1,5 @@
 /**
- * FE-ORG companies list implementation entry.
- * Full page lives in companies-list.tsx (single source of truth).
+ * Compatibility re-export. Source of truth: companies-list.tsx
  */
 "use client";
 
