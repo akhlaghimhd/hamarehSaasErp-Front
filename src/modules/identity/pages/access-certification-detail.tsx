@@ -542,7 +542,8 @@ export function AccessCertificationDetailPage() {
                               نیاز به اصلاح
                             </Button>
                             <Button
-                              type="button"lues                              size="sm"
+                              type="button"
+                              size="sm"
                               variant="ghost"
                               className="h-7 text-xs"
                               disabled={certifyMut.isPending}
