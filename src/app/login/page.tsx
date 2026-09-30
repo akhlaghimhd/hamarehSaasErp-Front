@@ -1,1 +1,4 @@
-SEE_FILE_AT_ARTIFACTS_login-page-RESTORED-UI.tsx_USER_MUST_COPY
+/**
+ * Login route entry — implementation in login-page-impl.
+ */
+export { default } from "./login-page-impl";
