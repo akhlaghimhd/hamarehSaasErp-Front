@@ -12,6 +12,7 @@ export { RoleDetailPage } from "./pages/role-detail";
 export { PermissionsListPage } from "./pages/permissions-list";
 export { ScopesListPage } from "./pages/scopes-list";
 export { AccessCertificationsListPage } from "./pages/access-certifications-list";
+export { AccessCertificationDetailPage } from "./pages/access-certification-detail";
 export { PrivilegedAccessListPage } from "./pages/privileged-access-list";
 export { RoleAssignmentRequestsListPage } from "./pages/role-assignment-requests-list";
 export { SodRulesListPage } from "./pages/sod-rules-list";
