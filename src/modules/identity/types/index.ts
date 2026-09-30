@@ -3,42 +3,77 @@ export type GenderCode = 1 | 2;
 export type AddressChangeStatus = 0 | 1 | 2 | 3;
 
 /** Membership status on tenant_users (1 = active, 0 = inactive). */
-export type MembershipStatus = 0 | 1;
+export type TenantUserStatus = 0 | 1;
 
-export type TenantUserRoleSummaryDto = {
+export interface TenantUserUserDto {
+  user_id?: string;
+  email?: string | null;
+  mobile?: string | null;
+  display_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+}
+
+/** Role summary attached on members list. */
+export interface TenantUserRoleSummaryDto {
   tenant_role_id: string;
-  code?: string | null;
   name?: string | null;
-};
+  code?: string | null;
+  parent_role_id?: string | null;
+}
 
-export type TenantUserDto = {
+/** Scope summary attached on members list. */
+export interface TenantUserScopeSummaryDto {
+  scope_id: string;
+  scope_name?: string | null;
+  scope_type?: string | null;
+}
+
+export interface TenantUserDto {
   tenant_user_id: string;
   tenant_id?: string;
   user_id?: string;
-  status?: MembershipStatus | number;
+  status?: number | TenantUserStatus;
   is_owner?: boolean;
-  created_at?: string | null;
-  updated_at?: string | null;
-  deleted_at?: string | null;
-  user?: {
-    user_id?: string;
-    email?: string | null;
-    mobile?: string | null;
-    first_name?: string | null;
-    last_name?: string | null;
-  } | null;
+  joined_at?: string | null;
+  left_at?: string | null;
+  user?: TenantUserUserDto | null;
   roles?: TenantUserRoleSummaryDto[];
-  scopes?: Array<{ scope_id?: string; name?: string | null; code?: string | null }>;
+  scopes?: TenantUserScopeSummaryDto[];
   [key: string]: unknown;
-};
+}
 
-export type SelfUpsertProfilePayload = {
+export interface CreateTenantUserPayload {
+  mobile: string;
+  display_name?: string;
+  [key: string]: unknown;
+}
+
+export interface UpdateTenantUserPayload {
+  status?: number;
+  display_name?: string;
+  [key: string]: unknown;
+}
+
+export interface UserProfileDto {
+  user_id?: string;
+  display_name?: string | null;
   first_name?: string | null;
   last_name?: string | null;
+  avatar_url?: string | null;
+  gender?: GenderCode | null;
+  birth_date?: string | null;
+  [key: string]: unknown;
+}
+
+export interface SelfUpsertProfilePayload {
+  display_name?: string;
+  first_name?: string;
+  last_name?: string;
   gender?: GenderCode | string;
   birth_date?: string | null;
   [key: string]: unknown;
-};
+}
 
 export type UpsertProfilePayload = SelfUpsertProfilePayload;
 
