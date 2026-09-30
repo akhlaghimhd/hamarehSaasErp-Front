@@ -1,6 +1,6 @@
 /**
  * Login page — password / OTP / MFA / set-password / forgot (complete).
- * Look: form + «ورود با OTP» under it + side visual (post-MFA compact style).
+ * Look: same card frame for password→MFA/forgot/OTP; «ورود با کد پیامکی» link.
  * Features: MFA challenge, FA digits, password eye, OTP session.
  */
 "use client";
@@ -489,9 +489,32 @@ export default function LoginPage() {
     );
   }
 
+  const keepFrame =
+    mode === "password" ||
+    mode === "otp" ||
+    mode === "mfa" ||
+    mode === "forgot" ||
+    mode === "set-password";
+  const panelKey = needHumanCheck ? "human" : mode;
+
   return (
-    <LoginShell showVisual={mode === "password" || mode === "otp"}>
+    <LoginShell showVisual={keepFrame}>
       <div className="flex w-full flex-1 flex-col justify-center gap-4 p-5 sm:p-6 lg:max-w-[400px]">
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              @keyframes login-panel-in {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+              }
+            `,
+          }}
+        />
+        <div
+          key={panelKey}
+          className="w-full"
+          style={{ animation: "login-panel-in 0.28s ease-out" }}
+        >
         {needHumanCheck ? (
           <HumanSlideCheck onPass={onHumanCheckPass} />
         ) : mode === "mfa" ? (
@@ -527,7 +550,8 @@ export default function LoginPage() {
           </form>
         ) : mode === "forgot" ? (
           <div className="space-y-3">
-            <h1 className="text-center text-lg font-semibold">بازیابی رمز عبور</h1>
+            <h1 className="text-center text-lg font-semibold tracking-tight">بازیابی رمز عبور</h1>
+            <p className="text-center text-xs text-muted-foreground">کد تأیید به موبایل ثبت‌شده ارسال می‌شود</p>
             <ErrorSlot message={formError} />
             {forgotStep === "mobile" || forgotStep === "idle" ? (
               <>
@@ -551,8 +575,8 @@ export default function LoginPage() {
         ) : mode === "otp" ? (
           <div className="space-y-4">
             <div className="space-y-1 text-center">
-              <h1 className="text-lg font-semibold">ورود با کد یکبارمصرف</h1>
-              <p className="text-sm text-muted-foreground">کد به موبایل شما ارسال می‌شود</p>
+              <h1 className="text-lg font-semibold">ورود با کد پیامکی</h1>
+              <p className="text-sm text-muted-foreground">کد یک‌بارمصرف به موبایل شما ارسال می‌شود</p>
             </div>
             <ErrorSlot message={formError} />
             {otpStep === "mobile" ? (
@@ -611,13 +635,14 @@ export default function LoginPage() {
             </div>
             <ActionButton type="submit" loading={isSubmitting} loadingLabel="در حال ورود…" disabled={blockedUntilEdit}>ورود</ActionButton>
             <div className="flex justify-between text-sm">
-              <button type="button" className="text-primary hover:underline" onClick={() => switchMode("otp")}>ورود با OTP</button>
+              <button type="button" className="text-primary hover:underline" onClick={() => switchMode("otp")}>ورود با کد پیامکی</button>
               <button type="button" className="text-muted-foreground hover:underline" onClick={() => switchMode("forgot")}>فراموشی رمز</button>
             </div>
           </form>
         )}
+        </div>
       </div>
-      {(mode === "password" || mode === "otp") && !needHumanCheck ? (
+      {keepFrame ? (
         <div className="hidden flex-1 border-s border-border/70 lg:block">
           <LoginVisual className="h-full min-h-[440px]" />
         </div>
