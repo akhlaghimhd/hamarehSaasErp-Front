@@ -19,6 +19,7 @@ export const SCOPE_TYPE_FA: Record<string, string> = {
   WAREHOUSE: "انبار",
   DEPARTMENT: "واحد سازمانی",
   COST_CENTER: "مرکز هزینه",
+  BUSINESS_UNIT: "واحد کسب‌وکار",
   CUSTOM: "سفارشی",
 };
 
