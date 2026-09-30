@@ -234,13 +234,18 @@ export default function LoginPage() {
   };
 
   const runMfaVerify = async () => {
-    if (!mfaToken || mfaCode.trim().length < 6) {
+    if (!mfaToken) {
+      setFormError("نشست تأیید منقضی شده. دوباره وارد شوید.");
+      return;
+    }
+    const normalized = toAsciiDigits(mfaCode).replace(/\s+/g, "").trim();
+    if (normalized.length < 6) {
       setFormError("کد تأیید را کامل وارد کنید.");
       return;
     }
     setMfaBusy(true); setFormError(null);
     try {
-      const result = await authService.completeMfaChallenge(mfaCode, {
+      const result = await authService.completeMfaChallenge(normalized, {
         tenantId: mfaPendingTenantId,
       });
       await handleLoginResult(result);
@@ -423,14 +428,11 @@ export default function LoginPage() {
       setForgotCode("");
       setForgotPassword("");
       setForgotPassword2("");
-    } else {
-      setForgotStep("idle");
     }
   };
 
   const onSetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!setPasswordToken) return;
     setFormError(null);
     const policyErr = validatePasswordClient(newPassword, {
       firstName: setPasswordUser?.first_name,
@@ -443,12 +445,9 @@ export default function LoginPage() {
     setSetPasswordBusy(true);
     try {
       await authService.setPassword(newPassword, newPassword2);
-      toast.success("رمز عبور ذخیره شد. لطفاً وارد شوید.");
+      toast.success("رمز ذخیره شد. دوباره وارد شوید.");
       setMode("password");
-      setSetPasswordToken(null);
-      setSetPasswordUser(null);
-      setNewPassword("");
-      setNewPassword2("");
+      setNewPassword(""); setNewPassword2("");
     } catch (err) {
       setFormError(err instanceof ApiClientError ? err.message : "ذخیره رمز ناموفق بود.");
     } finally { setSetPasswordBusy(false); }
@@ -469,44 +468,53 @@ export default function LoginPage() {
   };
 
   const onForgotConfirm = async () => {
+    const mobile = normalizeMobile(forgotMobile);
+    const code = toAsciiDigits(forgotCode).replace(/\D/g, "");
+    if (code.length < 4) { setFormError("کد را وارد کنید."); return; }
+    const policyErr = validatePasswordClient(forgotPassword, {});
+    if (policyErr) { setFormError(policyErr); return; }
     if (forgotPassword !== forgotPassword2) { setFormError("تکرار رمز یکسان نیست."); return; }
     setForgotBusy(true); setFormError(null);
     try {
-      await authService.forgotPasswordConfirm(
-        normalizeMobile(forgotMobile),
-        forgotCode.trim(),
-        forgotPassword,
-        forgotPassword2
-      );
-      toast.success("رمز به‌روز شد. وارد شوید.");
-      setMode("password");
-      setForgotStep("idle");
+      await authService.forgotPasswordConfirm(mobile, code, forgotPassword, forgotPassword2);
+      toast.success("رمز جدید ثبت شد. وارد شوید.");
+      switchMode("password");
     } catch (err) {
       setFormError(err instanceof ApiClientError ? err.message : "بازیابی ناموفق بود.");
     } finally { setForgotBusy(false); }
   };
 
-  if (orgs && preAuth) {
+  if (orgs && orgs.length > 0) {
     return (
       <LoginShell>
-        <div className="mx-auto flex w-full max-w-sm flex-col gap-3 px-4 py-10">
-          <h1 className="text-center text-lg font-semibold">انتخاب سازمان</h1>
-          <ErrorSlot message={formError} />
-          {orgs.map((o) => (
-            <button
-              key={o.tenant_id}
-              type="button"
-              disabled={orgBusy}
-              onClick={() => void onSelectOrg(o.tenant_id)}
-              className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-start hover:border-primary/40"
-            >
-              <Building2 className="h-4 w-4 text-primary" />
-              <span className="font-medium">{o.tenant_name}</span>
-              <span className="ms-auto text-xs text-muted-foreground" dir="ltr">{o.tenant_code}</span>
+        <div className="flex flex-1 flex-col justify-center px-4 py-8 sm:px-6">
+          <div className="mx-auto w-full max-w-sm space-y-4">
+            <div className="space-y-1 text-center">
+              <Building2 className="mx-auto h-8 w-8 text-primary" />
+              <h1 className="text-lg font-semibold">انتخاب سازمان</h1>
+              <p className="text-sm text-muted-foreground">سازمان مورد نظر را انتخاب کنید</p>
+            </div>
+            <ErrorSlot message={formError} />
+            <ul className="space-y-2">
+              {orgs.map((o) => (
+                <li key={o.tenant_id}>
+                  <button
+                    type="button"
+                    disabled={orgBusy}
+                    onClick={() => void onSelectOrg(o.tenant_id)}
+                    className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-4 py-3 text-start text-sm transition hover:border-primary/40 hover:bg-accent/40 disabled:opacity-50"
+                  >
+                    <span className="font-medium">{o.tenant_name || o.tenant_code}</span>
+                    {orgBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button type="button" className="w-full text-center text-sm text-muted-foreground" onClick={() => { setOrgs(null); setPreAuth(null); switchMode("password"); }}>
+              بازگشت
             </button>
-          ))}
+          </div>
         </div>
-        <div className="hidden lg:block"><LoginVisual className="h-full min-h-[440px]" /></div>
       </LoginShell>
     );
   }
@@ -518,7 +526,13 @@ export default function LoginPage() {
           {needHumanCheck ? (
             <HumanSlideCheck onPass={onHumanCheckPass} />
           ) : mode === "mfa" ? (
-            <>
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void runMfaVerify();
+              }}
+            >
               <div className="space-y-1 text-center">
                 <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <KeyRound className="h-5 w-5" />
@@ -531,23 +545,28 @@ export default function LoginPage() {
                 <Label htmlFor="mfa-code">کد تأیید</Label>
                 <Input
                   id="mfa-code"
-                  inputMode="numeric"
+                  inputMode="text"
                   autoComplete="one-time-code"
                   maxLength={16}
                   value={mfaCode}
-                  onChange={(e) => setMfaCode(e.target.value)}
+                  onChange={(e) => setMfaCode(toAsciiDigits(e.target.value))}
                   dir="ltr"
-                  className="text-center tracking-widest"
+                  className="text-center tracking-widest font-mono"
                   disabled={mfaBusy}
+                  autoFocus
                 />
               </div>
-              <ActionButton onClick={() => void runMfaVerify()} loading={mfaBusy} disabled={mfaCode.trim().length < 6}>
+              <ActionButton
+                type="submit"
+                loading={mfaBusy}
+                disabled={toAsciiDigits(mfaCode).replace(/\s+/g, "").trim().length < 6}
+              >
                 تأیید و ورود
               </ActionButton>
               <button type="button" className="w-full text-center text-sm text-muted-foreground" onClick={() => switchMode("password")}>
                 بازگشت
               </button>
-            </>
+            </form>
           ) : mode === "set-password" ? (
             <form onSubmit={onSetPassword} className="space-y-3">
               <h1 className="text-center text-lg font-semibold">تعیین رمز عبور</h1>
@@ -559,64 +578,84 @@ export default function LoginPage() {
             </form>
           ) : mode === "forgot" ? (
             <div className="space-y-3">
-              <h1 className="text-center text-lg font-semibold">بازیابی رمز</h1>
+              <h1 className="text-center text-lg font-semibold">بازیابی رمز عبور</h1>
               <ErrorSlot message={formError} />
               {forgotStep === "mobile" || forgotStep === "idle" ? (
                 <>
-                  <Input placeholder="۰۹۱۲xxxxxxxx" value={forgotMobile} onChange={(e) => setForgotMobile(e.target.value)} dir="ltr" />
-                  <ActionButton onClick={() => void onForgotRequest()} loading={forgotBusy}>ارسال کد</ActionButton>
+                  <Label>شماره موبایل</Label>
+                  <Input value={forgotMobile} onChange={(e) => setForgotMobile(e.target.value)} dir="ltr" placeholder="۰۹۱۲xxxxxxxx" />
+                  <ActionButton type="button" onClick={() => void onForgotRequest()} loading={forgotBusy}>ارسال کد</ActionButton>
                 </>
-              ) : forgotStep === "code" ? (
+              ) : forgotStep === "code" || forgotStep === "password" ? (
                 <>
-                  <Input placeholder="کد" value={forgotCode} onChange={(e) => setForgotCode(e.target.value)} dir="ltr" />
+                  <Label>کد دریافتی</Label>
+                  <Input value={forgotCode} onChange={(e) => setForgotCode(toAsciiDigits(e.target.value))} dir="ltr" />
                   <Input type="password" placeholder="رمز جدید" value={forgotPassword} onChange={(e) => setForgotPassword(e.target.value)} dir="ltr" />
                   <Input type="password" placeholder="تکرار رمز" value={forgotPassword2} onChange={(e) => setForgotPassword2(e.target.value)} dir="ltr" />
-                  <ActionButton onClick={() => void onForgotConfirm()} loading={forgotBusy}>ثبت رمز جدید</ActionButton>
+                  <ActionButton type="button" onClick={() => void onForgotConfirm()} loading={forgotBusy}>ثبت رمز جدید</ActionButton>
                 </>
               ) : null}
               <button type="button" className="w-full text-sm text-muted-foreground" onClick={() => switchMode("password")}>بازگشت</button>
             </div>
           ) : mode === "otp" ? (
             <div className="space-y-3">
-              <h1 className="text-center text-lg font-semibold">ورود با کد یکبارمصرف</h1>
+              <div className="space-y-1 text-center">
+                <Smartphone className="mx-auto h-8 w-8 text-primary" />
+                <h1 className="text-lg font-semibold">ورود با کد یکبارمصرف</h1>
+              </div>
               <ErrorSlot message={formError} />
               {otpStep === "mobile" ? (
                 <>
-                  <Input placeholder="۰۹۱۲xxxxxxxx" value={otpMobile} onChange={(e) => { setOtpMobile(e.target.value); markEdited(); }} dir="ltr" />
+                  <Label>شماره موبایل</Label>
+                  <Input
+                    value={displayIdentifier(otpMobile)}
+                    onChange={(e) => setOtpMobile(sanitizeIdentifierInput(e.target.value))}
+                    dir="ltr"
+                    placeholder="۰۹۱۲xxxxxxxx"
+                  />
                   {otpMobileError ? <p className="text-xs text-destructive">{otpMobileError}</p> : null}
-                  <ActionButton onClick={() => void onRequestOtp()} loading={otpRequestBusy}>ارسال کد</ActionButton>
+                  <ActionButton type="button" onClick={() => void onRequestOtp()} loading={otpRequestBusy}>دریافت کد</ActionButton>
                 </>
               ) : (
                 <>
-                  <OtpCodeInput value={otpCode} onChange={setOtpCode} onComplete={(c) => void onVerifyOtp(c)} disabled={otpVerifyBusy} />
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{timerLeft > 0 ? `${toFa(String(timerLeft))} ثانیه` : "منقضی"}</span>
-                    <ResendButton disabled={timerLeft > 0 || otpRequestBusy} onClick={() => void onRequestOtp({ force: true })} />
-                  </div>
-                  <ActionButton onClick={() => void onVerifyOtp()} loading={otpVerifyBusy} disabled={otpCode.replace(/\D/g, "").length !== OTP_LENGTH}>
+                  <p className="text-center text-sm text-muted-foreground">کد ارسال‌شده به {toFa(otpMobile)}</p>
+                  {debugCode ? <p className="text-center text-xs text-amber-700">کد تست: {debugCode}</p> : null}
+                  <OtpCodeInput value={otpCode} onChange={setOtpCode} onComplete={(c) => void onVerifyOtp(c)} disabled={otpVerifyBusy || blockedUntilEdit} />
+                  <ActionButton type="button" onClick={() => void onVerifyOtp()} loading={otpVerifyBusy} disabled={otpCode.replace(/\D/g, "").length !== OTP_LENGTH}>
                     تأیید کد
                   </ActionButton>
+                  <ResendButton
+                    cooldownSec={timerLeft}
+                    totalSec={OTP_TIMER_SEC}
+                    busy={otpRequestBusy}
+                    onClick={() => void onRequestOtp({ force: true })}
+                  />
+                  <button type="button" className="w-full text-sm text-muted-foreground" onClick={() => { setOtpStep("mobile"); clearOtpLocalSession(); }}>
+                    تغییر شماره
+                  </button>
                 </>
               )}
-              <button type="button" className="w-full text-sm text-muted-foreground" onClick={() => switchMode("password")}>ورود با رمز</button>
+              <button type="button" className="w-full text-sm text-muted-foreground" onClick={() => switchMode("password")}>ورود با رمز عبور</button>
             </div>
           ) : (
             <form onSubmit={handleSubmit(onPasswordSubmit)} className="space-y-3">
-              <h1 className="text-center text-lg font-semibold">ورود به سامانه</h1>
+              <div className="space-y-1 text-center">
+                <h1 className="text-lg font-semibold">ورود به سامانه</h1>
+                <p className="text-sm text-muted-foreground">ایمیل یا موبایل و رمز عبور</p>
+              </div>
               <ErrorSlot message={formError} />
               <div className="space-y-2">
                 <Label htmlFor="identifier">ایمیل یا موبایل</Label>
                 <Input
                   id="identifier"
+                  autoComplete="username"
+                  dir="ltr"
                   {...identifierReg}
                   value={displayIdentifier(identifierValue)}
                   onChange={(e) => {
-                    const v = sanitizeIdentifierInput(e.target.value);
-                    setValue("identifier", v, { shouldValidate: true });
                     markEdited();
+                    setValue("identifier", sanitizeIdentifierInput(e.target.value), { shouldValidate: true });
                   }}
-                  dir="ltr"
-                  autoComplete="username"
                 />
                 {errors.identifier ? <p className="text-xs text-destructive">{errors.identifier.message}</p> : null}
               </div>
@@ -626,37 +665,38 @@ export default function LoginPage() {
                   <Input
                     id="password"
                     type={showPasswordHold ? "text" : "password"}
-                    {...passwordReg}
-                    dir="ltr"
                     autoComplete="current-password"
-                    onChange={(e) => { passwordReg.onChange(e); markEdited(); }}
+                    dir="ltr"
+                    {...passwordReg}
+                    onChange={(e) => { markEdited(); passwordReg.onChange(e); }}
                   />
                   <button
                     type="button"
-                    className="absolute end-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    className="absolute end-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
                     onMouseDown={() => setShowPasswordHold(true)}
                     onMouseUp={() => setShowPasswordHold(false)}
                     onMouseLeave={() => setShowPasswordHold(false)}
-                    tabIndex={-1}
+                    onTouchStart={() => setShowPasswordHold(true)}
+                    onTouchEnd={() => setShowPasswordHold(false)}
+                    aria-label="نمایش رمز"
                   >
                     <Eye className="h-4 w-4" />
                   </button>
                 </div>
                 {errors.password ? <p className="text-xs text-destructive">{errors.password.message}</p> : null}
               </div>
-              <ActionButton type="submit" loading={isSubmitting} disabled={blockedUntilEdit}>
-                ورود
-              </ActionButton>
-              <div className="flex justify-between text-sm">
-                <button type="button" className="text-primary" onClick={() => switchMode("otp")}>ورود با OTP</button>
-                <button type="button" className="text-muted-foreground" onClick={() => switchMode("forgot")}>فراموشی رمز</button>
+              <ActionButton type="submit" loading={isSubmitting}>ورود</ActionButton>
+              <div className="flex items-center justify-between text-sm">
+                <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => switchMode("otp")}>
+                  ورود با کد یکبارمصرف
+                </button>
+                <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => switchMode("forgot")}>
+                  فراموشی رمز
+                </button>
               </div>
             </form>
           )}
         </div>
-      </div>
-      <div className="hidden lg:block">
-        <LoginVisual className="h-full min-h-[440px]" />
       </div>
     </LoginShell>
   );
