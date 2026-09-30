@@ -13,6 +13,15 @@ export type AccessCertCampaignDto = {
   completed_at?: string | null;
   items_total?: number;
   items_pending?: number;
+  totals?: {
+    items?: number;
+    pending?: number;
+    approved?: number;
+    revoke_requested?: number;
+    deferred?: number;
+    sod_block?: number;
+    sod_warn?: number;
+  };
   [key: string]: unknown;
 };
 
@@ -63,6 +72,23 @@ function asList<T>(data: T[] | { data?: T[] } | null | undefined): T[] {
   return [];
 }
 
+/** show() returns { campaign, totals } from backend — normalize to flat DTO */
+function normalizeCampaign(raw: unknown): AccessCertCampaignDto {
+  if (!raw || typeof raw !== "object") return {} as AccessCertCampaignDto;
+  const o = raw as Record<string, unknown>;
+  if (o.campaign && typeof o.campaign === "object") {
+    const c = o.campaign as AccessCertCampaignDto;
+    const totals = (o.totals as AccessCertCampaignDto["totals"]) || undefined;
+    return {
+      ...c,
+      totals,
+      items_total: totals?.items,
+      items_pending: totals?.pending,
+    };
+  }
+  return o as AccessCertCampaignDto;
+}
+
 export const accessCertificationService = {
   async list(): Promise<AccessCertCampaignDto[]> {
     const envelope = await apiGet(identityPaths.accessCertifications);
@@ -71,22 +97,22 @@ export const accessCertificationService = {
 
   async create(payload: CreateAccessCertCampaignPayload): Promise<AccessCertCampaignDto> {
     const envelope = await apiPost(identityPaths.accessCertifications, payload);
-    return unwrapData<AccessCertCampaignDto>(envelope);
+    return normalizeCampaign(unwrapData(envelope));
   },
 
   async show(id: string): Promise<AccessCertCampaignDto> {
     const envelope = await apiGet(identityPaths.accessCertification(id));
-    return unwrapData<AccessCertCampaignDto>(envelope);
+    return normalizeCampaign(unwrapData(envelope));
   },
 
   async open(id: string): Promise<AccessCertCampaignDto> {
     const envelope = await apiPost(identityPaths.accessCertificationOpen(id), {});
-    return unwrapData<AccessCertCampaignDto>(envelope);
+    return normalizeCampaign(unwrapData(envelope));
   },
 
   async complete(id: string): Promise<AccessCertCampaignDto> {
     const envelope = await apiPost(identityPaths.accessCertificationComplete(id), {});
-    return unwrapData<AccessCertCampaignDto>(envelope);
+    return normalizeCampaign(unwrapData(envelope));
   },
 
   async listItems(campaignId: string, decision?: string): Promise<AccessCertItemDto[]> {
