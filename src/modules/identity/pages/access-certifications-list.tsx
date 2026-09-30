@@ -212,16 +212,6 @@ export function AccessCertificationsListPage() {
       toast.error(e instanceof ApiClientError ? e.message : "باز کردن کمپین ناموفق بود"),
   });
 
-  const completeMut = useMutation({
-    mutationFn: (id: string) => accessCertificationService.complete(id),
-    onSuccess: () => {
-      toast.success("کمپین تکمیل شد");
-      void qc.invalidateQueries({ queryKey: ["identity", "access-certifications"] });
-    },
-    onError: (e) =>
-      toast.error(e instanceof ApiClientError ? e.message : "تکمیل کمپین ناموفق بود"),
-  });
-
   function resetCreate() {
     setCode("");
     setName("");
@@ -450,9 +440,13 @@ export function AccessCertificationsListPage() {
                         </Button>
                       ) : null}
                       {canManage && String(r.status).toUpperCase() === "OPEN" ? (
-                        <Button type="button" size="sm" variant="secondary" className="h-7 text-xs" disabled={completeMut.isPending}
-                          onClick={() => void completeMut.mutateAsync(r.campaign_id)}>
-                          تکمیل
+                        <Button type="button" size="sm" variant="secondary" className="h-7 text-xs"
+                          onClick={() =>
+                            router.push(
+                              `/dashboard/identity/access-certifications/${r.campaign_id}`
+                            )
+                          }>
+                          بررسی آیتم‌ها
                         </Button>
                       ) : null}
                     </div>
@@ -490,94 +484,91 @@ export function AccessCertificationsListPage() {
       <Sheet
         open={createOpen}
         onOpenChange={(open) => {
-          if (!open && formDirty) return;
-          if (!open) resetCreate();
+          if (!open && formDirty) {
+            const ok = window.confirm("تغییرات ذخیره نشده‌اند. فرم بسته شود؟");
+            if (!ok) return;
+          }
           setCreateOpen(open);
+          if (!open) resetCreate();
         }}
       >
-        <SheetContent
-          side="right"
-          className="flex h-full max-h-dvh w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
-          onInteractOutside={(e) => { if (formDirty) e.preventDefault(); }}
-          onPointerDownOutside={(e) => { if (formDirty) e.preventDefault(); }}
-          onEscapeKeyDown={(e) => { if (formDirty) e.preventDefault(); }}
-        >
-          <SheetHeader className="shrink-0 space-y-1 border-b px-6 py-4 text-start">
+        <SheetContent side="right" className="flex h-full max-h-dvh w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
+          <SheetHeader className="shrink-0 border-b px-6 py-4 text-start">
             <SheetTitle>کمپین بازبینی جدید</SheetTitle>
             <SheetDescription>
-              بعد از ایجاد، با «باز کردن» از همهٔ اعضا عکس نقش‌ها گرفته می‌شود.
+              بعد از ایجاد، کمپین را «باز» کنید تا نقش‌های اعضا ثبت شود.
             </SheetDescription>
           </SheetHeader>
-          <form
-            className="flex min-h-0 flex-1 flex-col overflow-hidden"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!code.trim() || !name.trim()) {
-                toast.error("کد و نام کمپین الزامی است");
-                return;
-              }
-              void createMut.mutateAsync();
-            }}
-          >
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="ac-code">کد کمپین</Label>
-                <Input id="ac-code" className="h-9" placeholder="مثال: cert-1405-01" value={code}
-                  onChange={(e) => setCode(e.target.value)} dir="ltr" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ac-name">نام کمپین</Label>
-                <Input id="ac-name" className="h-9" placeholder="مثال: بازبینی فصل بهار" value={name}
-                  onChange={(e) => setName(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ac-desc">توضیح (اختیاری)</Label>
-                <Input id="ac-desc" className="h-9" value={description}
-                  onChange={(e) => setDescription(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>موعد بازبینی (شمسی، اختیاری)</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  <Select value={jy || undefined} onValueChange={setJy}>
-                    <SelectTrigger className="h-9"><SelectValue placeholder="سال" /></SelectTrigger>
-                    <SelectContent>
-                      {yearOptions.map((y) => (
-                        <SelectItem key={y} value={String(y)}>{toFaDigits(y)}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={jm || undefined} onValueChange={setJm}>
-                    <SelectTrigger className="h-9"><SelectValue placeholder="ماه" /></SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                        <SelectItem key={m} value={String(m)}>{toFaDigits(m)}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={jd || undefined} onValueChange={setJd}>
-                    <SelectTrigger className="h-9"><SelectValue placeholder="روز" /></SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                        <SelectItem key={d} value={String(d)}>{toFaDigits(d)}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="ac-code">کد کمپین</Label>
+              <Input
+                id="ac-code"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="مثلاً q3-1405"
+                className="font-mono"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ac-name">نام</Label>
+              <Input
+                id="ac-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="بازبینی فصلی پاییز"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ac-desc">توضیح (اختیاری)</Label>
+              <Input
+                id="ac-desc"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>موعد (شمسی، اختیاری)</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <Select value={jy || undefined} onValueChange={setJy}>
+                  <SelectTrigger><SelectValue placeholder="سال" /></SelectTrigger>
+                  <SelectContent>
+                    {yearOptions.map((y) => (
+                      <SelectItem key={y} value={String(y)}>{toFaDigits(y)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={jm || undefined} onValueChange={setJm}>
+                  <SelectTrigger><SelectValue placeholder="ماه" /></SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                      <SelectItem key={m} value={String(m)}>{toFaDigits(m)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={jd || undefined} onValueChange={setJd}>
+                  <SelectTrigger><SelectValue placeholder="روز" /></SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                      <SelectItem key={d} value={String(d)}>{toFaDigits(d)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-            <SheetFooter className="shrink-0 gap-2 border-t px-6 py-4 sm:flex-row">
-              <Button type="button" variant="outline" onClick={() => { resetCreate(); setCreateOpen(false); }}>
-                انصراف
-              </Button>
-              <Button type="submit" disabled={createMut.isPending}>
-                {createMut.isPending ? (
-                  <><Loader2 className="me-1.5 h-4 w-4 animate-spin" />در حال ثبت…</>
-                ) : (
-                  "ثبت کمپین"
-                )}
-              </Button>
-            </SheetFooter>
-          </form>
+          </div>
+          <SheetFooter className="shrink-0 border-t px-6 py-4">
+            <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+              انصراف
+            </Button>
+            <Button
+              type="button"
+              disabled={createMut.isPending || !code.trim() || !name.trim()}
+              onClick={() => void createMut.mutateAsync()}
+            >
+              ثبت کمپین
+            </Button>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
     </div>
