@@ -62,7 +62,6 @@ import {
 } from "@/shared/components/ui/dialog";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -844,15 +843,21 @@ export function SodRulesListPage() {
                     <DropdownMenuContent align="end" className="w-48">
                       <DropdownMenuLabel>نمایش ستون‌ها</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      {COL_META.map((c) => (
-                        <DropdownMenuCheckboxItem
+                      {COL_META.filter((c) => !c.locked).map((c) => (
+                        <DropdownMenuItem
                           key={c.id}
-                          checked={visibleCols.has(c.id)}
-                          disabled={c.locked}
-                          onCheckedChange={() => toggleCol(c.id)}
+                          className="gap-2"
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            toggleCol(c.id);
+                          }}
                         >
-                          {c.label}
-                        </DropdownMenuCheckboxItem>
+                          <Checkbox
+                            checked={visibleCols.has(c.id)}
+                            className="pointer-events-none"
+                          />
+                          <span>{c.label}</span>
+                        </DropdownMenuItem>
                       ))}
                     </DropdownMenuContent>
                   </DropdownMenu>
