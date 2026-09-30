@@ -1,9 +1,18 @@
-/** Permissions catalog — grouped by module, then by abstract use-case. */
+/** Permissions catalog — module list + collapsible use-case drawers. */
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Search, KeyRound, X, Info, Pencil } from "lucide-react";
+import {
+  Loader2,
+  Search,
+  KeyRound,
+  X,
+  Info,
+  Pencil,
+  ChevronDown,
+  ChevronLeft,
+} from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
@@ -56,6 +65,8 @@ export function PermissionsListPage() {
   const [moduleQuery, setModuleQuery] = useState("");
   const [permQuery, setPermQuery] = useState("");
   const [selectedModule, setSelectedModule] = useState<string | null>(null);
+  /** Open use-case drawer names (accordion). */
+  const [openDrawers, setOpenDrawers] = useState<Set<string>>(new Set());
 
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<PermissionDto | null>(null);
@@ -131,7 +142,6 @@ export function PermissionsListPage() {
     );
   }, [modules, selectedModule, permQuery]);
 
-  /** Abstract use-case buckets under the selected module. */
   const useCaseSections = useMemo(() => {
     const map = new Map<string, PermissionDto[]>();
     for (const p of selectedPerms) {
@@ -151,6 +161,36 @@ export function PermissionsListPage() {
       ),
     }));
   }, [selectedPerms]);
+
+  // When module changes: open only the first drawer. When searching: open all matches.
+  useEffect(() => {
+    if (!useCaseSections.length) {
+      setOpenDrawers(new Set());
+      return;
+    }
+    if (permQuery.trim()) {
+      setOpenDrawers(new Set(useCaseSections.map((s) => s.name)));
+      return;
+    }
+    setOpenDrawers(new Set([useCaseSections[0].name]));
+  }, [selectedModule, permQuery, useCaseSections]);
+
+  function toggleDrawer(name: string) {
+    setOpenDrawers((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  function expandAll() {
+    setOpenDrawers(new Set(useCaseSections.map((s) => s.name)));
+  }
+
+  function collapseAll() {
+    setOpenDrawers(new Set());
+  }
 
   function openEdit(p: PermissionDto) {
     setEditing(p);
@@ -211,8 +251,8 @@ export function PermissionsListPage() {
           title="مجوزها"
           description={
             canRelabel
-              ? "کاتالوگ عملیات سیستم، گروه‌بندی‌شده بر اساس حوزه و کاربرد. مالک می‌تواند عنوان و راهنما را ویرایش کند."
-              : "کاتالوگ عملیات سیستم — گروه‌بندی بر اساس حوزه (هویت، سازمان، شرکا، …) و کاربرد."
+              ? "کاتالوگ عملیات سیستم به‌صورت کشوهای بازشونده. مالک می‌تواند عنوان و راهنما را ویرایش کند."
+              : "کاتالوگ عملیات — حوزه‌ها در سمت راست؛ داخل هر حوزه کشوهای کاربرد (باز/بسته)."
           }
           breadcrumbs={[
             { label: "داشبورد", href: "/dashboard" },
@@ -224,9 +264,8 @@ export function PermissionsListPage() {
         <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <p className="leading-relaxed">
-            سمت راست: حوزه اصلی (هویت، سازمان، شرکا، …). داخل هر حوزه، مجوزها بر
-            اساس کاربرد (مثلاً کاربران، نقش‌ها، شرکت‌ها) دسته‌بندی شده‌اند. تخصیص به
-            نقش در صفحه «نقش‌ها» انجام می‌شود.
+            حوزه را انتخاب کنید، سپس فقط کشوی موردنیاز را باز کنید. با جستجو،
+            همه دسته‌های دارای نتیجه به‌طور خودکار باز می‌شوند.
           </p>
         </div>
 
@@ -340,8 +379,30 @@ export function PermissionsListPage() {
               </h2>
               <span className="text-xs text-muted-foreground">
                 {toFaDigits(selectedPerms.length)} مجوز ·{" "}
-                {toFaDigits(useCaseSections.length)} دسته
+                {toFaDigits(useCaseSections.length)} کشو
               </span>
+              {useCaseSections.length > 0 ? (
+                <div className="ms-auto flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-[11px]"
+                    onClick={expandAll}
+                  >
+                    باز کردن همه
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-[11px]"
+                    onClick={collapseAll}
+                  >
+                    بستن همه
+                  </Button>
+                </div>
+              ) : null}
             </div>
 
             <div className="border-b border-border/40 px-3 py-2">
@@ -381,81 +442,106 @@ export function PermissionsListPage() {
                   title={permQuery ? "موردی با این جستجو نیست" : "این حوزه خالی است"}
                 />
               ) : (
-                <div className="space-y-3">
-                  {useCaseSections.map((section) => (
-                    <div key={section.name} className="space-y-0.5">
-                      <div className="sticky top-0 z-[1] flex items-center gap-2 bg-card/95 px-2 py-1.5 backdrop-blur-sm">
-                        <span className="text-[11px] font-semibold text-foreground">
-                          {section.name}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {toFaDigits(section.perms.length)}
-                        </span>
-                        <div className="h-px flex-1 bg-border/60" />
-                      </div>
-                      <ul className="space-y-0.5">
-                        {section.perms.map((p) => {
-                          const title = displayPermissionName(p.name, p.code);
-                          const hint =
-                            p.description?.trim() ||
-                            `عملیات «${title}» در سیستم تعریف شده است.`;
-                          const active = (p.status ?? 1) === 1;
-                          return (
-                            <li key={p.tenant_permission_id}>
-                              <div
-                                className={cn(
-                                  "flex items-start gap-2 rounded-md px-2.5 py-2",
-                                  !active && "opacity-50"
-                                )}
-                              >
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <span className="truncate text-[13px] font-medium text-foreground">
-                                          {title}
+                <div className="space-y-2">
+                  {useCaseSections.map((section) => {
+                    const open = openDrawers.has(section.name);
+                    return (
+                      <div
+                        key={section.name}
+                        className="overflow-hidden rounded-lg border border-border/60"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => toggleDrawer(section.name)}
+                          className="flex w-full items-center gap-2 bg-muted/25 px-3 py-2.5 text-start transition-colors hover:bg-muted/40"
+                          aria-expanded={open}
+                        >
+                          {open ? (
+                            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          ) : (
+                            <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          )}
+                          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
+                            {section.name}
+                          </span>
+                          <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] tabular-nums text-muted-foreground">
+                            {toFaDigits(section.perms.length)} مجوز
+                          </span>
+                        </button>
+
+                        {open ? (
+                          <ul className="space-y-0.5 border-t border-border/50 p-2">
+                            {section.perms.map((p) => {
+                              const title = displayPermissionName(
+                                p.name,
+                                p.code
+                              );
+                              const hint =
+                                p.description?.trim() ||
+                                `عملیات «${title}» در سیستم تعریف شده است.`;
+                              const active = (p.status ?? 1) === 1;
+                              return (
+                                <li key={p.tenant_permission_id}>
+                                  <div
+                                    className={cn(
+                                      "flex items-start gap-2 rounded-md px-2.5 py-2",
+                                      !active && "opacity-50"
+                                    )}
+                                  >
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <span className="truncate text-[13px] font-medium text-foreground">
+                                              {title}
+                                            </span>
+                                          </TooltipTrigger>
+                                          <TooltipContent
+                                            side="top"
+                                            className="max-w-xs text-xs leading-relaxed"
+                                          >
+                                            <p className="font-medium">
+                                              {title}
+                                            </p>
+                                            <p className="mt-1 opacity-90">
+                                              {hint}
+                                            </p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                          {actionTypeLabel(p.action_type)}
                                         </span>
-                                      </TooltipTrigger>
-                                      <TooltipContent
-                                        side="top"
-                                        className="max-w-xs text-xs leading-relaxed"
+                                        {!active ? (
+                                          <span className="shrink-0 text-[10px] text-amber-700 dark:text-amber-300">
+                                            غیرفعال
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                      <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">
+                                        {hint}
+                                      </p>
+                                    </div>
+                                    {canRelabel ? (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                                        onClick={() => openEdit(p)}
+                                        aria-label="ویرایش عنوان و راهنما"
                                       >
-                                        <p className="font-medium">{title}</p>
-                                        <p className="mt-1 opacity-90">{hint}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                    <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                                      {actionTypeLabel(p.action_type)}
-                                    </span>
-                                    {!active ? (
-                                      <span className="shrink-0 text-[10px] text-amber-700 dark:text-amber-300">
-                                        غیرفعال
-                                      </span>
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </Button>
                                     ) : null}
                                   </div>
-                                  <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">
-                                    {hint}
-                                  </p>
-                                </div>
-                                {canRelabel ? (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                                    onClick={() => openEdit(p)}
-                                    aria-label="ویرایش عنوان و راهنما"
-                                  >
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </Button>
-                                ) : null}
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  ))}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : null}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
