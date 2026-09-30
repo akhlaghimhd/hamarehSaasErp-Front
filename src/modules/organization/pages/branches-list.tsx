@@ -1,35 +1,92 @@
 /**
- * FE-ORG — فهرست شعب (با گیت multi_branch)
- * بدون پک: مشاهده مجاز؛ ایجاد شعبه دوم مسدود.
+ * FE-ORG — فهرست شعب با گیت multi_branch + فرم ایجاد
  */
 "use client";
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { GitBranch, Loader2, Plus, Search } from "lucide-react";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { StatusChip } from "@/shared/components/data-display/status-chip";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { Input } from "@/shared/components/ui/input";
 import { Button } from "@/shared/components/ui/button";
+import { Label } from "@/shared/components/ui/label";
 import { Skeleton } from "@/shared/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/components/ui/table";
+import { Switch } from "@/shared/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/shared/components/ui/sheet";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/shared/components/ui/table";
 import { usePermission } from "@/auth";
+import { ApiClientError } from "@/api";
 import { toFaDigits } from "@/shared/lib/utils";
+import { useCompanies } from "../hooks/use-companies";
 import { FEATURE_PACK_CODES, useFeaturePackEnabled } from "../hooks/use-feature-packs";
-import { useAllBranches } from "../hooks/use-branches";
+import { useAllBranches, useCreateBranch } from "../hooks/use-branches";
 import { companyDetailPath } from "../lib/company-ref";
-import { OrganizationPermissions, BRANCH_KIND_LABELS, type BranchDto } from "../types";
+import {
+  OrganizationPermissions,
+  BRANCH_KIND_LABELS,
+  type BranchDto,
+} from "../types";
+
+type BranchForm = {
+  company_id: string;
+  code: string;
+  name: string;
+  address: string;
+  branch_kind: string;
+  is_active: boolean;
+};
+
+const emptyForm = (): BranchForm => ({
+  company_id: "",
+  code: "",
+  name: "",
+  address: "",
+  branch_kind: "OFFICE",
+  is_active: true,
+});
 
 export function BranchesListPage() {
+  const qc = useQueryClient();
   const canView = usePermission(OrganizationPermissions.branchView);
   const canCreate = usePermission(OrganizationPermissions.branchCreate);
   const { enabled: hasMultiBranch, isLoading: packLoading } = useFeaturePackEnabled(
     FEATURE_PACK_CODES.multiBranch
   );
-  const { data, isLoading, isError, refetch, isFetching } = useAllBranches();
+  const { data: companies } = useCompanies();
+  const { data, isLoading, isError, refetch, isFetching } = useAllBranches(
+    "active",
+    (companies ?? []).map((c) => c.company_id)
+  );
   const [query, setQuery] = useState("");
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const form = useForm<BranchForm>({ defaultValues: emptyForm() });
+  const formCompanyId = form.watch("company_id");
+  const createMutation = useCreateBranch(formCompanyId || "");
 
   const rows = useMemo(() => {
     const list = (data ?? []) as BranchDto[];
@@ -45,12 +102,39 @@ export function BranchesListPage() {
 
   const createBlockedByPack = !packLoading && !hasMultiBranch && rows.length >= 1;
 
-  function onCreateClick() {
+  function openCreate() {
     if (createBlockedByPack) {
       toast.message("بسته multi_branch فعال نیست؛ ایجاد شعبه دوم مجاز نیست.");
       return;
     }
-    toast.message("برای ایجاد شعبه از جزئیات شرکت استفاده کنید یا پک multi_branch را فعال کنید.");
+    form.reset(emptyForm());
+    const first = (companies ?? [])[0];
+    if (first) form.setValue("company_id", first.company_id);
+    setSheetOpen(true);
+  }
+
+  async function onSubmit(values: BranchForm) {
+    if (createBlockedByPack) {
+      toast.message("بسته multi_branch فعال نیست؛ ایجاد شعبه دوم مجاز نیست.");
+      return;
+    }
+    try {
+      await createMutation.mutateAsync({
+        company_id: values.company_id,
+        code: values.code.trim(),
+        name: values.name.trim(),
+        address: values.address.trim() || undefined,
+        branch_kind: values.branch_kind,
+        is_active: values.is_active,
+      });
+      toast.success("شعبه ایجاد شد");
+      setSheetOpen(false);
+      form.reset(emptyForm());
+      void qc.invalidateQueries({ queryKey: ["organization", "branches"] });
+      void refetch();
+    } catch (e) {
+      toast.error(e instanceof ApiClientError ? e.message : "خطا در ایجاد شعبه");
+    }
   }
 
   if (!canView) {
@@ -75,7 +159,7 @@ export function BranchesListPage() {
           canCreate ? (
             <Button
               size="sm"
-              onClick={onCreateClick}
+              onClick={openCreate}
               disabled={createBlockedByPack}
               title={createBlockedByPack ? "بسته multi_branch لازم است" : undefined}
             >
@@ -114,7 +198,11 @@ export function BranchesListPage() {
           onAction={() => void refetch()}
         />
       ) : rows.length === 0 ? (
-        <EmptyState title="شعبه‌ای یافت نشد" />
+        <EmptyState
+          title="شعبه‌ای یافت نشد"
+          actionLabel={canCreate && !createBlockedByPack ? "شعبه جدید" : undefined}
+          onAction={canCreate && !createBlockedByPack ? openCreate : undefined}
+        />
       ) : (
         <div className="rounded-md border">
           <Table>
@@ -165,6 +253,83 @@ export function BranchesListPage() {
           </div>
         </div>
       )}
+
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent className="sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>شعبه جدید</SheetTitle>
+          </SheetHeader>
+          <form className="mt-4 space-y-3" onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="space-y-1">
+              <Label>شرکت</Label>
+              <Select
+                value={form.watch("company_id") || ""}
+                onValueChange={(v) => form.setValue("company_id", v, { shouldDirty: true })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="انتخاب شرکت" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(companies ?? []).map((c) => (
+                    <SelectItem key={c.company_id} value={c.company_id}>
+                      {c.legal_name || c.name || c.code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>کد</Label>
+              <Input {...form.register("code", { required: true })} />
+            </div>
+            <div className="space-y-1">
+              <Label>نام</Label>
+              <Input {...form.register("name", { required: true })} />
+            </div>
+            <div className="space-y-1">
+              <Label>آدرس</Label>
+              <Input {...form.register("address")} />
+            </div>
+            <div className="space-y-1">
+              <Label>نوع</Label>
+              <Select
+                value={form.watch("branch_kind") || "OFFICE"}
+                onValueChange={(v) => form.setValue("branch_kind", v, { shouldDirty: true })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(BRANCH_KIND_LABELS ?? { OFFICE: "دفتر" }).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>
+                      {v}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={form.watch("is_active") !== false}
+                onCheckedChange={(c) => form.setValue("is_active", c, { shouldDirty: true })}
+              />
+              <Label>فعال</Label>
+            </div>
+            <SheetFooter>
+              <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>
+                انصراف
+              </Button>
+              <Button type="submit" disabled={createMutation.isPending || createBlockedByPack}>
+                {createMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "ایجاد"
+                )}
+              </Button>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
