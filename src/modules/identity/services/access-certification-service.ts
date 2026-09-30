@@ -72,7 +72,6 @@ function asList<T>(data: T[] | { data?: T[] } | null | undefined): T[] {
   return [];
 }
 
-/** show() returns { campaign, totals } from backend — normalize to flat DTO */
 function normalizeCampaign(raw: unknown): AccessCertCampaignDto {
   if (!raw || typeof raw !== "object") return {} as AccessCertCampaignDto;
   const o = raw as Record<string, unknown>;
@@ -113,6 +112,23 @@ export const accessCertificationService = {
   async complete(id: string): Promise<AccessCertCampaignDto> {
     const envelope = await apiPost(identityPaths.accessCertificationComplete(id), {});
     return normalizeCampaign(unwrapData(envelope));
+  },
+
+  async reEvaluate(id: string): Promise<{
+    campaign: AccessCertCampaignDto;
+    totals?: AccessCertCampaignDto["totals"];
+    re_eval?: { resolved?: number; updated?: number; added?: number };
+  }> {
+    const envelope = await apiPost(identityPaths.accessCertificationReEvaluate(id), {});
+    const raw = unwrapData(envelope) as Record<string, unknown>;
+    const campaign = normalizeCampaign(
+      raw.campaign ? { campaign: raw.campaign, totals: raw.totals } : raw
+    );
+    return {
+      campaign,
+      totals: (raw.totals as AccessCertCampaignDto["totals"]) || campaign.totals,
+      re_eval: raw.re_eval as { resolved?: number; updated?: number; added?: number },
+    };
   },
 
   async listItems(campaignId: string, decision?: string): Promise<AccessCertItemDto[]> {
