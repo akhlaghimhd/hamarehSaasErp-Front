@@ -103,11 +103,16 @@ export const roleService = {
     });
   },
 
+  /**
+   * Sync permission set on a role.
+   * Backend route: POST /identity/roles/{id}/permissions
+   * Body (AssignPermissionsRequest): tenant_role_id + permission_ids
+   */
   async assignPermissions(
     tenantRoleId: string,
     permissionIds: string[]
   ): Promise<void> {
-    await apiPost(identityPaths.roleAssignPermissions, {
+    await apiPost(identityPaths.roleAssignPermissions(tenantRoleId), {
       tenant_role_id: tenantRoleId,
       permission_ids: permissionIds,
     });

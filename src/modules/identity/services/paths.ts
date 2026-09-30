@@ -16,8 +16,15 @@ export const identityPaths = {
   userRestore: (id: string) => `${IDENTITY_BASE}/users/${id}/restore`,
   roles: `${IDENTITY_BASE}/roles`,
   role: (id: string) => `${IDENTITY_BASE}/roles/${id}`,
+  /** POST body: { user_id, role_ids } — assign roles to a member */
   roleAssign: `${IDENTITY_BASE}/roles/assign`,
-  roleAssignPermissions: `${IDENTITY_BASE}/roles/assign-permissions`,
+  /**
+   * Assign permissions to a role.
+   * Backend: POST /identity/roles/{id}/permissions
+   * Body still includes tenant_role_id + permission_ids (AssignPermissionsRequest).
+   */
+  roleAssignPermissions: (roleId: string) =>
+    `${IDENTITY_BASE}/roles/${roleId}/permissions`,
   permissions: `${IDENTITY_BASE}/permissions`,
   permission: (id: string) => `${IDENTITY_BASE}/permissions/${id}`,
   scopes: `${IDENTITY_BASE}/scopes`,
