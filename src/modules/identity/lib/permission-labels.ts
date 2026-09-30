@@ -1,4 +1,4 @@
-/** Persian display helpers for permissions (module, title, module icon). */
+/** Persian display helpers for permissions (module, title, module icon, use-case group). */
 
 import type { LucideIcon } from "lucide-react";
 import {
@@ -148,6 +148,35 @@ export const MODULE_ICONS: Record<string, LucideIcon> = {
   تولید: Package,
 };
 
+/** Preferred order of abstract use-case groups inside a module. */
+const USE_CASE_ORDER: string[] = [
+  // هویت
+  "کاربران و عضویت",
+  "نقش‌ها و تخصیص",
+  "کاتالوگ مجوزها",
+  "محدوده دسترسی (Scope)",
+  "پروفایل",
+  "امنیت و حاکمیت دسترسی",
+  // سازمان
+  "شرکت‌ها",
+  "شعب",
+  "واحدهای سازمانی",
+  "مالکیت و اطلاعات حقوقی شرکت",
+  "واحد کسب‌وکار و مرکز هزینه",
+  "سلسله‌مراتب",
+  "ساختار فروش و خرید",
+  "بین‌شرکتی و تلفیق",
+  // شرکا
+  "طرف تجاری",
+  "کاربران و تخصیص سازمان",
+  "توافق و کمیسیون",
+  "تسویه و پرداخت",
+  "مخاطب، سند و حساب بانکی",
+  "سابقه فعالیت",
+  // سایر
+  "سایر",
+];
+
 export function localizeModuleName(name?: string | null): string {
   const raw = (name ?? "").trim();
   if (!raw) return "سایر";
@@ -157,6 +186,112 @@ export function localizeModuleName(name?: string | null): string {
 export function moduleIcon(moduleName?: string | null): LucideIcon {
   const fa = localizeModuleName(moduleName);
   return MODULE_ICONS[fa] ?? LayoutGrid;
+}
+
+/**
+ * Abstract use-case subgroup under a module (Identity / Org / Partner…).
+ * Based primarily on permission code prefix so grouping stays stable.
+ */
+export function permissionUseCaseGroup(
+  code?: string | null,
+  _moduleName?: string | null
+): string {
+  const c = (code ?? "").toLowerCase().trim();
+
+  // —— هویت ——
+  if (c.startsWith("identity.user") || c.startsWith("identity.membership")) {
+    return "کاربران و عضویت";
+  }
+  if (c.startsWith("identity.role")) return "نقش‌ها و تخصیص";
+  if (c.startsWith("identity.permission")) return "کاتالوگ مجوزها";
+  if (c.startsWith("identity.scope")) return "محدوده دسترسی (Scope)";
+  if (c.startsWith("identity.profile")) return "پروفایل";
+  if (
+    c.startsWith("identity.sod") ||
+    c.startsWith("identity.mfa") ||
+    c.startsWith("identity.access_cert") ||
+    c.startsWith("identity.privileged") ||
+    c.startsWith("identity.sso")
+  ) {
+    return "امنیت و حاکمیت دسترسی";
+  }
+  if (c.startsWith("identity.")) return "امنیت و حاکمیت دسترسی";
+
+  // —— سازمان ——
+  if (c.startsWith("organization.company")) return "شرکت‌ها";
+  if (c.startsWith("organization.branch")) return "شعب";
+  if (c.startsWith("organization.department")) return "واحدهای سازمانی";
+  if (
+    c.startsWith("organization.ownership") ||
+    c.startsWith("organization.fiscal") ||
+    c.startsWith("organization.bank") ||
+    c.startsWith("organization.officer")
+  ) {
+    return "مالکیت و اطلاعات حقوقی شرکت";
+  }
+  if (
+    c.startsWith("organization.business_unit") ||
+    c.startsWith("organization.cost_center")
+  ) {
+    return "واحد کسب‌وکار و مرکز هزینه";
+  }
+  if (c.startsWith("organization.hierarchy")) return "سلسله‌مراتب";
+  if (
+    c.startsWith("organization.sales_org") ||
+    c.startsWith("organization.purch_org") ||
+    c.startsWith("organization.sales_structure")
+  ) {
+    return "ساختار فروش و خرید";
+  }
+  if (
+    c.startsWith("organization.intercompany") ||
+    c.startsWith("organization.consolidation") ||
+    c.startsWith("organization.structure")
+  ) {
+    return "بین‌شرکتی و تلفیق";
+  }
+  if (c.startsWith("organization.")) return "سایر";
+
+  // —— شرکا ——
+  if (c.startsWith("partner.partner_user")) return "کاربران و تخصیص سازمان";
+  if (c.startsWith("partner.assignment")) return "کاربران و تخصیص سازمان";
+  if (c.startsWith("partner.partner")) return "طرف تجاری";
+  if (
+    c.startsWith("partner.agreement") ||
+    c.startsWith("partner.commission_rule") ||
+    c.startsWith("partner.commission")
+  ) {
+    return "توافق و کمیسیون";
+  }
+  if (c.startsWith("partner.payout")) return "تسویه و پرداخت";
+  if (
+    c.startsWith("partner.contact") ||
+    c.startsWith("partner.document") ||
+    c.startsWith("partner.bank_account")
+  ) {
+    return "مخاطب، سند و حساب بانکی";
+  }
+  if (c.startsWith("partner.activity")) return "سابقه فعالیت";
+  if (c.startsWith("partner.")) return "سایر";
+
+  // —— سایر ماژول‌ها: پیشوند دوم کد ——
+  const parts = c.split(".");
+  if (parts.length >= 2) {
+    const entity = parts[1]?.replace(/[-_]/g, " ") ?? "";
+    if (entity) return translateWords(entity);
+  }
+  return "سایر";
+}
+
+export function sortUseCaseGroups(names: string[]): string[] {
+  return [...names].sort((a, b) => {
+    const ia = USE_CASE_ORDER.indexOf(a);
+    const ib = USE_CASE_ORDER.indexOf(b);
+    const oa = ia === -1 ? 999 : ia;
+    const ob = ib === -1 ? 999 : ib;
+    if (oa !== ob) return oa - ob;
+    return a.localeCompare(b, "fa");
+  });
 }
 
 function translateWords(raw: string): string {
@@ -190,7 +325,11 @@ export function displayPermissionName(
     const e = translateWords(entity);
     const built = `${a} ${e}`.replace(/\s+/g, " ").trim();
     if (built && !/[A-Za-z]{2,}/.test(built)) return built;
-    if (built) return built.replace(/[A-Za-z]+/g, (m) => WORD_FA[m.toLowerCase()] ?? m);
+    if (built)
+      return built.replace(
+        /[A-Za-z]+/g,
+        (m) => WORD_FA[m.toLowerCase()] ?? m
+      );
   }
 
   if (n && hasLatin) {

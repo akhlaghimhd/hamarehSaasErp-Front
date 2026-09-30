@@ -1,4 +1,4 @@
-/** Permissions catalog — owner may relabel name + description; create/delete still seeder-only. */
+/** Permissions catalog — grouped by module, then by abstract use-case. */
 
 "use client";
 
@@ -40,6 +40,8 @@ import {
   displayPermissionName,
   localizeModuleName,
   moduleIcon,
+  permissionUseCaseGroup,
+  sortUseCaseGroups,
 } from "../lib/permission-labels";
 
 export function PermissionsListPage() {
@@ -120,6 +122,7 @@ export function PermissionsListPage() {
         p.code,
         p.description,
         actionTypeLabel(p.action_type),
+        permissionUseCaseGroup(p.code, p.module_name),
       ]
         .filter(Boolean)
         .join(" ")
@@ -127,6 +130,27 @@ export function PermissionsListPage() {
         .includes(q)
     );
   }, [modules, selectedModule, permQuery]);
+
+  /** Abstract use-case buckets under the selected module. */
+  const useCaseSections = useMemo(() => {
+    const map = new Map<string, PermissionDto[]>();
+    for (const p of selectedPerms) {
+      const g = permissionUseCaseGroup(p.code, p.module_name);
+      const list = map.get(g) ?? [];
+      list.push(p);
+      map.set(g, list);
+    }
+    const names = sortUseCaseGroups(Array.from(map.keys()));
+    return names.map((name) => ({
+      name,
+      perms: (map.get(name) ?? []).sort((a, b) =>
+        displayPermissionName(a.name, a.code).localeCompare(
+          displayPermissionName(b.name, b.code),
+          "fa"
+        )
+      ),
+    }));
+  }, [selectedPerms]);
 
   function openEdit(p: PermissionDto) {
     setEditing(p);
@@ -187,8 +211,8 @@ export function PermissionsListPage() {
           title="مجوزها"
           description={
             canRelabel
-              ? "کاتالوگ عملیات سیستم. مالک می‌تواند عنوان و راهنمای کاربری را ویرایش کند؛ ایجاد/حذف فقط از سیدر."
-              : "کاتالوگ عملیات سیستم — فقط مشاهده. ایجاد و حذف فقط از طریق تیم توسعه (سیدر)."
+              ? "کاتالوگ عملیات سیستم، گروه‌بندی‌شده بر اساس حوزه و کاربرد. مالک می‌تواند عنوان و راهنما را ویرایش کند."
+              : "کاتالوگ عملیات سیستم — گروه‌بندی بر اساس حوزه (هویت، سازمان، شرکا، …) و کاربرد."
           }
           breadcrumbs={[
             { label: "داشبورد", href: "/dashboard" },
@@ -200,11 +224,9 @@ export function PermissionsListPage() {
         <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <p className="leading-relaxed">
-            کد سیستمی مجوز تغییر نمی‌کند. تخصیص عملیات به نقش‌ها در صفحه «نقش‌ها»
-            انجام می‌شود.
-            {canRelabel
-              ? " با آیکن ویرایش می‌توانید عنوان فارسی و راهنمای (هینت) هر مجوز را برای همین سازمان تنظیم کنید."
-              : " ویرایش عنوان و راهنما فقط برای مالک سازمان فعال است."}
+            سمت راست: حوزه اصلی (هویت، سازمان، شرکا، …). داخل هر حوزه، مجوزها بر
+            اساس کاربرد (مثلاً کاربران، نقش‌ها، شرکت‌ها) دسته‌بندی شده‌اند. تخصیص به
+            نقش در صفحه «نقش‌ها» انجام می‌شود.
           </p>
         </div>
 
@@ -231,9 +253,9 @@ export function PermissionsListPage() {
           <section className="flex min-h-[20rem] flex-col overflow-hidden rounded-xl border border-border/70 bg-card lg:order-1">
             <div className="flex items-center gap-2 border-b border-border/60 bg-muted/20 px-3 py-2.5">
               <KeyRound className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">سرگروه‌ها</h2>
+              <h2 className="text-sm font-semibold">حوزه‌ها</h2>
               <span className="text-xs text-muted-foreground">
-                {toFaDigits(filteredModules.length)} گروه
+                {toFaDigits(filteredModules.length)} حوزه
               </span>
               {isFetching && !isLoading ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
@@ -245,7 +267,7 @@ export function PermissionsListPage() {
                 <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className={cn("h-8 ps-8 text-sm", moduleQuery && "pe-8")}
-                  placeholder="جستجوی سرگروه یا مجوز…"
+                  placeholder="جستجوی حوزه یا مجوز…"
                   value={moduleQuery}
                   onChange={(e) => setModuleQuery(e.target.value)}
                 />
@@ -270,7 +292,9 @@ export function PermissionsListPage() {
                   ))}
                 </div>
               ) : filteredModules.length === 0 ? (
-                <EmptyState title={moduleQuery ? "گروهی پیدا نشد" : "کاتالوگ خالی است"} />
+                <EmptyState
+                  title={moduleQuery ? "حوزه‌ای پیدا نشد" : "کاتالوگ خالی است"}
+                />
               ) : (
                 <ul className="space-y-0.5">
                   {filteredModules.map((m) => {
@@ -280,7 +304,10 @@ export function PermissionsListPage() {
                       <li key={m.name}>
                         <button
                           type="button"
-                          onClick={() => setSelectedModule(m.name)}
+                          onClick={() => {
+                            setSelectedModule(m.name);
+                            setPermQuery("");
+                          }}
                           className={cn(
                             "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-start transition-colors",
                             selected
@@ -308,11 +335,12 @@ export function PermissionsListPage() {
             <div className="flex flex-wrap items-center gap-2 border-b border-border/60 bg-muted/20 px-3 py-2.5">
               <h2 className="text-sm font-semibold">
                 {selectedModule
-                  ? `عملیات «${selectedModule}»`
-                  : "عملیات گروه"}
+                  ? `کاربردهای «${selectedModule}»`
+                  : "کاربردهای حوزه"}
               </h2>
               <span className="text-xs text-muted-foreground">
-                {toFaDigits(selectedPerms.length)} مورد
+                {toFaDigits(selectedPerms.length)} مجوز ·{" "}
+                {toFaDigits(useCaseSections.length)} دسته
               </span>
             </div>
 
@@ -321,7 +349,7 @@ export function PermissionsListPage() {
                 <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className={cn("h-8 ps-8 text-sm", permQuery && "pe-8")}
-                  placeholder="جستجو در این گروه…"
+                  placeholder="جستجو در این حوزه…"
                   value={permQuery}
                   onChange={(e) => setPermQuery(e.target.value)}
                   disabled={!selectedModule}
@@ -341,7 +369,7 @@ export function PermissionsListPage() {
 
             <div className="min-h-0 flex-1 overflow-y-auto p-2">
               {!selectedModule ? (
-                <EmptyState title="گروهی انتخاب نشده" />
+                <EmptyState title="حوزه‌ای انتخاب نشده" />
               ) : isLoading ? (
                 <div className="space-y-2 p-2">
                   {Array.from({ length: 6 }).map((_, i) => (
@@ -350,70 +378,85 @@ export function PermissionsListPage() {
                 </div>
               ) : selectedPerms.length === 0 ? (
                 <EmptyState
-                  title={permQuery ? "موردی با این جستجو نیست" : "این گروه خالی است"}
+                  title={permQuery ? "موردی با این جستجو نیست" : "این حوزه خالی است"}
                 />
               ) : (
-                <ul className="space-y-0.5">
-                  {selectedPerms.map((p) => {
-                    const title = displayPermissionName(p.name, p.code);
-                    const hint =
-                      p.description?.trim() ||
-                      `عملیات «${title}» در سیستم تعریف شده است.`;
-                    const active = (p.status ?? 1) === 1;
-                    return (
-                      <li key={p.tenant_permission_id}>
-                        <div
-                          className={cn(
-                            "flex items-start gap-2 rounded-md px-2.5 py-2",
-                            !active && "opacity-50"
-                          )}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="truncate text-[13px] font-medium text-foreground">
-                                    {title}
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent
-                                  side="top"
-                                  className="max-w-xs text-xs leading-relaxed"
-                                >
-                                  <p className="font-medium">{title}</p>
-                                  <p className="mt-1 opacity-90">{hint}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                                {actionTypeLabel(p.action_type)}
-                              </span>
-                              {!active ? (
-                                <span className="shrink-0 text-[10px] text-amber-700 dark:text-amber-300">
-                                  غیرفعال
-                                </span>
-                              ) : null}
-                            </div>
-                            <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">
-                              {hint}
-                            </p>
-                          </div>
-                          {canRelabel ? (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                              onClick={() => openEdit(p)}
-                              aria-label="ویرایش عنوان و راهنما"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                          ) : null}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
+                <div className="space-y-3">
+                  {useCaseSections.map((section) => (
+                    <div key={section.name} className="space-y-0.5">
+                      <div className="sticky top-0 z-[1] flex items-center gap-2 bg-card/95 px-2 py-1.5 backdrop-blur-sm">
+                        <span className="text-[11px] font-semibold text-foreground">
+                          {section.name}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {toFaDigits(section.perms.length)}
+                        </span>
+                        <div className="h-px flex-1 bg-border/60" />
+                      </div>
+                      <ul className="space-y-0.5">
+                        {section.perms.map((p) => {
+                          const title = displayPermissionName(p.name, p.code);
+                          const hint =
+                            p.description?.trim() ||
+                            `عملیات «${title}» در سیستم تعریف شده است.`;
+                          const active = (p.status ?? 1) === 1;
+                          return (
+                            <li key={p.tenant_permission_id}>
+                              <div
+                                className={cn(
+                                  "flex items-start gap-2 rounded-md px-2.5 py-2",
+                                  !active && "opacity-50"
+                                )}
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="truncate text-[13px] font-medium text-foreground">
+                                          {title}
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent
+                                        side="top"
+                                        className="max-w-xs text-xs leading-relaxed"
+                                      >
+                                        <p className="font-medium">{title}</p>
+                                        <p className="mt-1 opacity-90">{hint}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                    <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                      {actionTypeLabel(p.action_type)}
+                                    </span>
+                                    {!active ? (
+                                      <span className="shrink-0 text-[10px] text-amber-700 dark:text-amber-300">
+                                        غیرفعال
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">
+                                    {hint}
+                                  </p>
+                                </div>
+                                {canRelabel ? (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                                    onClick={() => openEdit(p)}
+                                    aria-label="ویرایش عنوان و راهنما"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </section>
@@ -450,11 +493,8 @@ export function PermissionsListPage() {
                   onChange={(e) => setEditHint(e.target.value)}
                   maxLength={500}
                   rows={4}
-                  placeholder="توضیح دقیق برای مدیر: این مجوز دقیقاً چه کاری را مجاز می‌کند…"
+                  placeholder="توضیح دقیق: این مجوز دقیقاً چه کاری را مجاز می‌کند…"
                 />
-                <p className="text-[10px] text-muted-foreground">
-                  این متن در tooltip و زیر عنوان نشان داده می‌شود.
-                </p>
               </div>
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
@@ -462,7 +502,6 @@ export function PermissionsListPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setEditOpen(false)}
-                disabled={updateMutation.isPending}
               >
                 انصراف
               </Button>
@@ -474,7 +513,7 @@ export function PermissionsListPage() {
                 {updateMutation.isPending ? (
                   <>
                     <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />
-                    در حال ذخیره…
+                    ذخیره…
                   </>
                 ) : (
                   "ذخیره"
