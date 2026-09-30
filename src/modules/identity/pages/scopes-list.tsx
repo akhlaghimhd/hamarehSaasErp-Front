@@ -126,7 +126,6 @@ type ListStatusFilter = "all" | "active" | "inactive" | "deleted";
 type SortKey =
   | "name"
   | "type"
-  | "ref"
   | "status"
   | "created_at"
   | "updated_at";
@@ -205,10 +204,10 @@ function formatJalaliDate(value?: string | null): string {
 
 function escapeHtml(s: string) {
   return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/&/g, "&")
+    .replace(/</g, "<")
+    .replace(/>/g, ">")
+    .replace(/"/g, """);
 }
 
 function sortValue(r: ScopeDto, key: SortKey): string | number {
@@ -217,8 +216,6 @@ function sortValue(r: ScopeDto, key: SortKey): string | number {
       return (r.scope_name ?? "").toLowerCase();
     case "type":
       return (r.scope_type ?? "").toLowerCase();
-    case "ref":
-      return (r.reference_id ?? "").toLowerCase();
     case "status":
       if (r.deleted_at) return 2;
       if (r.is_active === false) return 1;
@@ -237,7 +234,6 @@ function exportScopesExcel(rows: ScopeDto[]) {
     [
       "نام محدوده",
       "نوع",
-      "مرجع",
       "وضعیت",
       "توضیح",
       "تاریخ ایجاد",
@@ -253,7 +249,6 @@ function exportScopesExcel(rows: ScopeDto[]) {
     aoa.push([
       r.scope_name ?? "",
       scopeTypeLabel(r.scope_type),
-      r.reference_id ?? "",
       status,
       r.description ?? "",
       formatJalaliDateTime(r.created_at ? String(r.created_at) : null),
@@ -289,9 +284,6 @@ function exportScopesPdf(rows: ScopeDto[]) {
       const cells = [
         escapeHtml(r.scope_name ?? "—"),
         escapeHtml(scopeTypeLabel(r.scope_type)),
-        escapeHtml(
-          r.reference_id ? String(r.reference_id).slice(0, 8) + "…" : "—"
-        ),
         escapeHtml(status),
         escapeHtml(formatJalaliDate(r.created_at ? String(r.created_at) : null)),
       ];
@@ -301,7 +293,7 @@ function exportScopesPdf(rows: ScopeDto[]) {
   const html = `<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/><title>محدوده‌های دسترسی</title>
 <style>body{font-family:Tahoma,Arial,sans-serif;font-size:12px;padding:16px;direction:rtl}h1{font-size:16px;margin:0 0 12px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px 8px;text-align:right}th{background:#f3f4f6}</style></head><body>
 <h1>محدوده‌های دسترسی</h1>
-<table><thead><tr><th>نام</th><th>نوع</th><th>مرجع</th><th>وضعیت</th><th>ایجاد</th></tr></thead>
+<table><thead><tr><th>نام</th><th>نوع</th><th>وضعیت</th><th>ایجاد</th></tr></thead>
 <tbody>${body}</tbody></table>
 <script>window.onload=function(){window.print()}</script></body></html>`;
   const w = window.open("", "_blank");
@@ -363,7 +355,6 @@ export function ScopesListPage() {
       new Set([
         "name",
         "type",
-        "ref",
         "status",
         "created_at",
         "updated_at",
@@ -647,7 +638,6 @@ export function ScopesListPage() {
   const COL_META: { id: string; label: string; locked?: boolean }[] = [
     { id: "name", label: "نام محدوده", locked: true },
     { id: "type", label: "نوع" },
-    { id: "ref", label: "مرجع" },
     { id: "status", label: "وضعیت" },
     { id: "created_at", label: "تاریخ ایجاد" },
     { id: "updated_at", label: "آخرین ویرایش" },
@@ -930,18 +920,6 @@ export function ScopesListPage() {
                     </button>
                   </TableHead>
                 ) : null}
-                {visibleCols.has("ref") ? (
-                  <TableHead className="sticky top-0 z-20 bg-card">
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 font-medium hover:text-foreground"
-                      onClick={() => toggleSort("ref")}
-                    >
-                      مرجع
-                      <SortIcon k="ref" />
-                    </button>
-                  </TableHead>
-                ) : null}
                 {visibleCols.has("status") ? (
                   <TableHead className="sticky top-0 z-20 bg-card">
                     <button
@@ -987,14 +965,14 @@ export function ScopesListPage() {
               {isLoading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={8} className="py-2">
+                    <TableCell colSpan={7} className="py-2">
                       <Skeleton className="h-7 w-full" />
                     </TableCell>
                   </TableRow>
                 ))
               ) : pageRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="p-0">
+                  <TableCell colSpan={7} className="p-0">
                     <EmptyState
                       title={
                         Boolean(q.trim()) || listStatus !== "all"
@@ -1032,18 +1010,6 @@ export function ScopesListPage() {
                     {visibleCols.has("type") ? (
                       <TableCell className="px-2 py-1 text-xs">
                         {scopeTypeLabel(r.scope_type)}
-                      </TableCell>
-                    ) : null}
-                    {visibleCols.has("ref") ? (
-                      <TableCell className="px-2 py-1">
-                        <span
-                          className="font-mono text-[11px] text-muted-foreground"
-                          dir="ltr"
-                        >
-                          {r.reference_id
-                            ? `${String(r.reference_id).slice(0, 8)}…`
-                            : "—"}
-                        </span>
                       </TableCell>
                     ) : null}
                     {visibleCols.has("status") ? (
