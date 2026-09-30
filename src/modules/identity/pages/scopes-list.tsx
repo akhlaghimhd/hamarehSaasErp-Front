@@ -72,7 +72,11 @@ type CreateForm = {
 
 function asArray<T>(data: unknown): T[] {
   if (Array.isArray(data)) return data as T[];
-  if (data && typeof data === "object" && Array.isArray((data as { data?: T[] }).data)) {
+  if (
+    data &&
+    typeof data === "object" &&
+    Array.isArray((data as { data?: T[] }).data)
+  ) {
     return (data as { data: T[] }).data;
   }
   return [];
@@ -90,7 +94,7 @@ export function ScopesListPage() {
   const canCreate = usePermission("identity.scope.create");
   const canDelete = usePermission("identity.scope.delete");
 
-  const { data, isLoading, isError, error, refetch, isFetching } = useScopes();
+  const { data, isLoading, isError, error, refetch } = useScopes();
   const createMutation = useCreateScope();
   const deleteMutation = useSoftDeleteScope();
 
@@ -176,7 +180,9 @@ export function ScopesListPage() {
           }>(unwrap(envelope));
           options = list.map((bu) => ({
             id: bu.business_unit_id,
-            label: [bu.name, bu.code].filter(Boolean).join(" · ") || bu.business_unit_id,
+            label:
+              [bu.name, bu.code].filter(Boolean).join(" · ") ||
+              bu.business_unit_id,
           }));
         } else if (type === "COST_CENTER") {
           const companies = await companyService.list("active");
@@ -203,9 +209,12 @@ export function ScopesListPage() {
           }
           options = all;
         } else if (type === "WAREHOUSE") {
-          // Inventory module: GET /api/v1/inventory/warehouses (or /inventory/warehouses)
-          let list: Array<{ warehouse_id?: string; id?: string; name?: string; code?: string }> =
-            [];
+          let list: Array<{
+            warehouse_id?: string;
+            id?: string;
+            name?: string;
+            code?: string;
+          }> = [];
           try {
             const envelope = await apiGet("/inventory/warehouses");
             list = asArray(unwrap(envelope));
@@ -260,7 +269,7 @@ export function ScopesListPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- form.setValue stable enough
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createOpen, scopeType]);
 
   const rows = data ?? [];
@@ -278,7 +287,6 @@ export function ScopesListPage() {
   }, [rows, query]);
 
   const total = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const columns: DataTableColumn<ScopeDto>[] = [
@@ -385,10 +393,9 @@ export function ScopesListPage() {
         err instanceof ApiClientError && err.message
           ? err.message
           : MSG_GENERIC_ERROR;
-      // Map known English backend messages
-      if (/reference_id is required/i.test(msg)) {
+      if (/reference_id is required|موجودیت مرجع/i.test(msg)) {
         toast.error("انتخاب موجودیت مرجع برای این نوع محدوده الزامی است.");
-      } else if (/does not exist/i.test(msg)) {
+      } else if (/does not exist|یافت نشد/i.test(msg)) {
         toast.error("موجودیت انتخاب‌شده در این سازمان یافت نشد.");
       } else {
         toast.error(msg);
@@ -461,13 +468,14 @@ export function ScopesListPage() {
       <DataTable
         columns={columns}
         data={pageRows}
-        isLoading={isLoading}
-        isFetching={isFetching}
+        getRowKey={(row) => row.scope_id}
+        loading={isLoading}
+        isFiltered={Boolean(query.trim())}
         emptyTitle="هنوز محدوده‌ای تعریف نشده"
+        emptyDescription="با دکمه «محدوده جدید» اولین محدوده را بسازید."
         page={page}
         pageSize={pageSize}
         total={total}
-        totalPages={totalPages}
         onPageChange={setPage}
         onPageSizeChange={(s) => {
           setPageSize(s);
@@ -526,7 +534,7 @@ export function ScopesListPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
                 برای شرکت، شعبه، انبار، واحد و مرکز هزینه باید موجودیت واقعی
                 انتخاب شود. نوع «سفارشی» بدون مرجع است.
               </p>
@@ -559,7 +567,7 @@ export function ScopesListPage() {
                   </Select>
                 )}
                 {refHint ? (
-                  <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed">
+                  <p className="text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">
                     {refHint}
                   </p>
                 ) : null}
