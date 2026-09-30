@@ -16,6 +16,7 @@ import {
   Landmark,
   ArrowLeftRight,
   ShoppingCart,
+  Package,
 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { usePermission } from "@/auth";
@@ -184,7 +185,6 @@ export function OrganizationHomePage() {
       description:
         "بخش‌بندی مدیریتی مستقل از ساختار حقوقی برای گزارش و کنترل عملکرد",
       icon: Layers,
-      // Independent sellable pack — without it, card stays visible but marked locked for create UX
       open: true,
       packHint: !packsLoading && !hasMultiBu
         ? "بسته multi_business_unit لازم است؛ بدون آن ایجاد BU مسدود است"
@@ -218,6 +218,15 @@ export function OrganizationHomePage() {
       description:
         "سازمان‌دهی مسیر فروش و خرید برای عملیات بازرگانی روزمره",
       icon: ShoppingCart,
+      open: true,
+    },
+    {
+      key: "featurePacks",
+      href: "/dashboard/organization/feature-packs",
+      title: "بسته‌های قابلیت",
+      description:
+        "وضعیت entitlementهای خریداری‌شده (multi_company / multi_branch / BU / hierarchy)",
+      icon: Package,
       open: true,
     },
   ];
