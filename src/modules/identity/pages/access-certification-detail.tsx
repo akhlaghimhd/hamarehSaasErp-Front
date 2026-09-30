@@ -7,8 +7,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
+  CircleHelp,
   ClipboardCheck,
-  Info,
   Loader2,
   Search,
 } from "lucide-react";
@@ -34,6 +34,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/shared/components/ui/dialog";
 import { ApiClientError } from "@/api";
 import { usePermission } from "@/auth";
 import { toFaDigits } from "@/shared/lib/utils";
@@ -110,7 +118,7 @@ export function AccessCertificationDetailPage() {
     return map;
   }, [members]);
 
-  const roleLabel = useMemo(() => {
+  const roleoleLabel = useMemo(() => {
     const map = new Map<string, string>();
     for (const r of roles) {
       const id = String(
@@ -203,10 +211,7 @@ export function AccessCertificationDetailPage() {
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(page, totalPages);
-  const pageRows = filtered.slice(
-    (safePage - 1) * pageSize,
-    safePage * pageSize
-  );
+  const pageRows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const summary = useMemo(() => {
     const pending = items.filter(
@@ -257,6 +262,39 @@ export function AccessCertificationDetailPage() {
         ]}
         actions={
           <div className="flex flex-wrap gap-2">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button type="button" size="sm" variant="outline">
+                  <CircleHelp className="me-1.5 h-4 w-4" />
+                  راهنما
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md text-start">
+                <DialogHeader>
+                  <DialogTitle>راهنمای تصمیم‌گیری</DialogTitle>
+                  <DialogDescription className="sr-only">
+                    معنی دکمه‌های تأیید و کاهش دسترسی
+                  </DialogDescription>
+                </DialogHeader>
+                <ul className="list-inside list-disc space-y-2 text-sm text-muted-foreground">
+                  <li>
+                    <strong className="text-foreground">تأیید:</strong> دسترسی
+                    فعلی مناسب است.
+                  </li>
+                  <li>
+                    <strong className="text-foreground">کاهش دسترسی:</strong>{" "}
+                    باید نقش‌ها اصلاح شوند (حذف خودکار نیست؛ فقط ثبت درخواست).
+                  </li>
+                  <li>
+                    <strong className="text-foreground">موکول:</strong> بعداً
+                    دوباره بررسی می‌کنید.
+                  </li>
+                </ul>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  برای «تکمیل کمپین» نباید هیچ ردیفی در وضعیت «در انتظار» بماند.
+                </p>
+              </DialogContent>
+            </Dialog>
             <Button
               type="button"
               size="sm"
@@ -283,41 +321,23 @@ export function AccessCertificationDetailPage() {
                 type="button"
                 size="sm"
                 variant="secondary"
-                disabled={completeMut.isPending}
+                disabled={completeMut.isPending || summary.pending > 0}
+                title={
+                  summary.pending > 0
+                    ? `هنوز ${summary.pending} نفر در انتظار تصمیم هستند`
+                    : undefined
+                }
                 onClick={() => void completeMut.mutateAsync()}
               >
                 تکمیل کمپین
+                {summary.pending > 0
+                  ? ` (${toFaDigits(summary.pending)} در انتظار)`
+                  : ""}
               </Button>
             ) : null}
           </div>
         }
       />
-
-      <div className="rounded-xl border bg-muted/30 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
-        <div className="mb-1 flex items-center gap-1.5 font-medium text-foreground">
-          <Info className="h-4 w-4" />
-          راهنمای تصمیم‌گیری
-        </div>
-        <ul className="list-inside list-disc space-y-1">
-          <li>
-            <strong className="text-foreground">تأیید:</strong> دسترسی فعلی
-            مناسب است و نیازی به تغییر نیست.
-          </li>
-          <li>
-            <strong className="text-foreground">درخواست کاهش دسترسی:</strong>{" "}
-            نقش‌ها باید کم یا اصلاح شوند (حذف خودکار نقش انجام نمی‌شود؛ فقط
-            ثبت درخواست است).
-          </li>
-          <li>
-            <strong className="text-foreground">موکول:</strong> فعلاً تصمیم
-            قطعی ندارید؛ بعداً دوباره بررسی می‌کنید.
-          </li>
-        </ul>
-        <p className="mt-2">
-          ردیف‌های با «نقض مسدود» را اول بررسی کنید؛ این‌ها ترکیب نقش‌هایی
-          هستند که طبق قوانین سازمان نباید همزمان باشند.
-        </p>
-      </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[
@@ -402,20 +422,12 @@ export function AccessCertificationDetailPage() {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-b bg-card shadow-sm">
-              <TableHead className="sticky top-0 z-20 w-10 bg-card text-center text-xs">
-                #
-              </TableHead>
+              <TableHead className="sticky top-0 z-20 w-10 bg-card text-center text-xs">#</TableHead>
               <TableHead className="sticky top-0 z-20 bg-card">عضو</TableHead>
-              <TableHead className="sticky top-0 z-20 bg-card">
-                نقش‌های فعلی
-              </TableHead>
-              <TableHead className="sticky top-0 z-20 bg-card">
-                وضعیت تضاد
-              </TableHead>
+              <TableHead className="sticky top-0 z-20 bg-card">نقش‌های فعلی</TableHead>
+              <TableHead className="sticky top-0 z-20 bg-card">وضعیت تضاد</TableHead>
               <TableHead className="sticky top-0 z-20 bg-card">تصمیم</TableHead>
-              <TableHead className="sticky top-0 z-20 bg-card text-end">
-                عملیات
-              </TableHead>
+              <TableHead className="sticky top-0 z-20 bg-card text-end">عملیات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -431,11 +443,7 @@ export function AccessCertificationDetailPage() {
               <TableRow>
                 <TableCell colSpan={6} className="p-0">
                   <EmptyState
-                    title={
-                      isDraft
-                        ? "هنوز آیتمی نیست"
-                        : "موردی با این فیلتر پیدا نشد"
-                    }
+                    title={isDraft ? "هنوز آیتمی نیست" : "موردی با این فیلتر پیدا نشد"}
                     description={
                       isDraft
                         ? "کمپین را باز کنید تا فهرست اعضا ساخته شود."
@@ -450,8 +458,7 @@ export function AccessCertificationDetailPage() {
                   !r.decision || String(r.decision).toUpperCase() === "PENDING";
                 const deferred =
                   String(r.decision || "").toUpperCase() === "DEFERRED";
-                const canAct =
-                  canCertify && isOpen && (pending || deferred);
+                const canAct = canCertify && isOpen && (pending || deferred);
                 return (
                   <TableRow key={r.item_id}>
                     <TableCell className="px-2 py-1 text-center text-xs text-muted-foreground">
