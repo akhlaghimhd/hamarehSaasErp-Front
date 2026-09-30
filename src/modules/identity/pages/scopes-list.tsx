@@ -51,7 +51,6 @@ import { branchService } from "@/modules/organization/services/branch-service";
 import { departmentService } from "@/modules/organization/services/department-service";
 import { organizationPaths } from "@/modules/organization/services/paths";
 
-/** Types that must point at a real org entity (backend STRUCTURAL_TYPES). */
 const STRUCTURAL_TYPES = new Set([
   "COMPANY",
   "BRANCH",
@@ -62,6 +61,19 @@ const STRUCTURAL_TYPES = new Set([
 ]);
 
 type RefOption = { id: string; label: string };
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function pickEntityId(
+  ...candidates: Array<string | null | undefined>
+): string | null {
+  for (const c of candidates) {
+    const v = (c ?? "").trim();
+    if (v && UUID_RE.test(v)) return v;
+  }
+  return null;
+}
 
 type CreateForm = {
   scope_name: string;
@@ -140,17 +152,34 @@ export function ScopesListPage() {
 
         if (type === "COMPANY") {
           const list = await companyService.list("active");
-          options = list.map((c) => ({
-            id: c.company_id,
-            label: c.name || c.legal_name || c.code || c.company_id,
-          }));
+          options = list
+            .map((c) => {
+              const id = pickEntityId(
+                c.company_id,
+                (c as { id?: string }).id
+              );
+              if (!id) return null;
+              return {
+                id,
+                label: c.name || c.legal_name || c.code || id,
+              };
+            })
+            .filter(Boolean) as RefOption[];
         } else if (type === "BRANCH") {
           const list = await branchService.listAll("active");
-          options = list.map((b) => ({
-            id: b.branch_id,
-            label:
-              [b.name, b.code].filter(Boolean).join(" · ") || b.branch_id,
-          }));
+          options = list
+            .map((b) => {
+              const id = pickEntityId(
+                b.branch_id,
+                (b as { id?: string }).id
+              );
+              if (!id) return null;
+              return {
+                id,
+                label: [b.name, b.code].filter(Boolean).join(" · ") || id,
+              };
+            })
+            .filter(Boolean) as RefOption[];
         } else if (type === "DEPARTMENT") {
           const companies = await companyService.list("active");
           const all: RefOption[] = [];
@@ -161,13 +190,18 @@ export function ScopesListPage() {
                 "active"
               );
               for (const d of deps) {
+                const id = pickEntityId(
+                  d.department_id,
+                  (d as { id?: string }).id
+                );
+                if (!id) continue;
                 all.push({
-                  id: d.department_id,
+                  id,
                   label: `${d.name}${d.code ? ` · ${d.code}` : ""} (${c.name ?? ""})`,
                 });
               }
             } catch {
-              /* soft skip company */
+              /* soft */
             }
           }
           options = all;
@@ -177,13 +211,18 @@ export function ScopesListPage() {
             business_unit_id: string;
             name?: string;
             code?: string;
+            id?: string;
           }>(unwrap(envelope));
-          options = list.map((bu) => ({
-            id: bu.business_unit_id,
-            label:
-              [bu.name, bu.code].filter(Boolean).join(" · ") ||
-              bu.business_unit_id,
-          }));
+          options = list
+            .map((bu) => {
+              const id = pickEntityId(bu.business_unit_id, bu.id);
+              if (!id) return null;
+              return {
+                id,
+                label: [bu.name, bu.code].filter(Boolean).join(" · ") || id,
+              };
+            })
+            .filter(Boolean) as RefOption[];
         } else if (type === "COST_CENTER") {
           const companies = await companyService.list("active");
           const all: RefOption[] = [];
@@ -196,11 +235,14 @@ export function ScopesListPage() {
                 cost_center_id: string;
                 name?: string;
                 code?: string;
+                id?: string;
               }>(unwrap(envelope));
               for (const cc of list) {
+                const id = pickEntityId(cc.cost_center_id, cc.id);
+                if (!id) continue;
                 all.push({
-                  id: cc.cost_center_id,
-                  label: `${cc.name ?? cc.code ?? cc.cost_center_id} (${c.name ?? ""})`,
+                  id,
+                  label: `${cc.name ?? cc.code ?? id} (${c.name ?? ""})`,
                 });
               }
             } catch {
@@ -228,7 +270,7 @@ export function ScopesListPage() {
           }
           options = list
             .map((w) => {
-              const id = w.warehouse_id || w.id;
+              const id = pickEntityId(w.warehouse_id, w.id);
               if (!id) return null;
               return {
                 id,
@@ -366,9 +408,10 @@ export function ScopesListPage() {
       return;
     }
     const type = String(values.scope_type).toUpperCase();
-    if (STRUCTURAL_TYPES.has(type) && !values.reference_id) {
+    const refId = pickEntityId(values.reference_id);
+    if (STRUCTURAL_TYPES.has(type) && !refId) {
       toast.error(
-        `برای نوع «${scopeTypeLabel(type)}» باید موجودیت مرجع را انتخاب کنید.`
+        `برای نوع «${scopeTypeLabel(type)}» باید موجودیت مرجع را از فهرست انتخاب کنید.`
       );
       return;
     }
@@ -376,8 +419,9 @@ export function ScopesListPage() {
       await createMutation.mutateAsync({
         scope_name: name,
         scope_type: type,
-        reference_id: values.reference_id || null,
+        reference_id: refId,
         description: values.description?.trim() || null,
+        is_active: true,
       });
       toast.success("محدوده ایجاد شد");
       setCreateOpen(false);
@@ -393,13 +437,7 @@ export function ScopesListPage() {
         err instanceof ApiClientError && err.message
           ? err.message
           : MSG_GENERIC_ERROR;
-      if (/reference_id is required|موجودیت مرجع/i.test(msg)) {
-        toast.error("انتخاب موجودیت مرجع برای این نوع محدوده الزامی است.");
-      } else if (/does not exist|یافت نشد/i.test(msg)) {
-        toast.error("موجودیت انتخاب‌شده در این سازمان یافت نشد.");
-      } else {
-        toast.error(msg);
-      }
+      toast.error(msg);
     }
   }
 
@@ -521,7 +559,12 @@ export function ScopesListPage() {
               <Label>نوع *</Label>
               <Select
                 value={form.watch("scope_type")}
-                onValueChange={(v) => form.setValue("scope_type", v)}
+                onValueChange={(v) =>
+                  form.setValue("scope_type", v, {
+                    shouldDirty: true,
+                    shouldTouch: true,
+                  })
+                }
               >
                 <SelectTrigger className="h-9">
                   <SelectValue />
@@ -535,8 +578,8 @@ export function ScopesListPage() {
                 </SelectContent>
               </Select>
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                برای شرکت، شعبه، انبار، واحد و مرکز هزینه باید موجودیت واقعی
-                انتخاب شود. نوع «سفارشی» بدون مرجع است.
+                برای شرکت، شعبه، انبار، واحد و مرکز هزینه باید موجودیت واقعی از
+                فهرست انتخاب شود. نوع «سفارشی» بدون مرجع است.
               </p>
             </div>
 
@@ -551,7 +594,12 @@ export function ScopesListPage() {
                 ) : (
                   <Select
                     value={form.watch("reference_id") || undefined}
-                    onValueChange={(v) => form.setValue("reference_id", v)}
+                    onValueChange={(v) =>
+                      form.setValue("reference_id", v, {
+                        shouldDirty: true,
+                        shouldTouch: true,
+                      })
+                    }
                     disabled={refOptions.length === 0}
                   >
                     <SelectTrigger className="h-9">
