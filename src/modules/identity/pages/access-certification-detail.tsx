@@ -1,4 +1,4 @@
-/** جزئیات کمپین بازبینی — سناریوی ساده */
+/** جزئیات کمپین بازبینی — سناریوی ساده و قابل‌پیگیری */
 
 "use client";
 
@@ -6,8 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowRight,
   ClipboardCheck,
+  ExternalLink,
   FileText,
   Loader2,
   Search,
@@ -56,8 +56,8 @@ const STATUS_LABEL: Record<string, string> = {
 const DECISION_LABEL: Record<string, string> = {
   PENDING: "در انتظار",
   APPROVED: "تأیید شد",
-  REVOKE_REQUESTED: "نیاز به اصلاح",
-  DEFERRED: "موکول شد",
+  REVOKE_REQUESTED: "نیاز به اصلاح نقش",
+  DEFERRED: "موکول به دوره بعد",
 };
 
 export function AccessCertificationDetailPage() {
@@ -113,6 +113,16 @@ export function AccessCertificationDetailPage() {
     return map;
   }, [members]);
 
+  const userToTenantUser = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of members) {
+      const uid = String(m.user_id ?? "");
+      const tid = String(m.tenant_user_id ?? "");
+      if (uid && tid) map.set(uid, tid);
+    }
+    return map;
+  }, [members]);
+
   const roleLabel = useMemo(() => {
     const map = new Map<string, string>();
     for (const r of roles) {
@@ -145,20 +155,15 @@ export function AccessCertificationDetailPage() {
       const d = String(i.decision ?? "PENDING").toUpperCase().trim();
       return d === "" || d === "PENDING";
     }).length;
-    if (isOpen && pending === 0) {
-      setDecisionFilter("all");
-    } else if (isCompleted) {
-      setDecisionFilter("all");
-    } else if (isDraft) {
-      setDecisionFilter("all");
-    }
+    if (isOpen && pending === 0) setDecisionFilter("all");
+    else if (isCompleted || isDraft) setDecisionFilter("all");
     setDefaultFilterSet(true);
   }, [items, itemsLoading, isOpen, isCompleted, isDraft, defaultFilterSet]);
 
   const openMut = useMutation({
     mutationFn: () => accessCertificationService.open(campaignId),
     onSuccess: () => {
-      toast.success("بررسی شروع شد — برای هر عضو تصمیم بگیرید");
+      toast.success("بررسی شروع شد");
       void qc.invalidateQueries({
         queryKey: ["identity", "access-certifications", campaignId],
       });
@@ -174,7 +179,7 @@ export function AccessCertificationDetailPage() {
   const completeMut = useMutation({
     mutationFn: () => accessCertificationService.complete(campaignId),
     onSuccess: () => {
-      toast.success("کمپین پایان یافت. می‌توانید گزارش بگیرید.");
+      toast.success("کمپین پایان یافت");
       void qc.invalidateQueries({
         queryKey: ["identity", "access-certifications", campaignId],
       });
@@ -197,13 +202,39 @@ export function AccessCertificationDetailPage() {
     mutationFn: ({
       itemId,
       decision,
+      userId,
     }: {
       itemId: string;
       decision: "APPROVED" | "REVOKE_REQUESTED" | "DEFERRED";
+      userId?: string;
     }) => accessCertificationService.certifyItem(itemId, { decision }),
-    onSuccess: () => {
-      toast.success("ثبت شد");
+    onSuccess: (_data, vars) => {
       void refetchItems();
+      if (vars.decision === "APPROVED") {
+        toast.success("دسترسی تأیید شد");
+      } else if (vars.decision === "DEFERRED") {
+        toast.success(
+          "موکول شد — در این دوره بررسی نمی‌شود؛ کمپین را می‌توانید پایان دهید."
+        );
+      } else if (vars.decision === "REVOKE_REQUESTED") {
+        const tid = vars.userId
+          ? userToTenantUser.get(String(vars.userId))
+          : undefined;
+        toast.success("علامت «نیاز به اصلاح نقش» ثبت شد", {
+          description: tid
+            ? "اکنون نقش‌های این عضو را در صفحهٔ عضو اصلاح کنید."
+            : "سپس از فهرست اعضا نقش‌ها را اصلاح کنید.",
+          action: tid
+            ? {
+                label: "اصلاح نقش‌ها",
+                onClick: () =>
+                  router.push(`/dashboard/identity/members/${tid}`),
+              }
+            : undefined,
+          duration: 8000,
+        });
+        setDecisionFilter("REVOKE_REQUESTED");
+      }
     },
     onError: (e) =>
       toast.error(
@@ -216,8 +247,14 @@ export function AccessCertificationDetailPage() {
       const d = String(i.decision ?? "PENDING").toUpperCase().trim();
       return d === "" || d === "PENDING";
     }).length;
+    const revoke = items.filter(
+      (i) => String(i.decision || "").toUpperCase() === "REVOKE_REQUESTED"
+    ).length;
+    const deferred = items.filter(
+      (i) => String(i.decision || "").toUpperCase() === "DEFERRED"
+    ).length;
     const block = items.filter((i) => i.sod_has_block).length;
-    return { total: items.length, pending, block };
+    return { total: items.length, pending, revoke, deferred, block };
   }, [items]);
 
   const filtered = useMemo(() => {
@@ -255,6 +292,15 @@ export function AccessCertificationDetailPage() {
     if (!ids.length) return "بدون نقش";
     return ids.map((id) => roleLabel.get(String(id)) || "نقش").join("، ");
   };
+
+  function memberHref(item: AccessCertItemDto): string | null {
+    const fromItem = String(
+      (item as { tenant_user_id?: string }).tenant_user_id || ""
+    );
+    if (fromItem) return `/dashboard/identity/members/${fromItem}`;
+    const mapped = userToTenantUser.get(String(item.user_id ?? ""));
+    return mapped ? `/dashboard/identity/members/${mapped}` : null;
+  }
 
   async function handleReport() {
     if (!campaign) return;
@@ -296,9 +342,11 @@ export function AccessCertificationDetailPage() {
             : isOpen
               ? summary.pending > 0
                 ? `${toFaDigits(summary.pending)} نفر هنوز تصمیم نگرفته‌اند.`
-                : "همه تصمیم‌ها ثبت شد — می‌توانید کمپین را پایان دهید."
+                : summary.revoke > 0
+                  ? `تصمیم‌ها کامل است · ${toFaDigits(summary.revoke)} نفر نیاز به اصلاح نقش دارند.`
+                  : "تصمیم‌ها کامل است — می‌توانید کمپین را پایان دهید."
               : isCompleted
-                ? "این دوره تمام شده است. از گزارش می‌توانید استفاده کنید."
+                ? "این دوره تمام شده. از گزارش استفاده کنید."
                 : STATUS_LABEL[status] || status
         }
         icon={<ClipboardCheck className="h-5 w-5" />}
@@ -313,18 +361,6 @@ export function AccessCertificationDetailPage() {
         ]}
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() =>
-                router.push("/dashboard/identity/access-certifications")
-              }
-            >
-              <ArrowRight className="me-1.5 h-4 w-4" />
-              بازگشت
-            </Button>
-
             <Button
               type="button"
               size="sm"
@@ -361,7 +397,7 @@ export function AccessCertificationDetailPage() {
                     setDecisionFilter("PENDING");
                     setPage(1);
                     toast.message(
-                      `هنوز ${toFaDigits(summary.pending)} نفر باقی مانده‌اند.`
+                      `هنوز ${toFaDigits(summary.pending)} نفر بدون تصمیم‌اند.`
                     );
                     return;
                   }
@@ -378,10 +414,24 @@ export function AccessCertificationDetailPage() {
         }
       />
 
+      {isOpen ? (
+        <div className="rounded-lg border bg-muted/30 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+          <strong className="text-foreground">تأیید:</strong> نقش‌ها مناسب‌اند.{" "}
+          <strong className="text-foreground">نیاز به اصلاح نقش:</strong> بعداً
+          از صفحهٔ همان عضو نقش‌ها را عوض کنید (خودکار حذف نمی‌شود).{" "}
+          <strong className="text-foreground">موکول:</strong> این دوره بررسی
+          نمی‌شود؛ مانع پایان کمپین نیست. تا وقتی کمپین باز است می‌توانید تصمیم را
+          عوض کنید.
+        </div>
+      ) : null}
+
       {!isDraft && items.length > 0 ? (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
           <span>
-            کل: <strong className="text-foreground">{toFaDigits(summary.total)}</strong>
+            کل:{" "}
+            <strong className="text-foreground">
+              {toFaDigits(summary.total)}
+            </strong>
           </span>
           <span>
             در انتظار:{" "}
@@ -393,9 +443,17 @@ export function AccessCertificationDetailPage() {
               {toFaDigits(summary.pending)}
             </strong>
           </span>
+          {summary.revoke > 0 ? (
+            <span>
+              نیاز به اصلاح:{" "}
+              <strong className="text-foreground">
+                {toFaDigits(summary.revoke)}
+              </strong>
+            </span>
+          ) : null}
           {summary.block > 0 ? (
             <span>
-              تضاد نقش جدی:{" "}
+              تضاد نقش:{" "}
               <strong className="text-destructive">
                 {toFaDigits(summary.block)}
               </strong>
@@ -424,7 +482,7 @@ export function AccessCertificationDetailPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="h-8 w-[10rem]">
+          <SelectTrigger className="h-8 w-[11rem]">
             <SelectValue placeholder="نمایش" />
           </SelectTrigger>
           <SelectContent>
@@ -444,20 +502,18 @@ export function AccessCertificationDetailPage() {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-b bg-card shadow-sm">
-              <TableHead className="w-[12rem]">عضو</TableHead>
-              <TableHead>نقش‌ها</TableHead>
-              <TableHead className="w-[7rem]">وضعیت نقش</TableHead>
-              <TableHead className="w-[7rem]">تصمیم</TableHead>
-              {canDecide ? (
-                <TableHead className="w-[14rem] text-end">اقدام</TableHead>
-              ) : null}
+              <TableHead className="w-[11rem]">عضو</TableHead>
+              <TableHead>نقش‌ها (عکس لحظهٔ باز شدن)</TableHead>
+              <TableHead className="w-[6.5rem]">تضاد</TableHead>
+              <TableHead className="w-[8rem]">تصمیم</TableHead>
+              <TableHead className="w-[16rem] text-end">اقدام</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {itemsLoading || campLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell colSpan={canDecide ? 5 : 4}>
+                  <TableCell colSpan={5}>
                     <Skeleton className="h-8 w-full" />
                   </TableCell>
                 </TableRow>
@@ -465,7 +521,7 @@ export function AccessCertificationDetailPage() {
             ) : pageRows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={canDecide ? 5 : 4}
+                  colSpan={5}
                   className="h-24 text-center text-muted-foreground"
                 >
                   {items.length === 0
@@ -473,18 +529,14 @@ export function AccessCertificationDetailPage() {
                       ? "برای شروع، «شروع بررسی» را بزنید."
                       : "آیتمی نیست"
                     : decisionFilter === "PENDING"
-                      ? "مورد بازی باقی نمانده — فیلتر را روی «همه» بگذارید یا کمپین را پایان دهید."
+                      ? "مورد بازی نمانده — فیلتر را «همه» کنید یا کمپین را پایان دهید."
                       : "با این فیلتر موردی نیست"}
                 </TableCell>
               </TableRow>
             ) : (
               pageRows.map((r) => {
-                const pending =
-                  !r.decision ||
-                  String(r.decision).toUpperCase() === "PENDING";
-                const deferred =
-                  String(r.decision || "").toUpperCase() === "DEFERRED";
-                const showActions = canDecide && (pending || deferred);
+                const d = String(r.decision || "PENDING").toUpperCase();
+                const href = memberHref(r);
                 return (
                   <TableRow key={r.item_id}>
                     <TableCell className="font-medium">
@@ -496,7 +548,7 @@ export function AccessCertificationDetailPage() {
                     </TableCell>
                     <TableCell>
                       {r.sod_has_block ? (
-                        <StatusChip tone="danger" label="تضاد جدی" />
+                        <StatusChip tone="danger" label="جدی" />
                       ) : r.sod_has_warn ? (
                         <StatusChip tone="warning" label="هشدار" />
                       ) : (
@@ -504,64 +556,92 @@ export function AccessCertificationDetailPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-sm">
-                      {DECISION_LABEL[
-                        String(r.decision || "PENDING").toUpperCase()
-                      ] || "—"}
+                      {DECISION_LABEL[d] || "—"}
                     </TableCell>
-                    {canDecide ? (
-                      <TableCell className="text-end">
-                        {showActions ? (
-                          <div className="flex flex-wrap justify-end gap-1">
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="h-7 text-xs"
-                              disabled={certifyMut.isPending}
-                              onClick={() =>
-                                void certifyMut.mutateAsync({
-                                  itemId: r.item_id,
-                                  decision: "APPROVED",
-                                })
-                              }
-                            >
-                              تأیید
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-xs"
-                              disabled={certifyMut.isPending}
-                              onClick={() =>
-                                void certifyMut.mutateAsync({
-                                  itemId: r.item_id,
-                                  decision: "REVOKE_REQUESTED",
-                                })
-                              }
-                            >
-                              نیاز به اصلاح
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 text-xs"
-                              disabled={certifyMut.isPending}
-                              onClick={() =>
-                                void certifyMut.mutateAsync({
-                                  itemId: r.item_id,
-                                  decision: "DEFERRED",
-                                })
-                              }
-                            >
-                              بعداً
-                            </Button>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                    ) : null}
+                    <TableCell className="text-end">
+                      <div className="flex flex-wrap items-center justify-end gap-1">
+                        {d === "REVOKE_REQUESTED" && href ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="h-7 text-xs"
+                            onClick={() => router.push(href)}
+                          >
+                            <ExternalLink className="me-1 h-3 w-3" />
+                            اصلاح نقش‌ها
+                          </Button>
+                        ) : null}
+
+                        {canDecide ? (
+                          <>
+                            {d !== "APPROVED" ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-7 text-xs"
+                                disabled={certifyMut.isPending}
+                                onClick={() =>
+                                  void certifyMut.mutateAsync({
+                                    itemId: r.item_id,
+                                    decision: "APPROVED",
+                                    userId: String(r.user_id || ""),
+                                  })
+                                }
+                              >
+                                تأیید
+                              </Button>
+                            ) : null}
+                            {d !== "REVOKE_REQUESTED" ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                disabled={certifyMut.isPending}
+                                onClick={() =>
+                                  void certifyMut.mutateAsync({
+                                    itemId: r.item_id,
+                                    decision: "REVOKE_REQUESTED",
+                                    userId: String(r.user_id || ""),
+                                  })
+                                }
+                              >
+                                نیاز به اصلاح
+                              </Button>
+                            ) : null}
+                            {d !== "DEFERRED" ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 text-xs"
+                                disabled={certifyMut.isPending}
+                                onClick={() =>
+                                  void certifyMut.mutateAsync({
+                                    itemId: r.item_id,
+                                    decision: "DEFERRED",
+                                    userId: String(r.user_id || ""),
+                                  })
+                                }
+                              >
+                                موکول
+                              </Button>
+                            ) : null}
+                          </>
+                        ) : href && d !== "REVOKE_REQUESTED" ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs"
+                            onClick={() => router.push(href)}
+                          >
+                            عضو
+                          </Button>
+                        ) : null}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 );
               })
