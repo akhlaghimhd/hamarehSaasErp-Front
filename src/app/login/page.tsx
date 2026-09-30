@@ -1,6 +1,7 @@
 /**
  * Login page — password / OTP / MFA / set-password / forgot (complete).
- * Layout: card shell + visual panel. MFA/OTP codes shown in FA digits.
+ * Look: form + «ورود با OTP» under it + side visual (post-MFA compact style).
+ * Features: MFA challenge, FA digits, password eye, OTP session.
  */
 "use client";
 
@@ -24,6 +25,7 @@ import {
   type AuthUser,
 } from "@/auth";
 import { ApiClientError } from "@/api";
+import { LoginVisual } from "./login-visual";
 import { HumanSlideCheck } from "./login-human-slide";
 import {
   ErrorSlot,
@@ -31,7 +33,6 @@ import {
   ResendButton,
   OtpCodeInput,
   LoginShell,
-  LoginVisualPanel,
   OTP_LENGTH,
   OTP_TIMER_SEC,
   toFa,
@@ -488,25 +489,23 @@ export default function LoginPage() {
     );
   }
 
-  const showSideVisual = (mode === "password" || mode === "otp") && !needHumanCheck;
-
   return (
-    <LoginShell showVisual={showSideVisual}>
+    <LoginShell showVisual={mode === "password" || mode === "otp"}>
       <div className="flex w-full flex-1 flex-col justify-center gap-4 p-5 sm:p-6 lg:max-w-[400px]">
         {needHumanCheck ? (
           <HumanSlideCheck onPass={onHumanCheckPass} />
         ) : mode === "mfa" ? (
           <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void runMfaVerify(); }}>
-            <div className="space-y-1">
-              <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <div className="space-y-1 text-center">
+              <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <KeyRound className="h-5 w-5" />
               </div>
-              <h1 className="text-lg font-semibold tracking-tight">تأیید دو مرحله‌ای</h1>
-              <p className="text-xs text-muted-foreground">کد ۶ رقمی Authenticator یا کد بازیابی</p>
+              <h1 className="text-lg font-semibold">تأیید دو مرحله‌ای</h1>
+              <p className="text-sm text-muted-foreground">کد ۶ رقمی Authenticator یا recovery</p>
             </div>
             <ErrorSlot message={formError} />
-            <div className="space-y-1.5">
-              <Label htmlFor="mfa-code" className="text-xs">کد تأیید</Label>
+            <div className="space-y-2">
+              <Label htmlFor="mfa-code">کد تأیید</Label>
               <Input id="mfa-code" inputMode="numeric" autoComplete="one-time-code" maxLength={16}
                 value={toFa(mfaCode)}
                 onChange={(e) => setMfaCode(toAsciiDigits(e.target.value).replace(/[^\dA-Za-z\-]/g, "").slice(0, 16))}
@@ -515,14 +514,11 @@ export default function LoginPage() {
             <ActionButton type="submit" loading={mfaBusy} loadingLabel="در حال تأیید…" disabled={toAsciiDigits(mfaCode).replace(/\s+/g, "").trim().length < 6}>
               تأیید و ورود
             </ActionButton>
-            <button type="button" className="w-full text-center text-xs text-muted-foreground hover:underline" onClick={() => switchMode("password")}>بازگشت به ورود با رمز</button>
+            <button type="button" className="w-full text-center text-sm text-muted-foreground hover:underline" onClick={() => switchMode("password")}>بازگشت</button>
           </form>
         ) : mode === "set-password" ? (
           <form onSubmit={onSetPassword} className="space-y-3">
-            <div className="space-y-1">
-              <h1 className="text-lg font-semibold">تعیین رمز عبور</h1>
-              <p className="text-xs text-muted-foreground">برای ادامه، یک رمز عبور امن تعیین کنید</p>
-            </div>
+            <h1 className="text-center text-lg font-semibold">تعیین رمز عبور</h1>
             <ErrorSlot message={formError} />
             <p className="text-[11px] text-muted-foreground">{PASSWORD_HINT}</p>
             <div className="space-y-1.5"><Label className="text-xs">رمز جدید</Label><Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} dir="ltr" className="h-10" autoComplete="new-password" /></div>
@@ -531,10 +527,7 @@ export default function LoginPage() {
           </form>
         ) : mode === "forgot" ? (
           <div className="space-y-3">
-            <div className="space-y-1">
-              <h1 className="text-lg font-semibold">بازیابی رمز عبور</h1>
-              <p className="text-xs text-muted-foreground">با موبایل ثبت‌شده رمز جدید تعیین کنید</p>
-            </div>
+            <h1 className="text-center text-lg font-semibold">بازیابی رمز عبور</h1>
             <ErrorSlot message={formError} />
             {forgotStep === "mobile" || forgotStep === "idle" ? (
               <>
@@ -553,28 +546,21 @@ export default function LoginPage() {
                 <ActionButton type="button" onClick={() => void onForgotConfirm()} loading={forgotBusy}>ثبت رمز جدید</ActionButton>
               </>
             )}
-            <button type="button" className="w-full text-xs text-muted-foreground hover:underline" onClick={() => switchMode("password")}>بازگشت</button>
+            <button type="button" className="w-full text-center text-sm text-muted-foreground hover:underline" onClick={() => switchMode("password")}>بازگشت</button>
           </div>
         ) : mode === "otp" ? (
           <div className="space-y-4">
-            <div className="space-y-1">
-              <h1 className="text-lg font-semibold tracking-tight">ورود به هماره</h1>
-              <p className="text-xs text-muted-foreground">ورود با کد یک‌بارمصرف پیامکی</p>
-            </div>
-            <div className="relative flex h-10 rounded-xl border border-border/80 bg-muted/40 p-1" role="tablist">
-              <button type="button" role="tab" onClick={() => switchMode("password")} className="relative z-10 flex flex-1 items-center justify-center gap-1.5 rounded-lg text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
-                <KeyRound className="h-3.5 w-3.5 opacity-70" />رمز عبور
-              </button>
-              <button type="button" role="tab" aria-selected className="relative z-10 flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-background text-xs font-semibold text-primary shadow-sm">
-                <Smartphone className="h-3.5 w-3.5" />کد یک‌بارمصرف
-              </button>
+            <div className="space-y-1 text-center">
+              <h1 className="text-lg font-semibold">ورود با کد یکبارمصرف</h1>
+              <p className="text-sm text-muted-foreground">کد به موبایل شما ارسال می‌شود</p>
             </div>
             <ErrorSlot message={formError} />
             {otpStep === "mobile" ? (
               <>
-                <div className="space-y-1.5"><Label className="text-xs">شماره موبایل</Label>
+                <div className="space-y-2">
+                  <Label>شماره موبایل</Label>
                   <Input value={displayIdentifier(otpMobile)} onChange={(e) => setOtpMobile(sanitizeIdentifierInput(e.target.value))} dir="ltr" className="h-10" placeholder={toFa("0912xxxxxxxx")} />
-                  {otpMobileError ? <p className="text-[11px] text-destructive">{otpMobileError}</p> : null}
+                  {otpMobileError ? <p className="text-xs text-destructive">{otpMobileError}</p> : null}
                 </div>
                 <ActionButton type="button" onClick={() => void onRequestOtp()} loading={otpRequestBusy}>دریافت کد</ActionButton>
               </>
@@ -582,41 +568,31 @@ export default function LoginPage() {
               <>
                 <p className="text-center text-sm text-muted-foreground">کد ارسال‌شده به <span dir="ltr" className="font-medium text-foreground">{toFa(otpMobile)}</span></p>
                 {debugCode ? <p className="text-center text-xs text-amber-700 dark:text-amber-300">کد تست: {toFa(debugCode)}</p> : null}
-                <OtpCodeInput value={otpCode} onChange={setOtpCode} onComplete={(c) => void onVerifyOtp(c)} disabled={otpVerifyBusy || blockedUntilEdit} />
+                <OtpCodeInput value={otpCode} onChange={setOtpCode} onComplete={(code) => void onVerifyOtp(code)} disabled={otpVerifyBusy || blockedUntilEdit} />
                 <ActionButton type="button" onClick={() => void onVerifyOtp()} loading={otpVerifyBusy} disabled={fromFa(otpCode).replace(/\D/g, "").length !== OTP_LENGTH}>تأیید کد</ActionButton>
                 <ResendButton cooldownSec={timerLeft} totalSec={OTP_TIMER_SEC} busy={otpRequestBusy} onClick={() => void onRequestOtp({ force: true })} />
-                <button type="button" className="w-full text-xs text-muted-foreground hover:underline" onClick={() => { setOtpStep("mobile"); clearOtpLocalSession(); }}>تغییر شماره</button>
+                <button type="button" className="w-full text-center text-sm text-muted-foreground hover:underline" onClick={() => { setOtpStep("mobile"); clearOtpLocalSession(); }}>تغییر شماره</button>
               </>
             )}
+            <button type="button" className="w-full text-center text-sm text-muted-foreground hover:underline" onClick={() => switchMode("password")}>بازگشت به ورود با رمز</button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit(onPasswordSubmit)} className="space-y-4">
-            <div className="space-y-1">
+          <form onSubmit={handleSubmit(onPasswordSubmit)} className="space-y-4" noValidate>
+            <div className="space-y-1 text-center sm:text-start">
               <h1 className="text-lg font-semibold tracking-tight">ورود به هماره</h1>
-              <p className="text-xs text-muted-foreground">با رمز عبور یا کد یک‌بارمصرف وارد شوید</p>
-            </div>
-            <div className="relative flex h-10 rounded-xl border border-border/80 bg-muted/40 p-1" role="tablist">
-              <button type="button" role="tab" aria-selected className="relative z-10 flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-background text-xs font-semibold text-primary shadow-sm">
-                <KeyRound className="h-3.5 w-3.5" />رمز عبور
-              </button>
-              <button type="button" role="tab" onClick={() => switchMode("otp")} className="relative z-10 flex flex-1 items-center justify-center gap-1.5 rounded-lg text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
-                <Smartphone className="h-3.5 w-3.5 opacity-70" />کد یک‌بارمصرف
-              </button>
+              <p className="text-xs text-muted-foreground">ایمیل یا موبایل و رمز عبور خود را وارد کنید</p>
             </div>
             <ErrorSlot message={formError} />
-            <div className="space-y-1.5">
-              <Label htmlFor="identifier" className="text-xs font-medium">ایمیل یا موبایل <span className="text-destructive">*</span></Label>
+            <div className="space-y-2">
+              <Label htmlFor="identifier">ایمیل یا موبایل</Label>
               <Input id="identifier" autoComplete="username" dir="ltr" className="h-10 text-left text-sm" placeholder="0912… یا user@company.com"
                 name={identifierReg.name} ref={identifierReg.ref} onBlur={identifierReg.onBlur}
                 value={displayIdentifier(identifierValue)}
-                onChange={(e) => { markEdited(); setValue("identifier", sanitizeIdentifierInput(e.target.value), { shouldValidate: false, shouldDirty: true }); }} />
-              {errors.identifier ? <p className="text-[11px] text-destructive">{errors.identifier.message}</p> : null}
+                onChange={(e) => { markEdited(); setValue("identifier", sanitizeIdentifierInput(e.target.value), { shouldValidate: true, shouldDirty: true }); }} />
+              {errors.identifier ? <p className="text-xs text-destructive">{errors.identifier.message}</p> : null}
             </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="password" className="text-xs font-medium">رمز عبور <span className="text-destructive">*</span></Label>
-                <button type="button" className="text-[11px] text-primary hover:underline" onClick={() => switchMode("forgot")}>فراموشی رمز؟</button>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">رمز عبور</Label>
               <div className="relative">
                 <Input id="password" type={showPasswordHold ? "text" : "password"} autoComplete="current-password" dir="ltr" className="h-10 pe-10 text-left text-sm" placeholder="••••••••"
                   name={passwordReg.name} ref={passwordReg.ref} onBlur={passwordReg.onBlur} value={passwordValue}
@@ -631,13 +607,21 @@ export default function LoginPage() {
                   <Eye className="h-4 w-4" />
                 </button>
               </div>
-              {errors.password ? <p className="text-[11px] text-destructive">{errors.password.message}</p> : null}
+              {errors.password ? <p className="text-xs text-destructive">{errors.password.message}</p> : null}
             </div>
-            <ActionButton type="submit" loading={isSubmitting} loadingLabel="در حال ورود…">ورود</ActionButton>
+            <ActionButton type="submit" loading={isSubmitting} loadingLabel="در حال ورود…" disabled={blockedUntilEdit}>ورود</ActionButton>
+            <div className="flex justify-between text-sm">
+              <button type="button" className="text-primary hover:underline" onClick={() => switchMode("otp")}>ورود با OTP</button>
+              <button type="button" className="text-muted-foreground hover:underline" onClick={() => switchMode("forgot")}>فراموشی رمز</button>
+            </div>
           </form>
         )}
       </div>
-      {showSideVisual ? <LoginVisualPanel /> : null}
+      {(mode === "password" || mode === "otp") && !needHumanCheck ? (
+        <div className="hidden flex-1 border-s border-border/70 lg:block">
+          <LoginVisual className="h-full min-h-[440px]" />
+        </div>
+      ) : null}
     </LoginShell>
   );
 }
