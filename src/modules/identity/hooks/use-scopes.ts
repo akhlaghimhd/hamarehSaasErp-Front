@@ -4,19 +4,24 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   scopeService,
   type CreateScopePayload,
+  type ScopeMembershipFilter,
   type UpdateScopePayload,
 } from "../services/scope-service";
 
 export const scopesQueryKey = ["identity", "scopes"] as const;
 
+export function scopesListQueryKey(membership: ScopeMembershipFilter = "active") {
+  return [...scopesQueryKey, membership] as const;
+}
+
 export function userScopesQueryKey(tenantUserId: string) {
   return ["identity", "user-scopes", tenantUserId] as const;
 }
 
-export function useScopes() {
+export function useScopes(membership: ScopeMembershipFilter = "active") {
   return useQuery({
-    queryKey: scopesQueryKey,
-    queryFn: () => scopeService.list(),
+    queryKey: scopesListQueryKey(membership),
+    queryFn: () => scopeService.list({ membership }),
     staleTime: 60_000,
     retry: 1,
   });
@@ -48,6 +53,14 @@ export function useSoftDeleteScope() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => scopeService.softDelete(id),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: scopesQueryKey }),
+  });
+}
+
+export function useRestoreScope() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => scopeService.restore(id),
     onSuccess: () => void qc.invalidateQueries({ queryKey: scopesQueryKey }),
   });
 }

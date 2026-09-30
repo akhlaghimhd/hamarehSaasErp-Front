@@ -1,5 +1,5 @@
 /**
- * FE-P1 Sprint 4 — Scope API client.
+ * Scope API client — list / create / update / soft-delete / restore.
  */
 
 import { apiDelete, apiGet, apiPost, apiPut } from "@/api";
@@ -12,7 +12,10 @@ export type ScopeType =
   | "WAREHOUSE"
   | "DEPARTMENT"
   | "COST_CENTER"
-  | "CUSTOM";
+  | "CUSTOM"
+  | "BUSINESS_UNIT";
+
+export type ScopeMembershipFilter = "active" | "deleted";
 
 export interface ScopeDto {
   scope_id: string;
@@ -24,6 +27,7 @@ export interface ScopeDto {
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
+  deleted_at?: string | null;
 }
 
 export interface CreateScopePayload {
@@ -56,10 +60,14 @@ function asList<T>(data: T[] | { data?: T[] } | null | undefined): T[] {
 }
 
 export const scopeService = {
-  async list(scopeType?: string): Promise<ScopeDto[]> {
-    const qs = scopeType
-      ? `?scope_type=${encodeURIComponent(scopeType)}`
-      : "";
+  async list(options?: {
+    scopeType?: string;
+    membership?: ScopeMembershipFilter;
+  }): Promise<ScopeDto[]> {
+    const params = new URLSearchParams();
+    if (options?.scopeType) params.set("scope_type", options.scopeType);
+    if (options?.membership) params.set("membership", options.membership);
+    const qs = params.toString() ? `?${params.toString()}` : "";
     const envelope = await apiGet(`${identityPaths.scopes}${qs}`);
     return asList(unwrapData(envelope));
   },
@@ -81,6 +89,11 @@ export const scopeService = {
 
   async softDelete(id: string): Promise<void> {
     await apiDelete(identityPaths.scope(id));
+  },
+
+  async restore(id: string): Promise<ScopeDto> {
+    const envelope = await apiPost(identityPaths.scopeRestore(id), {});
+    return unwrapData<ScopeDto>(envelope);
   },
 
   async listForUser(tenantUserId: string): Promise<ScopeDto[]> {
