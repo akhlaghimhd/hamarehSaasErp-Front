@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPost } from "@/api";
+import { apiDelete, apiGet, apiPost, apiPut } from "@/api";
 import type { ApiSuccessResponse } from "@/api/types";
 import { identityPaths } from "./paths";
 
@@ -18,6 +18,8 @@ export type SodRuleDto = {
   severity?: number;
   enforcement?: string;
   is_active?: boolean;
+  inactive_until?: string | null;
+  deleted_at?: string | null;
   role_a?: SodRoleRef | null;
   role_b?: SodRoleRef | null;
   [key: string]: unknown;
@@ -34,6 +36,15 @@ export type CreateSodRulePayload = {
   is_active?: boolean;
 };
 
+export type UpdateSodRulePayload = {
+  name?: string;
+  description?: string | null;
+  severity?: number;
+  enforcement?: "BLOCK" | "WARN";
+  is_active?: boolean;
+  inactive_until?: string | null;
+};
+
 export type SodEvaluateResult = {
   conflicts: Array<{
     sod_rule_id?: string;
@@ -46,6 +57,11 @@ export type SodEvaluateResult = {
   }>;
   has_block: boolean;
   has_warn: boolean;
+};
+
+export type SodListParams = {
+  status?: "active" | "inactive" | "all";
+  only_trashed?: boolean;
 };
 
 function unwrapData<T>(envelope: unknown): T {
@@ -62,8 +78,13 @@ function asList<T>(data: T[] | { data?: T[] } | null | undefined): T[] {
 }
 
 export const sodService = {
-  async list(): Promise<SodRuleDto[]> {
-    const envelope = await apiGet(identityPaths.sodRules);
+  async list(params?: SodListParams): Promise<SodRuleDto[]> {
+    const q = new URLSearchParams();
+    if (params?.status && params.status !== "all") q.set("status", params.status);
+    if (params?.only_trashed) q.set("only_trashed", "1");
+    const qs = q.toString();
+    const path = qs ? `${identityPaths.sodRules}?${qs}` : identityPaths.sodRules;
+    const envelope = await apiGet(path);
     return asList(unwrapData(envelope));
   },
 
@@ -72,8 +93,18 @@ export const sodService = {
     return unwrapData<SodRuleDto>(envelope);
   },
 
+  async update(id: string, payload: UpdateSodRulePayload): Promise<SodRuleDto> {
+    const envelope = await apiPut(identityPaths.sodRule(id), payload);
+    return unwrapData<SodRuleDto>(envelope);
+  },
+
   async softDelete(id: string): Promise<void> {
     await apiDelete(identityPaths.sodRule(id));
+  },
+
+  async restore(id: string): Promise<SodRuleDto> {
+    const envelope = await apiPost(identityPaths.sodRuleRestore(id), {});
+    return unwrapData<SodRuleDto>(envelope);
   },
 
   async evaluate(roleIds: string[]): Promise<SodEvaluateResult> {

@@ -62,4 +62,6 @@ export const identityPaths = {
   sodRules: `${IDENTITY_BASE}/sod-rules`,
   sodRule: (id: string) => `${IDENTITY_BASE}/sod-rules/${id}`,
   sodEvaluate: `${IDENTITY_BASE}/sod-rules/evaluate`,
+  sodRuleRestore: (id: string) =>
+    `${IDENTITY_BASE}/sod-rules/${id}/restore`,
 } as const;
