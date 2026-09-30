@@ -90,11 +90,11 @@ function roleName(
   return rel?.name || rel?.code || fallbackMap.get(id) || "—";
 }
 
-function severityTone(s?: number): "default" | "warning" | "danger" | "success" {
+function severityTone(s?: number): "neutral" | "warning" | "danger" | "success" {
   if (s === 4) return "danger";
   if (s === 3) return "warning";
   if (s === 1) return "success";
-  return "default";
+  return "neutral";
 }
 
 function addDays(days: number): string {
@@ -420,7 +420,7 @@ export function SodRulesListPage() {
       <PageHeader
         title="قوانین تفکیک وظایف"
         description="تعیین جفت‌نقش‌هایی که نباید همزمان به یک کاربر داده شوند"
-        icon={Scale}
+        icon={<Scale className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -492,18 +492,21 @@ export function SodRulesListPage() {
           description={
             error instanceof Error ? error.message : "بارگذاری قوانین ناموفق بود."
           }
-          action={
-            <Button type="button" variant="outline" onClick={() => void refetch()}>
-              تلاش مجدد
-            </Button>
-          }
+          actionLabel="تلاش مجدد"
+          onAction={() => void refetch()}
         />
       ) : (
         <DataTable
           columns={columns}
           data={rows}
-          isLoading={isLoading}
-          emptyMessage="قانونی برای نمایش نیست. با «قانون جدید» شروع کنید یا فیلتر را تغییر دهید."
+          getRowKey={(r) => r.sod_rule_id}
+          loading={isLoading}
+          isFiltered={Boolean(q.trim()) || statusFilter !== "all"}
+          emptyTitle="قانونی ثبت نشده"
+          emptyDescription="با «قانون جدید» اولین قانون تفکیک وظایف را بسازید."
+          emptySearchTitle="نتیجه‌ای نیست"
+          emptySearchDescription="عبارت جستجو یا فیلتر وضعیت را تغییر دهید."
+          density="compact"
         />
       )}
 
