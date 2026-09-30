@@ -96,18 +96,19 @@ export const IdentityPermissions = {
   permissionUpdate: "identity.permission.update",
   permissionDelete: "identity.permission.delete",
   scopeView: "identity.scope.view",
+  scopeCreate: "identity.scope.create",
+  scopeUpdate: "identity.scope.update",
+  scopeDelete: "identity.scope.delete",
   scopeAssign: "identity.scope.assign",
   membershipHistoryView: "identity.membership_history.view",
+  sodView: "identity.sod.view",
+  sodManage: "identity.sod.manage",
   accessCertView: "identity.access_cert.view",
   accessCertManage: "identity.access_cert.manage",
   accessCertCertify: "identity.access_cert.certify",
-  privilegedView: "identity.privileged.view",
-  privilegedRequest: "identity.privileged.request",
-  privilegedApprove: "identity.privileged.approve",
-  sodView: "identity.sod.view",
-  sodManage: "identity.sod.manage",
-  /** دریافت پیام‌های سیستمی (انواع در payload.message_type) */
+  accessCertReceiveReminder: "identity.access_cert.receive_reminder",
   systemNotificationReceive: "identity.system_notification.receive",
+  mfaManage: "identity.mfa.manage",
 } as const;
 
 export type IdentityPermissionCode =
