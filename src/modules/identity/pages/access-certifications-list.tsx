@@ -1,140 +1,196 @@
-/** Access Certification campaigns + item certify — ID-W2-01 FE */
+/** فهرست کمپین‌های بازبینی دسترسی — الگوی جدول کاربران / محدوده‌ها */
 
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ClipboardCheck, Loader2, Plus, Search } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ClipboardCheck,
+  Info,
+  Loader2,
+  Plus,
+  Search,
+} from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import {
-  DataTable,
-  type DataTableColumn,
-} from "@/shared/components/data-display/data-table";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/shared/components/ui/table";
+import { Skeleton } from "@/shared/components/ui/skeleton";
 import { StatusChip } from "@/shared/components/data-display/status-chip";
+import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { Input } from "@/shared/components/ui/input";
 import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/components/ui/dialog";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/components/ui/select";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
+  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from "@/shared/components/ui/sheet";
 import { ApiClientError } from "@/api";
 import { usePermission } from "@/auth";
+import { cn, toFaDigits } from "@/shared/lib/utils";
 import { IdentityPermissions } from "../types";
-import { useTenantUsers } from "../hooks/use-tenant-users";
-import { useRoles } from "../hooks/use-roles";
 import {
   accessCertificationService,
   type AccessCertCampaignDto,
-  type AccessCertItemDto,
 } from "../services/access-certification-service";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "پیش‌نویس",
-  OPEN: "باز",
-  COMPLETED: "تکمیل",
-  CANCELLED: "لغو",
+  OPEN: "در حال بازبینی",
+  COMPLETED: "تکمیل‌شده",
+  CANCELLED: "لغو شده",
 };
 
-const DECISION_LABEL: Record<string, string> = {
-  PENDING: "در انتظار",
-  APPROVED: "تأیید",
-  REVOKE_REQUESTED: "درخواست لغو",
-  DEFERRED: "موکول",
-};
+type SortKey = "name" | "code" | "status" | "due_at" | "created_at";
+type SortDir = "asc" | "desc";
 
-function shortId(id?: string | null): string {
-  if (!id) return "—";
-  return id.length > 10 ? `${id.slice(0, 8)}…` : id;
+/** Minimal Jalali → Gregorian (for form due date). */
+function jalaliToGregorian(jy: number, jm: number, jd: number): string {
+  const gy = jy <= 979 ? 621 : 1600;
+  jy -= jy <= 979 ? 0 : 979;
+  let days =
+    365 * jy +
+    Math.floor(jy / 33) * 8 +
+    Math.floor(((jy % 33) + 3) / 4) +
+    78 +
+    jd +
+    (jm < 7 ? (jm - 1) * 31 : (jm - 7) * 30 + 186);
+  let gy2 = gy + 400 * Math.floor(days / 146097);
+  days %= 146097;
+  if (days > 36524) {
+    gy2 += 100 * Math.floor(--days / 36524);
+    days %= 36524;
+    if (days >= 365) days++;
+  }
+  gy2 += 4 * Math.floor(days / 1461);
+  days %= 1461;
+  if (days > 365) {
+    gy2 += Math.floor((days - 1) / 365);
+    days = (days - 1) % 365;
+  }
+  let gd = days + 1;
+  const sal_a = [
+    0,
+    31,
+    (gy2 % 4 === 0 && gy2 % 100 !== 0) || gy2 % 400 === 0 ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ];
+  let gm = 0;
+  for (gm = 1; gm <= 12 && gd > sal_a[gm]; gm++) gd -= sal_a[gm];
+  const yyyy = String(gy2);
+  const mm = String(gm).padStart(2, "0");
+  const dd = String(gd).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function formatJalaliDateTime(value?: string | null): string {
+  if (!value) return "—";
+  try {
+    return toFaDigits(
+      new Intl.DateTimeFormat("fa-IR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(new Date(value))
+    );
+  } catch {
+    return toFaDigits(String(value));
+  }
+}
+
+function statusTone(status?: string): "success" | "warning" | "danger" | "neutral" {
+  switch (String(status || "").toUpperCase()) {
+    case "OPEN":
+      return "warning";
+    case "COMPLETED":
+      return "success";
+    case "CANCELLED":
+      return "danger";
+    default:
+      return "neutral";
+  }
 }
 
 export function AccessCertificationsListPage() {
   const canView = usePermission(IdentityPermissions.accessCertView);
   const canManage = usePermission(IdentityPermissions.accessCertManage);
-  const canCertify = usePermission(IdentityPermissions.accessCertCertify);
+  const router = useRouter();
   const qc = useQueryClient();
+
   const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [sortKey, setSortKey] = useState<SortKey>("created_at");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
   const [createOpen, setCreateOpen] = useState(false);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [dueAt, setDueAt] = useState("");
-  const [itemsOpen, setItemsOpen] = useState(false);
-  const [activeCampaign, setActiveCampaign] = useState<AccessCertCampaignDto | null>(null);
+  const [jy, setJy] = useState("");
+  const [jm, setJm] = useState("");
+  const [jd, setJd] = useState("");
 
-  const { data: members = [] } = useTenantUsers("active");
-  const { data: roles = [] } = useRoles();
+  const formDirty = Boolean(
+    code.trim() || name.trim() || description.trim() || jy || jm || jd
+  );
 
-  const userLabel = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const m of members) {
-      const uid = String(m.user_id ?? "");
-      if (!uid) continue;
-      const label =
-        m.user?.display_name ||
-        [m.user?.first_name, m.user?.last_name].filter(Boolean).join(" ") ||
-        m.user?.email ||
-        m.user?.mobile ||
-        shortId(uid);
-      map.set(uid, label);
-    }
-    return map;
-  }, [members]);
-
-  const roleLabel = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const r of roles) {
-      map.set(r.tenant_role_id, r.name || r.code || shortId(r.tenant_role_id));
-    }
-    return map;
-  }, [roles]);
-
-  const { data = [], isLoading, isError, error, refetch } = useQuery({
+  const { data = [], isLoading, isError, error } = useQuery({
     queryKey: ["identity", "access-certifications"],
     queryFn: () => accessCertificationService.list(),
     enabled: canView,
   });
 
-  const campaignId = activeCampaign?.campaign_id;
-
-  const {
-    data: items = [],
-    isLoading: itemsLoading,
-    refetch: refetchItems,
-  } = useQuery({
-    queryKey: ["identity", "access-certifications", campaignId, "items"],
-    queryFn: () =>
-      campaignId
-        ? accessCertificationService.listItems(campaignId)
-        : Promise.resolve([] as AccessCertItemDto[]),
-    enabled: Boolean(campaignId) && itemsOpen && canView,
-  });
-
   const createMut = useMutation({
-    mutationFn: () =>
-      accessCertificationService.create({
+    mutationFn: () => {
+      let due: string | null = null;
+      if (jy && jm && jd) {
+        due = jalaliToGregorian(Number(jy), Number(jm), Number(jd));
+      }
+      return accessCertificationService.create({
         code: code.trim(),
         name: name.trim(),
         description: description.trim() || null,
-        due_at: dueAt || null,
-      }),
+        due_at: due,
+      });
+    },
     onSuccess: () => {
       toast.success("کمپین ایجاد شد");
+      resetCreate();
       setCreateOpen(false);
-      setCode("");
-      setName("");
-      setDescription("");
-      setDueAt("");
       void qc.invalidateQueries({ queryKey: ["identity", "access-certifications"] });
     },
     onError: (e) =>
@@ -143,9 +199,12 @@ export function AccessCertificationsListPage() {
 
   const openMut = useMutation({
     mutationFn: (id: string) => accessCertificationService.open(id),
-    onSuccess: () => {
-      toast.success("کمپین باز شد");
+    onSuccess: (c) => {
+      toast.success("کمپین باز شد؛ فهرست اعضا برای بازبینی آماده است");
       void qc.invalidateQueries({ queryKey: ["identity", "access-certifications"] });
+      if (c?.campaign_id) {
+        router.push(`/dashboard/identity/access-certifications/${c.campaign_id}`);
+      }
     },
     onError: (e) =>
       toast.error(e instanceof ApiClientError ? e.message : "باز کردن کمپین ناموفق بود"),
@@ -161,417 +220,508 @@ export function AccessCertificationsListPage() {
       toast.error(e instanceof ApiClientError ? e.message : "تکمیل کمپین ناموفق بود"),
   });
 
-  const certifyMut = useMutation({
-    mutationFn: ({
-      itemId,
-      decision,
-    }: {
-      itemId: string;
-      decision: "APPROVED" | "REVOKE_REQUESTED" | "DEFERRED";
-    }) => accessCertificationService.certifyItem(itemId, { decision }),
-    onSuccess: () => {
-      toast.success("تصمیم ثبت شد");
-      void refetchItems();
-      void qc.invalidateQueries({ queryKey: ["identity", "access-certifications"] });
-    },
-    onError: (e) =>
-      toast.error(e instanceof ApiClientError ? e.message : "ثبت تصمیم ناموفق بود"),
-  });
+  function resetCreate() {
+    setCode("");
+    setName("");
+    setDescription("");
+    setJy("");
+    setJm("");
+    setJd("");
+  }
 
-  const rows = useMemo(() => {
+  const filteredSorted = useMemo(() => {
+    let list = data;
+    if (statusFilter !== "all") {
+      list = list.filter(
+        (r) => String(r.status || "").toUpperCase() === statusFilter
+      );
+    }
     const term = q.trim().toLowerCase();
-    if (!term) return data;
-    return data.filter((r) =>
-      [r.code, r.name, r.status].some((v) => String(v ?? "").toLowerCase().includes(term))
-    );
-  }, [data, q]);
+    if (term) {
+      list = list.filter((r) =>
+        [r.code, r.name, r.description, r.status].some((v) =>
+          String(v ?? "")
+            .toLowerCase()
+            .includes(term)
+        )
+      );
+    }
+    return [...list].sort((a, b) => {
+      const va = String((a as Record<string, unknown>)[sortKey] ?? "").toLowerCase();
+      const vb = String((b as Record<string, unknown>)[sortKey] ?? "").toLowerCase();
+      if (va < vb) return sortDir === "asc" ? -1 : 1;
+      if (va > vb) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [data, statusFilter, q, sortKey, sortDir]);
 
-  const openItems = (campaign: AccessCertCampaignDto) => {
-    setActiveCampaign(campaign);
-    setItemsOpen(true);
+  const total = filteredSorted.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = filteredSorted.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize
+  );
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+    setPage(1);
   };
 
-  const columns: DataTableColumn<AccessCertCampaignDto>[] = [
-    {
-      id: "code",
-      header: "کد",
-      cell: (r) => <span className="font-mono text-xs">{r.code ?? "—"}</span>,
-    },
-    {
-      id: "name",
-      header: "نام",
-      cell: (r) => r.name ?? "—",
-    },
-    {
-      id: "status",
-      header: "وضعیت",
-      cell: (r) => (
-        <StatusChip
-          label={STATUS_LABEL[String(r.status ?? "")] ?? String(r.status ?? "—")}
-          tone={r.status === "OPEN" ? "success" : r.status === "COMPLETED" ? "neutral" : "warning"}
-        />
-      ),
-    },
-    {
-      id: "due",
-      header: "مهلت",
-      cell: (r) =>
-        r.due_at ? (
-          <span dir="ltr" className="text-xs tabular-nums">
-            {String(r.due_at).slice(0, 10)}
-          </span>
-        ) : (
-          "—"
-        ),
-    },
-    {
-      id: "actions",
-      header: "عملیات",
-      cell: (r) => (
-        <div className="flex flex-wrap gap-1">
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-7 text-xs"
-            onClick={() => openItems(r)}
-          >
-            آیتم‌ها
-          </Button>
-          {canManage && r.status === "DRAFT" ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs"
-              disabled={openMut.isPending}
-              onClick={() => void openMut.mutateAsync(r.campaign_id)}
-            >
-              باز کردن
-            </Button>
-          ) : null}
-          {canManage && r.status === "OPEN" ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs"
-              disabled={completeMut.isPending}
-              onClick={() => void completeMut.mutateAsync(r.campaign_id)}
-            >
-              تکمیل
-            </Button>
-          ) : null}
-        </div>
-      ),
-    },
-  ];
+  const SortIcon = ({ k }: { k: SortKey }) => {
+    if (sortKey !== k) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
+    return sortDir === "asc" ? (
+      <ArrowUp className="h-3 w-3" />
+    ) : (
+      <ArrowDown className="h-3 w-3" />
+    );
+  };
 
-  const itemColumns: DataTableColumn<AccessCertItemDto>[] = [
-    {
-      id: "user",
-      header: "کاربر",
-      cell: (r) => {
-        const id = String(r.user_id ?? "");
-        return (
-          <div className="min-w-0">
-            <div className="text-sm font-medium">{userLabel.get(id) ?? shortId(id)}</div>
-            <div dir="ltr" className="font-mono text-[10px] text-muted-foreground">
-              {shortId(id)}
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      id: "role",
-      header: "نقش",
-      cell: (r) => {
-        const id = String(r.tenant_role_id ?? "");
-        return (
-          <div className="min-w-0">
-            <div className="text-sm font-medium">{roleLabel.get(id) ?? shortId(id)}</div>
-            <div dir="ltr" className="font-mono text-[10px] text-muted-foreground">
-              {shortId(id)}
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      id: "decision",
-      header: "تصمیم",
-      cell: (r) => {
-        const d = String(r.decision ?? "PENDING");
-        return (
-          <StatusChip
-            label={DECISION_LABEL[d] ?? d}
-            tone={
-              d === "APPROVED"
-                ? "success"
-                : d === "REVOKE_REQUESTED"
-                  ? "warning"
-                  : "neutral"
-            }
-          />
-        );
-      },
-    },
-    {
-      id: "sod",
-      header: "SoD",
-      cell: (r) => {
-        if (r.sod_has_block) {
-          const names = (r.sod_conflicts ?? [])
-            .filter((c) => String(c.enforcement ?? "").toUpperCase() === "BLOCK")
-            .map((c) => c.name || c.code)
-            .filter(Boolean)
-            .join("؛ ");
-          return (
-            <StatusChip
-              label={names ? `نقض مسدود: ${names}` : "نقض مسدود SoD"}
-              tone="danger"
-            />
-          );
-        }
-        if (r.sod_has_warn) {
-          return <StatusChip label="هشدار SoD" tone="warning" />;
-        }
-        return <StatusChip label="بدون تعارض" tone="success" />;
-      },
-    },
-    {
-      id: "actions",
-      header: "عملیات",
-      cell: (r) => {
-        const pending = !r.decision || r.decision === "PENDING";
-        if (!canCertify || !pending || activeCampaign?.status !== "OPEN") {
-          return "—";
-        }
-        return (
-          <div className="flex flex-wrap gap-1">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs"
-              disabled={certifyMut.isPending}
-              onClick={() =>
-                void certifyMut.mutateAsync({
-                  itemId: r.item_id,
-                  decision: "APPROVED",
-                })
-              }
-            >
-              تأیید
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs"
-              disabled={certifyMut.isPending}
-              onClick={() =>
-                void certifyMut.mutateAsync({
-                  itemId: r.item_id,
-                  decision: "REVOKE_REQUESTED",
-                })
-              }
-            >
-              لغو نقش
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-7 text-xs"
-              disabled={certifyMut.isPending}
-              onClick={() =>
-                void certifyMut.mutateAsync({
-                  itemId: r.item_id,
-                  decision: "DEFERRED",
-                })
-              }
-            >
-              موکول
-            </Button>
-          </div>
-        );
-      },
-    },
-  ];
+  const currentJy = Number(
+    new Intl.DateTimeFormat("fa-IR-u-nu-latn", { year: "numeric" }).format(
+      new Date()
+    )
+  );
+  const yearOptions = Array.from({ length: 8 }, (_, i) => currentJy + i);
 
   if (!canView) {
     return (
-      <div className="space-y-4">
-        <PageHeader title="بازبینی دسترسی" description="مجوز مشاهده ندارید." />
+      <div className="flex min-h-0 flex-col gap-3">
+        <EmptyState
+          title="دسترسی ندارید"
+          description="برای مشاهده بازبینی دسترسی، مجوز لازم را از مدیر سیستم دریافت کنید."
+        />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex min-h-0 flex-col gap-3">
       <PageHeader
-        title="بازبینی دسترسی (Access Certification)"
-        description="کمپین‌های بررسی دوره‌ای نقش‌ها و دسترسی‌ها — هنگام باز کردن کمپین، نقض SoD روی نقش‌های فعلی علامت‌گذاری می‌شود"
+        title="بازبینی دسترسی"
+        description="بررسی دوره‌ای نقش‌ها و دسترسی اعضای سازمان"
+        icon={<ClipboardCheck className="h-5 w-5" />}
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "هویت و دسترسی", href: "/dashboard/identity" },
           { label: "بازبینی دسترسی" },
         ]}
-        icon={<ClipboardCheck className="h-5 w-5" />}
         actions={
           canManage ? (
-            <Button
-              type="button"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => setCreateOpen(true)}
-            >
-              <Plus className="h-3.5 w-3.5" />
+            <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="me-1.5 h-4 w-4" />
               کمپین جدید
             </Button>
           ) : null
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[200px] flex-1 max-w-sm">
-          <Search className="absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="جستجو…"
-            className="ps-8 h-9"
-          />
+      <div className="rounded-xl border bg-muted/30 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+        <div className="mb-1 flex items-center gap-1.5 font-medium text-foreground">
+          <Info className="h-4 w-4 shrink-0" />
+          این صفحه چه کاری انجام می‌دهد؟
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>
-          بروزرسانی
-        </Button>
+        <p>
+          با «باز کردن» کمپین، سیستم از همهٔ اعضای فعال سازمان یک عکس می‌گیرد:
+          هر نفر الان چه نقش‌هایی دارد و آیا ترکیب نقش‌هایش با قوانین
+          «تفکیک وظایف» در تضاد است یا نه. سپس شما برای هر نفر تصمیم
+          می‌گیرید: دسترسی درست است، باید نقش‌ها کم شوند، یا تصمیم را به
+          بعد موکول می‌کنید.
+        </p>
+        <p className="mt-2">
+          شکاف‌های رایج: کارمندی که هم ثبت‌کننده و هم تأییدکننده است؛ دسترسی
+          قدیمی بعد از جابه‌جایی شغلی؛ نقش‌هایی که با هم نباید همزمان باشند
+          (مثلاً خرید و پرداخت). قوانین تضاد در بخش «تفکیک وظایف» تعریف
+          می‌شوند.
+        </p>
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center gap-2 py-12 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          در حال بارگذاری…
+      {isError ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {error instanceof Error ? error.message : "بارگذاری ناموفق بود"}
         </div>
-      ) : isError ? (
-        <p className="text-sm text-destructive">
-          {error instanceof ApiClientError ? error.message : "خطا در بارگذاری"}
-        </p>
-      ) : (
-        <DataTable
-          columns={columns}
-          data={rows}
-          getRowKey={(r) => r.campaign_id}
-          isFiltered={q.trim().length > 0}
-          emptyTitle="کمپینی ثبت نشده است."
-          emptySearchTitle="نتیجه‌ای پیدا نشد."
-        />
-      )}
+      ) : null}
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>کمپین بازبینی دسترسی</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="ac-code">کد</Label>
-              <Input
-                id="ac-code"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="مثلاً Q1-2026"
-                disabled={createMut.isPending}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="ac-name">نام</Label>
-              <Input
-                id="ac-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="نام کمپین"
-                disabled={createMut.isPending}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="ac-desc">توضیح</Label>
-              <Input
-                id="ac-desc"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="اختیاری"
-                disabled={createMut.isPending}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="ac-due">مهلت</Label>
-              <Input
-                id="ac-due"
-                type="date"
-                value={dueAt}
-                onChange={(e) => setDueAt(e.target.value)}
-                disabled={createMut.isPending}
-              />
-            </div>
-          </div>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={createMut.isPending}
-              onClick={() => setCreateOpen(false)}
-            >
-              انصراف
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              disabled={createMut.isPending || !code.trim() || !name.trim()}
-              onClick={() => void createMut.mutateAsync()}
-            >
-              {createMut.isPending ? (
-                <>
-                  <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />
-                  در حال ایجاد…
-                </>
-              ) : (
-                "ایجاد"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[12rem] flex-1 sm:max-w-sm">
+          <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="h-8 ps-8 text-sm"
+            placeholder="جستجو در نام یا کد…"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => {
+            setStatusFilter(v);
+            setPage(1);
+          }}
+        >
+          <SelectTrigger className="h-8 w-[10rem]">
+            <SelectValue placeholder="وضعیت" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">همه وضعیت‌ها</SelectItem>
+            <SelectItem value="DRAFT">پیش‌نویس</SelectItem>
+            <SelectItem value="OPEN">در حال بازبینی</SelectItem>
+            <SelectItem value="COMPLETED">تکمیل‌شده</SelectItem>
+          </SelectContent>
+        </Select>
+        {isLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        ) : null}
+      </div>
 
-      <Sheet open={itemsOpen} onOpenChange={setItemsOpen}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>
-              آیتم‌های کمپین{activeCampaign?.name ? ` — ${activeCampaign.name}` : ""}
-            </SheetTitle>
-          </SheetHeader>
-          <div className="mt-4 space-y-3">
-            {itemsLoading ? (
-              <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                در حال بارگذاری آیتم‌ها…
-              </div>
+      <div className="min-h-0 flex-1 overflow-auto rounded-xl border">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent border-b bg-card shadow-sm">
+              <TableHead className="sticky top-0 z-20 w-10 bg-card px-2 text-center text-xs">
+                #
+              </TableHead>
+              <TableHead className="sticky top-0 z-20 bg-card">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 font-medium"
+                  onClick={() => toggleSort("name")}
+                >
+                  نام کمپین
+                  <SortIcon k="name" />
+                </button>
+              </TableHead>
+              <TableHead className="sticky top-0 z-20 bg-card">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 font-medium"
+                  onClick={() => toggleSort("code")}
+                >
+                  کد
+                  <SortIcon k="code" />
+                </button>
+              </TableHead>
+              <TableHead className="sticky top-0 z-20 bg-card">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 font-medium"
+                  onClick={() => toggleSort("status")}
+                >
+                  وضعیت
+                  <SortIcon k="status" />
+                </button>
+              </TableHead>
+              <TableHead className="sticky top-0 z-20 bg-card">موعد</TableHead>
+              <TableHead className="sticky top-0 z-20 bg-card text-end">
+                عملیات
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell colSpan={6} className="py-2">
+                    <Skeleton className="h-7 w-full" />
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : pageRows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="p-0">
+                  <EmptyState
+                    title="کمپینی ثبت نشده"
+                    description="با «کمپین جدید» اولین دوره بازبینی را شروع کنید."
+                  />
+                </TableCell>
+              </TableRow>
             ) : (
-              <DataTable
-                columns={itemColumns}
-                data={[...items].sort((a, b) => {
-                  const score = (x: AccessCertItemDto) =>
-                    x.sod_has_block ? 2 : x.sod_has_warn ? 1 : 0;
-                  return score(b) - score(a);
-                })}
-                getRowKey={(r) => r.item_id}
-                emptyTitle="آیتمی وجود ندارد (کمپین را باز کنید تا snapshot ساخته شود)."
-              />
+              pageRows.map((r, idx) => (
+                <TableRow key={r.campaign_id}>
+                  <TableCell className="px-2 py-1 text-center text-xs text-muted-foreground">
+                    {toFaDigits((safePage - 1) * pageSize + idx + 1)}
+                  </TableCell>
+                  <TableCell className="px-2 py-1">
+                    <button
+                      type="button"
+                      className="text-start text-sm font-medium hover:underline"
+                      onClick={() =>
+                        router.push(
+                          `/dashboard/identity/access-certifications/${r.campaign_id}`
+                        )
+                      }
+                    >
+                      {r.name || "—"}
+                    </button>
+                    {r.description ? (
+                      <div className="truncate text-[11px] text-muted-foreground">
+                        {r.description}
+                      </div>
+                    ) : null}
+                  </TableCell>
+                  <TableCell className="px-2 py-1 font-mono text-xs">
+                    {r.code || "—"}
+                  </TableCell>
+                  <TableCell className="px-2 py-1">
+                    <StatusChip
+                      label={
+                        STATUS_LABEL[String(r.status || "").toUpperCase()] ||
+                        r.status ||
+                        "—"
+                      }
+                      tone={statusTone(r.status)}
+                    />
+                  </TableCell>
+                  <TableCell className="px-2 py-1 text-xs text-muted-foreground">
+                    {formatJalaliDateTime(r.due_at ? String(r.due_at) : null)}
+                  </TableCell>
+                  <TableCell className="px-2 py-1">
+                    <div className="flex flex-wrap justify-end gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={() =>
+                          router.push(
+                            `/dashboard/identity/access-certifications/${r.campaign_id}`
+                          )
+                        }
+                      >
+                        جزئیات
+                      </Button>
+                      {canManage &&
+                      String(r.status).toUpperCase() === "DRAFT" ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-7 text-xs"
+                          disabled={openMut.isPending}
+                          onClick={() => void openMut.mutateAsync(r.campaign_id)}
+                        >
+                          باز کردن
+                        </Button>
+                      ) : null}
+                      {canManage &&
+                      String(r.status).toUpperCase() === "OPEN" ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="h-7 text-xs"
+                          disabled={completeMut.isPending}
+                          onClick={() =>
+                            void completeMut.mutateAsync(r.campaign_id)
+                          }
+                        >
+                          تکمیل
+                        </Button>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
-          </div>
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>
+          {total === 0
+            ? "موردی نیست"
+            : `نمایش ${toFaDigits((safePage - 1) * pageSize + 1)}–${toFaDigits(Math.min(safePage * pageSize, total))} از ${toFaDigits(total)}`}
+        </span>
+        <div className="flex items-center gap-2">
+          <Select
+            value={String(pageSize)}
+            onValueChange={(v) => {
+              setPageSize(Number(v));
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="h-7 w-[4.5rem]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[10, 20, 50].map((n) => (
+                <SelectItem key={n} value={String(n)}>
+                  {toFaDigits(n)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7"
+            disabled={safePage <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            قبلی
+          </Button>
+          <span className="tabular-nums">
+            {toFaDigits(safePage)} / {toFaDigits(totalPages)}
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7"
+            disabled={safePage >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            بعدی
+          </Button>
+        </div>
+      </div>
+
+      <Sheet
+        open={createOpen}
+        onOpenChange={(open) => {
+          if (!open && formDirty) return;
+          if (!open) resetCreate();
+          setCreateOpen(open);
+        }}
+      >
+        <SheetContent
+          side="right"
+          className="flex h-full max-h-dvh w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
+          onInteractOutside={(e) => {
+            if (formDirty) e.preventDefault();
+          }}
+          onPointerDownOutside={(e) => {
+            if (formDirty) e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            if (formDirty) e.preventDefault();
+          }}
+        >
+          <SheetHeader className="shrink-0 space-y-1 border-b px-6 py-4 text-start">
+            <SheetTitle>کمپین بازبینی جدید</SheetTitle>
+            <SheetDescription>
+              یک دورهٔ بازبینی بسازید. بعد از ایجاد، با «باز کردن» از همهٔ اعضا
+              عکس نقش‌ها گرفته می‌شود.
+            </SheetDescription>
+          </SheetHeader>
+          <form
+            className="flex min-h-0 flex-1 flex-col overflow-hidden"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!code.trim() || !name.trim()) {
+                toast.error("کد و نام کمپین الزامی است");
+                return;
+              }
+              void createMut.mutateAsync();
+            }}
+          >
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="ac-code">کد کمپین</Label>
+                <Input
+                  id="ac-code"
+                  className="h-9"
+                  placeholder="مثال: cert-1405-01"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  dir="ltr"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  فقط حروف لاتین کوچک، عدد، خط تیره یا زیرخط
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ac-name">نام کمپین</Label>
+                <Input
+                  id="ac-name"
+                  className="h-9"
+                  placeholder="مثال: بازبینی فصل بهار"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ac-desc">توضیح (اختیاری)</Label>
+                <Input
+                  id="ac-desc"
+                  className="h-9"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>موعد بازبینی (شمسی، اختیاری)</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Select value={jy || undefined} onValueChange={setJy}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="سال" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {yearOptions.map((y) => (
+                        <SelectItem key={y} value={String(y)}>
+                          {toFaDigits(y)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={jm || undefined} onValueChange={setJm}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="ماه" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                        <SelectItem key={m} value={String(m)}>
+                          {toFaDigits(m)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={jd || undefined} onValueChange={setJd}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="روز" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                        <SelectItem key={d} value={String(d)}>
+                          {toFaDigits(d)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+            <SheetFooter className="shrink-0 gap-2 border-t px-6 py-4 sm:flex-row">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  resetCreate();
+                  setCreateOpen(false);
+                }}
+              >
+                انصراف
+              </Button>
+              <Button type="submit" disabled={createMut.isPending}>
+                {createMut.isPending ? (
+                  <>
+                    <Loader2 className="me-1.5 h-4 w-4 animate-spin" />
+                    در حال ثبت…
+                  </>
+                ) : (
+                  "ثبت کمپین"
+                )}
+              </Button>
+            </SheetFooter>
+          </form>
         </SheetContent>
       </Sheet>
     </div>
