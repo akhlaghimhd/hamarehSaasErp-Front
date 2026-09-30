@@ -21,6 +21,16 @@ export type AccessCertItemDto = {
   campaign_id?: string;
   user_id?: string;
   tenant_role_id?: string;
+  role_ids_snapshot?: string[] | null;
+  sod_has_block?: boolean;
+  sod_has_warn?: boolean;
+  sod_conflicts?: Array<{
+    sod_rule_id?: string;
+    code?: string;
+    name?: string;
+    enforcement?: string;
+    severity?: number;
+  }> | null;
   decision?: string | null;
   note?: string | null;
   reviewed_by?: string | null;
