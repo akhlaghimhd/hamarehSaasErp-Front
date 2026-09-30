@@ -1,9 +1,9 @@
-/** FE-P1-T16/T17 — فهرست محدوده‌های دسترسی + ایجاد با reference_id */
+/** فهرست محدوده‌های دسترسی — حذف تأیید‌شده، فعال/غیرفعال، بازیابی */
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, Search, Scan } from "lucide-react";
+import { Loader2, Plus, RotateCcw, Search, Scan } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/layout/page-header";
@@ -29,16 +29,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select";
+import { Switch } from "@/shared/components/ui/switch";
 import { usePermission } from "@/auth";
 import { apiGet, ApiClientError } from "@/api";
 import { toFaDigits } from "@/shared/lib/utils";
 import {
   useCreateScope,
+  useRestoreScope,
   useScopes,
   useSoftDeleteScope,
+  useUpdateScope,
 } from "../hooks/use-scopes";
 import { IdentityPermissions } from "../types";
-import type { ScopeDto } from "../services/scope-service";
+import type {
+  ScopeDto,
+  ScopeMembershipFilter,
+} from "../services/scope-service";
 import {
   SCOPE_TYPE_FA,
   scopeTypeLabel,
@@ -61,6 +67,7 @@ const STRUCTURAL_TYPES = new Set([
 ]);
 
 type RefOption = { id: string; label: string };
+type StatusFilter = "all" | "active" | "inactive";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -104,16 +111,24 @@ function unwrap(envelope: unknown): unknown {
 export function ScopesListPage() {
   const canView = usePermission(IdentityPermissions.scopeView);
   const canCreate = usePermission("identity.scope.create");
+  const canUpdate = usePermission("identity.scope.update");
   const canDelete = usePermission("identity.scope.delete");
 
-  const { data, isLoading, isError, error, refetch } = useScopes();
-  const createMutation = useCreateScope();
-  const deleteMutation = useSoftDeleteScope();
-
+  const [membershipFilter, setMembershipFilter] =
+    useState<ScopeMembershipFilter>("active");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [createOpen, setCreateOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ScopeDto | null>(null);
+
+  const { data, isLoading, isError, error, refetch, isFetching } =
+    useScopes(membershipFilter);
+  const createMutation = useCreateScope();
+  const updateMutation = useUpdateScope();
+  const deleteMutation = useSoftDeleteScope();
+  const restoreMutation = useRestoreScope();
 
   const [refOptions, setRefOptions] = useState<RefOption[]>([]);
   const [refLoading, setRefLoading] = useState(false);
@@ -281,7 +296,7 @@ export function ScopesListPage() {
 
           if (options.length === 0) {
             setRefHint(
-              "هنوز انباری در سیستم ثبت نشده. ابتدا در ماژول انبار، انبار تعریف کنید؛ سپس محدودهٔ انبار بسازید."
+              "هنوز انباری در سیستم ثبت نشده. ابتدا در ماژول انبار، انبار تعریف کنید."
             );
           }
         }
@@ -316,9 +331,17 @@ export function ScopesListPage() {
 
   const rows = data ?? [];
   const filtered = useMemo(() => {
+    let list = rows;
+    if (membershipFilter === "active" && statusFilter !== "all") {
+      list = list.filter((r) =>
+        statusFilter === "active"
+          ? r.is_active !== false
+          : r.is_active === false
+      );
+    }
     const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => {
+    if (!q) return list;
+    return list.filter((r) => {
       const typeFa = scopeTypeLabel(r.scope_type);
       return [r.scope_name, typeFa, r.description, r.reference_id]
         .filter(Boolean)
@@ -326,71 +349,44 @@ export function ScopesListPage() {
         .toLowerCase()
         .includes(q);
     });
-  }, [rows, query]);
+  }, [rows, query, membershipFilter, statusFilter]);
 
   const total = filtered.length;
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
 
-  const columns: DataTableColumn<ScopeDto>[] = [
-    {
-      id: "name",
-      header: "نام",
-      cell: (row) => (
-        <span className="font-medium">{row.scope_name || "—"}</span>
-      ),
-    },
-    {
-      id: "type",
-      header: "نوع",
-      cell: (row) => (
-        <span className="text-xs">{scopeTypeLabel(row.scope_type)}</span>
-      ),
-    },
-    {
-      id: "ref",
-      header: "مرجع",
-      cell: (row) => (
-        <span className="font-mono text-[11px] text-muted-foreground">
-          {row.reference_id
-            ? `${String(row.reference_id).slice(0, 8)}…`
-            : "—"}
-        </span>
-      ),
-    },
-    {
-      id: "status",
-      header: "وضعیت",
-      cell: (row) =>
-        row.is_active === false ? (
-          <StatusChip label="غیرفعال" tone="neutral" />
-        ) : (
-          <StatusChip label="فعال" tone="success" />
-        ),
-    },
-    {
-      id: "actions",
-      header: "",
-      cell: (row) =>
-        canDelete ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs text-destructive"
-            disabled={deleteMutation.isPending}
-            onClick={() => void onDelete(row)}
-          >
-            حذف
-          </Button>
-        ) : null,
-    },
-  ];
-
-  async function onDelete(row: ScopeDto) {
-    if (!window.confirm(`محدوده «${row.scope_name}» حذف شود؟`)) return;
+  async function onToggleActive(row: ScopeDto, next: boolean) {
     try {
-      await deleteMutation.mutateAsync(row.scope_id);
+      await updateMutation.mutateAsync({
+        id: row.scope_id,
+        payload: { is_active: next },
+      });
+      toast.success(next ? "محدوده فعال شد" : "محدوده غیرفعال شد");
+      void refetch();
+    } catch (e) {
+      toast.error(
+        e instanceof ApiClientError && e.message ? e.message : MSG_GENERIC_ERROR
+      );
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    try {
+      await deleteMutation.mutateAsync(deleteTarget.scope_id);
       toast.success("محدوده حذف شد");
+      setDeleteTarget(null);
+      void refetch();
+    } catch (e) {
+      toast.error(
+        e instanceof ApiClientError && e.message ? e.message : MSG_GENERIC_ERROR
+      );
+    }
+  }
+
+  async function onRestore(row: ScopeDto) {
+    try {
+      await restoreMutation.mutateAsync(row.scope_id);
+      toast.success("محدوده بازگردانی شد");
       void refetch();
     } catch (e) {
       toast.error(
@@ -441,6 +437,90 @@ export function ScopesListPage() {
     }
   }
 
+  const columns: DataTableColumn<ScopeDto>[] = [
+    {
+      id: "name",
+      header: "نام",
+      cell: (row) => (
+        <span className="font-medium">{row.scope_name || "—"}</span>
+      ),
+    },
+    {
+      id: "type",
+      header: "نوع",
+      cell: (row) => (
+        <span className="text-xs">{scopeTypeLabel(row.scope_type)}</span>
+      ),
+    },
+    {
+      id: "ref",
+      header: "مرجع",
+      cell: (row) => (
+        <span className="font-mono text-[11px] text-muted-foreground" dir="ltr">
+          {row.reference_id
+            ? `${String(row.reference_id).slice(0, 8)}…`
+            : "—"}
+        </span>
+      ),
+    },
+    {
+      id: "status",
+      header: "وضعیت",
+      cell: (row) =>
+        membershipFilter === "deleted" ? (
+          <StatusChip label="حذف‌شده" tone="neutral" />
+        ) : canUpdate ? (
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={row.is_active !== false}
+              disabled={updateMutation.isPending}
+              onCheckedChange={(c) => void onToggleActive(row, c)}
+              aria-label="فعال/غیرفعال"
+            />
+            <span className="text-xs text-muted-foreground">
+              {row.is_active !== false ? "فعال" : "غیرفعال"}
+            </span>
+          </div>
+        ) : (
+          <StatusChip
+            label={row.is_active !== false ? "فعال" : "غیرفعال"}
+            tone={row.is_active !== false ? "success" : "neutral"}
+          />
+        ),
+    },
+    {
+      id: "actions",
+      header: "عملیات",
+      cell: (row) => (
+        <div className="flex items-center gap-1">
+          {membershipFilter === "deleted" && canUpdate ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              disabled={restoreMutation.isPending}
+              onClick={() => void onRestore(row)}
+            >
+              بازگردانی
+            </Button>
+          ) : null}
+          {membershipFilter === "active" && canDelete ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-destructive"
+              onClick={() => setDeleteTarget(row)}
+            >
+              حذف
+            </Button>
+          ) : null}
+        </div>
+      ),
+    },
+  ];
+
   if (!canView) {
     return (
       <div className="space-y-6">
@@ -470,7 +550,7 @@ export function ScopesListPage() {
           { label: "محدوده‌ها" },
         ]}
         actions={
-          canCreate ? (
+          canCreate && membershipFilter === "active" ? (
             <Button
               type="button"
               size="sm"
@@ -508,9 +588,21 @@ export function ScopesListPage() {
         data={pageRows}
         getRowKey={(row) => row.scope_id}
         loading={isLoading}
-        isFiltered={Boolean(query.trim())}
-        emptyTitle="هنوز محدوده‌ای تعریف نشده"
-        emptyDescription="با دکمه «محدوده جدید» اولین محدوده را بسازید."
+        isFiltered={
+          Boolean(query.trim()) ||
+          statusFilter !== "all" ||
+          membershipFilter !== "active"
+        }
+        emptyTitle={
+          membershipFilter === "deleted"
+            ? "محدوده حذف‌شده‌ای نیست"
+            : "هنوز محدوده‌ای تعریف نشده"
+        }
+        emptyDescription={
+          membershipFilter === "deleted"
+            ? "با حذف نرم، موارد اینجا ظاهر می‌شوند."
+            : "با دکمه «محدوده جدید» اولین محدوده را بسازید."
+        }
         page={page}
         pageSize={pageSize}
         total={total}
@@ -533,6 +625,54 @@ export function ScopesListPage() {
                 }}
               />
             </div>
+            <Select
+              value={membershipFilter}
+              onValueChange={(v) => {
+                setMembershipFilter(v as ScopeMembershipFilter);
+                setPage(1);
+                setStatusFilter("all");
+              }}
+            >
+              <SelectTrigger className="h-9 w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">موارد جاری</SelectItem>
+                <SelectItem value="deleted">حذف‌شده‌ها</SelectItem>
+              </SelectContent>
+            </Select>
+            {membershipFilter === "active" ? (
+              <Select
+                value={statusFilter}
+                onValueChange={(v) => {
+                  setStatusFilter(v as StatusFilter);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="h-9 w-[130px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">همه وضعیت‌ها</SelectItem>
+                  <SelectItem value="active">فعال</SelectItem>
+                  <SelectItem value="inactive">غیرفعال</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9"
+              onClick={() => void refetch()}
+              disabled={isFetching}
+            >
+              {isFetching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RotateCcw className="h-4 w-4" />
+              )}
+            </Button>
             <div className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
               <Scan className="h-3.5 w-3.5" />
               <span>{toFaDigits(total)} محدوده</span>
@@ -540,6 +680,39 @@ export function ScopesListPage() {
           </div>
         }
       />
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+      >
+        <DialogContent className="sm:max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>حذف محدوده</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            محدوده «{deleteTarget?.scope_name}» به‌صورت نرم حذف شود؟ می‌توانید
+            بعداً از فهرست «حذف‌شده‌ها» آن را بازگردانی کنید.
+          </p>
+          <DialogFooter className="gap-2 sm:justify-start">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleteMutation.isPending}
+            >
+              انصراف
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void confirmDelete()}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "در حال حذف…" : "حذف محدوده"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-md">
@@ -578,8 +751,8 @@ export function ScopesListPage() {
                 </SelectContent>
               </Select>
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                برای شرکت، شعبه، انبار، واحد و مرکز هزینه باید موجودیت واقعی از
-                فهرست انتخاب شود. نوع «سفارشی» بدون مرجع است.
+                برای شرکت، شعبه، انبار و واحد باید موجودیت واقعی انتخاب شود. نوع
+                «سفارشی» بدون مرجع است.
               </p>
             </div>
 
