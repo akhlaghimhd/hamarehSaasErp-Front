@@ -318,6 +318,29 @@ export function AccessCertificationsListPage() {
       },
     },
     {
+      id: "sod",
+      header: "SoD",
+      cell: (r) => {
+        if (r.sod_has_block) {
+          const names = (r.sod_conflicts ?? [])
+            .filter((c) => String(c.enforcement ?? "").toUpperCase() === "BLOCK")
+            .map((c) => c.name || c.code)
+            .filter(Boolean)
+            .join("؛ ");
+          return (
+            <StatusChip
+              label={names ? `نقض مسدود: ${names}` : "نقض مسدود SoD"}
+              tone="danger"
+            />
+          );
+        }
+        if (r.sod_has_warn) {
+          return <StatusChip label="هشدار SoD" tone="warning" />;
+        }
+        return <StatusChip label="بدون تعارض" tone="success" />;
+      },
+    },
+    {
       id: "actions",
       header: "عملیات",
       cell: (r) => {
@@ -390,7 +413,7 @@ export function AccessCertificationsListPage() {
     <div className="space-y-6">
       <PageHeader
         title="بازبینی دسترسی (Access Certification)"
-        description="کمپین‌های بررسی دوره‌ای نقش‌ها و دسترسی‌ها"
+        description="کمپین‌های بررسی دوره‌ای نقش‌ها و دسترسی‌ها — هنگام باز کردن کمپین، نقض SoD روی نقش‌های فعلی علامت‌گذاری می‌شود"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "هویت و دسترسی", href: "/dashboard/identity" },
@@ -539,7 +562,11 @@ export function AccessCertificationsListPage() {
             ) : (
               <DataTable
                 columns={itemColumns}
-                data={items}
+                data={[...items].sort((a, b) => {
+                  const score = (x: AccessCertItemDto) =>
+                    x.sod_has_block ? 2 : x.sod_has_warn ? 1 : 0;
+                  return score(b) - score(a);
+                })}
                 getRowKey={(r) => r.item_id}
                 emptyTitle="آیتمی وجود ندارد (کمپین را باز کنید تا snapshot ساخته شود)."
               />
