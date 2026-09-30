@@ -163,8 +163,14 @@ export function AccessCertificationDetailPage() {
         queryKey: ["identity", "access-cert-items", campaignId],
       });
     },
-    onError: (e) =>
-      toast.error(e instanceof ApiClientError ? e.message : "تکمیل ناموفق بود"),
+    onError: (e) => {
+      const msg =
+        e instanceof ApiClientError ? e.message : "تکمیل ناموفق بود";
+      toast.error(msg);
+      setDecisionFilter("PENDING");
+      setPage(1);
+      void refetchItems();
+    },
   });
 
   const certifyMut = useMutation({
@@ -343,8 +349,10 @@ export function AccessCertificationDetailPage() {
                 }
                 onClick={() => {
                   if (summary.pending > 0) {
+                    setDecisionFilter("PENDING");
+                    setPage(1);
                     toast.error(
-                      `هنوز ${toFaDigits(summary.pending)} آیتم در وضعیت «در انتظار» است. ابتدا برای همه تصمیم بگیرید.`
+                      `هنوز ${toFaDigits(summary.pending)} عضو بدون تصمیم هستند. ابتدا برای همهٔ ردیف‌های «در انتظار» تصمیم بگیرید.`
                     );
                     return;
                   }
@@ -362,23 +370,82 @@ export function AccessCertificationDetailPage() {
       />
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {[
-          { label: "کل افراد", value: summary.total },
-          { label: "در انتظار", value: summary.pending },
-          { label: "نقض مسدود", value: summary.block },
-          { label: "هشدار", value: summary.warn },
-        ].map((c) => (
-          <div
-            key={c.label}
-            className="rounded-xl border bg-card px-3 py-2 text-center"
-          >
-            <div className="text-lg font-semibold tabular-nums">
-              {toFaDigits(c.value)}
-            </div>
-            <div className="text-[11px] text-muted-foreground">{c.label}</div>
+        <button
+          type="button"
+          className="rounded-xl border bg-card px-3 py-2 text-center transition-colors hover:bg-muted/40"
+          onClick={() => {
+            setDecisionFilter("all");
+            setPage(1);
+          }}
+        >
+          <div className="text-lg font-semibold tabular-nums">
+            {toFaDigits(summary.total)}
           </div>
-        ))}
+          <div className="text-[11px] text-muted-foreground">کل افراد</div>
+        </button>
+        <button
+          type="button"
+          className={
+            summary.pending > 0
+              ? "rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-center transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40"
+              : "rounded-xl border bg-card px-3 py-2 text-center transition-colors hover:bg-muted/40"
+          }
+          onClick={() => {
+            setDecisionFilter("PENDING");
+            setPage(1);
+          }}
+        >
+          <div className="text-lg font-semibold tabular-nums">
+            {toFaDigits(summary.pending)}
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            در انتظار {summary.pending > 0 ? "(کلیک = فیلتر)" : ""}
+          </div>
+        </button>
+        <button
+          type="button"
+          className="rounded-xl border bg-card px-3 py-2 text-center transition-colors hover:bg-muted/40"
+          onClick={() => {
+            setSodFilter("block");
+            setPage(1);
+          }}
+        >
+          <div className="text-lg font-semibold tabular-nums">
+            {toFaDigits(summary.block)}
+          </div>
+          <div className="text-[11px] text-muted-foreground">نقض مسدود</div>
+        </button>
+        <button
+          type="button"
+          className="rounded-xl border bg-card px-3 py-2 text-center transition-colors hover:bg-muted/40"
+          onClick={() => {
+            setSodFilter("warn");
+            setPage(1);
+          }}
+        >
+          <div className="text-lg font-semibold tabular-nums">
+            {toFaDigits(summary.warn)}
+          </div>
+          <div className="text-[11px] text-muted-foreground">هشدار</div>
+        </button>
       </div>
+
+      {isOpen && summary.pending > 0 ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+          هنوز {toFaDigits(summary.pending)} عضو بدون تصمیم هستند. برای تکمیل
+          کمپین باید برای همه تصمیم بگیرید (تأیید / درخواست لغو نقش / موکول).{" "}
+          <button
+            type="button"
+            className="font-medium underline underline-offset-2"
+            onClick={() => {
+              setDecisionFilter("PENDING");
+              setPage(1);
+            }}
+          >
+            فقط موارد در انتظار را نشان بده
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[12rem] flex-1 sm:max-w-sm">
@@ -526,7 +593,7 @@ export function AccessCertificationDetailPage() {
                               })
                             }
                           >
-                            کاهش
+                            کاهش دسترسی
                           </Button>
                           <Button
                             type="button"
@@ -556,12 +623,12 @@ export function AccessCertificationDetailPage() {
         </Table>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span>
-          {total === 0
-            ? "موردی نیست"
-            : `نمایش ${toFaDigits((safePage - 1) * pageSize + 1)}–${toFaDigits(Math.min(safePage * pageSize, total))} از ${toFaDigits(total)}`}
-        </span>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+        <div>
+          نمایش {toFaDigits((safePage - 1) * pageSize + (total ? 1 : 0))}–
+          {toFaDigits(Math.min(safePage * pageSize, total))} از {" "}
+          {toFaDigits(total)}
+        </div>
         <div className="flex items-center gap-2">
           <Select
             value={String(pageSize)}
@@ -570,7 +637,7 @@ export function AccessCertificationDetailPage() {
               setPage(1);
             }}
           >
-            <SelectTrigger className="h-7 w-[4.5rem]">
+            <SelectTrigger className="h-8 w-[5.5rem]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -585,20 +652,20 @@ export function AccessCertificationDetailPage() {
             type="button"
             size="sm"
             variant="outline"
-            className="h-7"
+            className="h-8"
             disabled={safePage <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
             قبلی
           </Button>
-          <span>
+          <span className="tabular-nums">
             {toFaDigits(safePage)} / {toFaDigits(totalPages)}
           </span>
           <Button
             type="button"
             size="sm"
             variant="outline"
-            className="h-7"
+            className="h-8"
             disabled={safePage >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           >
