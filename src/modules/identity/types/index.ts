@@ -32,6 +32,16 @@ export type TenantUserDto = {
   [key: string]: unknown;
 };
 
+export type SelfUpsertProfilePayload = {
+  first_name?: string | null;
+  last_name?: string | null;
+  gender?: GenderCode | string;
+  birth_date?: string | null;
+  [key: string]: unknown;
+};
+
+export type UpsertProfilePayload = SelfUpsertProfilePayload;
+
 export const IdentityPermissions = {
   userView: "identity.user.view",
   userCreate: "identity.user.create",
