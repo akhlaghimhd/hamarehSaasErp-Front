@@ -68,12 +68,15 @@ export function MembershipHistoryPanel({
   isLoading,
   isError,
 }: {
-  items: MembershipHistoryDto[];
-  isLoading: boolean;
-  isError: boolean;
+  items?: MembershipHistoryDto[] | null;
+  isLoading?: boolean;
+  isError?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const latest = items[0];
+  const list = Array.isArray(items) ? items : [];
+  const latest = list[0];
+  const loading = Boolean(isLoading);
+  const error = Boolean(isError);
 
   return (
     <Card className="border-border/50 bg-muted/10 shadow-none">
@@ -81,19 +84,19 @@ export function MembershipHistoryPanel({
         type="button"
         className="flex w-full items-start gap-3 px-4 py-3 text-start transition hover:bg-muted/20"
         onClick={() => setOpen((v) => !v)}
-        disabled={isLoading || isError || items.length === 0}
+        disabled={loading || error || list.length === 0}
       >
         <History className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1 space-y-0.5">
           <p className="text-sm font-medium text-muted-foreground">تاریخچه فعالیت</p>
-          {isLoading ? (
+          {loading ? (
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
               در حال بارگذاری…
             </p>
-          ) : isError ? (
+          ) : error ? (
             <p className="text-xs text-destructive">بارگذاری تاریخچه ممکن نشد.</p>
-          ) : items.length === 0 ? (
+          ) : list.length === 0 ? (
             <p className="text-xs text-muted-foreground">هنوز تغییری ثبت نشده است.</p>
           ) : (
             <p className="truncate text-xs text-muted-foreground">
@@ -101,7 +104,7 @@ export function MembershipHistoryPanel({
             </p>
           )}
         </div>
-        {items.length > 0 && !isLoading && !isError ? (
+        {list.length > 0 && !loading && !error ? (
           open ? (
             <ChevronUp className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
           ) : (
@@ -110,10 +113,10 @@ export function MembershipHistoryPanel({
         ) : null}
       </button>
 
-      {open && items.length > 0 ? (
+      {open && list.length > 0 ? (
         <div className="border-t border-border/40 px-4 pb-3 pt-2">
           <ul className="space-y-2.5">
-            {items.map((h, i) => (
+            {list.map((h, i) => (
               <li
                 key={h.history_id ?? i}
                 className="text-xs leading-relaxed text-muted-foreground"
