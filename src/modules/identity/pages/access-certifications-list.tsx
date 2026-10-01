@@ -452,10 +452,10 @@ export function AccessCertificationsListPage() {
           resetCreate();
         } else setCreateOpen(true);
       }}>
-        <SheetContent side="left" className="flex w-full flex-col gap-0 p-0 sm:max-w-md"
+        <SheetContent side="right" className="flex h-full max-h-dvh w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
           onPointerDownOutside={(e) => { if (formDirty) e.preventDefault(); }}
           onEscapeKeyDown={(e) => { if (formDirty) e.preventDefault(); }}>
-          <SheetHeader className="border-b px-5 py-4 text-start">
+          <SheetHeader className="shrink-0 border-b px-5 py-4 text-start">
             <SheetTitle>کمپین جدید</SheetTitle>
           </SheetHeader>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
@@ -470,7 +470,7 @@ export function AccessCertificationsListPage() {
                 onChange={(e) => setName(e.target.value)} placeholder="بازبینی فصلی" />
             </div>
           </div>
-          <SheetFooter className="border-t px-5 py-3">
+          <SheetFooter className="shrink-0 border-t px-5 py-3">
             <Button type="button" variant="outline" onClick={() => { resetCreate(); setCreateOpen(false); }}>انصراف</Button>
             <Button type="button" disabled={createMut.isPending || !code.trim() || !name.trim()}
               onClick={() => void createMut.mutateAsync()}>
