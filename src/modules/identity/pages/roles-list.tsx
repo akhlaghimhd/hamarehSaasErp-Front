@@ -645,13 +645,16 @@ export function RolesListPage() {
                 <EmptyState title="مجوزی یافت نشد" />
               ) : (
                 <div className="space-y-2">
-                  {permsByModule.map(([mod, list]) => (
+                  {permsByModule.map(([mod, list], idx) => (
                     <PermissionModuleGroup
                       key={mod}
                       moduleName={mod}
                       permissions={list}
                       draftPerms={draftPerms}
-                      canEdit={canEditPerms}
+                      canAssign={canEditPerms}
+                      busy={assignMutation.isPending}
+                      defaultOpen={idx === 0 || permQuery.trim().length > 0}
+                      forceOpenSubgroups={permQuery.trim().length > 0}
                       onToggle={togglePerm}
                       onToggleMany={toggleManyPerms}
                     />
