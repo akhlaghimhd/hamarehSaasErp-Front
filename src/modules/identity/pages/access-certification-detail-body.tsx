@@ -23,7 +23,11 @@ import { accessCertificationService, type AccessCertItemDto } from "../services/
 import { openAccessCertReport } from "../lib/access-cert-report";
 
 const DECISION_LABEL: Record<string, string> = {
-  PENDING: "باز", APPROVED: "استثنا", REVOKE_REQUESTED: "در اصلاح", DEFERRED: "موکول",
+  PENDING: "باز",
+  APPROVED: "استثنا",
+  REVOKE_REQUESTED: "در اصلاح",
+  DEFERRED: "موکول",
+  RESOLVED: "رفع‌شده",
 };
 
 export function AccessCertificationDetailBody() {
@@ -291,6 +295,7 @@ export function AccessCertificationDetailBody() {
               <SelectItem value="all">همه</SelectItem>
               <SelectItem value="APPROVED">استثنا</SelectItem>
               <SelectItem value="DEFERRED">موکول</SelectItem>
+              <SelectItem value="RESOLVED">رفع‌شده</SelectItem>
             </SelectContent>
           </Select>
           {items.length > 0 ? (
@@ -353,7 +358,7 @@ export function AccessCertificationDetailBody() {
                     <TableCell className="px-2 py-2 align-top text-xs">{DECISION_LABEL[d] || d}</TableCell>
                     <TableCell className="px-2 py-2 align-top text-end">
                       <div className="flex flex-wrap items-center justify-end gap-1">
-                        {href && isOpen ? (
+                        {href && isOpen && isWork ? (
                           <Button type="button" size="sm" variant="secondary" className="h-7 text-xs" onClick={() => router.push(href)}>
                             <ExternalLink className="me-1 h-3 w-3" />اصلاح نقش
                           </Button>
@@ -366,7 +371,7 @@ export function AccessCertificationDetailBody() {
                               onClick={() => void certifyMut.mutateAsync({ itemId: r.item_id, decision: "DEFERRED" })}>موکول</Button>
                           </>
                         ) : null}
-                        {canDecide && !isWork ? (
+                        {canDecide && !isWork && d !== "RESOLVED" ? (
                           <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" disabled={certifyMut.isPending}
                             onClick={() => void certifyMut.mutateAsync({ itemId: r.item_id, decision: "REVOKE_REQUESTED" })}>باز کردن</Button>
                         ) : null}
