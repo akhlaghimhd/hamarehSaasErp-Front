@@ -48,7 +48,8 @@ export type AccessCertItemDto = {
 };
 
 export type CreateAccessCertCampaignPayload = {
-  code: string;
+  /** اختیاری — خالی بماند تا سرور خودش بسازد */
+  code?: string | null;
   name: string;
   description?: string | null;
   due_at?: string | null;
@@ -95,7 +96,15 @@ export const accessCertificationService = {
   },
 
   async create(payload: CreateAccessCertCampaignPayload): Promise<AccessCertCampaignDto> {
-    const envelope = await apiPost(identityPaths.accessCertifications, payload);
+    const body: Record<string, unknown> = {
+      name: payload.name,
+    };
+    const code = (payload.code ?? "").trim();
+    if (code) body.code = code;
+    if (payload.description != null) body.description = payload.description;
+    if (payload.due_at != null) body.due_at = payload.due_at;
+
+    const envelope = await apiPost(identityPaths.accessCertifications, body);
     return normalizeCampaign(unwrapData(envelope));
   },
 
