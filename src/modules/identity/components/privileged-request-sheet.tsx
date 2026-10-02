@@ -1,7 +1,7 @@
 /** Request sheet for privileged / emergency access — right side, searchable pickers */
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -17,6 +17,13 @@ import type { TenantUserDto } from "../types";
 import type { RoleDto } from "../services/role-service";
 import { privilegedAccessService } from "../services/privileged-access-service";
 
+const DURATION_PRESETS: { minutes: number; label: string; hint?: string }[] = [
+  { minutes: 60, label: "۱ ساعت" },
+  { minutes: 480, label: "۸ ساعت", hint: "یک روز کاری" },
+  { minutes: 10080, label: "۷ روز" },
+  { minutes: 43200, label: "۳۰ روز", hint: "یک ماه" },
+];
+
 function shortId(id?: string | null): string {
   if (!id) return "—";
   return id.length > 10 ? `${id.slice(0, 8)}…` : id;
@@ -29,6 +36,7 @@ export function PrivilegedRequestSheet({
   roles,
   userLabel,
   onCreated,
+  initialUserId = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -36,6 +44,8 @@ export function PrivilegedRequestSheet({
   roles: RoleDto[];
   userLabel: Map<string, string>;
   onCreated: () => void;
+  /** Prefill beneficiary (e.g. from member detail deep-link). */
+  initialUserId?: string | null;
 }) {
   const [userId, setUserId] = useState("");
   const [roleId, setRoleId] = useState("");
@@ -43,6 +53,13 @@ export function PrivilegedRequestSheet({
   const [durationMinutes, setDurationMinutes] = useState("60");
   const [userSearch, setUserSearch] = useState("");
   const [roleSearch, setRoleSearch] = useState("");
+
+  useEffect(() => {
+    if (open && initialUserId) {
+      setUserId(initialUserId);
+      setUserSearch("");
+    }
+  }, [open, initialUserId]);
 
   const privilegedRoles = useMemo(
     () => roles.filter((r) => Boolean(r.is_privileged) && Number(r.status) === 1),
@@ -79,7 +96,7 @@ export function PrivilegedRequestSheet({
         user_id: userId,
         tenant_role_id: roleId,
         reason: reason.trim(),
-        duration_minutes: Math.max(5, Math.min(480, Number(durationMinutes) || 60)),
+        duration_minutes: Math.max(5, Math.min(43200, Number(durationMinutes) || 60)),
       }),
     onSuccess: () => {
       toast.success("درخواست دسترسی اضطراری ثبت شد");
@@ -199,10 +216,38 @@ export function PrivilegedRequestSheet({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="pa-duration">مدت (دقیقه)</Label>
-            <Input id="pa-duration" type="number" min={5} max={480} value={durationMinutes}
-              onChange={(e) => setDurationMinutes(e.target.value)} disabled={requestMut.isPending} className="h-9" />
-            <p className="text-[11px] text-muted-foreground">حداقل ۵، حداکثر ۴۸۰ دقیقه (۸ ساعت)</p>
+            <Label>مدت دسترسی</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {DURATION_PRESETS.map((p) => {
+                const active = Number(durationMinutes) === p.minutes;
+                return (
+                  <button
+                    key={p.minutes}
+                    type="button"
+                    disabled={requestMut.isPending}
+                    onClick={() => setDurationMinutes(String(p.minutes))}
+                    className={
+                      "rounded-lg border px-3 py-2.5 text-start transition-colors " +
+                      (active
+                        ? "border-primary bg-primary/10 ring-1 ring-primary/30"
+                        : "border-border/70 hover:bg-muted/40")
+                    }
+                  >
+                    <div className="text-sm font-medium">{p.label}</div>
+                    {p.hint ? (
+                      <div className="text-[11px] text-muted-foreground">{p.hint}</div>
+                    ) : (
+                      <div className="text-[11px] text-muted-foreground tabular-nums">
+                        {p.minutes} دقیقه
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              پس از پایان مدت، دسترسی خودکار لغو می‌شود. حداکثر ۳۰ روز.
+            </p>
           </div>
 
           <div className="space-y-2">
