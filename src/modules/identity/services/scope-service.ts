@@ -22,7 +22,10 @@ export interface ScopeDto {
   tenant_id?: string;
   scope_name: string;
   scope_type: string;
+  /** Primary/first reference (BC). Prefer reference_ids. */
   reference_id?: string | null;
+  /** Same-type entity ids covered by this named scope (1..n). */
+  reference_ids?: string[];
   description?: string | null;
   is_active?: boolean;
   created_at?: string;
@@ -33,7 +36,9 @@ export interface ScopeDto {
 export interface CreateScopePayload {
   scope_name: string;
   scope_type: ScopeType | string;
+  /** Prefer reference_ids; reference_id kept for older callers. */
   reference_id?: string | null;
+  reference_ids?: string[];
   description?: string | null;
   is_active?: boolean;
 }
@@ -42,6 +47,7 @@ export interface UpdateScopePayload {
   scope_name?: string;
   scope_type?: string;
   reference_id?: string | null;
+  reference_ids?: string[];
   description?: string | null;
   is_active?: boolean;
 }
