@@ -61,6 +61,33 @@ const STATUS_LABEL: Record<string, string> = {
   CANCELLED: "لغو شده",
 };
 
+/** فقط a-z 0-9 _ - — ارقام فارسی هم به انگلیسی */
+function sanitizeCampaignCode(raw: string): string {
+  let s = raw.trim();
+  const fa = "۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩";
+  const en = "01234567890123456789";
+  s = s
+    .split("")
+    .map((ch) => {
+      const i = fa.indexOf(ch);
+      return i >= 0 ? en[i] : ch;
+    })
+    .join("");
+  s = s.toLowerCase().replace(/\s+/g, "-");
+  s = s.replace(/[^a-z0-9_-]/g, "");
+  s = s.replace(/-+/g, "-").replace(/^[-_]+|[-_]+$/g, "");
+  return s.slice(0, 80);
+}
+
+function suggestCampaignCode(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const r = Math.random().toString(36).slice(2, 6);
+  return `ac-${y}${m}${day}-${r}`;
+}
+
 function statusTone(
   status?: string
 ): "success" | "warning" | "danger" | "neutral" {
@@ -116,6 +143,7 @@ export function AccessCertificationsListPage() {
   const [reportBusy, setReportBusy] = useState<string | null>(null);
 
   const formDirty = Boolean(code.trim() || name.trim());
+  const codeOk = code.trim().length >= 2 && /^[a-z0-9_-]+$/.test(code.trim());
 
   const { data = [], isLoading, isError, error } = useQuery({
     queryKey: ["identity", "access-certifications"],
@@ -167,7 +195,7 @@ export function AccessCertificationsListPage() {
   const createMut = useMutation({
     mutationFn: () =>
       accessCertificationService.create({
-        code: code.trim(),
+        code: sanitizeCampaignCode(code),
         name: name.trim(),
       }),
     onSuccess: (c) => {
@@ -211,6 +239,12 @@ export function AccessCertificationsListPage() {
   function resetCreate() {
     setCode("");
     setName("");
+  }
+
+  function openCreateForm() {
+    setCode(suggestCampaignCode());
+    setName("");
+    setCreateOpen(true);
   }
 
   async function handleReport(campaign: AccessCertCampaignDto) {
@@ -285,7 +319,7 @@ export function AccessCertificationsListPage() {
         ]}
         actions={
           canManage ? (
-            <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+            <Button type="button" size="sm" onClick={openCreateForm}>
               <Plus className="me-1.5 h-4 w-4" />
               کمپین جدید
             </Button>
@@ -450,7 +484,9 @@ export function AccessCertificationsListPage() {
           if (formDirty) return;
           setCreateOpen(false);
           resetCreate();
-        } else setCreateOpen(true);
+        } else {
+          openCreateForm();
+        }
       }}>
         <SheetContent side="right" className="flex h-full max-h-dvh w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
           onPointerDownOutside={(e) => { if (formDirty) e.preventDefault(); }}
@@ -461,19 +497,49 @@ export function AccessCertificationsListPage() {
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
             <div className="space-y-1.5">
               <Label htmlFor="ac-code">کد</Label>
-              <Input id="ac-code" className="h-9 font-mono" dir="ltr" value={code}
-                onChange={(e) => setCode(e.target.value)} placeholder="q3-1404" />
+              <Input
+                id="ac-code"
+                className="h-9 font-mono"
+                dir="ltr"
+                value={code}
+                onChange={(e) => setCode(sanitizeCampaignCode(e.target.value))}
+                placeholder="q3-1404"
+                autoComplete="off"
+              />
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                فقط حروف انگلیسی، عدد، خط تیره (-) و زیرخط (_). مثال:{" "}
+                <span className="font-mono" dir="ltr">q3-1404</span>
+                {" "}یا{" "}
+                <span className="font-mono" dir="ltr">ac-20261002-ab12</span>
+              </p>
+              {code.trim() && !codeOk ? (
+                <p className="text-[11px] text-destructive">کد حداقل ۲ کاراکتر معتبر لازم دارد.</p>
+              ) : null}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ac-name">نام</Label>
-              <Input id="ac-name" className="h-9" value={name}
-                onChange={(e) => setName(e.target.value)} placeholder="بازبینی فصلی" />
+              <Input
+                id="ac-name"
+                className="h-9"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="بازبینی فصلی"
+              />
             </div>
           </div>
           <SheetFooter className="shrink-0 border-t px-5 py-3">
             <Button type="button" variant="outline" onClick={() => { resetCreate(); setCreateOpen(false); }}>انصراف</Button>
-            <Button type="button" disabled={createMut.isPending || !code.trim() || !name.trim()}
-              onClick={() => void createMut.mutateAsync()}>
+            <Button
+              type="button"
+              disabled={createMut.isPending || !codeOk || !name.trim()}
+              onClick={() => {
+                if (!codeOk) {
+                  toast.error("کد کمپین نامعتبر است. فقط حروف انگلیسی، عدد، - و _");
+                  return;
+                }
+                void createMut.mutateAsync();
+              }}
+            >
               {createMut.isPending ? <Loader2 className="me-1.5 h-4 w-4 animate-spin" /> : null}
               ایجاد
             </Button>
