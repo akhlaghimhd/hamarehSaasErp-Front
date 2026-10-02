@@ -1,4 +1,4 @@
-/** نقش‌های کاربر — جستجو، درخت، انتخاب مستقل هر نقش (بدون cascade والد/فرزند) */
+/** نقش‌های کاربر — درخت با cascade والد/فرزند (UX) — مجوزها همچنان snapshot */
 
 "use client";
 
@@ -91,6 +91,20 @@ function filterTree(nodes: RoleNode[], q: string): RoleNode[] {
   return walk(nodes);
 }
 
+/** شناسهٔ همهٔ نوادگان (بدون خود گره) */
+function collectDescendantIds(node: RoleNode): string[] {
+  const ids: string[] = [];
+  for (const c of node.children) {
+    ids.push(c.tenant_role_id, ...collectDescendantIds(c));
+  }
+  return ids;
+}
+
+/** خود + همهٔ نوادگان — برای cascade انتخاب */
+function collectSubtreeIds(node: RoleNode): string[] {
+  return [node.tenant_role_id, ...collectDescendantIds(node)];
+}
+
 type SelectionState = "kept" | "added" | "removed" | "none";
 
 function selectionState(
@@ -106,6 +120,18 @@ function selectionState(
   return "none";
 }
 
+/** وضعیت تیک والد بر اساس زیرشاخه (و خودش) */
+function subtreeCheckState(
+  node: RoleNode,
+  selected: Set<string>
+): "all" | "some" | "none" {
+  const ids = collectSubtreeIds(node);
+  const count = ids.filter((id) => selected.has(id)).length;
+  if (count === 0) return "none";
+  if (count === ids.length) return "all";
+  return "some";
+}
+
 function RoleTreeRow({
   node,
   depth,
@@ -113,7 +139,8 @@ function RoleTreeRow({
   initial,
   expanded,
   onToggleExpand,
-  onToggle,
+  onToggleLeaf,
+  onToggleSubtree,
 }: {
   node: RoleNode;
   depth: number;
@@ -121,12 +148,17 @@ function RoleTreeRow({
   initial: Set<string>;
   expanded: Set<string>;
   onToggleExpand: (id: string) => void;
-  onToggle: (id: string) => void;
+  onToggleLeaf: (id: string) => void;
+  onToggleSubtree: (node: RoleNode) => void;
 }) {
   const hasChildren = node.children.length > 0;
   const isOpen = expanded.has(node.tenant_role_id);
   const state = selectionState(node.tenant_role_id, selected, initial);
-  const isChecked = selected.has(node.tenant_role_id);
+  const checkState = hasChildren
+    ? subtreeCheckState(node, selected)
+    : selected.has(node.tenant_role_id)
+      ? "all"
+      : "none";
 
   return (
     <div>
@@ -151,10 +183,18 @@ function RoleTreeRow({
           <span className="inline-block w-6 shrink-0" />
         )}
 
-        {/* هر نقش مستقل است — بدون cascade والد/فرزند (مجوزها snapshot هستند) */}
         <Checkbox
-          checked={isChecked}
-          onCheckedChange={() => onToggle(node.tenant_role_id)}
+          checked={
+            checkState === "all"
+              ? true
+              : checkState === "some"
+                ? "indeterminate"
+                : false
+          }
+          onCheckedChange={() => {
+            if (hasChildren) onToggleSubtree(node);
+            else onToggleLeaf(node.tenant_role_id);
+          }}
         />
 
         <span
@@ -179,7 +219,8 @@ function RoleTreeRow({
               initial={initial}
               expanded={expanded}
               onToggleExpand={onToggleExpand}
-              onToggle={onToggle}
+              onToggleLeaf={onToggleLeaf}
+              onToggleSubtree={onToggleSubtree}
             />
           ))
         : null}
@@ -228,11 +269,25 @@ export function AssignRolesCard({ userId }: { userId: string }) {
     setExpanded(next);
   }, [editing, query, filtered]);
 
-  const toggle = (id: string) => {
+  const toggleLeaf = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  };
+
+  /** تیک والد: خود + همهٔ فرزندان را یکجا روشن/خاموش می‌کند */
+  const toggleSubtree = (node: RoleNode) => {
+    const ids = collectSubtreeIds(node);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const allOn = ids.every((id) => next.has(id));
+      for (const id of ids) {
+        if (allOn) next.delete(id);
+        else next.add(id);
+      }
       return next;
     });
   };
@@ -290,7 +345,9 @@ export function AssignRolesCard({ userId }: { userId: string }) {
       <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
         <div className="space-y-1">
           <CardTitle className="text-base">نقش‌ها</CardTitle>
-          <CardDescription>نقش‌های سازمانی این کاربر</CardDescription>
+          <CardDescription>
+            نقش‌های سازمانی این کاربر — تیک والد همهٔ زیرنقش‌ها را هم انتخاب می‌کند
+          </CardDescription>
         </div>
         {canAssign && !editing ? (
           <Button
@@ -342,7 +399,8 @@ export function AssignRolesCard({ userId }: { userId: string }) {
                     initial={initial}
                     expanded={expanded}
                     onToggleExpand={toggleExpand}
-                    onToggle={toggle}
+                    onToggleLeaf={toggleLeaf}
+                    onToggleSubtree={toggleSubtree}
                   />
                 ))}
               </div>
