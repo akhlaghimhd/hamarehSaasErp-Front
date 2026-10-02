@@ -53,6 +53,11 @@ export function buildTree(roles: RoleDto[]): TreeNode[] {
   return roots.map(walk);
 }
 
+/**
+ * Filter roles by status/query.
+ * - Status filter (active/inactive): only matching roles; missing parents become roots.
+ * - Text search with status=all: keep ancestors so hierarchy context remains.
+ */
 export function filterRolesKeepAncestors(
   roles: RoleDto[],
   q: string,
@@ -73,10 +78,13 @@ export function filterRolesKeepAncestors(
   for (const r of roles) {
     if (!match(r)) continue;
     keep.add(r.tenant_role_id);
-    let pid = r.parent_role_id;
-    while (pid && byId.has(pid)) {
-      keep.add(pid);
-      pid = byId.get(pid)?.parent_role_id ?? null;
+    // Ancestor chain only for pure text search (status=all) to preserve context.
+    if (status === "all" && q) {
+      let pid = r.parent_role_id;
+      while (pid && byId.has(pid)) {
+        keep.add(pid);
+        pid = byId.get(pid)?.parent_role_id ?? null;
+      }
     }
   }
   return roles.filter((r) => keep.has(r.tenant_role_id));
@@ -140,7 +148,8 @@ export function RoleTreeItem({
         }}
         className={cn(
           "group relative flex cursor-pointer items-center gap-1 rounded-md pe-1 transition-colors",
-          selected ? "bg-primary/10" : "hover:bg-muted/50"
+          selected ? "bg-primary/10" : "hover:bg-muted/50",
+          !isActive && "opacity-75"
         )}
       >
         <div className="relative shrink-0 self-stretch" style={{ width: (depth + 1) * TREE_INDENT }}>
@@ -202,7 +211,8 @@ export function RoleTreeItem({
             <span
               className={cn(
                 "truncate",
-                depth === 0 ? "text-sm font-medium text-foreground" : "font-normal"
+                depth === 0 ? "text-sm font-medium text-foreground" : "font-normal",
+                !isActive && "text-muted-foreground line-through decoration-muted-foreground/50"
               )}
             >
               {role.name}
@@ -214,6 +224,11 @@ export function RoleTreeItem({
               )}
               title={isActive ? "فعال" : "غیرفعال"}
             />
+            {!isActive ? (
+              <span className="rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">
+                غیرفعال
+              </span>
+            ) : null}
             <span className="ms-auto flex shrink-0 items-center gap-2 text-[10px] tabular-nums text-muted-foreground">
               {hasChildren ? (
                 <span title="زیرنقش">{toFaDigits(children.length)} زیرنقش</span>
