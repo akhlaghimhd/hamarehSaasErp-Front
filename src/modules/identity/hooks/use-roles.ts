@@ -65,8 +65,12 @@ export function useUpdateRole() {
       id: string;
       payload: UpdateRolePayload;
     }) => roleService.update(id, payload),
-    onSuccess: (data) => {
-      void qc.invalidateQueries({ queryKey: rolesQueryKey });
+    onSuccess: (data, vars) => {
+      void qc.invalidateQueries({ queryKey: rolesQueryKey, refetchType: "active" });
+      void qc.invalidateQueries({
+        queryKey: roleQueryKey(vars.id),
+        refetchType: "active",
+      });
       if (data?.tenant_role_id) {
         qc.setQueryData(roleQueryKey(data.tenant_role_id), data);
       }
