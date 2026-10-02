@@ -53,6 +53,12 @@ export interface UpdateRolePayload {
   status?: number;
 }
 
+export type AssignRolesResult = {
+  mode: "direct" | "pending";
+  message?: string;
+  pending_count?: number;
+};
+
 function unwrapData<T>(envelope: unknown): T {
   if (envelope && typeof envelope === "object" && "data" in envelope) {
     return (envelope as ApiSuccessResponse<T>).data;
@@ -96,11 +102,34 @@ export const roleService = {
     await apiDelete(identityPaths.role(id));
   },
 
-  async assignToUser(userId: string, roleIds: string[]): Promise<void> {
-    await apiPost(identityPaths.roleAssign, {
+  async assignToUser(
+    userId: string,
+    roleIds: string[]
+  ): Promise<AssignRolesResult> {
+    const envelope = await apiPost<{
+      status?: string;
+      mode?: string;
+      message?: string;
+      data?: { pending_count?: number };
+    }>(identityPaths.roleAssign, {
       user_id: userId,
       role_ids: roleIds,
     });
+    const mode =
+      envelope &&
+      typeof envelope === "object" &&
+      (envelope.mode === "pending" || envelope.status === "pending")
+        ? "pending"
+        : "direct";
+    return {
+      mode,
+      message:
+        envelope && typeof envelope === "object" ? envelope.message : undefined,
+      pending_count:
+        envelope && typeof envelope === "object"
+          ? envelope.data?.pending_count
+          : undefined,
+    };
   },
 
   /**
