@@ -14,7 +14,7 @@ import { Input } from "@/shared/components/ui/input";
 import { Button } from "@/shared/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { ApiClientError } from "@/api";
-import { usePermission } from "@/auth";
+import { useAuthStore, usePermission } from "@/auth";
 import { toFaDigits } from "@/shared/lib/utils";
 import { IdentityPermissions } from "../types";
 import { useTenantUsers } from "../hooks/use-tenant-users";
@@ -34,6 +34,8 @@ export function AccessCertificationDetailBody() {
   const canView = usePermission(IdentityPermissions.accessCertView);
   const canManage = usePermission(IdentityPermissions.accessCertManage);
   const canCertify = usePermission(IdentityPermissions.accessCertCertify);
+  const authUser = useAuthStore((s) => s.user);
+  const organization = useAuthStore((s) => s.organization);
   const [q, setQ] = useState("");
   const [decisionFilter, setDecisionFilter] = useState("open");
   const [page, setPage] = useState(1);
@@ -60,8 +62,15 @@ export function AccessCertificationDetailBody() {
       if (!uid) continue;
       map.set(uid, m.user?.display_name || [m.user?.first_name, m.user?.last_name].filter(Boolean).join(" ") || m.user?.mobile || m.user?.email || uid);
     }
+    if (authUser?.user_id) {
+      const label =
+        [authUser.first_name, authUser.last_name].filter(Boolean).join(" ") ||
+        authUser.email ||
+        authUser.user_id;
+      if (!map.has(authUser.user_id)) map.set(authUser.user_id, label);
+    }
     return map;
-  }, [members]);
+  }, [members, authUser]);
 
   const userToTenantUser = useMemo(() => {
     const map = new Map<string, string>();
@@ -195,7 +204,19 @@ export function AccessCertificationDetailBody() {
     if (!campaign) return;
     setReportBusy(true);
     try {
-      await openAccessCertReport({ campaign, items, userLabel, roleLabel });
+      const reporterName =
+        [authUser?.first_name, authUser?.last_name].filter(Boolean).join(" ") ||
+        authUser?.email ||
+        null;
+      await openAccessCertReport({
+        campaign,
+        items,
+        userLabel,
+        roleLabel,
+        tenantName: organization?.tenant_name,
+        tenantCode: organization?.tenant_code,
+        reporterName,
+      });
     } catch (e) {
       toast.error(e instanceof ApiClientError ? e.message : "تهیه گزارش ناموفق بود");
     } finally {
