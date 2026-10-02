@@ -89,7 +89,10 @@ export const IdentityPermissions = {
   roleCreate: "identity.role.create",
   roleUpdate: "identity.role.update",
   roleDelete: "identity.role.delete",
+  /** Request grant/revoke (or direct assign when dual-approval is off). */
   roleAssign: "identity.role.assign",
+  /** Approve or reject pending role assignment requests. */
+  roleApprove: "identity.role.approve",
   roleAssignPermissions: "identity.role.assign-permissions",
   permissionView: "identity.permission.view",
   permissionCreate: "identity.permission.create",
