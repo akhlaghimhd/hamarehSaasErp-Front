@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { usePermission } from "@/auth";
 import { useTenantUsers } from "../hooks/use-tenant-users";
@@ -8,11 +9,12 @@ import { IdentityPermissions } from "../types";
 import { MembersCompanyFilter } from "../components/members-company-filter";
 import type { MembershipListFilter } from "../services/tenant-user-service";
 import { MSG_NO_ACCESS } from "../lib/ui-copy";
+import { memberDetailPath } from "../lib/member-ref";
 import { Users } from "lucide-react";
 
 /**
- * Temporary minimal restore after accidental wipe.
- * Full UI is in artifacts/members-list-impl.CRITICAL-RESTORE.tsx — will be restored next.
+ * Temporary members list after accidental wipe of full UI.
+ * Full DataTable UI: artifacts/members-list-impl.CRITICAL-RESTORE.tsx
  */
 export function MembersListPage() {
   const canView = usePermission(IdentityPermissions.userView);
@@ -44,11 +46,12 @@ export function MembersListPage() {
           <option value="active">کاربران جاری</option>
           <option value="deleted">کاربران حذف‌شده</option>
         </select>
-        <MembersCompanyFilter
-          value={companyFilter}
-          onChange={(v) => setCompanyFilter(v)}
-        />
-        <button type="button" className="h-8 rounded border px-3 text-sm" onClick={() => void refetch()}>
+        <MembersCompanyFilter value={companyFilter} onChange={(v) => setCompanyFilter(v)} />
+        <button
+          type="button"
+          className="h-8 rounded border px-3 text-sm"
+          onClick={() => void refetch()}
+        >
           تازه‌سازی
         </button>
       </div>
@@ -60,7 +63,7 @@ export function MembersListPage() {
         <div className="overflow-auto rounded border">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b bg-muted/40 text-start">
+              <tr className="border-b bg-muted/40">
                 <th className="p-2 text-start">نام</th>
                 <th className="p-2 text-start">ایمیل</th>
                 <th className="p-2 text-start">موبایل</th>
@@ -68,14 +71,27 @@ export function MembersListPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.tenant_user_id ?? r.user_id} className="border-b">
-                  <td className="p-2">{(r as { display_name?: string }).display_name || (r as { full_name?: string }).full_name || "—"}</td>
-                  <td className="p-2">{r.email || "—"}</td>
-                  <td className="p-2">{(r as { mobile?: string }).mobile || "—"}</td>
-                  <td className="p-2">{r.status === 1 || (r as { status_code?: string }).status_code === "active" ? "فعال" : "غیرفعال"}</td>
-                </tr>
-              ))}
+              {rows.map((r) => {
+                const name =
+                  r.user?.display_name ||
+                  [r.user?.first_name, r.user?.last_name].filter(Boolean).join(" ") ||
+                  "—";
+                return (
+                  <tr key={r.tenant_user_id} className="border-b">
+                    <td className="p-2">
+                      <Link
+                        href={memberDetailPath(r.tenant_user_id)}
+                        className="text-primary underline-offset-2 hover:underline"
+                      >
+                        {name}
+                      </Link>
+                    </td>
+                    <td className="p-2">{r.user?.email || "—"}</td>
+                    <td className="p-2">{r.user?.mobile || "—"}</td>
+                    <td className="p-2">{r.status === 1 ? "فعال" : "غیرفعال"}</td>
+                  </tr>
+                );
+              })}
               {rows.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="p-4 text-center text-muted-foreground">
