@@ -61,6 +61,10 @@ export const identityPaths = {
     `${IDENTITY_BASE}/privileged-access/${id}/revoke`,
   privilegedExtend: (id: string) =>
     `${IDENTITY_BASE}/privileged-access/${id}/extend`,
+  privilegedReactivate: (id: string) =>
+    `${IDENTITY_BASE}/privileged-access/${id}/reactivate`,
+  privilegedUpdate: (id: string) =>
+    `${IDENTITY_BASE}/privileged-access/${id}`,
   privilegedMarkRole: `${IDENTITY_BASE}/privileged-access/mark-role`,
   roleAssignmentRequests: `${IDENTITY_BASE}/role-assignment-requests`,
   roleAssignmentApprove: (id: string) =>
