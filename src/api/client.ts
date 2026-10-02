@@ -1,5 +1,22 @@
 /**
- * Axios API client — auth header, tenant header, unified error handling.
+ * FE-P0-T01 — Central API Client
+ *
+ * Responsibilities (locked by Frontend Architecture):
+ * - Single Axios instance for all Backend calls
+ * - Inject Authorization: Bearer <access_token>
+ * - Inject X-Tenant-ID (required by TenantContextMiddleware)
+ * - Normalize Backend error shapes into ApiClientError
+ * - Clear auth storage on 401 (session invalid) only when a token was sent
+ * - Limited retry for idempotent network/5xx failures
+ * - No business logic; pure transport + contract
+ *
+ * Backend contracts observed:
+ * - Header: X-Tenant-ID
+ * - Auth: Laravel Sanctum personal access token (no refresh endpoint yet)
+ * - Success envelope: { status: "success", message?, data }
+ * - Error envelope: { status: "error" | success: false, message, errors? }
+ *
+ * Known debt: Refresh-token queue — Backend has no refresh endpoint; 401 clears session only.
  */
 
 import axios, {
@@ -8,50 +25,48 @@ import axios, {
   type AxiosRequestConfig,
   type InternalAxiosRequestConfig,
 } from "axios";
-import { tokenStorage } from "@/auth/token-storage";
+import { ApiClientError, type ApiErrorResponse } from "./types";
+import { tokenStorage } from "./token-storage";
 
-const TENANT_HEADER = "X-Tenant-Id";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
 
-export class ApiClientError extends Error {
-  statusCode: number;
-  errors?: Record<string, string[] | string>;
-  isNetworkError?: boolean;
+/** Header name locked by Backend TenantContextMiddleware. */
+export const TENANT_HEADER = "X-Tenant-ID";
 
-  constructor(args: {
-    statusCode: number;
-    message: string;
-    errors?: Record<string, string[] | string>;
-    isNetworkError?: boolean;
-  }) {
-    super(args.message);
-    this.name = "ApiClientError";
-    this.statusCode = args.statusCode;
-    this.errors = args.errors;
-    this.isNetworkError = args.isNetworkError;
-  }
+/** Max automatic retries for transient failures (GET-like / network / 502–504). */
+const MAX_RETRIES = 2;
+
+type RetriableConfig = InternalAxiosRequestConfig & { __retryCount?: number };
+
+export const apiClient: AxiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  },
+  timeout: 30_000,
+});
+
+function isIdempotentMethod(method?: string): boolean {
+  const m = (method ?? "get").toLowerCase();
+  return m === "get" || m === "head" || m === "options";
 }
 
-function defaultMessageForStatus(status: number): string {
-  switch (status) {
-    case 400:
-      return "درخواست نامعتبر است.";
-    case 401:
-      return "نشست شما منقضی شده یا احراز هویت نشده‌اید. لطفاً دوباره وارد شوید.";
-    case 403:
-      return "شما مجوز انجام این عملیات را ندارید.";
-    case 404:
-      return "منبع مورد نظر یافت نشد.";
-    case 422:
-      return "لطفاً اطلاعات فرم را بررسی و اصلاح کنید.";
-    case 429:
-      return "تعداد درخواست‌ها زیاد است. کمی بعد تلاش کنید.";
-    case 500:
-    case 502:
-    case 503:
-      return "خطای داخلی سرور. لطفاً بعداً تلاش کنید.";
-    default:
-      return "خطای غیرمنتظره رخ داد.";
+function shouldRetry(error: AxiosError, config?: RetriableConfig): boolean {
+  if (!config) return false;
+  const count = config.__retryCount ?? 0;
+  if (count >= MAX_RETRIES) return false;
+
+  // Network / timeout
+  if (!error.response) return true;
+
+  const status = error.response.status;
+  // Retry only safe methods on gateway errors
+  if (isIdempotentMethod(config.method) && [502, 503, 504].includes(status)) {
+    return true;
   }
+  return false;
 }
 
 function looksEnglishOnly(msg: string): boolean {
@@ -116,20 +131,9 @@ function humanizeApiMessage(
   return msg;
 }
 
-const baseURL =
-  typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_BASE_URL
-    ? process.env.NEXT_PUBLIC_API_BASE_URL
-    : "";
-
-export const apiClient: AxiosInstance = axios.create({
-  baseURL,
-  timeout: 60_000,
-  headers: {
-    Accept: "application/json",
-    "Content-Type": "application/json",
-  },
-});
-
+// ---------------------------------------------------------------------------
+// Request: inject token + tenant
+// ---------------------------------------------------------------------------
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = tokenStorage.getAccessToken();
@@ -150,10 +154,20 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// ---------------------------------------------------------------------------
+// Response: limited retry + normalize errors + handle 401
+// ---------------------------------------------------------------------------
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: AxiosError<{ message?: string; errors?: Record<string, string[] | string> }>) => {
-    const config = error.config;
+  async (error: AxiosError<ApiErrorResponse>) => {
+    const config = error.config as RetriableConfig | undefined;
+
+    if (shouldRetry(error, config) && config) {
+      config.__retryCount = (config.__retryCount ?? 0) + 1;
+      const delayMs = 300 * config.__retryCount;
+      await new Promise((r) => setTimeout(r, delayMs));
+      return apiClient.request(config);
+    }
 
     if (!error.response) {
       const isTimeout = error.code === "ECONNABORTED";
@@ -171,6 +185,7 @@ apiClient.interceptors.response.use(
     const { status, data } = error.response;
 
     if (status === 401) {
+      // Only clear session when a Bearer token was actually sent (real auth failure).
       const authHeader = config?.headers?.Authorization;
       const hadToken =
         typeof authHeader === "string" && authHeader.startsWith("Bearer ");
@@ -198,6 +213,29 @@ apiClient.interceptors.response.use(
   }
 );
 
+function defaultMessageForStatus(status: number): string {
+  switch (status) {
+    case 400:
+      return "درخواست نامعتبر است.";
+    case 401:
+      return "نشست شما منقضی شده یا احراز هویت نشده‌اید. لطفاً دوباره وارد شوید.";
+    case 403:
+      return "شما مجوز انجام این عملیات را ندارید.";
+    case 404:
+      return "منبع مورد نظر یافت نشد.";
+    case 422:
+      return "لطفاً اطلاعات فرم را بررسی و اصلاح کنید.";
+    case 429:
+      return "تعداد درخواست‌ها زیاد است. کمی بعد تلاش کنید.";
+    case 500:
+    case 502:
+    case 503:
+      return "خطای داخلی سرور. لطفاً بعداً تلاش کنید.";
+    default:
+      return "خطای غیرمنتظره رخ داد.";
+  }
+}
+
 export async function apiGet<T>(
   url: string,
   config?: AxiosRequestConfig
@@ -224,6 +262,15 @@ export async function apiPut<T>(
   return res.data;
 }
 
+export async function apiPatch<T>(
+  url: string,
+  body?: unknown,
+  config?: AxiosRequestConfig
+): Promise<T> {
+  const res = await apiClient.patch<T>(url, body, config);
+  return res.data;
+}
+
 export async function apiDelete<T>(
   url: string,
   config?: AxiosRequestConfig
@@ -231,3 +278,5 @@ export async function apiDelete<T>(
   const res = await apiClient.delete<T>(url, config);
   return res.data;
 }
+
+export default apiClient;
