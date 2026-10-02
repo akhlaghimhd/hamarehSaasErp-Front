@@ -18,10 +18,13 @@ export function tenantUserQueryKey(tenantUserId: string) {
   return ["identity", "tenant-users", tenantUserId] as const;
 }
 
-export function useTenantUsers(membership: MembershipListFilter = "active") {
+export function useTenantUsers(
+  membership: MembershipListFilter = "active",
+  opts?: { companyId?: string | null }
+) {
   return useQuery({
-    queryKey: [...tenantUsersQueryKey, membership],
-    queryFn: () => tenantUserService.list(membership),
+    queryKey: [...tenantUsersQueryKey, membership, opts?.companyId ?? null],
+    queryFn: () => tenantUserService.list(membership, opts),
     staleTime: 60_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
