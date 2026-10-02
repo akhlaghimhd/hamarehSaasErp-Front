@@ -14,6 +14,7 @@ import {
   ClipboardCheck,
   ShieldAlert,
   GitPullRequestArrow,
+  Settings2,
   Scale,
 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
@@ -92,6 +93,13 @@ const cards: HubCard[] = [
     icon: GitPullRequestArrow,
     open: true,
   },
+  {
+    href: "/dashboard/identity/settings",
+    title: "تنظیمات هویت",
+    description: "تأیید دوگانه نقش و سیاست‌های امنیتی مستأجر",
+    icon: Settings2,
+    open: true,
+  },
 ];
 
 function HubCardView({
@@ -160,6 +168,7 @@ export function IdentityHome() {
     "/dashboard/identity/access-certifications": canViewAccessCert,
     "/dashboard/identity/privileged-access": canViewPrivileged,
     "/dashboard/identity/role-assignment-requests": canViewRoleAssign,
+    "/dashboard/identity/settings": canViewUsers,
   };
 
   return (
