@@ -40,6 +40,7 @@ function shortId(id?: string | null): string {
 export function RoleAssignmentRequestsListPage() {
   const canView = usePermission(IdentityPermissions.roleView);
   const canAssign = usePermission(IdentityPermissions.roleAssign);
+  const canApprove = usePermission(IdentityPermissions.roleApprove);
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
@@ -108,7 +109,7 @@ export function RoleAssignmentRequestsListPage() {
   const approveMut = useMutation({
     mutationFn: (id: string) => roleAssignmentRequestService.approve(id),
     onSuccess: () => {
-      toast.success("درخواست تخصیص نقش تأیید شد");
+      toast.success("درخواست تأیید شد و نقش اعمال شد");
       void qc.invalidateQueries({ queryKey: ["identity", "role-assignment-requests"] });
     },
     onError: (e) =>
@@ -118,7 +119,7 @@ export function RoleAssignmentRequestsListPage() {
   const rejectMut = useMutation({
     mutationFn: (id: string) => roleAssignmentRequestService.reject(id),
     onSuccess: () => {
-      toast.success("درخواست رد شد");
+      toast.success("درخواست رد شد — برای اعمال دوباره باید درخواست جدید ثبت شود");
       void qc.invalidateQueries({ queryKey: ["identity", "role-assignment-requests"] });
     },
     onError: (e) =>
@@ -210,7 +211,7 @@ export function RoleAssignmentRequestsListPage() {
       id: "actions",
       header: "عملیات",
       cell: (r) =>
-        canAssign ? (
+        canApprove ? (
           <div className="flex flex-wrap gap-1">
             <Button
               type="button"
