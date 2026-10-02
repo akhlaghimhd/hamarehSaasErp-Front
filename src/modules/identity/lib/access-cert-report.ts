@@ -1,4 +1,4 @@
-/** گزارش PDF بازبینی دسترسی — برندینگ مستاجر + تصمیم‌گیرنده */
+/** گزارش PDF بازبینی دسترسی — برندینگ مستاجر + تصمیم‌گیرنده + موارد رفع‌شده */
 
 import { toast } from "sonner";
 import { toFaDigits } from "@/shared/lib/utils";
@@ -19,6 +19,7 @@ const DECISION_FA: Record<string, string> = {
   APPROVED: "پذیرش استثنا (عمداً پذیرفته شد)",
   REVOKE_REQUESTED: "در صف اصلاح نقش",
   DEFERRED: "موکول به دوره بعد",
+  RESOLVED: "رفع‌شده با اصلاح نقش",
 };
 
 /** Avoid literal HTML entities in source (GitHub content API can decode them and break JS). */
@@ -61,15 +62,17 @@ function decidedAtOf(item: AccessCertItemDto): string | null {
   return null;
 }
 
+function decisionOf(item: AccessCertItemDto): string {
+  return String(item.decision || "PENDING").toUpperCase();
+}
+
 export async function openAccessCertReport(opts: {
   campaign: AccessCertCampaignDto;
   items: AccessCertItemDto[];
   userLabel: Map<string, string>;
   roleLabel: Map<string, string>;
-  /** نام سازمان / مستاجر برای سربرگ */
   tenantName?: string | null;
   tenantCode?: string | null;
-  /** نام و نام خانوادگی تهیه‌کننده گزارش */
   reporterName?: string | null;
 }) {
   const {
@@ -84,25 +87,41 @@ export async function openAccessCertReport(opts: {
   const st = String(campaign.status || "").toUpperCase();
 
   const openCount = items.filter((i) => {
-    const d = String(i.decision || "PENDING").toUpperCase();
+    const d = decisionOf(i);
     return d === "PENDING" || d === "REVOKE_REQUESTED";
   }).length;
-  const exception = items.filter(
-    (i) => String(i.decision || "").toUpperCase() === "APPROVED"
-  ).length;
-  const deferred = items.filter(
-    (i) => String(i.decision || "").toUpperCase() === "DEFERRED"
-  ).length;
+  const exception = items.filter((i) => decisionOf(i) === "APPROVED").length;
+  const deferred = items.filter((i) => decisionOf(i) === "DEFERRED").length;
+  const resolved = items.filter((i) => decisionOf(i) === "RESOLVED").length;
   const blocks = items.filter((i) => i.sod_has_block).length;
   const warns = items.filter((i) => i.sod_has_warn && !i.sod_has_block).length;
 
   const orgTitle = String(tenantName || "").trim() || "سازمان";
   const orgCode = String(tenantCode || "").trim();
-  const reporter =
-    String(reporterName || "").trim() || "کاربر سامانه";
+  const reporter = String(reporterName || "").trim() || "کاربر سامانه";
+
+  const decisionRank = (d: string): number => {
+    switch (d) {
+      case "PENDING":
+        return 5;
+      case "REVOKE_REQUESTED":
+        return 4;
+      case "APPROVED":
+        return 3;
+      case "DEFERRED":
+        return 2;
+      case "RESOLVED":
+        return 1;
+      default:
+        return 0;
+    }
+  };
 
   const rows = [...items]
     .sort((a, b) => {
+      const da = decisionRank(decisionOf(a));
+      const db = decisionRank(decisionOf(b));
+      if (db !== da) return db - da;
       const sa = a.sod_has_block ? 2 : a.sod_has_warn ? 1 : 0;
       const sb = b.sod_has_block ? 2 : b.sod_has_warn ? 1 : 0;
       return sb - sa;
@@ -113,7 +132,7 @@ export async function openAccessCertReport(opts: {
       const roles = (i.role_ids_snapshot || [])
         .map((id) => roleLabel.get(String(id)) || "نقش")
         .join("، ");
-      const d = String(i.decision || "PENDING").toUpperCase();
+      const d = decisionOf(i);
       const severity = i.sod_has_block
         ? "تضاد جدی"
         : i.sod_has_warn
@@ -154,17 +173,13 @@ export async function openAccessCertReport(opts: {
         escapeHtml(severity) +
         "</strong>" +
         (conflicts
-          ? '<div class=\"sub\">' +
-            escapeHtml(conflicts) +
-            "</div>"
+          ? '<div class=\"sub\">' + escapeHtml(conflicts) + "</div>"
           : "") +
         "</td>" +
         "<td>" +
         escapeHtml(DECISION_FA[d] || d) +
         (note
-          ? '<div class=\"sub\">یادداشت: ' +
-            escapeHtml(note) +
-            "</div>"
+          ? '<div class=\"sub\">یادداشت: ' + escapeHtml(note) + "</div>"
           : "") +
         "</td>" +
         "<td>" +
@@ -214,9 +229,7 @@ export async function openAccessCertReport(opts: {
     '<div class="org">' +
     escapeHtml(orgTitle) +
     "</div>" +
-    (orgCode
-      ? '<div class="code">' + escapeHtml(orgCode) + "</div>"
-      : "") +
+    (orgCode ? '<div class="code">' + escapeHtml(orgCode) + "</div>" : "") +
     "<h1>گزارش بازبینی دسترسی</h1>" +
     "</div>" +
     "<div style=\"text-align:left;font-size:12px;color:#64748b\">" +
@@ -261,12 +274,12 @@ export async function openAccessCertReport(opts: {
     "</div>" +
     "</div>" +
     "<p style=\"margin:0 0 8px;color:#334155\">" +
-    "این گزارش <strong>شکاف‌های نقش</strong> در لحظهٔ اسکن و <strong>تصمیم مدیر</strong> روی هر مورد را نشان می‌دهد." +
+    "این گزارش <strong>همهٔ شکاف‌های ثبت‌شده</strong> (از جمله موارد رفع‌شده) و <strong>تصمیم مدیر</strong> روی هر مورد را نشان می‌دهد." +
     "</p>" +
     '<div class="cards">' +
     '<div class="card"><b>' +
     toFaDigits(items.length) +
-    "</b><span>کل شکاف‌ها</span></div>" +
+    "</b><span>کل موارد</span></div>" +
     '<div class="card"><b>' +
     toFaDigits(blocks) +
     "</b><span>تضاد جدی</span></div>" +
@@ -277,28 +290,32 @@ export async function openAccessCertReport(opts: {
     toFaDigits(openCount) +
     "</b><span>باز</span></div>" +
     '<div class="card"><b>' +
+    toFaDigits(resolved) +
+    "</b><span>رفع‌شده</span></div>" +
+    '<div class="card"><b>' +
     toFaDigits(exception) +
     "</b><span>استثنا</span></div>" +
     '<div class="card"><b>' +
     toFaDigits(deferred) +
     "</b><span>موکول</span></div>" +
     "</div>" +
-    "<h2>جزئیات موارد</h2>" +
+    "<h2>جزئیات موارد (کامل — بدون پنهان‌کاری)</h2>" +
     "<table>" +
     "<thead><tr>" +
     '<th style="width:4%">#</th>' +
     '<th style="width:16%">عضو</th>' +
-    '<th style="width:22%">نقش‌ها در زمان اسکن</th>' +
-    '<th style="width:22%">اشکال / قانون</th>' +
-    '<th style="width:20%">تصمیم</th>' +
-    '<th style="width:16%">تصمیم‌گیرنده</th>' +
+    '<th style="width:20%">نقش‌ها در زمان اسکن</th>' +
+    '<th style="width:20%">اشکال / قانون</th>' +
+    '<th style="width:22%">تصمیم</th>' +
+    '<th style="width:18%">تصمیم‌گیرنده</th>' +
     "</tr></thead>" +
     "<tbody>" +
     (rows ||
       "<tr><td colspan='6' style='text-align:center'>موردی ثبت نشده</td></tr>") +
     "</tbody></table>" +
     '<p class="note">' +
-    "«پذیرش استثنا» یعنی مدیر آگاهانه ریسک باقی‌مانده را پذیرفته است. " +
+    "«رفع‌شده با اصلاح نقش» یعنی پس از تغییر نقش‌ها و «بررسی مجدد»، تضاد دیگر وجود نداشت. " +
+    "«پذیرش استثنا» یعنی مدیر آگاهانه ریسک را پذیرفته است. " +
     "«موکول» یعنی بررسی به دوره بعد منتقل شده." +
     "</p>" +
     '<div class="footer">' +
