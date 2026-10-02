@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from "@/api";
+import { apiGet, apiPost, apiPut } from "@/api";
 import type { ApiSuccessResponse } from "@/api/types";
 import { identityPaths } from "./paths";
 import type { RoleDto } from "./role-service";
@@ -71,6 +71,22 @@ export const privilegedAccessService = {
     const envelope = await apiPost(identityPaths.privilegedExtend(id), {
       duration_minutes: durationMinutes,
     });
+    return unwrapData<PrivilegedGrantDto>(envelope);
+  },
+
+  async reactivate(
+    id: string,
+    payload: { duration_minutes: number; tenant_role_id?: string; reason?: string }
+  ): Promise<PrivilegedGrantDto> {
+    const envelope = await apiPost(identityPaths.privilegedReactivate(id), payload);
+    return unwrapData<PrivilegedGrantDto>(envelope);
+  },
+
+  async update(
+    id: string,
+    payload: { tenant_role_id?: string; duration_minutes?: number; reason?: string }
+  ): Promise<PrivilegedGrantDto> {
+    const envelope = await apiPut(identityPaths.privilegedUpdate(id), payload);
     return unwrapData<PrivilegedGrantDto>(envelope);
   },
 
