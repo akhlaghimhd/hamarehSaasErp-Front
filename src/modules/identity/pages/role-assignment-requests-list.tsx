@@ -144,6 +144,20 @@ export function RoleAssignmentRequestsListPage() {
       cell: (r) => <StatusChip label={String(r.status ?? "PENDING")} tone="warning" />,
     },
     {
+      id: "action",
+      header: "نوع",
+      cell: (r) => {
+        const a = String((r as { request_action?: string }).request_action ?? "GRANT").toUpperCase();
+        const isRevoke = a === "REVOKE";
+        return (
+          <StatusChip
+            label={isRevoke ? "برداشتن نقش" : "اعطای نقش"}
+            tone={isRevoke ? "neutral" : "success"}
+          />
+        );
+      },
+    },
+    {
       id: "user",
       header: "کاربر",
       cell: (r) => {
