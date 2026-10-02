@@ -11,6 +11,8 @@ export type AccessCertCampaignDto = {
   due_at?: string | null;
   opened_at?: string | null;
   completed_at?: string | null;
+  deleted_at?: string | null;
+  is_archived?: boolean;
   items_total?: number;
   items_pending?: number;
   totals?: {
@@ -48,7 +50,6 @@ export type AccessCertItemDto = {
 };
 
 export type CreateAccessCertCampaignPayload = {
-  /** اختیاری در UI — اگر خالی باشد اینجا کد ساخته می‌شود */
   code?: string | null;
   name: string;
   description?: string | null;
@@ -59,6 +60,8 @@ export type CertifyItemPayload = {
   decision: "APPROVED" | "REVOKE_REQUESTED" | "DEFERRED";
   note?: string | null;
 };
+
+export type AccessCertListScope = "active" | "archived" | "all";
 
 function unwrapData<T>(envelope: unknown): T {
   if (envelope && typeof envelope === "object" && "data" in envelope) {
@@ -89,7 +92,6 @@ function normalizeCampaign(raw: unknown): AccessCertCampaignDto {
   return o as AccessCertCampaignDto;
 }
 
-/** همیشه یک کد غیرخالی برای سازگاری با بک‌اندهای قدیمی (required) */
 function ensureCampaignCode(raw?: string | null): string {
   const cleaned = (raw ?? "").trim();
   if (cleaned.length >= 2) return cleaned.slice(0, 80);
@@ -99,8 +101,9 @@ function ensureCampaignCode(raw?: string | null): string {
 }
 
 export const accessCertificationService = {
-  async list(): Promise<AccessCertCampaignDto[]> {
-    const envelope = await apiGet(identityPaths.accessCertifications);
+  async list(scope: AccessCertListScope = "active"): Promise<AccessCertCampaignDto[]> {
+    const q = scope && scope !== "active" ? `?scope=${encodeURIComponent(scope)}` : "";
+    const envelope = await apiGet(`${identityPaths.accessCertifications}${q}`);
     return asList(unwrapData(envelope));
   },
 
@@ -111,7 +114,6 @@ export const accessCertificationService = {
       ...(payload.description != null ? { description: payload.description } : {}),
       ...(payload.due_at != null ? { due_at: payload.due_at } : {}),
     };
-
     const envelope = await apiPost(identityPaths.accessCertifications, body);
     return normalizeCampaign(unwrapData(envelope));
   },
@@ -128,6 +130,15 @@ export const accessCertificationService = {
 
   async complete(id: string): Promise<AccessCertCampaignDto> {
     const envelope = await apiPost(identityPaths.accessCertificationComplete(id), {});
+    return normalizeCampaign(unwrapData(envelope));
+  },
+
+  async archive(id: string): Promise<void> {
+    await apiPost(identityPaths.accessCertificationArchive(id), {});
+  },
+
+  async unarchive(id: string): Promise<AccessCertCampaignDto> {
+    const envelope = await apiPost(identityPaths.accessCertificationUnarchive(id), {});
     return normalizeCampaign(unwrapData(envelope));
   },
 

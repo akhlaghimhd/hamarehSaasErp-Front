@@ -44,6 +44,10 @@ export const identityPaths = {
     `${IDENTITY_BASE}/access-certifications/${id}/items`,
   accessCertificationComplete: (id: string) =>
     `${IDENTITY_BASE}/access-certifications/${id}/complete`,
+  accessCertificationArchive: (id: string) =>
+    `${IDENTITY_BASE}/access-certifications/${id}/archive`,
+  accessCertificationUnarchive: (id: string) =>
+    `${IDENTITY_BASE}/access-certifications/${id}/unarchive`,
   accessCertificationReEvaluate: (id: string) =>
     `${IDENTITY_BASE}/access-certifications/${id}/re-evaluate`,
   accessCertifyItem: (itemId: string) =>
