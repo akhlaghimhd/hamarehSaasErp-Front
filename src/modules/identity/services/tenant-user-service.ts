@@ -75,13 +75,25 @@ export const tenantUserService = {
       const envelope = await apiGet(identityPaths.user(tenantUserId));
       return unwrapData<TenantUserDto>(envelope);
     } catch (e) {
-      if (e instanceof ApiClientError && e.status === 404) return null;
+      if (e instanceof ApiClientError && e.statusCode === 404) {
+        return null;
+      }
       throw e;
     }
   },
 
   async create(payload: CreateTenantUserPayload): Promise<TenantUserDto> {
-    const envelope = await apiPost(identityPaths.users, payload);
+    const body: Record<string, unknown> = {
+      first_name: payload.first_name,
+      last_name: payload.last_name,
+      mobile: payload.mobile,
+      is_owner: payload.is_owner ?? false,
+      role_ids: payload.role_ids ?? [],
+    };
+    if (payload.email_local_part) {
+      body.email_local_part = payload.email_local_part;
+    }
+    const envelope = await apiPost(identityPaths.users, body);
     return unwrapData<TenantUserDto>(envelope);
   },
 
@@ -89,7 +101,14 @@ export const tenantUserService = {
     tenantUserId: string,
     payload: UpdateTenantUserPayload
   ): Promise<TenantUserDto> {
-    const envelope = await apiPut(identityPaths.user(tenantUserId), payload);
+    const body: Record<string, unknown> = {};
+    if (payload.first_name !== undefined) body.first_name = payload.first_name;
+    if (payload.last_name !== undefined) body.last_name = payload.last_name;
+    if (payload.mobile !== undefined) body.mobile = payload.mobile;
+    if (payload.is_owner !== undefined) body.is_owner = payload.is_owner;
+    if (payload.status !== undefined) body.status = payload.status;
+
+    const envelope = await apiPut(identityPaths.user(tenantUserId), body);
     return unwrapData<TenantUserDto>(envelope);
   },
 
