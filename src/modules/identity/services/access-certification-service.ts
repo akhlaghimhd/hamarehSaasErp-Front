@@ -48,7 +48,7 @@ export type AccessCertItemDto = {
 };
 
 export type CreateAccessCertCampaignPayload = {
-  /** اختیاری — خالی بماند تا سرور خودش بسازد */
+  /** اختیاری — خالی بماند تا به‌صورت خودکار ساخته شود */
   code?: string | null;
   name: string;
   description?: string | null;
@@ -89,6 +89,12 @@ function normalizeCampaign(raw: unknown): AccessCertCampaignDto {
   return o as AccessCertCampaignDto;
 }
 
+function generateCampaignCode(): string {
+  const d = new Date();
+  const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  return `ac-${stamp}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
 export const accessCertificationService = {
   async list(): Promise<AccessCertCampaignDto[]> {
     const envelope = await apiGet(identityPaths.accessCertifications);
@@ -99,8 +105,8 @@ export const accessCertificationService = {
     const body: Record<string, unknown> = {
       name: payload.name,
     };
-    const code = (payload.code ?? "").trim();
-    if (code) body.code = code;
+    const code = (payload.code ?? "").trim() || generateCampaignCode();
+    body.code = code;
     if (payload.description != null) body.description = payload.description;
     if (payload.due_at != null) body.due_at = payload.due_at;
 
