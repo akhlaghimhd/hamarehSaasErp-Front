@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDown, ArrowUp, ArrowUpDown, Check, Loader2, Plus, Search,
@@ -80,6 +81,9 @@ export function PrivilegedAccessListPage() {
   const canApprove = usePermission(IdentityPermissions.privilegedApprove);
   const canRequest = usePermission(IdentityPermissions.privilegedRequest);
   const qc = useQueryClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const prefillUserId = searchParams.get("requestUserId") || searchParams.get("userId") || "";
 
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -89,10 +93,18 @@ export function PrivilegedAccessListPage() {
   const [pageSize, setPageSize] = useState(20);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
+  const [lockedPrefillUserId, setLockedPrefillUserId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{
     kind: "approve" | "deny" | "revoke";
     targets: PrivilegedGrantDto[];
   } | null>(null);
+
+  useEffect(() => {
+    if (prefillUserId) {
+      setLockedPrefillUserId(prefillUserId);
+      setCreateOpen(true);
+    }
+  }, [prefillUserId]);
 
   const { data: members = [] } = useTenantUsers("active");
   const { data: roles = [] } = useRoles();
@@ -412,7 +424,6 @@ export function PrivilegedAccessListPage() {
                       <TableCell className="px-2">
                         <div className="min-w-0 max-w-[10rem]">
                           <div className="truncate text-sm font-medium">{userLabel.get(uid) ?? shortId(uid)}</div>
-                          <div dir="ltr" className="font-mono text-[10px] text-muted-foreground">{shortId(uid)}</div>
                         </div>
                       </TableCell>
                       <TableCell className="px-2">
@@ -533,11 +544,24 @@ export function PrivilegedAccessListPage() {
 
         <PrivilegedRequestSheet
           open={createOpen}
-          onOpenChange={setCreateOpen}
+          onOpenChange={(open) => {
+            setCreateOpen(open);
+            if (!open && prefillUserId) {
+              router.replace("/dashboard/identity/privileged-access");
+              setLockedPrefillUserId(null);
+            }
+          }}
           members={members}
           roles={roles}
           userLabel={userLabel}
-          onCreated={() => void qc.invalidateQueries({ queryKey: ["identity", "privileged-access"] })}
+          initialUserId={lockedPrefillUserId ?? (prefillUserId || null)}
+          onCreated={() => {
+            void qc.invalidateQueries({ queryKey: ["identity", "privileged-access"] });
+            if (prefillUserId) {
+              router.replace("/dashboard/identity/privileged-access");
+              setLockedPrefillUserId(null);
+            }
+          }}
         />
       </div>
     </TooltipProvider>
