@@ -5,7 +5,15 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ClipboardCheck, FileText, Loader2, Plus, Search } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  ClipboardCheck,
+  FileText,
+  Loader2,
+  Plus,
+  Search,
+} from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import {
@@ -59,9 +67,9 @@ const STATUS_LABEL: Record<string, string> = {
   OPEN: "در حال بررسی",
   COMPLETED: "پایان‌یافته",
   CANCELLED: "لغو شده",
+  ARCHIVED: "بایگانی",
 };
 
-/** فقط برای ارسال به API — هنگام تایپ کاربر را محدود نمی‌کند */
 function normalizeCampaignCodeForApi(raw: string): string {
   let s = raw.trim();
   const fa = "۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩";
@@ -79,7 +87,6 @@ function normalizeCampaignCodeForApi(raw: string): string {
   return s.slice(0, 80);
 }
 
-/** اگر کاربر کد ندهد، یک کد ساده برای ارسال می‌سازیم */
 function autoCampaignCode(): string {
   const d = new Date();
   const y = d.getFullYear();
@@ -99,6 +106,8 @@ function statusTone(
       return "success";
     case "CANCELLED":
       return "danger";
+    case "ARCHIVED":
+      return "neutral";
     default:
       return "neutral";
   }
@@ -137,7 +146,7 @@ export function AccessCertificationsListPage() {
   const qc = useQueryClient();
 
   const [q, setQ] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("active");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [createOpen, setCreateOpen] = useState(false);
@@ -147,12 +156,21 @@ export function AccessCertificationsListPage() {
 
   const formDirty = Boolean(code.trim() || name.trim());
   const normalizedCode = normalizeCampaignCodeForApi(code);
-  /** خالی = مجاز؛ اگر پر شد حداقل ۲ کاراکتر معتبر */
   const codeOk = code.trim() === "" || normalizedCode.length >= 2;
 
+  const listScope =
+    statusFilter === "archived"
+      ? "archived"
+      : statusFilter === "all"
+        ? "all"
+        : "active";
+
   const { data = [], isLoading, isError, error } = useQuery({
-    queryKey: ["identity", "access-certifications"],
-    queryFn: () => accessCertificationService.list(),
+    queryKey: ["identity", "access-certifications", listScope],
+    queryFn: () =>
+      accessCertificationService.list(
+        listScope as "active" | "archived" | "all"
+      ),
     enabled: canView,
   });
 
@@ -207,7 +225,6 @@ export function AccessCertificationsListPage() {
   const createMut = useMutation({
     mutationFn: () =>
       accessCertificationService.create({
-        // خالی → کد خودکار تا با هر نسخه بک‌اند سازگار باشد
         code: normalizedCode || autoCampaignCode(),
         name: name.trim(),
       }),
@@ -235,6 +252,26 @@ export function AccessCertificationsListPage() {
     },
     onError: (e) =>
       toast.error(e instanceof ApiClientError ? e.message : "شروع بررسی ناموفق بود"),
+  });
+
+  const archiveMut = useMutation({
+    mutationFn: (id: string) => accessCertificationService.archive(id),
+    onSuccess: () => {
+      toast.success("کمپین بایگانی شد");
+      void qc.invalidateQueries({ queryKey: ["identity", "access-certifications"] });
+    },
+    onError: (e) =>
+      toast.error(e instanceof ApiClientError ? e.message : "بایگانی ناموفق بود"),
+  });
+
+  const unarchiveMut = useMutation({
+    mutationFn: (id: string) => accessCertificationService.unarchive(id),
+    onSuccess: () => {
+      toast.success("از بایگانی خارج شد");
+      void qc.invalidateQueries({ queryKey: ["identity", "access-certifications"] });
+    },
+    onError: (e) =>
+      toast.error(e instanceof ApiClientError ? e.message : "بازگردانی ناموفق بود"),
   });
 
   function resetCreate() {
@@ -280,8 +317,9 @@ export function AccessCertificationsListPage() {
 
   const filtered = useMemo(() => {
     let list = data;
-    if (statusFilter !== "all") {
-      list = list.filter((r) => String(r.status || "").toUpperCase() === statusFilter);
+    const sf = statusFilter.toUpperCase();
+    if (sf === "DRAFT" || sf === "OPEN" || sf === "COMPLETED" || sf === "CANCELLED") {
+      list = list.filter((r) => String(r.status || "").toUpperCase() === sf);
     }
     const term = q.trim().toLowerCase();
     if (term) {
@@ -352,14 +390,16 @@ export function AccessCertificationsListPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="h-8 w-[9.5rem]">
+          <SelectTrigger className="h-8 w-[11rem]">
             <SelectValue placeholder="وضعیت" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">همه</SelectItem>
+            <SelectItem value="active">جاری</SelectItem>
             <SelectItem value="DRAFT">پیش‌نویس</SelectItem>
             <SelectItem value="OPEN">در حال بررسی</SelectItem>
             <SelectItem value="COMPLETED">پایان‌یافته</SelectItem>
+            <SelectItem value="archived">بایگانی</SelectItem>
+            <SelectItem value="all">همه</SelectItem>
           </SelectContent>
         </Select>
         {isLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
@@ -389,12 +429,20 @@ export function AccessCertificationsListPage() {
             ) : pageRows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="p-0">
-                  <EmptyState title="هنوز کمپینی نیست" description="با «کمپین جدید» دورهٔ بازبینی را شروع کنید." />
+                  <EmptyState
+                    title={statusFilter === "archived" ? "بایگانی خالی است" : "کمپینی نیست"}
+                    description={
+                      statusFilter === "archived"
+                        ? "کمپین پایان‌یافته را از فهرست جاری بایگانی کنید."
+                        : "با «کمپین جدید» شروع کنید."
+                    }
+                  />
                 </TableCell>
               </TableRow>
             ) : (
               pageRows.map((r, idx) => {
                 const st = String(r.status || "").toUpperCase();
+                const archived = Boolean(r.is_archived || r.deleted_at);
                 return (
                   <TableRow key={r.campaign_id}>
                     <TableCell className="px-2 py-1.5 text-center text-xs text-muted-foreground">
@@ -405,7 +453,10 @@ export function AccessCertificationsListPage() {
                       <div className="font-mono text-[11px] text-muted-foreground">{r.code || ""}</div>
                     </TableCell>
                     <TableCell className="px-2 py-1.5">
-                      <StatusChip label={STATUS_LABEL[st] || st} tone={statusTone(st)} />
+                      <StatusChip
+                        label={archived ? STATUS_LABEL.ARCHIVED : STATUS_LABEL[st] || st}
+                        tone={archived ? "neutral" : statusTone(st)}
+                      />
                     </TableCell>
                     <TableCell className="px-2 py-1.5 text-xs text-muted-foreground">
                       {formatJalali(r.created_at ? String(r.created_at) : null)}
@@ -415,7 +466,7 @@ export function AccessCertificationsListPage() {
                     </TableCell>
                     <TableCell className="px-2 py-1.5">
                       <div className="flex flex-wrap items-center justify-end gap-1">
-                        {canManage && st === "DRAFT" ? (
+                        {canManage && st === "DRAFT" && !archived ? (
                           <Button
                             type="button"
                             size="sm"
@@ -426,7 +477,7 @@ export function AccessCertificationsListPage() {
                             شروع بررسی
                           </Button>
                         ) : null}
-                        {st === "OPEN" ? (
+                        {st === "OPEN" && !archived ? (
                           <Button
                             type="button"
                             size="sm"
@@ -440,7 +491,7 @@ export function AccessCertificationsListPage() {
                             ادامه
                           </Button>
                         ) : null}
-                        {st === "OPEN" || st === "COMPLETED" || st === "DRAFT" ? (
+                        {!archived && (st === "OPEN" || st === "COMPLETED" || st === "DRAFT") ? (
                           <TooltipProvider delayDuration={200}>
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -459,7 +510,45 @@ export function AccessCertificationsListPage() {
                                   )}
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent>گزارش PDF</TooltipContent>
+                              <TooltipContent>گزارش</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : null}
+                        {canManage && st === "COMPLETED" && !archived ? (
+                          <TooltipProvider delayDuration={200}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0"
+                                  disabled={archiveMut.isPending}
+                                  onClick={() => void archiveMut.mutateAsync(r.campaign_id)}
+                                >
+                                  <Archive className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>بایگانی</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : null}
+                        {canManage && archived ? (
+                          <TooltipProvider delayDuration={200}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0"
+                                  disabled={unarchiveMut.isPending}
+                                  onClick={() => void unarchiveMut.mutateAsync(r.campaign_id)}
+                                >
+                                  <ArchiveRestore className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>خروج از بایگانی</TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
                         ) : null}
@@ -556,16 +645,11 @@ export function AccessCertificationsListPage() {
                 dir="ltr"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                placeholder="خالی بماند تا خودکار ساخته شود"
+                placeholder="اختیاری"
                 autoComplete="off"
               />
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                پر کردن لازم نیست. خالی بگذارید تا هنگام ذخیره کد ساخته شود.
-              </p>
               {code.trim() && !codeOk ? (
-                <p className="text-[11px] text-destructive">
-                  اگر کد می‌نویسید، حداقل دو حرف یا عدد بگذارید.
-                </p>
+                <p className="text-[11px] text-destructive">حداقل دو کاراکتر</p>
               ) : null}
             </div>
             <div className="space-y-1.5">
@@ -588,7 +672,7 @@ export function AccessCertificationsListPage() {
               disabled={createMut.isPending || !codeOk || !name.trim()}
               onClick={() => {
                 if (!codeOk) {
-                  toast.error("کد واردشده قابل استفاده نیست؛ خالی بگذارید یا ساده بنویسید.");
+                  toast.error("کد واردشده قابل استفاده نیست.");
                   return;
                 }
                 void createMut.mutateAsync();
