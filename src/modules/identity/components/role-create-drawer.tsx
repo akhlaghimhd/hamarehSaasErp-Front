@@ -278,14 +278,14 @@ export function RoleCreateDrawer({
         setCopiedPermIds(ids);
         setCopyHint(
           ids.length > 0
-            ? `${toFaDigits(ids.length)} مجوز از «${role.name}» برای ذخیره اولیه کپی می‌شود (ارث‌بری زنده نیست)`
+            ? `${toFaDigits(ids.length)} مجوز از «${role.name}» کپی می‌شود`
             : `نقش «${role.name}» مجوزی ندارد`
         );
       })
       .catch(() => {
         if (!cancelled) {
           setCopiedPermIds([]);
-          setCopyHint("کپی مجوز ممکن نشد");
+          setCopyHint("کپی ممکن نشد");
         }
       })
       .finally(() => {
@@ -375,8 +375,7 @@ export function RoleCreateDrawer({
         <SheetHeader>
           <SheetTitle>نقش جدید</SheetTitle>
           <SheetDescription>
-            فقط نام، والد و در صورت نیاز کپی اولیه مجوز. پس از ایجاد، نقش در درخت
-            انتخاب می‌شود تا مجوزها را در پنل کناری تنظیم کنید.
+            نام، والد و در صورت نیاز کپی اولیه مجوز.
           </SheetDescription>
         </SheetHeader>
 
@@ -415,11 +414,6 @@ export function RoleCreateDrawer({
               placeholder="انتخاب والد یا ریشه"
               disabled={createMutation.isPending}
             />
-            <p className="text-[11px] text-muted-foreground">
-              تورفتگی = زیرنقش. عدد «فر» تعداد فرزند مستقیم است. این فقط ساختار
-              درختی است و مجوز را خودکار منتقل نمی‌کند.
-            </p>
-
             <Separator />
 
             <RoleTreePicker
@@ -436,15 +430,11 @@ export function RoleCreateDrawer({
             {inheritBusy ? (
               <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                در حال خواندن مجوزهای نقش مبدأ…
+                در حال خواندن مجوزها…
               </p>
             ) : copyHint ? (
               <p className="text-[11px] text-muted-foreground">{copyHint}</p>
-            ) : (
-              <p className="text-[11px] text-muted-foreground">
-                کپی فقط یک‌بار در لحظه ایجاد است؛ بعداً از پنل کناری ویرایش کنید.
-              </p>
-            )}
+            ) : null}
           </div>
 
           <SheetFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
