@@ -4,6 +4,7 @@ import { identityPaths } from "./paths";
 
 export type IdentitySettingsDto = {
   require_role_assignment_approval: boolean;
+  require_privileged_access_approval: boolean;
 };
 
 function unwrapData<T>(envelope: unknown): T {
@@ -21,6 +22,9 @@ export const identitySettingsService = {
       require_role_assignment_approval: Boolean(
         data?.require_role_assignment_approval
       ),
+      require_privileged_access_approval: Boolean(
+        data?.require_privileged_access_approval ?? true
+      ),
     };
   },
 
@@ -32,6 +36,9 @@ export const identitySettingsService = {
     return {
       require_role_assignment_approval: Boolean(
         data?.require_role_assignment_approval
+      ),
+      require_privileged_access_approval: Boolean(
+        data?.require_privileged_access_approval ?? true
       ),
     };
   },

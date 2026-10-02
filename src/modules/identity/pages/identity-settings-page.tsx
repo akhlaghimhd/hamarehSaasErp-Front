@@ -1,4 +1,4 @@
-/** Tenant identity system settings — dual role-assignment approval toggle */
+/** Tenant identity settings — separate dual-approval for roles vs privileged access */
 
 "use client";
 
@@ -12,7 +12,10 @@ import { Label } from "@/shared/components/ui/label";
 import { ApiClientError } from "@/api";
 import { usePermission } from "@/auth";
 import { IdentityPermissions } from "../types";
-import { identitySettingsService } from "../services/identity-settings-service";
+import {
+  identitySettingsService,
+  type IdentitySettingsDto,
+} from "../services/identity-settings-service";
 
 export function IdentitySettingsPage() {
   const canView = usePermission(IdentityPermissions.userView);
@@ -26,14 +29,10 @@ export function IdentitySettingsPage() {
   });
 
   const mut = useMutation({
-    mutationFn: (on: boolean) =>
-      identitySettingsService.update({ require_role_assignment_approval: on }),
-    onSuccess: (d) => {
-      toast.success(
-        d.require_role_assignment_approval
-          ? "تأیید دوگانه نقش فعال شد. اعطا و برداشتن نقش تا تأیید معلق می‌ماند."
-          : "تأیید دوگانه نقش خاموش شد. تخصیص نقش مستقیم اعمال می‌شود."
-      );
+    mutationFn: (payload: Partial<IdentitySettingsDto>) =>
+      identitySettingsService.update(payload),
+    onSuccess: () => {
+      toast.success("تنظیمات ذخیره شد");
       void qc.invalidateQueries({ queryKey: ["identity", "settings"] });
     },
     onError: (e) =>
@@ -50,13 +49,14 @@ export function IdentitySettingsPage() {
     );
   }
 
-  const on = Boolean(data?.require_role_assignment_approval);
+  const roleOn = Boolean(data?.require_role_assignment_approval);
+  const privOn = Boolean(data?.require_privileged_access_approval ?? true);
 
   return (
     <div className="space-y-6 p-4">
       <PageHeader
         title="تنظیمات هویت و دسترسی"
-        description="سیاست‌های امنیتی در سطح مستأجر — توسط خود مشتری کنترل می‌شود"
+        description="سیاست‌های امنیتی در سطح مستأجر — موقت در این صفحه؛ بعداً به تنظیمات سیستم منتقل می‌شود"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "هویت و دسترسی", href: "/dashboard/identity" },
@@ -88,42 +88,76 @@ export function IdentitySettingsPage() {
           </Button>
         </div>
       ) : (
-        <div className="max-w-xl rounded-xl border bg-card p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="dual-approval" className="text-base font-medium">
-                تأیید دوگانه تخصیص نقش
-              </Label>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                وقتی فعال باشد، اعطای نقش جدید و برداشتن نقش قبلی به‌صورت درخواست
-                معلق ثبت می‌شود و تا تأیید نفر دوم اعمال نمی‌گردد. دسترسی‌های قبلی
-                کاربر تا زمان تأیید، فعال می‌مانند. وقتی خاموش باشد، همان مسیر
-                مستقیم فعلی اعمال می‌شود.
-              </p>
+        <div className="max-w-xl space-y-4">
+          <div className="rounded-xl border bg-card p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="dual-role" className="text-base font-medium">
+                  تأیید دوگانه تخصیص نقش عادی
+                </Label>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  اعطا/برداشتن نقش از صفحه کاربر تا تأیید نفر دوم اعمال نمی‌شود.
+                  دسترسی‌های قبلی تا تأیید فعال می‌مانند. خاموش = مسیر مستقیم.
+                </p>
+              </div>
+              <Switch
+                id="dual-role"
+                checked={roleOn}
+                disabled={!canUpdate || mut.isPending}
+                onCheckedChange={(v) => {
+                  if (!canUpdate) return;
+                  void mut.mutateAsync({
+                    require_role_assignment_approval: Boolean(v),
+                  });
+                }}
+              />
             </div>
-            <Switch
-              id="dual-approval"
-              checked={on}
-              disabled={!canUpdate || mut.isPending}
-              onCheckedChange={(v) => {
-                if (!canUpdate) return;
-                void mut.mutateAsync(Boolean(v));
-              }}
-            />
+            <p className="mt-3 text-xs text-muted-foreground">
+              وضعیت:{" "}
+              <span className="font-medium text-foreground">
+                {roleOn ? "فعال (مسیر دوگانه)" : "خاموش (مسیر مستقیم)"}
+              </span>
+            </p>
           </div>
+
+          <div className="rounded-xl border bg-card p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="dual-priv" className="text-base font-medium">
+                  تأیید دوگانه دسترسی اضطراری (موقت)
+                </Label>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  درخواست‌های break-glass در صف دسترسی اضطراری می‌مانند تا تأیید
+                  شوند. خاموش = فعال‌سازی فوری بدون نفر دوم. این صف جدا از تخصیص
+                  نقش عادی است.
+                </p>
+              </div>
+              <Switch
+                id="dual-priv"
+                checked={privOn}
+                disabled={!canUpdate || mut.isPending}
+                onCheckedChange={(v) => {
+                  if (!canUpdate) return;
+                  void mut.mutateAsync({
+                    require_privileged_access_approval: Boolean(v),
+                  });
+                }}
+              />
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              وضعیت:{" "}
+              <span className="font-medium text-foreground">
+                {privOn ? "فعال (نیاز به تأیید)" : "خاموش (فعال‌سازی فوری)"}
+              </span>
+            </p>
+          </div>
+
           {mut.isPending ? (
-            <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               در حال ذخیره…
             </p>
-          ) : (
-            <p className="mt-3 text-xs text-muted-foreground">
-              وضعیت فعلی:{" "}
-              <span className="font-medium text-foreground">
-                {on ? "فعال (مسیر دوگانه)" : "خاموش (مسیر مستقیم)"}
-              </span>
-            </p>
-          )}
+          ) : null}
         </div>
       )}
     </div>
