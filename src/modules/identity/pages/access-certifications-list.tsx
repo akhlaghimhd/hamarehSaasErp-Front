@@ -61,7 +61,8 @@ const STATUS_LABEL: Record<string, string> = {
   CANCELLED: "لغو شده",
 };
 
-function sanitizeCampaignCode(raw: string): string {
+/** فقط برای ارسال به API — هنگام تایپ کاربر را محدود نمی‌کند */
+function normalizeCampaignCodeForApi(raw: string): string {
   let s = raw.trim();
   const fa = "۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩";
   const en = "01234567890123456789";
@@ -76,15 +77,6 @@ function sanitizeCampaignCode(raw: string): string {
   s = s.replace(/[^a-z0-9_-]/g, "");
   s = s.replace(/-+/g, "-").replace(/^[-_]+|[-_]+$/g, "");
   return s.slice(0, 80);
-}
-
-function suggestCampaignCode(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  const r = Math.random().toString(36).slice(2, 6);
-  return `ac-${y}${m}${day}-${r}`;
 }
 
 function statusTone(
@@ -144,7 +136,9 @@ export function AccessCertificationsListPage() {
   const [reportBusy, setReportBusy] = useState<string | null>(null);
 
   const formDirty = Boolean(code.trim() || name.trim());
-  const codeOk = code.trim().length >= 2 && /^[a-z0-9_-]+$/.test(code.trim());
+  const normalizedCode = normalizeCampaignCodeForApi(code);
+  /** خالی = سیستم خودش کد می‌سازد؛ اگر پر شد حداقل ۲ کاراکتر معتبر */
+  const codeOk = code.trim() === "" || normalizedCode.length >= 2;
 
   const { data = [], isLoading, isError, error } = useQuery({
     queryKey: ["identity", "access-certifications"],
@@ -203,7 +197,7 @@ export function AccessCertificationsListPage() {
   const createMut = useMutation({
     mutationFn: () =>
       accessCertificationService.create({
-        code: sanitizeCampaignCode(code),
+        code: normalizedCode, // خالی → بک‌اند خودش می‌سازد
         name: name.trim(),
       }),
     onSuccess: (c) => {
@@ -238,9 +232,14 @@ export function AccessCertificationsListPage() {
   }
 
   function openCreateForm() {
-    setCode(suggestCampaignCode());
+    setCode("");
     setName("");
     setCreateOpen(true);
+  }
+
+  function closeCreateForm() {
+    resetCreate();
+    setCreateOpen(false);
   }
 
   async function handleReport(campaign: AccessCertCampaignDto) {
@@ -517,19 +516,21 @@ export function AccessCertificationsListPage() {
       <Sheet
         open={createOpen}
         onOpenChange={(open) => {
-          if (!open) {
-            if (formDirty) return;
-            setCreateOpen(false);
-            resetCreate();
-          } else {
+          if (open) {
             openCreateForm();
+            return;
           }
+          // ضربدر و بستن عمدی همیشه مجاز است
+          closeCreateForm();
         }}
       >
         <SheetContent
           side="right"
           className="flex h-full max-h-dvh w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
           onPointerDownOutside={(e) => {
+            if (formDirty) e.preventDefault();
+          }}
+          onInteractOutside={(e) => {
             if (formDirty) e.preventDefault();
           }}
           onEscapeKeyDown={(e) => {
@@ -541,28 +542,23 @@ export function AccessCertificationsListPage() {
           </SheetHeader>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
             <div className="space-y-1.5">
-              <Label htmlFor="ac-code">کد</Label>
+              <Label htmlFor="ac-code">کد (اختیاری)</Label>
               <Input
                 id="ac-code"
-                className="h-9 font-mono"
+                className="h-9"
                 dir="ltr"
                 value={code}
-                onChange={(e) => setCode(sanitizeCampaignCode(e.target.value))}
-                placeholder="q3-1404"
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="مثلاً q3-1404"
                 autoComplete="off"
               />
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                فقط حروف انگلیسی، عدد، خط تیره (-) و زیرخط (_). مثال:{" "}
-                <span className="font-mono" dir="ltr">
-                  q3-1404
-                </span>{" "}
-                یا{" "}
-                <span className="font-mono" dir="ltr">
-                  ac-20261002-ab12
-                </span>
+                اختیاری است؛ اگر خالی بگذارید سیستم خودش کد می‌سازد.
               </p>
               {code.trim() && !codeOk ? (
-                <p className="text-[11px] text-destructive">کد حداقل ۲ کاراکتر معتبر لازم دارد.</p>
+                <p className="text-[11px] text-destructive">
+                  اگر کد می‌نویسید، حداقل دو حرف یا عدد بگذارید.
+                </p>
               ) : null}
             </div>
             <div className="space-y-1.5">
@@ -577,14 +573,7 @@ export function AccessCertificationsListPage() {
             </div>
           </div>
           <SheetFooter className="shrink-0 border-t px-5 py-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                resetCreate();
-                setCreateOpen(false);
-              }}
-            >
+            <Button type="button" variant="outline" onClick={closeCreateForm}>
               انصراف
             </Button>
             <Button
@@ -592,7 +581,7 @@ export function AccessCertificationsListPage() {
               disabled={createMut.isPending || !codeOk || !name.trim()}
               onClick={() => {
                 if (!codeOk) {
-                  toast.error("کد کمپین نامعتبر است. فقط حروف انگلیسی، عدد، - و _");
+                  toast.error("کد واردشده قابل استفاده نیست؛ خالی بگذارید یا ساده بنویسید.");
                   return;
                 }
                 void createMut.mutateAsync();
