@@ -79,6 +79,16 @@ function normalizeCampaignCodeForApi(raw: string): string {
   return s.slice(0, 80);
 }
 
+/** اگر کاربر کد ندهد، یک کد ساده برای ارسال می‌سازیم */
+function autoCampaignCode(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const r = Math.random().toString(36).slice(2, 6);
+  return `ac-${y}${m}${day}-${r}`;
+}
+
 function statusTone(
   status?: string
 ): "success" | "warning" | "danger" | "neutral" {
@@ -137,7 +147,7 @@ export function AccessCertificationsListPage() {
 
   const formDirty = Boolean(code.trim() || name.trim());
   const normalizedCode = normalizeCampaignCodeForApi(code);
-  /** خالی = سیستم خودش کد می‌سازد؛ اگر پر شد حداقل ۲ کاراکتر معتبر */
+  /** خالی = مجاز؛ اگر پر شد حداقل ۲ کاراکتر معتبر */
   const codeOk = code.trim() === "" || normalizedCode.length >= 2;
 
   const { data = [], isLoading, isError, error } = useQuery({
@@ -197,7 +207,8 @@ export function AccessCertificationsListPage() {
   const createMut = useMutation({
     mutationFn: () =>
       accessCertificationService.create({
-        code: normalizedCode, // خالی → بک‌اند خودش می‌سازد
+        // خالی → کد خودکار تا با هر نسخه بک‌اند سازگار باشد
+        code: normalizedCode || autoCampaignCode(),
         name: name.trim(),
       }),
     onSuccess: (c) => {
@@ -516,17 +527,13 @@ export function AccessCertificationsListPage() {
       <Sheet
         open={createOpen}
         onOpenChange={(open) => {
-          if (open) {
-            openCreateForm();
-            return;
-          }
-          // ضربدر و بستن عمدی همیشه مجاز است
-          closeCreateForm();
+          if (!open) closeCreateForm();
+          else setCreateOpen(true);
         }}
       >
         <SheetContent
           side="right"
-          className="flex h-full max-h-dvh w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
+          className="flex w-full flex-col gap-0 p-0 sm:max-w-md"
           onPointerDownOutside={(e) => {
             if (formDirty) e.preventDefault();
           }}
@@ -542,18 +549,18 @@ export function AccessCertificationsListPage() {
           </SheetHeader>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
             <div className="space-y-1.5">
-              <Label htmlFor="ac-code">کد (اختیاری)</Label>
+              <Label htmlFor="ac-code">کد</Label>
               <Input
                 id="ac-code"
                 className="h-9"
                 dir="ltr"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                placeholder="مثلاً q3-1404"
+                placeholder="خالی بماند تا خودکار ساخته شود"
                 autoComplete="off"
               />
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                اختیاری است؛ اگر خالی بگذارید سیستم خودش کد می‌سازد.
+                پر کردن لازم نیست. خالی بگذارید تا هنگام ذخیره کد ساخته شود.
               </p>
               {code.trim() && !codeOk ? (
                 <p className="text-[11px] text-destructive">
