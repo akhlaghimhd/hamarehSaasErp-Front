@@ -3,6 +3,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ChevronDown,
   ChevronLeft,
@@ -32,6 +33,7 @@ import {
   useAssignRoleToUser,
 } from "../hooks/use-roles";
 import type { RoleDto } from "../services/role-service";
+import { roleAssignmentRequestService } from "../services/role-assignment-request-service";
 import { IdentityPermissions } from "../types";
 import { MSG_GENERIC_ERROR } from "../lib/ui-copy";
 import { cn } from "@/shared/lib/utils";
@@ -91,7 +93,6 @@ function filterTree(nodes: RoleNode[], q: string): RoleNode[] {
   return walk(nodes);
 }
 
-/** شناسهٔ همهٔ نوادگان (بدون خود گره) */
 function collectDescendantIds(node: RoleNode): string[] {
   const ids: string[] = [];
   for (const c of node.children) {
@@ -100,7 +101,6 @@ function collectDescendantIds(node: RoleNode): string[] {
   return ids;
 }
 
-/** خود + همهٔ نوادگان — برای cascade انتخاب */
 function collectSubtreeIds(node: RoleNode): string[] {
   return [node.tenant_role_id, ...collectDescendantIds(node)];
 }
@@ -120,7 +120,6 @@ function selectionState(
   return "none";
 }
 
-/** وضعیت تیک والد بر اساس زیرشاخه (و خودش) */
 function subtreeCheckState(
   node: RoleNode,
   selected: Set<string>
@@ -237,6 +236,41 @@ export function AssignRolesCard({ userId }: { userId: string }) {
     refetch: refetchUserRoles,
   } = useUserRoles(userId);
   const assignMutation = useAssignRoleToUser();
+  const { data: pendingReqs = [] } = useQuery({
+    queryKey: ["identity", "role-assignment-requests"],
+    queryFn: () => roleAssignmentRequestService.listPending(),
+    enabled: Boolean(userId),
+  });
+  const pendingForUser = useMemo(() => {
+    return pendingReqs.filter((r) => String(r.user_id ?? "") === String(userId));
+  }, [pendingReqs, userId]);
+  const pendingGrantIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of pendingForUser) {
+      const a = String(
+        (r as { request_action?: string }).request_action ?? "GRANT"
+      ).toUpperCase();
+      if (a !== "REVOKE") s.add(String(r.tenant_role_id ?? ""));
+    }
+    return s;
+  }, [pendingForUser]);
+  const pendingRevokeIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of pendingForUser) {
+      const a = String(
+        (r as { request_action?: string }).request_action ?? "GRANT"
+      ).toUpperCase();
+      if (a === "REVOKE") s.add(String(r.tenant_role_id ?? ""));
+    }
+    return s;
+  }, [pendingForUser]);
+  const roleNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of allRoles ?? []) {
+      m.set(r.tenant_role_id, r.name || r.code || r.tenant_role_id);
+    }
+    return m;
+  }, [allRoles]);
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [initial, setInitial] = useState<Set<string>>(new Set());
@@ -278,7 +312,6 @@ export function AssignRolesCard({ userId }: { userId: string }) {
     });
   };
 
-  /** تیک والد: خود + همهٔ فرزندان را یکجا روشن/خاموش می‌کند */
   const toggleSubtree = (node: RoleNode) => {
     const ids = collectSubtreeIds(node);
     setSelected((prev) => {
@@ -321,11 +354,19 @@ export function AssignRolesCard({ userId }: { userId: string }) {
       return;
     }
     try {
-      await assignMutation.mutateAsync({
+      const result = await assignMutation.mutateAsync({
         userId,
         roleIds: Array.from(selected),
       });
-      toast.success("نقش‌ها ذخیره شد.");
+      if (result?.mode === "pending") {
+        toast.message(
+          result.message ||
+            "تغییر نقش‌ها در صف تأیید دوگانه ثبت شد. دسترسی‌های فعلی تا تأیید نفر دوم اعمال یا برداشته نمی‌شوند.",
+          { duration: 6000 }
+        );
+      } else {
+        toast.success(result?.message || "نقش‌ها با موفقیت ذخیره و اعمال شد.");
+      }
       setEditing(false);
       void refetchUserRoles();
     } catch (e) {
@@ -428,26 +469,72 @@ export function AssignRolesCard({ userId }: { userId: string }) {
                 ) : (
                   <Check className="h-3.5 w-3.5" />
                 )}
-                ذخیره
+                ثبت تغییرات نقش
               </Button>
             </div>
           </>
-        ) : assigned.length === 0 ? (
+        ) : assigned.length === 0 && pendingGrantIds.size === 0 ? (
           <p className="text-sm text-muted-foreground">
             هنوز نقشی برای این کاربر ثبت نشده است.
             {canAssign ? " با ویرایش می‌توانید نقش اضافه کنید." : ""}
           </p>
         ) : (
-          <div className="flex flex-wrap gap-2">
-            {assigned.map((r) => (
-              <span
-                key={r.tenant_role_id}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/30 px-2.5 py-1 text-xs text-foreground/90"
-              >
-                <Shield className="h-3 w-3 text-muted-foreground" />
-                {r.name}
-              </span>
-            ))}
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {assigned.map((r) => {
+                const revoking = pendingRevokeIds.has(r.tenant_role_id);
+                return (
+                  <span
+                    key={r.tenant_role_id}
+                    className={
+                      revoking
+                        ? "inline-flex items-center gap-1.5 rounded-full border border-dashed border-amber-500/50 bg-amber-500/5 px-2.5 py-1 text-xs text-muted-foreground opacity-70"
+                        : "inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/30 px-2.5 py-1 text-xs text-foreground/90"
+                    }
+                    title={
+                      revoking
+                        ? "در انتظار تأیید برای برداشتن این نقش"
+                        : undefined
+                    }
+                  >
+                    <Shield className="h-3 w-3 text-muted-foreground" />
+                    {r.name}
+                    {revoking ? (
+                      <span className="text-[10px] text-amber-700 dark:text-amber-400">
+                        (حذف — در انتظار تأیید)
+                      </span>
+                    ) : null}
+                  </span>
+                );
+              })}
+            </div>
+            {pendingGrantIds.size > 0 ? (
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-medium text-muted-foreground">
+                  نقش‌های در صف اعطا (هنوز اعمال نشده)
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {Array.from(pendingGrantIds).map((id) => (
+                    <span
+                      key={`pg-${id}`}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-primary/40 bg-primary/5 px-2.5 py-1 text-xs text-muted-foreground opacity-75"
+                    >
+                      <Shield className="h-3 w-3 text-primary/70" />
+                      {roleNameById.get(id) ?? id.slice(0, 8)}
+                      <span className="text-[10px] text-primary/80">
+                        (افزودن — در انتظار تأیید)
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {pendingForUser.length > 0 ? (
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                درخواست‌های معلق در بخش «تأیید تخصیص نقش» قابل تأیید یا رد هستند.
+                در صورت رد، دوباره نقش‌ها را ویرایش کنید تا درخواست جدید ثبت شود.
+              </p>
+            ) : null}
           </div>
         )}
       </CardContent>
