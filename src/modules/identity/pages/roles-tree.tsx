@@ -9,6 +9,7 @@ import {
   Pencil,
   UserCheck,
   UserMinus,
+  Star,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -227,6 +228,15 @@ export function RoleTreeItem({
             {!isActive ? (
               <span className="rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">
                 غیرفعال
+              </span>
+            ) : null}
+            {role.is_privileged ? (
+              <span
+                className="inline-flex items-center gap-0.5 rounded bg-amber-500/15 px-1 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
+                title="نقش ممتاز — فقط از مسیر دسترسی اضطراری"
+              >
+                <Star className="h-2.5 w-2.5 fill-current" />
+                ممتاز
               </span>
             ) : null}
             <span className="ms-auto flex shrink-0 items-center gap-2 text-[10px] tabular-nums text-muted-foreground">
