@@ -67,6 +67,13 @@ export const privilegedAccessService = {
     return unwrapData<PrivilegedGrantDto>(envelope);
   },
 
+  async extend(id: string, durationMinutes: number): Promise<PrivilegedGrantDto> {
+    const envelope = await apiPost(identityPaths.privilegedExtend(id), {
+      duration_minutes: durationMinutes,
+    });
+    return unwrapData<PrivilegedGrantDto>(envelope);
+  },
+
   /** Mark / unmark a role as privileged (break-glass eligible). */
   async markRole(tenantRoleId: string, isPrivileged: boolean): Promise<RoleDto> {
     const envelope = await apiPost(identityPaths.privilegedMarkRole, {
