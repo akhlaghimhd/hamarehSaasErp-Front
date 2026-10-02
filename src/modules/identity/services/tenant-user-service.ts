@@ -22,9 +22,13 @@ export type MembershipListFilter = "active" | "deleted";
 
 export const tenantUserService = {
   async list(
-    membership: MembershipListFilter = "active"
+    membership: MembershipListFilter = "active",
+    opts?: { companyId?: string | null }
   ): Promise<TenantUserDto[]> {
-    const qs = membership === "deleted" ? "?membership=deleted" : "";
+    const params = new URLSearchParams();
+    if (membership === "deleted") params.set("membership", "deleted");
+    if (opts?.companyId) params.set("company_id", opts.companyId);
+    const qs = params.toString() ? `?${params.toString()}` : "";
     const envelope = await apiGet(`${identityPaths.users}${qs}`);
     const data = unwrapData<TenantUserDto[] | { data?: TenantUserDto[] }>(
       envelope
@@ -71,25 +75,13 @@ export const tenantUserService = {
       const envelope = await apiGet(identityPaths.user(tenantUserId));
       return unwrapData<TenantUserDto>(envelope);
     } catch (e) {
-      if (e instanceof ApiClientError && e.statusCode === 404) {
-        return null;
-      }
+      if (e instanceof ApiClientError && e.status === 404) return null;
       throw e;
     }
   },
 
   async create(payload: CreateTenantUserPayload): Promise<TenantUserDto> {
-    const body: Record<string, unknown> = {
-      first_name: payload.first_name,
-      last_name: payload.last_name,
-      mobile: payload.mobile,
-      is_owner: payload.is_owner ?? false,
-      role_ids: payload.role_ids ?? [],
-    };
-    if (payload.email_local_part) {
-      body.email_local_part = payload.email_local_part;
-    }
-    const envelope = await apiPost(identityPaths.users, body);
+    const envelope = await apiPost(identityPaths.users, payload);
     return unwrapData<TenantUserDto>(envelope);
   },
 
@@ -97,14 +89,7 @@ export const tenantUserService = {
     tenantUserId: string,
     payload: UpdateTenantUserPayload
   ): Promise<TenantUserDto> {
-    const body: Record<string, unknown> = {};
-    if (payload.first_name !== undefined) body.first_name = payload.first_name;
-    if (payload.last_name !== undefined) body.last_name = payload.last_name;
-    if (payload.mobile !== undefined) body.mobile = payload.mobile;
-    if (payload.is_owner !== undefined) body.is_owner = payload.is_owner;
-    if (payload.status !== undefined) body.status = payload.status;
-
-    const envelope = await apiPut(identityPaths.user(tenantUserId), body);
+    const envelope = await apiPut(identityPaths.user(tenantUserId), payload);
     return unwrapData<TenantUserDto>(envelope);
   },
 
