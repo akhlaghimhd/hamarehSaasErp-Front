@@ -92,7 +92,7 @@ export function MembersListPage() {
       <PageHeader
         title="کاربران سازمان"
         description="فهرست اعضای مستأجر"
-        icon={Users}
+        icon={<Users className="h-4 w-4" />}
         actions={
           canCreate ? (
             <Button type="button" size="sm" className="gap-1.5" onClick={() => setCreateOpen(true)}>
