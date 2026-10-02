@@ -92,6 +92,7 @@ export function RolesListPage() {
   const [draftPerms, setDraftPerms] = useState<Set<string>>(new Set());
   const [baselinePerms, setBaselinePerms] = useState<Set<string>>(new Set());
   const [permsDirty, setPermsDirty] = useState(false);
+  const [pendingSelectId, setPendingSelectId] = useState<string | null>(null);
   const expandedInitRef = useRef(false);
 
   const rows = data ?? [];
@@ -212,15 +213,16 @@ export function RolesListPage() {
 
   const selectRole = (id: string) => {
     if (permsDirty && selectedId && selectedId !== id) {
-      if (
-        !window.confirm(
-          "تغییرات مجوز ذخیره نشده. بدون ذخیره نقش دیگری انتخاب شود؟"
-        )
-      ) {
-        return;
-      }
+      setPendingSelectId(id);
+      return;
     }
     setSelectedId(id);
+  };
+
+  const confirmDiscardAndSelect = () => {
+    if (!pendingSelectId) return;
+    setSelectedId(pendingSelectId);
+    setPendingSelectId(null);
   };
 
   const activateOne = async (row: RoleDto) => {
@@ -566,15 +568,14 @@ export function RolesListPage() {
               </div>
             </div>
 
-            <div className="border-b border-border/40 px-3 py-2">
-              <div className="relative">
+            <div className="flex flex-wrap items-center gap-2 border-b border-border/40 px-3 py-2">
+              <div className="relative min-w-[10rem] flex-1">
                 <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className={cn("h-8 ps-8 text-sm", permQuery && "pe-8")}
                   placeholder="جستجوی مجوز یا دسته…"
                   value={permQuery}
                   onChange={(e) => setPermQuery(e.target.value)}
-                  disabled={!selectedId}
                 />
                 {permQuery ? (
                   <button
@@ -589,44 +590,32 @@ export function RolesListPage() {
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            <div className="min-h-0 flex-1 overflow-y-auto p-2">
               {!selectedId ? (
-                <EmptyState
-                  title="نقشی انتخاب نشده"
-                  description="از پنل راست یک نقش را انتخاب کنید"
-                />
+                <EmptyState title="نقشی انتخاب نشده" />
               ) : detailLoading && !selectedRoleDetail ? (
-                <div className="space-y-2">
+                <div className="space-y-2 p-2">
                   {Array.from({ length: 6 }).map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
+                    <Skeleton key={i} className="h-16 w-full" />
                   ))}
                 </div>
               ) : permsLoading ? (
-                <div className="space-y-2">
+                <div className="space-y-2 p-2">
                   {Array.from({ length: 6 }).map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
+                    <Skeleton key={i} className="h-16 w-full" />
                   ))}
                 </div>
-              ) : filteredPerms.length === 0 ? (
-                <EmptyState
-                  title={
-                    permQuery.trim()
-                      ? "مجوزی با این جستجو نیست"
-                      : "هنوز مجوزی تعریف نشده"
-                  }
-                />
+              ) : permsByModule.length === 0 ? (
+                <EmptyState title="مجوزی یافت نشد" />
               ) : (
                 <div className="space-y-2">
-                  {permsByModule.map(([mod, list], idx) => (
+                  {permsByModule.map(([mod, list]) => (
                     <PermissionModuleGroup
                       key={mod}
                       moduleName={mod}
                       permissions={list}
                       draftPerms={draftPerms}
-                      canAssign={canAssignPerms}
-                      busy={assignMutation.isPending}
-                      defaultOpen={idx === 0 || Boolean(permQuery.trim())}
-                      forceOpenSubgroups={Boolean(permQuery.trim())}
+                      canEdit={Boolean(canAssignPerms && selectedId)}
                       onToggle={togglePerm}
                       onToggleMany={toggleManyPerms}
                     />
@@ -634,41 +623,6 @@ export function RolesListPage() {
                 </div>
               )}
             </div>
-
-            {canAssignPerms && selectedId && permsDirty ? (
-              <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-muted/20 px-3 py-2">
-                <span className="text-xs text-muted-foreground">
-                  تغییرات ذخیره نشده
-                </span>
-                <div className="flex gap-1.5">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 gap-1.5"
-                    disabled={assignMutation.isPending}
-                    onClick={resetPermissions}
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    انصراف
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-8 gap-1.5"
-                    disabled={assignMutation.isPending}
-                    onClick={() => void savePermissions()}
-                  >
-                    {assignMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4" />
-                    )}
-                    ذخیره مجوزها
-                  </Button>
-                </div>
-              </div>
-            ) : null}
           </section>
         </div>
 
@@ -740,6 +694,32 @@ export function RolesListPage() {
                 disabled={updateMutation.isPending}
               >
                 {updateMutation.isPending ? "در حال ذخیره…" : "ذخیره"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={Boolean(pendingSelectId)}
+          onOpenChange={(o) => !o && setPendingSelectId(null)}
+        >
+          <DialogContent className="sm:max-w-md" dir="rtl">
+            <DialogHeader>
+              <DialogTitle>تغییرات ذخیره‌نشده</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              تغییرات مجوز ذخیره نشده. بدون ذخیره نقش دیگری انتخاب شود؟
+            </p>
+            <DialogFooter className="gap-2 sm:justify-start">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPendingSelectId(null)}
+              >
+                انصراف
+              </Button>
+              <Button type="button" onClick={confirmDiscardAndSelect}>
+                ادامه بدون ذخیره
               </Button>
             </DialogFooter>
           </DialogContent>
