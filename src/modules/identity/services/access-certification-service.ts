@@ -48,7 +48,7 @@ export type AccessCertItemDto = {
 };
 
 export type CreateAccessCertCampaignPayload = {
-  /** اختیاری — خالی بماند تا به‌صورت خودکار ساخته شود */
+  /** اختیاری در UI — اگر خالی باشد اینجا کد ساخته می‌شود */
   code?: string | null;
   name: string;
   description?: string | null;
@@ -89,7 +89,10 @@ function normalizeCampaign(raw: unknown): AccessCertCampaignDto {
   return o as AccessCertCampaignDto;
 }
 
-function generateCampaignCode(): string {
+/** همیشه یک کد غیرخالی برای سازگاری با بک‌اندهای قدیمی (required) */
+function ensureCampaignCode(raw?: string | null): string {
+  const cleaned = (raw ?? "").trim();
+  if (cleaned.length >= 2) return cleaned.slice(0, 80);
   const d = new Date();
   const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
   return `ac-${stamp}-${Math.random().toString(36).slice(2, 6)}`;
@@ -102,13 +105,12 @@ export const accessCertificationService = {
   },
 
   async create(payload: CreateAccessCertCampaignPayload): Promise<AccessCertCampaignDto> {
-    const body: Record<string, unknown> = {
+    const body = {
       name: payload.name,
+      code: ensureCampaignCode(payload.code),
+      ...(payload.description != null ? { description: payload.description } : {}),
+      ...(payload.due_at != null ? { due_at: payload.due_at } : {}),
     };
-    const code = (payload.code ?? "").trim() || generateCampaignCode();
-    body.code = code;
-    if (payload.description != null) body.description = payload.description;
-    if (payload.due_at != null) body.due_at = payload.due_at;
 
     const envelope = await apiPost(identityPaths.accessCertifications, body);
     return normalizeCampaign(unwrapData(envelope));
