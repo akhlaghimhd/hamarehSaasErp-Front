@@ -36,6 +36,31 @@ export const tenantUserService = {
     return [];
   },
 
+  /**
+   * Server typeahead — does not load full roster.
+   * Backend requires min 2 chars; returns up to `limit` (default 25).
+   */
+  async search(
+    q: string,
+    opts?: { membership?: MembershipListFilter; limit?: number }
+  ): Promise<TenantUserDto[]> {
+    const term = q.trim();
+    if (term.length < 2) return [];
+    const membership = opts?.membership ?? "active";
+    const limit = opts?.limit ?? 25;
+    const params = new URLSearchParams();
+    if (membership === "deleted") params.set("membership", "deleted");
+    params.set("q", term);
+    params.set("limit", String(limit));
+    const envelope = await apiGet(`${identityPaths.users}?${params.toString()}`);
+    const data = unwrapData<TenantUserDto[] | { data?: TenantUserDto[] }>(envelope);
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === "object" && Array.isArray(data.data)) {
+      return data.data;
+    }
+    return [];
+  },
+
   async getEmailHost(): Promise<{ email_host: string }> {
     const envelope = await apiGet(identityPaths.usersEmailHost);
     return unwrapData<{ email_host: string }>(envelope);
