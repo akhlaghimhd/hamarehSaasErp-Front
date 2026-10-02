@@ -232,6 +232,8 @@ export function RolesListPage() {
         payload: { status: 1 },
       });
       toast.success("نقش فعال شد");
+      void refetch();
+      if (selectedId === row.tenant_role_id) void refetchDetail();
     } catch (e) {
       toast.error(
         e instanceof ApiClientError && e.message
@@ -248,6 +250,8 @@ export function RolesListPage() {
         payload: { status: 0 },
       });
       toast.success("نقش غیرفعال شد");
+      void refetch();
+      if (selectedId === row.tenant_role_id) void refetchDetail();
     } catch (e) {
       toast.error(
         e instanceof ApiClientError && e.message
@@ -349,7 +353,7 @@ export function RolesListPage() {
       selectedRoleDetail?.status ??
       rows.find((r) => r.tenant_role_id === selectedId)?.status ??
       null;
-    if (status !== 1) {
+    if (Number(status) !== 1) {
       toast.error(
         "امکان تخصیص مجوز به نقش غیرفعال وجود ندارد. ابتدا نقش را فعال کنید."
       );
@@ -397,11 +401,12 @@ export function RolesListPage() {
     rows.find((r) => r.tenant_role_id === selectedId)?.name ??
     null;
 
+  // Prefer list row status (refreshed on activate/deactivate) over detail cache.
   const selectedStatus =
-    selectedRoleDetail?.status ??
     rows.find((r) => r.tenant_role_id === selectedId)?.status ??
+    selectedRoleDetail?.status ??
     null;
-  const selectedIsActive = selectedStatus === 1;
+  const selectedIsActive = Number(selectedStatus) === 1;
   const canEditPerms = Boolean(canAssignPerms && selectedId && selectedIsActive);
 
   return (
