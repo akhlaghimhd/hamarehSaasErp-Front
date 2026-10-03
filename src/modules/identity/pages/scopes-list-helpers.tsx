@@ -1,7 +1,6 @@
 /** Helpers for scopes list page */
 import type { ScopeDto } from "@/modules/identity/services/scope-service";
 import * as XLSX from "xlsx";
-import { toFaDigits } from "@/shared/lib/utils";
 
 export const STRUCTURAL = new Set([
   "COMPANY",
@@ -44,21 +43,22 @@ export function refCount(r: ScopeDto) {
   return r.reference_id ? 1 : 0;
 }
 
+function statusLabel(r: ScopeDto) {
+  if ((r as { deleted_at?: string | null }).deleted_at) return "حذف‌شده";
+  if (r.is_active === false) return "غیرفعال";
+  return "فعال";
+}
+
 export function exportScopesExcel(rows: ScopeDto[]) {
   const aoa: (string | number)[][] = [
     ["نام", "نوع", "تعداد مرجع", "وضعیت", "توضیح"],
   ];
   for (const r of rows) {
-    const st = (r as { deleted_at?: string | null }).deleted_at
-      ? "حذف‌شده"
-      : r.is_active === false
-        ? "غیرفعال"
-        : "فعال";
     aoa.push([
       r.scope_name,
       scopeTypeLabel(r.scope_type),
       refCount(r),
-      st,
+      statusLabel(r),
       r.description || "",
     ]);
   }
@@ -77,4 +77,47 @@ export function exportScopesExcel(rows: ScopeDto[]) {
   URL.revokeObjectURL(url);
 }
 
-export { toFaDigits };
+function escapeHtml(s: string) {
+  return s
+    .replace(/&/g, "&")
+    .replace(/</g, "<")
+    .replace(/>/g, ">")
+    .replace(/"/g, """);
+}
+
+/** PDF via print window (same pattern as members list) */
+export function exportScopesPdf(rows: ScopeDto[]) {
+  const body = rows
+    .map((r) => {
+      const cells = [
+        escapeHtml(r.scope_name ?? "—"),
+        escapeHtml(scopeTypeLabel(r.scope_type)),
+        escapeHtml(String(refCount(r))),
+        escapeHtml(statusLabel(r)),
+        escapeHtml(r.description || "—"),
+      ];
+      return `<tr>${cells.map((c) => `<td>${c}</td>`).join("")}</tr>`;
+    })
+    .join("");
+  const html = `<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/><title>محدوده‌های دسترسی</title>
+<style>
+body{font-family:Tahoma,Arial,sans-serif;font-size:12px;padding:16px;direction:rtl}
+h1{font-size:16px;margin:0 0 12px}
+table{width:100%;border-collapse:collapse}
+th,td{border:1px solid #ccc;padding:6px 8px;text-align:right}
+th{background:#f3f4f6}
+</style></head><body>
+<h1>محدوده‌های دسترسی</h1>
+<table>
+<thead><tr><th>نام</th><th>نوع</th><th>مرجع</th><th>وضعیت</th><th>توضیح</th></tr></thead>
+<tbody>${body}</tbody>
+</table>
+<script>window.onload=function(){window.print()}</script>
+</body></html>`;
+  const w = window.open("", "_blank");
+  if (!w) {
+    throw new Error("مرورگر پنجره چاپ را مسدود کرد");
+  }
+  w.document.write(html);
+  w.document.close();
+}
