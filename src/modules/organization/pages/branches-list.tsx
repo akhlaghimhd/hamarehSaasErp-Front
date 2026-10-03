@@ -1,16 +1,11 @@
-﻿/**
- * FE-ORG ظ¤ ┘┘ç╪▒╪│╪ز ╪│╪▒╪د╪│╪▒█î ╪┤╪╣╪ذ
- * ┘ç┘àظî╪ز╪▒╪د╪▓ ╪┤╪▒┌ر╪زظî┘ç╪د: bulk╪î ╪ز╪ث█î█î╪»╪î sort╪î ╪│╪ز┘ê┘ظî┘ç╪د╪î ┘█î┘╪ز╪▒ ┘ê╪╢╪╣█î╪ز╪î ┘╪▒┘à ┌ر╪د┘à┘╪î dirty-guard
+/**
+ * FE-ORG — فهرست شعب (clean UTF-8)
  */
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowDown, ArrowUp, ArrowUpDown, Columns3, GitBranch, Loader2, Pencil, Plus,
-  Power, PowerOff, RotateCcw, Search, Trash2, X,
-} from "lucide-react";
+import { GitBranch, Loader2, Plus, Search } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/layout/page-header";
@@ -18,135 +13,35 @@ import { StatusChip } from "@/shared/components/data-display/status-chip";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { Input } from "@/shared/components/ui/input";
 import { Button } from "@/shared/components/ui/button";
-import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Skeleton } from "@/shared/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/shared/components/ui/dropdown-menu";
-import { TooltipProvider } from "@/shared/components/ui/tooltip";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/components/ui/table";
-import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/shared/components/ui/sheet";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { Label } from "@/shared/components/ui/label";
 import { Switch } from "@/shared/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
+import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/shared/components/ui/sheet";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/components/ui/table";
 import { usePermission } from "@/auth";
-import { ApiClientError, tokenStorage } from "@/api";
-import { cn, toFaDigits } from "@/shared/lib/utils";
+import { ApiClientError } from "@/api";
+import { toFaDigits } from "@/shared/lib/utils";
 import { useCompanies } from "../hooks/use-companies";
-import { useAllBranches, useCreateBranch, useUpdateBranch, useSoftDeleteBranch, useRestoreBranch } from "../hooks/use-branches";
-import { branchService, type BranchListFilter } from "../services/branch-service";
+import { useAllBranches, useCreateBranch } from "../hooks/use-branches";
 import { companyDetailPath } from "../lib/company-ref";
 import { OrganizationPermissions, BRANCH_KIND_LABELS, type BranchDto } from "../types";
-import { IconAction, fd } from "./companies-list-helpers";
 
-const MSG_ERR = "╪د┘╪ش╪د┘à ╪د█î┘ ┌ر╪د╪▒ ┘à┘à┌ر┘ ┘╪┤╪». ┌ر┘à█î ╪ذ╪╣╪» ╪»┘ê╪ذ╪د╪▒┘ç ╪ز┘╪د╪┤ ┌ر┘█î╪».";
-const MSG_NO_ACCESS = "╪ذ╪▒╪د█î ┘à╪┤╪د┘ç╪»┘ç ╪د█î┘ ╪ذ╪«╪┤ ┘à╪ش┘ê╪▓ ┘╪د╪▓┘à ╪▒╪د ┘╪»╪د╪▒█î╪».";
-const COL_STORAGE = "organization.branches.columns.v2";
-const ALL = "__all__";
-
-type StatusFilter = "all" | "active" | "inactive";
-type SortKey = "name" | "code" | "company" | "kind" | "address" | "status" | "created";
-type SortDir = "asc" | "desc";
-type ColumnId = "name" | "code" | "company" | "kind" | "address" | "status" | "created" | "actions";
-type BulkKind = "activate" | "deactivate" | "delete" | "restore";
-type BranchRow = BranchDto & { company_name: string };
-type BranchForm = {
-  company_id: string; code: string; name: string; address: string; branch_kind: string;
-  parent_branch_id: string; default_warehouse_id: string;
-  is_active: boolean; supports_shipping: boolean; supports_receiving: boolean; is_manufacturing_site: boolean;
-};
-
-const COLS: { id: ColumnId; label: string; hideable?: boolean; sort?: SortKey }[] = [
-  { id: "name", label: "┘╪د┘à ╪┤╪╣╪ذ┘ç", hideable: false, sort: "name" },
-  { id: "code", label: "┌ر╪»", sort: "code" },
-  { id: "company", label: "╪┤╪▒┌ر╪ز", sort: "company" },
-  { id: "kind", label: "┘┘ê╪╣", sort: "kind" },
-  { id: "address", label: "╪ت╪»╪▒╪│", sort: "address" },
-  { id: "status", label: "┘ê╪╢╪╣█î╪ز", sort: "status" },
-  { id: "created", label: "╪ز╪د╪▒█î╪« ╪د█î╪ش╪د╪»", sort: "created" },
-  { id: "actions", label: "╪╣┘à┘█î╪د╪ز", hideable: false },
-];
-
-const emptyForm = (): BranchForm => ({
-  company_id: "", code: "", name: "", address: "", branch_kind: "OFFICE",
-  parent_branch_id: "", default_warehouse_id: "",
-  is_active: true, supports_shipping: false, supports_receiving: false, is_manufacturing_site: false,
-});
-
-function rowToForm(r: BranchRow): BranchForm {
-  return {
-    company_id: r.company_id, code: r.code ?? "", name: r.name ?? "", address: r.address ?? "",
-    branch_kind: (r.branch_kind as string) || "OFFICE",
-    parent_branch_id: r.parent_branch_id ?? "", default_warehouse_id: r.default_warehouse_id ?? "",
-    is_active: r.is_active !== false,
-    supports_shipping: Boolean(r.supports_shipping), supports_receiving: Boolean(r.supports_receiving),
-    is_manufacturing_site: Boolean(r.is_manufacturing_site),
-  };
-}
-
-function hasAuthContext(): boolean {
-  if (typeof window === "undefined") return false;
-  return Boolean(tokenStorage.getAccessToken() && tokenStorage.getTenantId());
-}
-
-function formatCodeDisplay(code?: string | null): { text: string; dir: "ltr" | "rtl" } {
-  const s = (code ?? "").trim();
-  if (!s) return { text: "ظ¤", dir: "rtl" };
-  if (/[A-Za-z]/.test(s)) return { text: s, dir: "ltr" };
-  return { text: toFaDigits(s), dir: "rtl" };
-}
+type BranchForm = { company_id: string; code: string; name: string; address: string; branch_kind: string; is_active: boolean };
+const emptyForm = (): BranchForm => ({ company_id: "", code: "", name: "", address: "", branch_kind: "OFFICE", is_active: true });
 
 export function BranchesListPage() {
-  const canView = usePermission(OrganizationPermissions.branchView) || usePermission(OrganizationPermissions.companyView);
+  const canView = usePermission(OrganizationPermissions.branchView);
   const canCreate = usePermission(OrganizationPermissions.branchCreate);
-  const canUpdate = usePermission(OrganizationPermissions.branchUpdate);
-  const canDelete = usePermission(OrganizationPermissions.branchDelete);
-
-  const qc = useQueryClient();
-  const { data: companies, isLoading: companiesLoading } = useCompanies();
+  const { data: companies } = useCompanies();
   const companyList = companies ?? [];
   const companyIds = useMemo(() => companyList.map((c) => c.company_id), [companyList]);
-
+  const { data, isLoading, isError, refetch, isFetching } = useAllBranches("active", companyIds);
   const [query, setQuery] = useState("");
-  const [companyFilter, setCompanyFilter] = useState(ALL);
-  const [membershipFilter, setMembershipFilter] = useState<BranchListFilter>("active");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const [sortKey, setSortKey] = useState<SortKey>("name");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
-  const [visible, setVisible] = useState<Record<ColumnId, boolean>>(() => {
-    const base = Object.fromEntries(COLS.map((c) => [c.id, true])) as Record<ColumnId, boolean>;
-    if (typeof window === "undefined") return base;
-    try {
-      const raw = localStorage.getItem(COL_STORAGE);
-      return raw ? { ...base, ...JSON.parse(raw) } : base;
-    } catch { return base; }
-  });
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [editing, setEditing] = useState<BranchRow | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<BranchRow | null>(null);
-  const [confirmStatus, setConfirmStatus] = useState<null | { row: BranchRow; active: boolean }>(null);
-  const [bulkBusy, setBulkBusy] = useState(false);
-  const [confirmBulk, setConfirmBulk] = useState<null | { kind: BulkKind; targets: BranchRow[] }>(null);
-  const [rowBusyId, setRowBusyId] = useState<string | null>(null);
-
+  const [sheetOpen, setSheetOpen] = useState(false);
   const form = useForm<BranchForm>({ defaultValues: emptyForm() });
-  const isDirty = form.formState.isDirty;
-  const isDeletedView = membershipFilter === "deleted";
   const formCompanyId = form.watch("company_id");
-
-  const {
-    data: branchesData,
-    isLoading: branchesLoading,
-    isFetching: branchesFetching,
-    isError,
-    refetch: refetchBranches,
-  } = useAllBranches(membershipFilter, companyIds);
-
-  const isInitialLoading = companiesLoading || (hasAuthContext() && branchesLoading && !branchesData);
-  const isRefreshing = branchesFetching && !branchesLoading;
+  const createMutation = useCreateBranch(formCompanyId || "");
 
   const companyNameById = useMemo(() => {
     const m = new Map<string, string>();
@@ -154,604 +49,147 @@ export function BranchesListPage() {
     return m;
   }, [companyList]);
 
-  const allRows: BranchRow[] = useMemo(() => {
-    return (branchesData ?? []).map((b) => ({
+  const rows = useMemo(() => {
+    const list = ((data ?? []) as BranchDto[]).map((b) => ({
       ...b,
-      company_name: companyNameById.get(b.company_id) || b.company?.legal_name || b.company?.name || "ظ¤",
+      company_name: companyNameById.get(b.company_id) || "—",
     }));
-  }, [branchesData, companyNameById]);
-
-  const parentBranchOptions = useMemo(() => {
-    if (!formCompanyId) return [];
-    return allRows.filter((r) => r.company_id === formCompanyId && (!editing || r.branch_id !== editing.branch_id));
-  }, [allRows, formCompanyId, editing]);
-
-  const createMutation = useCreateBranch(formCompanyId || "");
-  const updateMutation = useUpdateBranch(editing?.company_id || formCompanyId || "");
-  const deleteMutation = useSoftDeleteBranch(confirmDelete?.company_id || "");
-  const restoreMutation = useRestoreBranch("");
-
-  useEffect(() => {
-    try { localStorage.setItem(COL_STORAGE, JSON.stringify(visible)); } catch { /* ignore */ }
-  }, [visible]);
-
-  const filteredSorted = useMemo(() => {
-    let list = allRows;
-    if (companyFilter !== ALL) list = list.filter((r) => r.company_id === companyFilter);
-    if (!isDeletedView) {
-      if (statusFilter === "active") list = list.filter((r) => r.is_active !== false);
-      if (statusFilter === "inactive") list = list.filter((r) => r.is_active === false);
-    }
     const q = query.trim().toLowerCase();
-    if (q) {
-      list = list.filter((r) =>
-        [r.code, r.name, r.address, r.company_name, r.branch_kind].filter(Boolean).join(" ").toLowerCase().includes(q)
-      );
-    }
-    return [...list].sort((a, b) => {
-      const pick = (r: BranchRow): string | number => {
-        if (sortKey === "name") return (r.name ?? "").toLowerCase();
-        if (sortKey === "code") return (r.code ?? "").toLowerCase();
-        if (sortKey === "company") return (r.company_name ?? "").toLowerCase();
-        if (sortKey === "kind") return (BRANCH_KIND_LABELS[r.branch_kind ?? ""] ?? r.branch_kind ?? "").toLowerCase();
-        if (sortKey === "address") return (r.address ?? "").toLowerCase();
-        if (sortKey === "status") return r.is_active !== false ? 1 : 0;
-        return r.created_at ? new Date(r.created_at).getTime() : 0;
-      };
-      const va = pick(a), vb = pick(b);
-      if (va < vb) return sortDir === "asc" ? -1 : 1;
-      if (va > vb) return sortDir === "asc" ? 1 : -1;
-      return 0;
-    });
-  }, [allRows, companyFilter, statusFilter, query, sortKey, sortDir, isDeletedView]);
+    if (!q) return list;
+    return list.filter((r) =>
+      [r.name, r.code, (r as { company_name?: string }).company_name]
+        .map((x) => String(x ?? "").toLowerCase())
+        .join(" ")
+        .includes(q)
+    );
+  }, [data, query, companyNameById]);
 
-  const total = filteredSorted.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const pageRows = filteredSorted.slice((safePage - 1) * pageSize, safePage * pageSize);
-  const isFiltered = query.trim().length > 0 || companyFilter !== ALL || (!isDeletedView && statusFilter !== "all");
-  const pageIds = pageRows.map((r) => r.branch_id);
-  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
-  const somePageSelected = pageIds.some((id) => selected.has(id));
-  const selectedRows = useMemo(() => filteredSorted.filter((r) => selected.has(r.branch_id)), [filteredSorted, selected]);
+  function openCreate() {
+    form.reset(emptyForm());
+    if (companyList[0]) form.setValue("company_id", companyList[0].company_id);
+    setSheetOpen(true);
+  }
 
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortKey(key); setSortDir("asc"); }
-  };
-  const SortIcon = ({ k }: { k: SortKey }) => {
-    if (sortKey !== k) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
-    return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
-  };
-
-  const invalidateBranchLists = (companyId?: string) => {
-    void qc.invalidateQueries({ queryKey: ["organization", "branches"] });
-    if (companyId) void qc.invalidateQueries({ queryKey: ["organization", "companies", companyId, "branches"] });
-  };
-
-  const openCreate = () => {
-    const base = emptyForm();
-    if (companyFilter !== ALL) base.company_id = companyFilter;
-    form.reset(base); setEditing(null); setCreateOpen(true);
-  };
-  const openEdit = (r: BranchRow) => { setEditing(r); form.reset(rowToForm(r)); setEditOpen(true); };
-  const forceCloseCreate = () => { setCreateOpen(false); form.reset(emptyForm()); };
-  const forceCloseEdit = () => { setEditOpen(false); setEditing(null); form.reset(emptyForm()); };
-
-  const onCreate = form.handleSubmit(async (values) => {
-    if (!values.company_id) { toast.error("╪┤╪▒┌ر╪ز ╪▒╪د ╪د┘╪ز╪«╪د╪ذ ┌ر┘█î╪»."); return; }
+  async function onSubmit(values: BranchForm) {
     try {
       await createMutation.mutateAsync({
-        company_id: values.company_id, code: values.code.trim(), name: values.name.trim(),
-        address: values.address.trim() || null, branch_kind: values.branch_kind || "OFFICE",
-        parent_branch_id: values.parent_branch_id?.trim() || null,
-        default_warehouse_id: values.default_warehouse_id?.trim() || null,
-        supports_shipping: values.supports_shipping, supports_receiving: values.supports_receiving,
-        is_manufacturing_site: values.is_manufacturing_site, is_active: values.is_active,
-      } as never);
-      toast.success("╪┤╪╣╪ذ┘ç ╪س╪ذ╪ز ╪┤╪»"); forceCloseCreate(); invalidateBranchLists(values.company_id);
-    } catch (e) { toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR); }
-  });
-
-  const onEdit = form.handleSubmit(async (values) => {
-    if (!editing) return;
-    try {
-      await updateMutation.mutateAsync({
-        branchId: editing.branch_id,
-        payload: {
-          code: values.code.trim(), name: values.name.trim(), address: values.address.trim() || null,
-          branch_kind: values.branch_kind || "OFFICE",
-          parent_branch_id: values.parent_branch_id?.trim() || null,
-          default_warehouse_id: values.default_warehouse_id?.trim() || null,
-          supports_shipping: values.supports_shipping,
-          supports_receiving: values.supports_receiving, is_manufacturing_site: values.is_manufacturing_site,
-          is_active: values.is_active, company_id: values.company_id || editing.company_id,
-        },
+        company_id: values.company_id,
+        code: values.code.trim(),
+        name: values.name.trim(),
+        address: values.address.trim() || undefined,
+        branch_kind: values.branch_kind,
+        is_active: values.is_active,
       });
-      toast.success("╪د╪╖┘╪د╪╣╪د╪ز ╪┤╪╣╪ذ┘ç ╪ذ┘çظî╪▒┘ê╪▓ ╪┤╪»"); forceCloseEdit(); invalidateBranchLists(editing.company_id);
-    } catch (e) { toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR); }
-  });
-
-  const runSetActive = async (row: BranchRow, active: boolean) => {
-    setRowBusyId(row.branch_id);
-    try {
-      await branchService.update(row.branch_id, {
-        code: row.code, name: row.name, address: row.address ?? null,
-        branch_kind: row.branch_kind ?? "OFFICE",
-        parent_branch_id: row.parent_branch_id ?? null,
-        default_warehouse_id: row.default_warehouse_id ?? null,
-        supports_shipping: row.supports_shipping,
-        supports_receiving: row.supports_receiving, is_manufacturing_site: row.is_manufacturing_site,
-        is_active: active, company_id: row.company_id,
-      });
-      toast.success(active ? "╪┤╪╣╪ذ┘ç ┘╪╣╪د┘ ╪┤╪»" : "╪┤╪╣╪ذ┘ç ╪║█î╪▒┘╪╣╪د┘ ╪┤╪»");
-      invalidateBranchLists(row.company_id);
-    } catch (e) { toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR); }
-    finally { setRowBusyId(null); setConfirmStatus(null); }
-  };
-
-  const filterTargetsForKind = (kind: BulkKind, targets: BranchRow[]): BranchRow[] => {
-    if (kind === "activate") return targets.filter((r) => r.is_active === false);
-    if (kind === "deactivate") return targets.filter((r) => r.is_active !== false);
-    return targets;
-  };
-
-  const requestBulk = (kind: BulkKind, targets: BranchRow[]) => {
-    const filtered = filterTargetsForKind(kind, targets);
-    if (filtered.length === 0) {
-      if (kind === "activate") toast.message("┘ç┘à┘ç┘¤ ┘à┘ê╪د╪▒╪» ╪د┘╪ز╪«╪د╪ذظî╪┤╪»┘ç ╪د╪▓ ┘é╪ذ┘ ┘╪╣╪د┘ ┘ç╪│╪ز┘╪».");
-      else if (kind === "deactivate") toast.message("┘à┘ê╪▒╪» ┘é╪د╪ذ┘ ╪║█î╪▒┘╪╣╪د┘ظî╪│╪د╪▓█î ╪»╪▒ ╪د┘╪ز╪«╪د╪ذ ┘█î╪│╪ز.");
-      else toast.message("┘à┘ê╪▒╪»█î ╪ذ╪▒╪د█î ╪د┘╪ش╪د┘à ╪╣┘à┘█î╪د╪ز ┘█î╪│╪ز.");
-      return;
+      toast.success("شعبه ایجاد شد");
+      setSheetOpen(false);
+      form.reset(emptyForm());
+      void refetch();
+    } catch (e) {
+      toast.error(e instanceof ApiClientError ? e.message : "خطا در ایجاد شعبه");
     }
-    setConfirmBulk({ kind, targets: filtered });
-  };
-
-  const runBulk = async (kind: BulkKind, targets: BranchRow[]) => {
-    setBulkBusy(true);
-    setConfirmBulk(null);
-    let ok = 0, fail = 0;
-    const companyIdsTouched = new Set<string>();
-    for (const row of targets) {
-      try {
-        if (kind === "delete") await branchService.softDelete(row.branch_id);
-        else if (kind === "restore") await branchService.restore(row.branch_id);
-        else {
-          await branchService.update(row.branch_id, {
-            code: row.code, name: row.name, address: row.address ?? null,
-            branch_kind: row.branch_kind ?? "OFFICE",
-            parent_branch_id: row.parent_branch_id ?? null,
-            default_warehouse_id: row.default_warehouse_id ?? null,
-            supports_shipping: row.supports_shipping,
-            supports_receiving: row.supports_receiving, is_manufacturing_site: row.is_manufacturing_site,
-            is_active: kind === "activate", company_id: row.company_id,
-          });
-        }
-        companyIdsTouched.add(row.company_id);
-        ok += 1;
-      } catch { fail += 1; }
-    }
-    setSelected(new Set());
-    for (const cid of companyIdsTouched) invalidateBranchLists(cid);
-    setBulkBusy(false);
-    if (ok > 0 && fail === 0) {
-      const msgs: Record<BulkKind, string> = {
-        restore: ok === 1 ? "█▒ ╪┤╪╣╪ذ┘ç ╪ذ╪د╪▓┌»╪▒╪»╪د┘█î ╪┤╪» ┘ê ╪║█î╪▒┘╪╣╪د┘ ╪ذ╪د┘é█î ┘à╪د┘╪»." : `${toFaDigits(ok)} ╪┤╪╣╪ذ┘ç ╪ذ╪د╪▓┌»╪▒╪»╪د┘█î ╪┤╪» ┘ê ╪║█î╪▒┘╪╣╪د┘ ╪ذ╪د┘é█î ┘à╪د┘╪»┘╪».`,
-        delete: ok === 1 ? "█▒ ╪┤╪╣╪ذ┘ç ╪ص╪░┘ ╪┤╪»." : `${toFaDigits(ok)} ╪┤╪╣╪ذ┘ç ╪ص╪░┘ ╪┤╪».`,
-        activate: ok === 1 ? "█▒ ╪┤╪╣╪ذ┘ç ┘╪╣╪د┘ ╪┤╪»." : `${toFaDigits(ok)} ╪┤╪╣╪ذ┘ç ┘╪╣╪د┘ ╪┤╪».`,
-        deactivate: ok === 1 ? "█▒ ╪┤╪╣╪ذ┘ç ╪║█î╪▒┘╪╣╪د┘ ╪┤╪»." : `${toFaDigits(ok)} ╪┤╪╣╪ذ┘ç ╪║█î╪▒┘╪╣╪د┘ ╪┤╪».`,
-      };
-      toast.success(msgs[kind]);
-    } else if (ok > 0) toast.success(`${toFaDigits(ok)} ╪د┘╪ش╪د┘à ╪┤╪»╪ؤ ${toFaDigits(fail)} ┘╪د┘à┘ê┘┘é.`);
-    else toast.error(MSG_ERR);
-  };
-
-  const restoreOne = async (row: BranchRow) => {
-    setRowBusyId(row.branch_id);
-    try {
-      await restoreMutation.mutateAsync(row.branch_id);
-      toast.success("╪┤╪╣╪ذ┘ç ╪ذ╪د╪▓┌»╪▒╪»╪د┘█î ╪┤╪» ┘ê ╪║█î╪▒┘╪╣╪د┘ ╪ذ╪د┘é█î ┘à╪د┘╪».");
-      setSelected((prev) => { const n = new Set(prev); n.delete(row.branch_id); return n; });
-      invalidateBranchLists(row.company_id);
-    } catch (e) { toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR); }
-    finally { setRowBusyId(null); }
-  };
-
-  const doDelete = async () => {
-    if (!confirmDelete) return;
-    try {
-      await deleteMutation.mutateAsync(confirmDelete.branch_id);
-      toast.success("╪┤╪╣╪ذ┘ç ╪ص╪░┘ ╪┤╪»");
-      setConfirmDelete(null);
-      setSelected((prev) => { const n = new Set(prev); n.delete(confirmDelete.branch_id); return n; });
-      invalidateBranchLists(confirmDelete.company_id);
-    } catch (e) { toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR); }
-  };
-
-  const formFields = (
-    <div className="space-y-5">
-      <div className="space-y-1.5">
-        <Label htmlFor="branch-company">╪┤╪▒┌ر╪ز *</Label>
-        <select id="branch-company" className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" {...form.register("company_id", { required: true })} disabled={Boolean(editing)}>
-          <option value="">ظ¤ ╪د┘╪ز╪«╪د╪ذ ╪┤╪▒┌ر╪ز ظ¤</option>
-          {companyList.map((c) => (
-            <option key={c.company_id} value={c.company_id}>{c.legal_name || c.name}{c.is_primary ? " (╪د╪╡┘█î)" : ""}</option>
-          ))}
-        </select>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5"><Label>┌ر╪» *</Label><Input className="h-9" dir="ltr" {...form.register("code", { required: true })} /></div>
-        <div className="space-y-1.5"><Label>┘╪د┘à *</Label><Input className="h-9" {...form.register("name", { required: true })} /></div>
-      </div>
-      <div className="space-y-1.5"><Label>╪ت╪»╪▒╪│</Label><Input className="h-9" {...form.register("address")} /></div>
-      <div className="space-y-1.5">
-        <Label>┘┘ê╪╣ ╪┤╪╣╪ذ┘ç</Label>
-        <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" {...form.register("branch_kind")}>
-          {Object.entries(BRANCH_KIND_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-      </div>
-      <div className="space-y-1.5">
-        <Label>╪┤╪╣╪ذ┘ç ┘ê╪د┘╪»</Label>
-        <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.watch("parent_branch_id") || ""} onChange={(e) => form.setValue("parent_branch_id", e.target.value, { shouldDirty: true })} disabled={!formCompanyId}>
-          <option value="">ظ¤ ╪ذ╪»┘ê┘ ┘ê╪د┘╪» ظ¤</option>
-          {parentBranchOptions.map((b) => (
-            <option key={b.branch_id} value={b.branch_id}>{b.name} ({b.code})</option>
-          ))}
-        </select>
-      </div>
-      <div className="space-y-1.5">
-        <Label>╪د┘╪ذ╪د╪▒ ┘╛█î╪┤ظî┘╪▒╪╢ (╪┤┘╪د╪│┘ç ╪د╪«╪ز█î╪د╪▒█î)</Label>
-        <Input className="h-9 font-mono text-xs" dir="ltr" placeholder="UUID ╪د┘╪ذ╪د╪▒" {...form.register("default_warehouse_id")} />
-      </div>
-      <div className="space-y-3 rounded-lg border p-3">
-        <div className="flex items-center justify-between gap-2"><Label>┘╪╣╪د┘</Label><Switch checked={form.watch("is_active")} onCheckedChange={(v) => form.setValue("is_active", v, { shouldDirty: true })} /></div>
-        <div className="flex items-center justify-between gap-2"><Label>╪د╪▒╪│╪د┘ ┌ر╪د┘╪د</Label><Switch checked={form.watch("supports_shipping")} onCheckedChange={(v) => form.setValue("supports_shipping", v, { shouldDirty: true })} /></div>
-        <div className="flex items-center justify-between gap-2"><Label>╪»╪▒█î╪د┘╪ز ┌ر╪د┘╪د</Label><Switch checked={form.watch("supports_receiving")} onCheckedChange={(v) => form.setValue("supports_receiving", v, { shouldDirty: true })} /></div>
-        <div className="flex items-center justify-between gap-2"><Label>╪│╪د█î╪ز ╪ز┘ê┘█î╪»</Label><Switch checked={form.watch("is_manufacturing_site")} onCheckedChange={(v) => form.setValue("is_manufacturing_site", v, { shouldDirty: true })} /></div>
-      </div>
-    </div>
-  );
+  }
 
   if (!canView) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="╪┤╪╣╪ذ / ╪│╪د█î╪ز" icon={<GitBranch className="h-4 w-4" />} breadcrumbs={[{ label: "╪│╪د╪▓┘à╪د┘", href: "/dashboard/organization" }, { label: "╪┤╪╣╪ذ" }]} />
-        <div className="rounded-xl border border-dashed px-6 py-12 text-center text-sm text-muted-foreground">{MSG_NO_ACCESS}</div>
-      </div>
-    );
+    return <div className="p-6"><EmptyState title="مجوز مشاهده شعب را ندارید" /></div>;
   }
 
   return (
-    <TooltipProvider delayDuration={200}>
-      <div className="flex min-h-0 flex-col gap-3">
-        <PageHeader
-          title="╪┤╪╣╪ذ / ╪│╪د█î╪ز"
-          icon={<GitBranch className="h-4 w-4" />}
-          description="┘┘ç╪▒╪│╪ز ╪┤╪╣╪ذ ┘ç┘à┘ç ╪┤╪▒┌ر╪زظî┘ç╪د ظ¤ ╪س╪ذ╪ز╪î ┘ê█î╪▒╪د█î╪┤ ┘ê ┘à╪»█î╪▒█î╪ز ┘ê╪╢╪╣█î╪ز"
-          breadcrumbs={[
-            { label: "╪»╪د╪┤╪ذ┘ê╪▒╪»", href: "/dashboard" },
-            { label: "╪│╪د╪▓┘à╪د┘", href: "/dashboard/organization" },
-            { label: "╪┤╪╣╪ذ" },
-          ]}
-          actions={canCreate && !isDeletedView ? (
-            <Button size="sm" className="h-8 gap-1.5" onClick={openCreate}><Plus className="h-4 w-4" />╪┤╪╣╪ذ┘ç ╪ش╪»█î╪»</Button>
-          ) : null}
-        />
-
-        {isError ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            <span>╪ذ╪د╪▒┌»╪░╪د╪▒█î ╪┤╪╣╪ذ ┘à┘à┌ر┘ ┘╪┤╪». ╪»┘ê╪ذ╪د╪▒┘ç ╪ز┘╪د╪┤ ┌ر┘█î╪».</span>
-            <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => void refetchBranches()}>╪ز┘╪د╪┤ ┘à╪ش╪»╪»</Button>
-          </div>
-        ) : null}
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[12rem] flex-1 sm:max-w-sm">
-            <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input className={cn("h-8 ps-8 text-sm", query && "pe-8")} placeholder="┘╪د┘à╪î ┌ر╪»╪î ╪┤╪▒┌ر╪ز╪î ╪ت╪»╪▒╪│ظخ" value={query} onChange={(e) => { setQuery(e.target.value); setPage(1); }} />
-            {query ? (
-              <button type="button" className="absolute end-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted" aria-label="┘╛╪د┌ر ┌ر╪▒╪»┘ ╪ش╪│╪ز╪ش┘ê" onClick={() => { setQuery(""); setPage(1); }}>
-                <X className="h-3.5 w-3.5" />
-              </button>
-            ) : null}
-          </div>
-          <Select value={companyFilter} onValueChange={(v) => { setCompanyFilter(v); setPage(1); }}>
-            <SelectTrigger className="h-8 w-[12rem]"><SelectValue placeholder="╪┤╪▒┌ر╪ز" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>┘ç┘à┘ç ╪┤╪▒┌ر╪زظî┘ç╪د</SelectItem>
-              {companyList.map((c) => (
-                <SelectItem key={c.company_id} value={c.company_id}>{c.legal_name || c.name}{c.is_primary ? " (╪د╪╡┘█î)" : ""}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={membershipFilter} onValueChange={(v) => { setMembershipFilter(v as BranchListFilter); setSelected(new Set()); setPage(1); }}>
-            <SelectTrigger className="h-8 w-[10rem]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="active">╪┤╪╣╪ذ ╪ش╪د╪▒█î</SelectItem>
-              <SelectItem value="deleted">╪┤╪╣╪ذ ╪ص╪░┘ظî╪┤╪»┘ç</SelectItem>
-            </SelectContent>
-          </Select>
-          {!isDeletedView ? (
-            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as StatusFilter); setPage(1); }}>
-              <SelectTrigger className="h-8 w-[8.5rem]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">┘ç┘à┘ç ┘ê╪╢╪╣█î╪زظî┘ç╪د</SelectItem>
-                <SelectItem value="active">┘╪╣╪د┘</SelectItem>
-                <SelectItem value="inactive">╪║█î╪▒┘╪╣╪د┘</SelectItem>
-              </SelectContent>
-            </Select>
-          ) : null}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className="h-8 gap-1"><Columns3 className="h-3.5 w-3.5" />╪│╪ز┘ê┘ظî┘ç╪د</Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel>┘┘à╪د█î╪┤ ╪│╪ز┘ê┘ظî┘ç╪د</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {COLS.filter((c) => c.hideable !== false).map((c) => (
-                <DropdownMenuItem key={c.id} className="gap-2" onSelect={(e) => e.preventDefault()} onClick={() => setVisible((v) => ({ ...v, [c.id]: !v[c.id] }))}>
-                  <Checkbox checked={visible[c.id] !== false} />{c.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        {selected.size > 0 ? (
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted/30 px-3 py-2">
-            <span className="text-xs text-muted-foreground">
-              {bulkBusy ? "╪»╪▒ ╪ص╪د┘ ╪د┘╪ش╪د┘à ╪╣┘à┘█î╪د╪ز ┌»╪▒┘ê┘ç█îظخ" : `${toFaDigits(selected.size)} ┘à┘ê╪▒╪» ╪د┘╪ز╪«╪د╪ذظî╪┤╪»┘ç`}
-            </span>
-            {!bulkBusy && isDeletedView && canUpdate ? (
-              <Button type="button" size="sm" className="h-7 gap-1" onClick={() => requestBulk("restore", selectedRows)}>
-                <RotateCcw className="h-3.5 w-3.5" />╪ذ╪د╪▓┌»╪▒╪»╪د┘█î
-              </Button>
-            ) : null}
-            {!bulkBusy && !isDeletedView ? (
-              <>
-                {canUpdate ? (
-                  <>
-                    <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => requestBulk("activate", selectedRows)}>┘╪╣╪د┘ظî╪│╪د╪▓█î</Button>
-                    <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => requestBulk("deactivate", selectedRows)}>╪║█î╪▒┘╪╣╪د┘ظî╪│╪د╪▓█î</Button>
-                  </>
-                ) : null}
-                {canDelete ? (
-                  <Button type="button" size="sm" variant="destructive" className="h-7" onClick={() => requestBulk("delete", selectedRows)}>╪ص╪░┘</Button>
-                ) : null}
-              </>
-            ) : null}
-            {!bulkBusy ? (
-              <Button type="button" size="sm" variant="ghost" className="h-7" onClick={() => setSelected(new Set())}>┘╪║┘ê ╪د┘╪ز╪«╪د╪ذ</Button>
-            ) : null}
-          </div>
-        ) : null}
-
-        <div className={cn("min-h-0 flex-1 overflow-auto rounded-xl border border-border transition-opacity", isRefreshing && !isInitialLoading && "opacity-70")}>
-          {isInitialLoading ? (
-            <div className="space-y-2 p-4">{Array.from({ length: 8 }).map((_, i) => (<Skeleton key={i} className="h-10 w-full" />))}</div>
-          ) : pageRows.length === 0 ? (
-            <EmptyState
-              icon={<GitBranch className="h-4 w-4" />}
-              title={isFiltered ? "┘╪ز█î╪ش┘çظî╪د█î ┘╛█î╪»╪د ┘╪┤╪»" : isDeletedView ? "╪┤╪╣╪ذ┘ç ╪ص╪░┘ظî╪┤╪»┘çظî╪د█î ┘█î╪│╪ز" : "╪┤╪╣╪ذ┘çظî╪د█î ╪س╪ذ╪ز ┘╪┤╪»┘ç"}
-              description={isFiltered ? "╪╣╪ذ╪د╪▒╪ز ╪ش╪│╪ز╪ش┘ê █î╪د ┘█î┘╪ز╪▒ ╪▒╪د ╪ز╪║█î█î╪▒ ╪»┘ç█î╪»." : isDeletedView ? "┘à┘ê╪د╪▒╪» ╪ص╪░┘ظî╪┤╪»┘ç ╪»╪▒ ╪د█î┘ ┘┘ç╪▒╪│╪ز ┘┘à╪د█î╪┤ ╪»╪د╪»┘ç ┘à█îظî╪┤┘ê┘╪»." : "╪د┘ê┘█î┘ ╪┤╪╣╪ذ┘ç ╪▒╪د ╪ذ╪▒╪د█î █î┌ر█î ╪د╪▓ ╪┤╪▒┌ر╪زظî┘ç╪د ╪س╪ذ╪ز ┌ر┘█î╪»."}
-            />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-10 px-2">
-                    <Checkbox
-                      checked={allPageSelected ? true : somePageSelected ? "indeterminate" : false}
-                      onCheckedChange={(v) => {
-                        setSelected((prev) => {
-                          const n = new Set(prev);
-                          if (v) pageIds.forEach((id) => n.add(id));
-                          else pageIds.forEach((id) => n.delete(id));
-                          return n;
-                        });
-                      }}
-                      aria-label="╪د┘╪ز╪«╪د╪ذ ╪╡┘╪ص┘ç"
-                    />
-                  </TableHead>
-                  {COLS.map((c) =>
-                    visible[c.id] === false ? null : (
-                      <TableHead key={c.id} className="px-2">
-                        {c.sort ? (
-                          <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleSort(c.sort!)}>
-                            {c.label}<SortIcon k={c.sort} />
-                          </button>
-                        ) : c.label}
-                      </TableHead>
-                    )
-                  )}
+    <div className="space-y-6">
+      <PageHeader
+        title="شعب"
+        description="فهرست سراسری شعب مستأجر"
+        breadcrumbs={[{ label: "سازمان", href: "/dashboard/organization" }, { label: "شعب" }]}
+        icon={<GitBranch className="h-4 w-4" />}
+        actions={canCreate ? <Button size="sm" onClick={openCreate}><Plus className="h-4 w-4" /> شعبه جدید</Button> : null}
+      />
+      <div className="relative max-w-md">
+        <Search className="absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input className="h-9 ps-9" placeholder="جستجو…" value={query} onChange={(e) => setQuery(e.target.value)} />
+      </div>
+      {isLoading ? (
+        <div className="space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
+      ) : isError ? (
+        <EmptyState title="بارگذاری ناموفق" actionLabel="تلاش مجدد" onAction={() => void refetch()} />
+      ) : rows.length === 0 ? (
+        <EmptyState title="شعبه‌ای یافت نشد" />
+      ) : (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>نام</TableHead>
+                <TableHead>کد</TableHead>
+                <TableHead>نوع</TableHead>
+                <TableHead>وضعیت</TableHead>
+                <TableHead>شرکت</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.branch_id}>
+                  <TableCell className="font-medium">{row.name}</TableCell>
+                  <TableCell className="font-mono text-xs" dir="ltr">{row.code || "—"}</TableCell>
+                  <TableCell>{BRANCH_KIND_LABELS?.[row.branch_kind as string] ?? row.branch_kind ?? "—"}</TableCell>
+                  <TableCell>
+                    <StatusChip tone={row.is_active !== false ? "success" : "neutral"} label={row.is_active !== false ? "فعال" : "غیرفعال"} />
+                  </TableCell>
+                  <TableCell>
+                    <Link href={companyDetailPath(row.company_id)} className="text-sm text-primary hover:underline">
+                      {(row as { company_name?: string }).company_name}
+                    </Link>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pageRows.map((row) => (
-                  <TableRow key={row.branch_id}>
-                    <TableCell className="px-2">
-                      <Checkbox
-                        checked={selected.has(row.branch_id)}
-                        onCheckedChange={(v) => {
-                          setSelected((prev) => {
-                            const n = new Set(prev);
-                            if (v) n.add(row.branch_id); else n.delete(row.branch_id);
-                            return n;
-                          });
-                        }}
-                        aria-label={`╪د┘╪ز╪«╪د╪ذ ${row.name}`}
-                      />
-                    </TableCell>
-                    {visible.name !== false ? (
-                      <TableCell className="px-2">
-                        <Link href={companyDetailPath(row.company_id, { from: "branches", hash: "branches" })} className="font-medium hover:underline">{row.name}</Link>
-                      </TableCell>
-                    ) : null}
-                    {visible.code !== false ? (
-                      <TableCell className="px-2 font-mono text-xs" dir={formatCodeDisplay(row.code).dir}>{formatCodeDisplay(row.code).text}</TableCell>
-                    ) : null}
-                    {visible.company !== false ? (
-                      <TableCell className="px-2 text-xs">
-                        <Link href={companyDetailPath(row.company_id, { from: "branches" })} className="hover:underline">{row.company_name}</Link>
-                      </TableCell>
-                    ) : null}
-                    {visible.kind !== false ? (
-                      <TableCell className="px-2 text-xs">{BRANCH_KIND_LABELS[row.branch_kind ?? "OFFICE"] ?? row.branch_kind ?? "ظ¤"}</TableCell>
-                    ) : null}
-                    {visible.address !== false ? (
-                      <TableCell className="max-w-[12rem] truncate px-2 text-xs text-muted-foreground">{row.address?.trim() || "ظ¤"}</TableCell>
-                    ) : null}
-                    {visible.status !== false ? (
-                      <TableCell className="px-2">
-                        {row.is_active !== false ? <StatusChip label="┘╪╣╪د┘" tone="success" /> : <StatusChip label="╪║█î╪▒┘╪╣╪د┘" tone="neutral" />}
-                      </TableCell>
-                    ) : null}
-                    {visible.created !== false ? (
-                      <TableCell className="px-2 text-xs text-muted-foreground">{fd(row.created_at)}</TableCell>
-                    ) : null}
-                    {visible.actions !== false ? (
-                      <TableCell className="px-2">
-                        <div className="flex items-center gap-0.5">
-                          {rowBusyId === row.branch_id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                          ) : isDeletedView ? (
-                            canUpdate ? (
-                              <IconAction label="╪ذ╪د╪▓┌»╪▒╪»╪د┘█î" onClick={() => void restoreOne(row)} disabled={Boolean(rowBusyId)}><RotateCcw className="h-3.5 w-3.5" /></IconAction>
-                            ) : null
-                          ) : (
-                            <>
-                              {canUpdate ? (
-                                <>
-                                  <IconAction label="┘ê█î╪▒╪د█î╪┤" onClick={() => openEdit(row)} disabled={Boolean(rowBusyId)}><Pencil className="h-3.5 w-3.5" /></IconAction>
-                                  {row.is_active !== false ? (
-                                    <IconAction label="╪║█î╪▒┘╪╣╪د┘ظî╪│╪د╪▓█î" onClick={() => setConfirmStatus({ row, active: false })} disabled={Boolean(rowBusyId)}><PowerOff className="h-3.5 w-3.5" /></IconAction>
-                                  ) : (
-                                    <IconAction label="┘╪╣╪د┘ظî╪│╪د╪▓█î" onClick={() => setConfirmStatus({ row, active: true })} disabled={Boolean(rowBusyId)}><Power className="h-3.5 w-3.5" /></IconAction>
-                                  )}
-                                </>
-                              ) : null}
-                              {canDelete ? (
-                                <IconAction label="╪ص╪░┘" variant="destructive" onClick={() => setConfirmDelete(row)} disabled={Boolean(rowBusyId)}><Trash2 className="h-3.5 w-3.5" /></IconAction>
-                              ) : null}
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                    ) : null}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+              ))}
+            </TableBody>
+          </Table>
+          <div className="border-t px-3 py-2 text-sm text-muted-foreground">
+            {toFaDigits(String(rows.length))} شعبه
+            {isFetching ? <Loader2 className="ms-2 inline h-3.5 w-3.5 animate-spin" /> : null}
+          </div>
         </div>
-
-        {total > 0 ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>{toFaDigits(total)} ┘à┘ê╪▒╪» ظ¤ ╪╡┘╪ص┘ç {toFaDigits(safePage)} ╪د╪▓ {toFaDigits(totalPages)}</span>
-            <div className="flex items-center gap-1">
-              <Button type="button" variant="outline" size="sm" className="h-7" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>┘é╪ذ┘█î</Button>
-              <Button type="button" variant="outline" size="sm" className="h-7" disabled={safePage >= totalPages} onClick={() => setPage((p) => p + 1)}>╪ذ╪╣╪»█î</Button>
-              <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
-                <SelectTrigger className="h-7 w-[4.5rem]"><SelectValue /></SelectTrigger>
+      )}
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent className="sm:max-w-md">
+          <SheetHeader><SheetTitle>شعبه جدید</SheetTitle></SheetHeader>
+          <form className="mt-4 space-y-3" onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="space-y-1">
+              <Label>شرکت</Label>
+              <Select value={form.watch("company_id") || ""} onValueChange={(v) => form.setValue("company_id", v, { shouldDirty: true })}>
+                <SelectTrigger><SelectValue placeholder="انتخاب شرکت" /></SelectTrigger>
                 <SelectContent>
-                  {[10, 20, 50, 100].map((n) => <SelectItem key={n} value={String(n)}>{toFaDigits(n)}</SelectItem>)}
+                  {companyList.map((c) => (
+                    <SelectItem key={c.company_id} value={c.company_id}>{c.legal_name || c.name || c.code}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-          </div>
-        ) : null}
-
-        <Dialog open={!!confirmBulk} onOpenChange={(o) => !o && !bulkBusy && setConfirmBulk(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {confirmBulk?.kind === "delete" ? "╪ز╪ث█î█î╪» ╪ص╪░┘" : confirmBulk?.kind === "restore" ? "╪ز╪ث█î█î╪» ╪ذ╪د╪▓┌»╪▒╪»╪د┘█î" : confirmBulk?.kind === "activate" ? "╪ز╪ث█î█î╪» ┘╪╣╪د┘ظî╪│╪د╪▓█î" : "╪ز╪ث█î█î╪» ╪║█î╪▒┘╪╣╪د┘ظî╪│╪د╪▓█î"}
-              </DialogTitle>
-              <DialogDescription className="text-right leading-relaxed">
-                {confirmBulk
-                  ? confirmBulk.kind === "delete"
-                    ? `${toFaDigits(confirmBulk.targets.length)} ╪┤╪╣╪ذ┘ç ╪د┘╪ز╪«╪د╪ذظî╪┤╪»┘ç ╪ص╪░┘ ┘à█îظî╪┤┘ê┘╪». ╪│┘ê╪د╪ذ┘é ╪ص┘╪╕ ┘à█îظî╪┤┘ê╪».`
-                    : confirmBulk.kind === "restore"
-                      ? `${toFaDigits(confirmBulk.targets.length)} ╪┤╪╣╪ذ┘ç ╪ذ╪د╪▓┌»╪▒╪»╪د┘█î ┘à█îظî╪┤┘ê┘╪» ┘ê ╪ز╪د ┘╪╣╪د┘ظî╪│╪د╪▓█î ╪»╪│╪ز█î ╪║█î╪▒┘╪╣╪د┘ ┘à█îظî┘à╪د┘┘╪».`
-                      : confirmBulk.kind === "activate"
-                        ? `${toFaDigits(confirmBulk.targets.length)} ╪┤╪╣╪ذ┘ç ┘╪╣╪د┘ ┘à█îظî╪┤┘ê┘╪».`
-                        : `${toFaDigits(confirmBulk.targets.length)} ╪┤╪╣╪ذ┘ç ╪║█î╪▒┘╪╣╪د┘ ┘à█îظî╪┤┘ê┘╪».`
-                  : ""}
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button type="button" variant="outline" size="sm" disabled={bulkBusy} onClick={() => setConfirmBulk(null)}>╪د┘╪╡╪▒╪د┘</Button>
-              <Button type="button" size="sm" variant={confirmBulk?.kind === "delete" ? "destructive" : "default"} disabled={bulkBusy || !confirmBulk} onClick={() => confirmBulk && void runBulk(confirmBulk.kind, confirmBulk.targets)}>
-                {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "╪ز╪ث█î█î╪»"}
+            <div className="space-y-1"><Label>کد</Label><Input {...form.register("code", { required: true })} /></div>
+            <div className="space-y-1"><Label>نام</Label><Input {...form.register("name", { required: true })} /></div>
+            <div className="space-y-1"><Label>آدرس</Label><Input {...form.register("address")} /></div>
+            <div className="space-y-1">
+              <Label>نوع</Label>
+              <Select value={form.watch("branch_kind") || "OFFICE"} onValueChange={(v) => form.setValue("branch_kind", v, { shouldDirty: true })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(BRANCH_KIND_LABELS ?? { OFFICE: "دفتر" }).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={form.watch("is_active") !== false} onCheckedChange={(c) => form.setValue("is_active", c, { shouldDirty: true })} />
+              <Label>فعال</Label>
+            </div>
+            <SheetFooter>
+              <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>انصراف</Button>
+              <Button type="submit" disabled={createMutation.isPending}>
+                {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ایجاد"}
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>╪ز╪ث█î█î╪» ╪ص╪░┘ ╪┤╪╣╪ذ┘ç</DialogTitle>
-              <DialogDescription className="text-right leading-relaxed">╪┤╪╣╪ذ┘ç ┬س{confirmDelete?.name}┬╗ ╪ص╪░┘ ┘à█îظî╪┤┘ê╪». ╪│┘ê╪د╪ذ┘é ╪ص┘╪╕ ┘à█îظî╪┤┘ê╪».</DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button type="button" variant="outline" size="sm" onClick={() => setConfirmDelete(null)}>╪د┘╪╡╪▒╪د┘</Button>
-              <Button type="button" size="sm" variant="destructive" disabled={deleteMutation.isPending} onClick={() => void doDelete()}>
-                {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "╪ص╪░┘"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={!!confirmStatus} onOpenChange={(o) => !o && !rowBusyId && setConfirmStatus(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{confirmStatus?.active ? "╪ز╪ث█î█î╪» ┘╪╣╪د┘ظî╪│╪د╪▓█î" : "╪ز╪ث█î█î╪» ╪║█î╪▒┘╪╣╪د┘ظî╪│╪د╪▓█î"}</DialogTitle>
-              <DialogDescription className="text-right leading-relaxed">
-                {confirmStatus?.active
-                  ? `╪┤╪╣╪ذ┘ç ┬س${confirmStatus.row.name}┬╗ ┘╪╣╪د┘ ┘à█îظî╪┤┘ê╪».`
-                  : `╪┤╪╣╪ذ┘ç ┬س${confirmStatus?.row.name ?? ""}┬╗ ╪║█î╪▒┘╪╣╪د┘ ┘à█îظî╪┤┘ê╪».`}
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button type="button" variant="outline" size="sm" disabled={Boolean(rowBusyId)} onClick={() => setConfirmStatus(null)}>╪د┘╪╡╪▒╪د┘</Button>
-              <Button type="button" size="sm" disabled={Boolean(rowBusyId) || !confirmStatus} onClick={() => confirmStatus && void runSetActive(confirmStatus.row, confirmStatus.active)}>
-                {rowBusyId ? <Loader2 className="h-4 w-4 animate-spin" /> : "╪ز╪ث█î█î╪»"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Sheet open={createOpen} onOpenChange={(open) => { if (!open) forceCloseCreate(); else setCreateOpen(true); }}>
-          <SheetContent className="flex w-full flex-col sm:max-w-lg" side="right" onInteractOutside={(e) => { if (isDirty) e.preventDefault(); }} onEscapeKeyDown={(e) => { if (isDirty) e.preventDefault(); }}>
-            <SheetHeader><SheetTitle>╪┤╪╣╪ذ┘ç ╪ش╪»█î╪»</SheetTitle></SheetHeader>
-            <form className="flex min-h-0 flex-1 flex-col" onSubmit={onCreate}>
-              <div className="flex-1 overflow-y-auto px-1 py-3">{formFields}</div>
-              <SheetFooter>
-                <Button type="button" variant="outline" size="sm" onClick={forceCloseCreate}>╪د┘╪╡╪▒╪د┘</Button>
-                <Button type="submit" size="sm" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "╪س╪ذ╪ز"}
-                </Button>
-              </SheetFooter>
-            </form>
-          </SheetContent>
-        </Sheet>
-
-        <Sheet open={editOpen} onOpenChange={(open) => { if (!open) forceCloseEdit(); else setEditOpen(true); }}>
-          <SheetContent className="flex w-full flex-col sm:max-w-lg" side="right" onInteractOutside={(e) => { if (isDirty) e.preventDefault(); }} onEscapeKeyDown={(e) => { if (isDirty) e.preventDefault(); }}>
-            <SheetHeader><SheetTitle>┘ê█î╪▒╪د█î╪┤ ╪┤╪╣╪ذ┘ç</SheetTitle></SheetHeader>
-            <form className="flex min-h-0 flex-1 flex-col" onSubmit={onEdit}>
-              <div className="flex-1 overflow-y-auto px-1 py-3">{formFields}</div>
-              <SheetFooter>
-                <Button type="button" variant="outline" size="sm" onClick={forceCloseEdit}>╪د┘╪╡╪▒╪د┘</Button>
-                <Button type="submit" size="sm" disabled={updateMutation.isPending}>
-                  {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "╪░╪«█î╪▒┘ç"}
-                </Button>
-              </SheetFooter>
-            </form>
-          </SheetContent>
-        </Sheet>
-      </div>
-    </TooltipProvider>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }
