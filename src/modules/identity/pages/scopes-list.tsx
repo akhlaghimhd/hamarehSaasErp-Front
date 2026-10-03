@@ -1,4 +1,4 @@
-/** فهرست محدوده‌های دسترسی — جدول کامل: سورت، صفحه، Excel، فعال/حذف/بازگردانی */
+/** فهرست محدوده‌های دسترسی — جدول کامل: سورت، صفحه، Excel/PDF، فعال/حذف/بازگردانی */
 
 "use client";
 
@@ -10,6 +10,7 @@ import {
   ArrowUpDown,
   Download,
   FileSpreadsheet,
+  FileText,
   Loader2,
   Plus,
   Power,
@@ -27,6 +28,14 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { Skeleton } from "@/shared/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/shared/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -84,6 +93,7 @@ import {
   scopeTypeLabel,
   refCount,
   exportScopesExcel,
+  exportScopesPdf,
 } from "./scopes-list-helpers";
 
 type CreateForm = {
@@ -454,10 +464,30 @@ export function ScopesListPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
-                  onSelect={() => exportScopesExcel(filteredSorted)}
+                  onSelect={() => {
+                    try {
+                      exportScopesExcel(filteredSorted);
+                    } catch {
+                      toast.error("خروجی اکسل ناموفق بود");
+                    }
+                  }}
                 >
                   <FileSpreadsheet className="me-2 h-4 w-4" />
-                  Excel ({toFaDigits(filteredSorted.length)} مورد)
+                  اکسل ({toFaDigits(filteredSorted.length)} مورد)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    try {
+                      exportScopesPdf(filteredSorted);
+                    } catch (e) {
+                      toast.error(
+                        e instanceof Error ? e.message : "خروجی PDF ناموفق بود"
+                      );
+                    }
+                  }}
+                >
+                  <FileText className="me-2 h-4 w-4" />
+                  PDF / چاپ
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -544,12 +574,12 @@ export function ScopesListPage() {
       ) : filteredSorted.length === 0 ? (
         <EmptyState title="موردی یافت نشد" />
       ) : (
-        <div className="overflow-hidden rounded-md border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-start">
-              <tr>
-                <th className="w-10 px-3 py-2 font-medium">#</th>
-                <th className="px-3 py-2 font-medium">
+        <div className="overflow-x-auto rounded-md border">
+          <Table className="w-full min-w-[640px] table-fixed text-sm">
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-12 px-2 text-center text-xs">#</TableHead>
+                <TableHead className="w-[22%] px-2 text-xs">
                   <button
                     type="button"
                     className="inline-flex items-center gap-1"
@@ -557,8 +587,8 @@ export function ScopesListPage() {
                   >
                     نام <SortIcon k="name" />
                   </button>
-                </th>
-                <th className="px-3 py-2 font-medium">
+                </TableHead>
+                <TableHead className="w-[14%] px-2 text-xs">
                   <button
                     type="button"
                     className="inline-flex items-center gap-1"
@@ -566,8 +596,8 @@ export function ScopesListPage() {
                   >
                     نوع <SortIcon k="type" />
                   </button>
-                </th>
-                <th className="px-3 py-2 font-medium">
+                </TableHead>
+                <TableHead className="w-16 px-2 text-center text-xs">
                   <button
                     type="button"
                     className="inline-flex items-center gap-1"
@@ -575,8 +605,8 @@ export function ScopesListPage() {
                   >
                     مرجع <SortIcon k="refs" />
                   </button>
-                </th>
-                <th className="px-3 py-2 font-medium">
+                </TableHead>
+                <TableHead className="w-24 px-2 text-xs">
                   <button
                     type="button"
                     className="inline-flex items-center gap-1"
@@ -584,21 +614,29 @@ export function ScopesListPage() {
                   >
                     وضعیت <SortIcon k="status" />
                   </button>
-                </th>
-                <th className="px-3 py-2 font-medium">توضیح</th>
-                <th className="w-28 px-3 py-2 font-medium">عملیات</th>
-              </tr>
-            </thead>
-            <tbody>
+                </TableHead>
+                <TableHead className="px-2 text-xs">توضیح</TableHead>
+                <TableHead className="w-[7.5rem] px-1 text-center text-xs">
+                  عملیات
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {pageRows.map((r, idx) => (
-                <tr key={r.scope_id} className="border-t">
-                  <td className="px-3 py-2 tabular-nums text-muted-foreground">
+                <TableRow key={r.scope_id}>
+                  <TableCell className="px-2 py-2 text-center text-xs tabular-nums text-muted-foreground">
                     {toFaDigits((safePage - 1) * pageSize + idx + 1)}
-                  </td>
-                  <td className="px-3 py-2 font-medium">{r.scope_name}</td>
-                  <td className="px-3 py-2">{scopeTypeLabel(r.scope_type)}</td>
-                  <td className="px-3 py-2 tabular-nums">{refCount(r)}</td>
-                  <td className="px-3 py-2">
+                  </TableCell>
+                  <TableCell className="max-w-0 truncate px-2 py-2 font-medium" title={r.scope_name}>
+                    {r.scope_name || "—"}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap px-2 py-2 text-xs">
+                    {scopeTypeLabel(r.scope_type)}
+                  </TableCell>
+                  <TableCell className="px-2 py-2 text-center text-xs tabular-nums">
+                    {toFaDigits(refCount(r))}
+                  </TableCell>
+                  <TableCell className="px-2 py-2">
                     {isDeletedView ? (
                       <StatusChip label="حذف‌شده" tone="danger" />
                     ) : r.is_active === false ? (
@@ -606,12 +644,12 @@ export function ScopesListPage() {
                     ) : (
                       <StatusChip label="فعال" tone="success" />
                     )}
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground">
+                  </TableCell>
+                  <TableCell className="max-w-0 truncate px-2 py-2 text-xs text-muted-foreground" title={r.description || undefined}>
                     {r.description || "—"}
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-0.5">
+                  </TableCell>
+                  <TableCell className="px-1 py-2">
+                    <div className="flex items-center justify-center gap-0.5">
                       {isDeletedView ? (
                         canUpdate ? (
                           <Button
@@ -667,11 +705,11 @@ export function ScopesListPage() {
                         </>
                       )}
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
           <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-sm text-muted-foreground">
             <span>
               نمایش {toFaDigits((safePage - 1) * pageSize + 1)}–
@@ -724,7 +762,7 @@ export function ScopesListPage() {
       )}
 
       <Sheet open={createOpen} onOpenChange={setCreateOpen}>
-        <SheetContent className="flex w-full flex-col sm:max-w-md">
+        <SheetContent className="flex w-full flex-col sm:max-w-sm">
           <SheetHeader>
             <SheetTitle>محدوده جدید</SheetTitle>
           </SheetHeader>
@@ -732,12 +770,12 @@ export function ScopesListPage() {
             className="flex min-h-0 flex-1 flex-col"
             onSubmit={form.handleSubmit(onCreateSubmit)}
           >
-            <div className="flex-1 space-y-4 overflow-y-auto px-1 py-2">
-              <div className="space-y-2">
+            <div className="flex-1 space-y-3 overflow-y-auto px-1 py-1">
+              <div className="space-y-1.5">
                 <Label>نام محدوده</Label>
                 <Input className="h-9" {...form.register("scope_name")} />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label>نوع</Label>
                 <Select
                   value={form.watch("scope_type")}
@@ -758,7 +796,7 @@ export function ScopesListPage() {
                 </Select>
               </div>
               {needsReference ? (
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label>موجودیت‌های مرجع (هم‌نوع — یک یا چند)</Label>
                   {refLoading ? (
                     <div className="flex h-9 items-center gap-2 text-xs text-muted-foreground">
@@ -775,7 +813,7 @@ export function ScopesListPage() {
                           onChange={(e) => setRefSearch(e.target.value)}
                         />
                       </div>
-                      <div className="max-h-48 overflow-y-auto p-1">
+                      <div className="max-h-36 overflow-y-auto p-1">
                         {filteredRefs.length === 0 ? (
                           <p className="px-2 py-2 text-xs text-muted-foreground">
                             موردی نیست
@@ -825,12 +863,12 @@ export function ScopesListPage() {
                   )}
                 </div>
               ) : null}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label>توضیح (اختیاری)</Label>
                 <Input className="h-9" {...form.register("description")} />
               </div>
             </div>
-            <SheetFooter className="gap-2 border-t pt-4">
+            <SheetFooter className="gap-2 border-t pt-3">
               <Button
                 type="button"
                 variant="outline"
