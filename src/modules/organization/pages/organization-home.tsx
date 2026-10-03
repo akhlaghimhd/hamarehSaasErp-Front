@@ -97,7 +97,7 @@ function HubCardView({
 
   if (interactive) {
     return (
-      <Link href={card.href} className="block" aria-current={active ? "page" : undefined}>
+      <Link href={card.href} className="block" prefetch={false} aria-current={active ? "page" : undefined}>
         {body}
       </Link>
     );
