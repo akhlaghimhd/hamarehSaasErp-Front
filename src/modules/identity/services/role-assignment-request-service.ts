@@ -6,6 +6,8 @@ export type RoleAssignmentRequestDto = {
   request_id: string;
   user_id?: string;
   tenant_role_id?: string;
+  role_name?: string | null;
+  request_action?: string | null;
   status?: string;
   reason?: string | null;
   valid_from?: string | null;
@@ -34,17 +36,19 @@ function unwrapData<T>(envelope: unknown): T {
 
 export const roleAssignmentRequestService = {
   async listPending(): Promise<RoleAssignmentRequestDto[]> {
-    const envelope = await apiGet(identityPaths.roleAssignmentRequests);
-    const data = unwrapData<
-      RoleAssignmentRequestDto[] | { data: RoleAssignmentRequestDto[] }
-    >(envelope);
-    if (Array.isArray(data)) return data;
-    if (
-      data &&
-      typeof data === "object" &&
-      Array.isArray((data as { data?: unknown }).data)
-    ) {
-      return (data as { data: RoleAssignmentRequestDto[] }).data;
+    const envelope = await apiGet<unknown>(identityPaths.roleAssignmentRequests);
+    const root = envelope as Record<string, unknown> | unknown[] | null;
+    if (Array.isArray(root)) return root as RoleAssignmentRequestDto[];
+    if (root && typeof root === "object") {
+      const d = (root as { data?: unknown }).data;
+      if (Array.isArray(d)) return d as RoleAssignmentRequestDto[];
+      if (
+        d &&
+        typeof d === "object" &&
+        Array.isArray((d as { data?: unknown }).data)
+      ) {
+        return (d as { data: RoleAssignmentRequestDto[] }).data;
+      }
     }
     return [];
   },
