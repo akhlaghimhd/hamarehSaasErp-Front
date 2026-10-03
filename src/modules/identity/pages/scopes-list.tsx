@@ -6,28 +6,28 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Loader2, Plus, Scan, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { PageHeader } from "@/components/shared/page-header";
-import { EmptyState } from "@/components/shared/empty-state";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/shared/components/layout/page-header";
+import { EmptyState } from "@/shared/components/feedback/empty-state";
+import { Button } from "@/shared/components/ui/button";
+import { Input } from "@/shared/components/ui/input";
+import { Label } from "@/shared/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/shared/components/ui/select";
 import {
   Sheet,
   SheetContent,
   SheetFooter,
   SheetHeader,
   SheetTitle,
-} from "@/components/ui/sheet";
-import { cn } from "@/lib/utils";
-import { ApiClientError } from "@/api/client";
-import { usePermission } from "@/modules/identity/hooks/use-permission";
+} from "@/shared/components/ui/sheet";
+import { cn } from "@/shared/lib/utils";
+import { ApiClientError } from "@/api";
+import { usePermission } from "@/auth";
 import {
   useCreateScope,
   useScopes,
