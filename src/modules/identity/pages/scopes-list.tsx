@@ -1,16 +1,32 @@
-/** فهرست محدوده‌های دسترسی — انتخاب چندمرجعه‌ی هم‌نوع */
+/** فهرست محدوده‌های دسترسی — جدول کامل: سورت، صفحه، Excel، فعال/حذف/بازگردانی */
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Loader2, Plus, Scan, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Download,
+  FileSpreadsheet,
+  Loader2,
+  Plus,
+  Power,
+  PowerOff,
+  RotateCcw,
+  Scan,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
+import { StatusChip } from "@/shared/components/data-display/status-chip";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
+import { Skeleton } from "@/shared/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -25,15 +41,33 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/shared/components/ui/sheet";
-import { cn } from "@/shared/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/shared/components/ui/dropdown-menu";
+import { cn, toFaDigits } from "@/shared/lib/utils";
 import { ApiClientError } from "@/api";
 import { usePermission } from "@/auth";
 import {
   useCreateScope,
   useScopes,
   useSoftDeleteScope,
+  useUpdateScope,
+  useRestoreScope,
 } from "@/modules/identity/hooks/use-scopes";
-import type { ScopeDto } from "@/modules/identity/services/scope-service";
+import type {
+  ScopeDto,
+  ScopeMembershipFilter,
+} from "@/modules/identity/services/scope-service";
 import { companyService } from "@/modules/organization/services/company-service";
 import { branchService } from "@/modules/organization/services/branch-service";
 import { departmentService } from "@/modules/organization/services/department-service";
@@ -41,35 +75,16 @@ import {
   businessUnitService,
   costCenterService,
 } from "@/modules/organization/services/org-extended-service";
-
-const STRUCTURAL = new Set([
-  "COMPANY",
-  "BRANCH",
-  "WAREHOUSE",
-  "DEPARTMENT",
-  "COST_CENTER",
-  "BUSINESS_UNIT",
-]);
-
-const TYPE_LABEL: Record<string, string> = {
-  COMPANY: "شرکت",
-  BRANCH: "شعبه",
-  WAREHOUSE: "انبار",
-  DEPARTMENT: "واحد سازمانی",
-  COST_CENTER: "مرکز هزینه",
-  BUSINESS_UNIT: "واحد کسب‌وکار",
-  CUSTOM: "سفارشی",
-};
-
-const CREATE_TYPE_OPTIONS: { value: string; label: string }[] = [
-  { value: "COMPANY", label: "شرکت" },
-  { value: "BRANCH", label: "شعبه" },
-  { value: "DEPARTMENT", label: "واحد سازمانی" },
-  { value: "BUSINESS_UNIT", label: "واحد کسب‌وکار" },
-  { value: "COST_CENTER", label: "مرکز هزینه" },
-];
-
-type RefOption = { id: string; label: string };
+import {
+  STRUCTURAL,
+  CREATE_TYPES,
+  type RefOption,
+  type SortKey,
+  type SortDir,
+  scopeTypeLabel,
+  refCount,
+  exportScopesExcel,
+} from "./scopes-list-helpers";
 
 type CreateForm = {
   scope_name: string;
@@ -78,20 +93,32 @@ type CreateForm = {
   description: string;
 };
 
-function scopeTypeLabel(t: string) {
-  return TYPE_LABEL[String(t).toUpperCase()] ?? t;
-}
-
 export function ScopesListPage() {
   const canView = usePermission("identity.scope.view");
   const canCreate = usePermission("identity.scope.create");
+  const canUpdate = usePermission("identity.scope.update");
   const canDelete = usePermission("identity.scope.delete");
 
-  const { data = [], isLoading, isError, error } = useScopes("active");
+  const [membership, setMembership] =
+    useState<ScopeMembershipFilter>("active");
+  const [listStatus, setListStatus] = useState<"all" | "active" | "inactive">(
+    "all"
+  );
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const { data = [], isLoading, isError, error, refetch, isFetching } =
+    useScopes(membership);
   const createMutation = useCreateScope();
+  const updateMutation = useUpdateScope();
   const deleteMutation = useSoftDeleteScope();
+  const restoreMutation = useRestoreScope();
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ScopeDto | null>(null);
   const [refOptions, setRefOptions] = useState<RefOption[]>([]);
   const [refLoading, setRefLoading] = useState(false);
   const [refSearch, setRefSearch] = useState("");
@@ -108,6 +135,11 @@ export function ScopesListPage() {
   const scopeType = form.watch("scope_type");
   const needsReference = STRUCTURAL.has(String(scopeType).toUpperCase());
   const selectedIds = form.watch("reference_ids") || [];
+  const isDeletedView = membership === "deleted";
+
+  useEffect(() => {
+    setPage(1);
+  }, [membership, listStatus, q, sortKey, sortDir]);
 
   useEffect(() => {
     if (!createOpen) return;
@@ -153,7 +185,10 @@ export function ScopesListPage() {
               const cid = c.company_id || (c as { id?: string }).id;
               if (!cid) return [] as RefOption[];
               try {
-                const deps = await departmentService.listByCompany(String(cid), "active");
+                const deps = await departmentService.listByCompany(
+                  String(cid),
+                  "active"
+                );
                 const companyLabel = c.name || c.legal_name || c.code || "";
                 return deps
                   .map((d) => {
@@ -163,7 +198,9 @@ export function ScopesListPage() {
                     const code = (d as { code?: string }).code || "";
                     return {
                       id: String(id),
-                      label: [name, code, companyLabel].filter(Boolean).join(" · "),
+                      label: [name, code, companyLabel]
+                        .filter(Boolean)
+                        .join(" · "),
                     };
                   })
                   .filter(Boolean) as RefOption[];
@@ -181,7 +218,8 @@ export function ScopesListPage() {
               if (!id) return null;
               return {
                 id: String(id),
-                label: [bu.name, bu.code].filter(Boolean).join(" · ") || String(id),
+                label:
+                  [bu.name, bu.code].filter(Boolean).join(" · ") || String(id),
               };
             })
             .filter(Boolean) as RefOption[];
@@ -206,7 +244,9 @@ export function ScopesListPage() {
                     if (!id) return null;
                     return {
                       id: String(id),
-                      label: [row.name, row.code, companyLabel].filter(Boolean).join(" · "),
+                      label: [row.name, row.code, companyLabel]
+                        .filter(Boolean)
+                        .join(" · "),
                     };
                   })
                   .filter(Boolean) as RefOption[];
@@ -233,10 +273,75 @@ export function ScopesListPage() {
   }, [createOpen, scopeType, form]);
 
   const filteredRefs = useMemo(() => {
-    const q = refSearch.trim().toLowerCase();
-    if (!q) return refOptions;
-    return refOptions.filter((o) => o.label.toLowerCase().includes(q));
+    const qq = refSearch.trim().toLowerCase();
+    if (!qq) return refOptions;
+    return refOptions.filter((o) => o.label.toLowerCase().includes(qq));
   }, [refOptions, refSearch]);
+
+  const filteredSorted = useMemo(() => {
+    let list = [...data];
+    if (!isDeletedView && listStatus === "active") {
+      list = list.filter((r) => r.is_active !== false);
+    } else if (!isDeletedView && listStatus === "inactive") {
+      list = list.filter((r) => r.is_active === false);
+    }
+    const qq = q.trim().toLowerCase();
+    if (qq) {
+      list = list.filter((r) =>
+        [r.scope_name, r.scope_type, r.description, ...(r.reference_ids || [])]
+          .map((x) => String(x ?? "").toLowerCase())
+          .join(" ")
+          .includes(qq)
+      );
+    }
+    list.sort((a, b) => {
+      let va: string | number = "";
+      let vb: string | number = "";
+      if (sortKey === "name") {
+        va = a.scope_name || "";
+        vb = b.scope_name || "";
+      } else if (sortKey === "type") {
+        va = scopeTypeLabel(a.scope_type);
+        vb = scopeTypeLabel(b.scope_type);
+      } else if (sortKey === "refs") {
+        va = refCount(a);
+        vb = refCount(b);
+      } else {
+        va = a.is_active === false ? 1 : 0;
+        vb = b.is_active === false ? 1 : 0;
+      }
+      if (va < vb) return sortDir === "asc" ? -1 : 1;
+      if (va > vb) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+    return list;
+  }, [data, isDeletedView, listStatus, q, sortKey, sortDir]);
+
+  const total = filteredSorted.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
+  const safePage = Math.min(page, totalPages);
+  const pageRows = filteredSorted.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize
+  );
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  function SortIcon({ k }: { k: SortKey }) {
+    if (sortKey !== k)
+      return <ArrowUpDown className="h-3 w-3 opacity-40" />;
+    return sortDir === "asc" ? (
+      <ArrowUp className="h-3 w-3" />
+    ) : (
+      <ArrowDown className="h-3 w-3" />
+    );
+  }
 
   async function onCreateSubmit(values: CreateForm) {
     const name = values.scope_name.trim();
@@ -284,11 +389,35 @@ export function ScopesListPage() {
     }
   }
 
-  async function onDelete(row: ScopeDto) {
-    if (!canDelete) return;
+  async function setActive(row: ScopeDto, active: boolean) {
     try {
-      await deleteMutation.mutateAsync(row.scope_id);
-      toast.success("محدوده حذف شد");
+      await updateMutation.mutateAsync({
+        id: row.scope_id,
+        payload: { is_active: active },
+      });
+      toast.success(active ? "محدوده فعال شد" : "محدوده غیرفعال شد");
+    } catch (e) {
+      toast.error(
+        e instanceof ApiClientError ? e.message : "خطا در تغییر وضعیت"
+      );
+    }
+  }
+
+  async function onRestore(row: ScopeDto) {
+    try {
+      await restoreMutation.mutateAsync(row.scope_id);
+      toast.success("محدوده بازگردانی شد");
+    } catch (e) {
+      toast.error(e instanceof ApiClientError ? e.message : "خطا در بازگردانی");
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    try {
+      await deleteMutation.mutateAsync(deleteTarget.scope_id);
+      toast.success("محدوده حذف شد (قابل بازیابی)");
+      setDeleteTarget(null);
     } catch (e) {
       toast.error(e instanceof ApiClientError ? e.message : "خطا در حذف");
     }
@@ -315,73 +444,282 @@ export function ScopesListPage() {
           { label: "محدوده‌ها" },
         ]}
         actions={
-          canCreate ? (
-            <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus className="me-1.5 h-4 w-4" />
-              محدوده جدید
-            </Button>
-          ) : null
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" size="sm" variant="outline">
+                  <Download className="me-1.5 h-4 w-4" />
+                  خروجی
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onSelect={() => exportScopesExcel(filteredSorted)}
+                >
+                  <FileSpreadsheet className="me-2 h-4 w-4" />
+                  Excel ({toFaDigits(filteredSorted.length)} مورد)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {canCreate && !isDeletedView ? (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setCreateOpen(true)}
+              >
+                <Plus className="me-1.5 h-4 w-4" />
+                محدوده جدید
+              </Button>
+            ) : null}
+          </div>
         }
       />
 
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[180px] flex-1">
+          <Search className="absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="h-9 ps-9"
+            placeholder="جستجو…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </div>
+        <Select
+          value={membership}
+          onValueChange={(v) => setMembership(v as ScopeMembershipFilter)}
+        >
+          <SelectTrigger className="h-9 w-[140px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="active">موارد جاری</SelectItem>
+            <SelectItem value="deleted">حذف‌شده‌ها</SelectItem>
+          </SelectContent>
+        </Select>
+        {!isDeletedView ? (
+          <Select
+            value={listStatus}
+            onValueChange={(v) =>
+              setListStatus(v as "all" | "active" | "inactive")
+            }
+          >
+            <SelectTrigger className="h-9 w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">همه وضعیت‌ها</SelectItem>
+              <SelectItem value="active">فعال</SelectItem>
+              <SelectItem value="inactive">غیرفعال</SelectItem>
+            </SelectContent>
+          </Select>
+        ) : null}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-9"
+          onClick={() => void refetch()}
+          disabled={isFetching}
+        >
+          {isFetching ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RotateCcw className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+
       {isLoading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          در حال بارگذاری…
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
         </div>
       ) : isError ? (
         <EmptyState
-          title="خطا"
-          description={error instanceof Error ? error.message : "بارگذاری ناموفق"}
+          title="خطا در بارگذاری"
+          description={error instanceof Error ? error.message : "ناموفق"}
         />
-      ) : data.length === 0 ? (
-        <EmptyState title="محدوده‌ای نیست" description="اولین محدوده را ثبت کنید." />
+      ) : filteredSorted.length === 0 ? (
+        <EmptyState title="موردی یافت نشد" />
       ) : (
         <div className="overflow-hidden rounded-md border">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-start">
               <tr>
-                <th className="px-3 py-2 font-medium">نام</th>
-                <th className="px-3 py-2 font-medium">نوع</th>
-                <th className="px-3 py-2 font-medium">تعداد مرجع</th>
+                <th className="w-10 px-3 py-2 font-medium">#</th>
+                <th className="px-3 py-2 font-medium">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1"
+                    onClick={() => toggleSort("name")}
+                  >
+                    نام <SortIcon k="name" />
+                  </button>
+                </th>
+                <th className="px-3 py-2 font-medium">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1"
+                    onClick={() => toggleSort("type")}
+                  >
+                    نوع <SortIcon k="type" />
+                  </button>
+                </th>
+                <th className="px-3 py-2 font-medium">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1"
+                    onClick={() => toggleSort("refs")}
+                  >
+                    مرجع <SortIcon k="refs" />
+                  </button>
+                </th>
+                <th className="px-3 py-2 font-medium">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1"
+                    onClick={() => toggleSort("status")}
+                  >
+                    وضعیت <SortIcon k="status" />
+                  </button>
+                </th>
                 <th className="px-3 py-2 font-medium">توضیح</th>
-                <th className="px-3 py-2 font-medium w-20" />
+                <th className="w-28 px-3 py-2 font-medium">عملیات</th>
               </tr>
             </thead>
             <tbody>
-              {data.map((r) => {
-                const count =
-                  Array.isArray(r.reference_ids) && r.reference_ids.length > 0
-                    ? r.reference_ids.length
-                    : r.reference_id
-                      ? 1
-                      : 0;
-                return (
-                  <tr key={r.scope_id} className="border-t">
-                    <td className="px-3 py-2">{r.scope_name}</td>
-                    <td className="px-3 py-2">{scopeTypeLabel(r.scope_type)}</td>
-                    <td className="px-3 py-2 tabular-nums">{count}</td>
-                    <td className="px-3 py-2 text-muted-foreground">
-                      {r.description || "—"}
-                    </td>
-                    <td className="px-3 py-2">
-                      {canDelete ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => onDelete(r)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      ) : null}
-                    </td>
-                  </tr>
-                );
-              })}
+              {pageRows.map((r, idx) => (
+                <tr key={r.scope_id} className="border-t">
+                  <td className="px-3 py-2 tabular-nums text-muted-foreground">
+                    {toFaDigits((safePage - 1) * pageSize + idx + 1)}
+                  </td>
+                  <td className="px-3 py-2 font-medium">{r.scope_name}</td>
+                  <td className="px-3 py-2">{scopeTypeLabel(r.scope_type)}</td>
+                  <td className="px-3 py-2 tabular-nums">{refCount(r)}</td>
+                  <td className="px-3 py-2">
+                    {isDeletedView ? (
+                      <StatusChip label="حذف‌شده" tone="danger" />
+                    ) : r.is_active === false ? (
+                      <StatusChip label="غیرفعال" tone="warning" />
+                    ) : (
+                      <StatusChip label="فعال" tone="success" />
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    {r.description || "—"}
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-0.5">
+                      {isDeletedView ? (
+                        canUpdate ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="بازگردانی"
+                            onClick={() => void onRestore(r)}
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        ) : null
+                      ) : (
+                        <>
+                          {canUpdate ? (
+                            r.is_active === false ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                title="فعال‌سازی"
+                                onClick={() => void setActive(r, true)}
+                              >
+                                <Power className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                title="غیرفعال‌سازی"
+                                onClick={() => void setActive(r, false)}
+                              >
+                                <PowerOff className="h-4 w-4" />
+                              </Button>
+                            )
+                          ) : null}
+                          {canDelete ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title="حذف"
+                              onClick={() => setDeleteTarget(r)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-sm text-muted-foreground">
+            <span>
+              نمایش {toFaDigits((safePage - 1) * pageSize + 1)}–
+              {toFaDigits(Math.min(safePage * pageSize, total))} از{" "}
+              {toFaDigits(total)}
+            </span>
+            <div className="flex items-center gap-2">
+              <Select
+                value={String(pageSize)}
+                onValueChange={(v) => {
+                  setPageSize(Number(v));
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="h-8 w-[80px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[10, 20, 50, 100].map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {toFaDigits(n)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={safePage <= 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                قبلی
+              </Button>
+              <span className="tabular-nums">
+                {toFaDigits(safePage)} / {toFaDigits(totalPages)}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={safePage >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                بعدی
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -411,7 +749,7 @@ export function ScopesListPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {CREATE_TYPE_OPTIONS.map(({ value, label }) => (
+                    {CREATE_TYPES.map(({ value, label }) => (
                       <SelectItem key={value} value={value}>
                         {label}
                       </SelectItem>
@@ -493,7 +831,11 @@ export function ScopesListPage() {
               </div>
             </div>
             <SheetFooter className="gap-2 border-t pt-4">
-              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCreateOpen(false)}
+              >
                 انصراف
               </Button>
               <Button
@@ -509,6 +851,39 @@ export function ScopesListPage() {
           </form>
         </SheetContent>
       </Sheet>
+
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>حذف محدوده دسترسی</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            اگر این محدوده به کاربری تخصیص داشته باشد، حذف مسدود می‌شود. محدوده
+            «{deleteTarget?.scope_name}» در صورت آزاد بودن به‌صورت نرم حذف
+            می‌شود.
+          </p>
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+            >
+              انصراف
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => void confirmDelete()}
+            >
+              {deleteMutation.isPending ? "در حال حذف…" : "بله، حذف شود"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
