@@ -53,6 +53,9 @@ import {
   sortUseCaseGroups,
 } from "../lib/permission-labels";
 
+/** Stable empty list — avoids `data ?? []` identity churn every render. */
+const EMPTY_PERMISSIONS: PermissionDto[] = [];
+
 export function PermissionsListPage() {
   const canView = usePermission(IdentityPermissions.permissionView);
   const isOwner = useAuthStore((s) => s.securityContext?.is_owner === true);
@@ -73,7 +76,7 @@ export function PermissionsListPage() {
   const [editName, setEditName] = useState("");
   const [editHint, setEditHint] = useState("");
 
-  const rows = data ?? [];
+  const rows = data ?? EMPTY_PERMISSIONS;
 
   const modules = useMemo(() => {
     const map = new Map<string, PermissionDto[]>();
@@ -99,7 +102,7 @@ export function PermissionsListPage() {
 
   useEffect(() => {
     if (!modules.length) {
-      setSelectedModule(null);
+      setSelectedModule((prev) => (prev === null ? prev : null));
       return;
     }
     if (selectedModule && modules.some((m) => m.name === selectedModule)) return;
@@ -163,16 +166,27 @@ export function PermissionsListPage() {
   }, [selectedPerms]);
 
   // When module changes: open only the first drawer. When searching: open all matches.
+  // Guard: only replace Set when membership actually changes (avoids max-update-depth).
   useEffect(() => {
     if (!useCaseSections.length) {
-      setOpenDrawers(new Set());
+      setOpenDrawers((prev) => (prev.size === 0 ? prev : new Set()));
       return;
     }
     if (permQuery.trim()) {
-      setOpenDrawers(new Set(useCaseSections.map((s) => s.name)));
+      const names = useCaseSections.map((s) => s.name);
+      setOpenDrawers((prev) => {
+        if (prev.size === names.length && names.every((n) => prev.has(n))) {
+          return prev;
+        }
+        return new Set(names);
+      });
       return;
     }
-    setOpenDrawers(new Set([useCaseSections[0].name]));
+    const first = useCaseSections[0].name;
+    setOpenDrawers((prev) => {
+      if (prev.size === 1 && prev.has(first)) return prev;
+      return new Set([first]);
+    });
   }, [selectedModule, permQuery, useCaseSections]);
 
   function toggleDrawer(name: string) {
@@ -314,7 +328,7 @@ export function PermissionsListPage() {
                   <button
                     type="button"
                     className="absolute end-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted"
-                    onClick={() => setModuleQuery("")}
+                    onClick={() => setModuleQuery("")} 
                     aria-label="پاک کردن"
                   >
                     <X className="h-3.5 w-3.5" />
@@ -489,49 +503,41 @@ export function PermissionsListPage() {
                                     )}
                                   >
                                     <div className="min-w-0 flex-1">
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <span className="truncate text-[13px] font-medium text-foreground">
-                                              {title}
-                                            </span>
-                                          </TooltipTrigger>
-                                          <TooltipContent
-                                            side="top"
-                                            className="max-w-xs text-xs leading-relaxed"
-                                          >
-                                            <p className="font-medium">
-                                              {title}
-                                            </p>
-                                            <p className="mt-1 opacity-90">
-                                              {hint}
-                                            </p>
-                                          </TooltipContent>
-                                        </Tooltip>
-                                        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className="text-sm font-medium text-foreground">
+                                          {title}
+                                        </span>
+                                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                                           {actionTypeLabel(p.action_type)}
                                         </span>
                                         {!active ? (
-                                          <span className="shrink-0 text-[10px] text-amber-700 dark:text-amber-300">
+                                          <span className="text-[10px] text-destructive">
                                             غیرفعال
                                           </span>
                                         ) : null}
                                       </div>
-                                      <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">
+                                      <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
                                         {hint}
+                                      </p>
+                                      <p className="mt-0.5 font-mono text-[10px] text-muted-foreground/80" dir="ltr">
+                                        {p.code}
                                       </p>
                                     </div>
                                     {canRelabel ? (
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                                        onClick={() => openEdit(p)}
-                                        aria-label="ویرایش عنوان و راهنما"
-                                      >
-                                        <Pencil className="h-3.5 w-3.5" />
-                                      </Button>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 shrink-0"
+                                            onClick={() => openEdit(p)}
+                                          >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>ویرایش عنوان و راهنما</TooltipContent>
+                                      </Tooltip>
                                     ) : null}
                                   </div>
                                 </li>
@@ -551,39 +557,33 @@ export function PermissionsListPage() {
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>ویرایش عنوان و راهنمای مجوز</DialogTitle>
+              <DialogTitle>ویرایش عنوان و راهنما</DialogTitle>
             </DialogHeader>
-            <div className="space-y-3 py-1">
-              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
-                کد سیستمی:{" "}
-                <span className="font-mono text-foreground">
-                  {editing?.code ?? "—"}
-                </span>
-                <span className="mt-1 block">این کد قابل تغییر نیست.</span>
+            {editing ? (
+              <div className="space-y-3">
+                <p className="font-mono text-xs text-muted-foreground" dir="ltr">
+                  {editing.code}
+                </p>
+                <div className="space-y-1.5">
+                  <Label htmlFor="perm-edit-name">عنوان</Label>
+                  <Input
+                    id="perm-edit-name"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="perm-edit-hint">راهنما</Label>
+                  <Textarea
+                    id="perm-edit-hint"
+                    rows={3}
+                    value={editHint}
+                    onChange={(e) => setEditHint(e.target.value)}
+                  />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="perm-name">عنوان نمایشی</Label>
-                <Input
-                  id="perm-name"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  maxLength={200}
-                  placeholder="مثلاً مشاهده کاربران"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="perm-hint">راهنمای کاربری (هینت)</Label>
-                <Textarea
-                  id="perm-hint"
-                  value={editHint}
-                  onChange={(e) => setEditHint(e.target.value)}
-                  maxLength={500}
-                  rows={4}
-                  placeholder="توضیح دقیق: این مجوز دقیقاً چه کاری را مجاز می‌کند…"
-                />
-              </div>
-            </div>
-            <DialogFooter className="gap-2 sm:gap-0">
+            ) : null}
+            <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
@@ -598,7 +598,7 @@ export function PermissionsListPage() {
               >
                 {updateMutation.isPending ? (
                   <>
-                    <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="me-1.5 h-4 w-4 animate-spin" />
                     ذخیره…
                   </>
                 ) : (
