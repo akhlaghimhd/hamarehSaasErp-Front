@@ -62,10 +62,12 @@ export function RoleAssignmentRequestsListPage() {
     return map;
   }, [roles]);
 
-  const { data = [], isLoading, isError, error } = useQuery({
+  const { data = [], isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ["identity", "role-assignment-requests"],
     queryFn: () => roleAssignmentRequestService.listPending(),
     enabled: canView,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const approveMut = useMutation({
@@ -95,7 +97,10 @@ export function RoleAssignmentRequestsListPage() {
     if (!term) return data;
     return data.filter((r) => {
       const u = userLabel.get(String(r.user_id ?? "")) ?? "";
-      const role = roleLabel.get(String(r.tenant_role_id ?? "")) ?? "";
+      const role =
+        (r as { role_name?: string | null }).role_name ||
+        roleLabel.get(String(r.tenant_role_id ?? "")) ||
+        "";
       return [u, role, r.reason, r.status, r.user_id, r.tenant_role_id].some((v) =>
         String(v ?? "").toLowerCase().includes(term)
       );
@@ -141,9 +146,13 @@ export function RoleAssignmentRequestsListPage() {
       header: "نقش",
       cell: (r) => {
         const id = String(r.tenant_role_id ?? "");
+        const name =
+          (r as { role_name?: string | null }).role_name ||
+          roleLabel.get(id) ||
+          shortId(id);
         return (
           <div className="min-w-0">
-            <div className="text-sm font-medium">{roleLabel.get(id) ?? shortId(id)}</div>
+            <div className="text-sm font-medium">{name}</div>
           </div>
         );
       },
@@ -209,14 +218,26 @@ export function RoleAssignmentRequestsListPage() {
         icon={<GitPullRequestArrow className="h-5 w-5" />}
       />
 
-      <div className="relative min-w-[200px] max-w-sm">
-        <Search className="absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="جستجو نام کاربر یا نقش…"
-          className="ps-8 h-9"
-        />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[200px] max-w-sm flex-1">
+          <Search className="absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="جستجو نام کاربر یا نقش…"
+            className="ps-8 h-9"
+          />
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-9"
+          disabled={isFetching}
+          onClick={() => void refetch()}
+        >
+          {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "بروزرسانی"}
+        </Button>
       </div>
 
       {isLoading ? (
