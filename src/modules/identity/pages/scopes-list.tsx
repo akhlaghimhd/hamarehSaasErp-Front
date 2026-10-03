@@ -69,7 +69,7 @@ function scopeTypeLabel(t: string) {
   return TYPE_LABEL[String(t).toUpperCase()] ?? t;
 }
 
-export default function ScopesListPage() {
+export function ScopesListPage() {
   const canView = usePermission("identity.scope.view");
   const canCreate = usePermission("identity.scope.create");
   const canDelete = usePermission("identity.scope.delete");
@@ -425,3 +425,5 @@ export default function ScopesListPage() {
     </div>
   );
 }
+
+export default ScopesListPage;
