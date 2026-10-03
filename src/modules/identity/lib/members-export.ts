@@ -1,6 +1,5 @@
 /** Client-side Excel (.xlsx) + PDF export for organization members. */
 
-import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { toFaDigits } from "@/shared/lib/utils";
 import type { TenantUserDto } from "../types";
@@ -65,9 +64,18 @@ function downloadArrayBuffer(filename: string, data: ArrayBuffer, mime: string) 
   URL.revokeObjectURL(url);
 }
 
-function writeXlsxDownload(filename: string, sheetName: string, aoa: (string | number)[][]) {
+/** Lazy-load xlsx only when user exports/imports — keeps list page free of ~228KB chunk. */
+async function loadXlsx() {
+  return import("xlsx");
+}
+
+async function writeXlsxDownload(
+  filename: string,
+  sheetName: string,
+  aoa: (string | number)[][]
+) {
+  const XLSX = await loadXlsx();
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  // عرض تقریبی ستون‌ها برای خوانایی در اکسل
   const colCount = aoa[0]?.length ?? 1;
   ws["!cols"] = Array.from({ length: colCount }, (_, i) => {
     let max = 10;
@@ -80,7 +88,6 @@ function writeXlsxDownload(filename: string, sheetName: string, aoa: (string | n
   });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  // bookType xlsx = فرمت واقعی Office Open XML
   const out = XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
   downloadArrayBuffer(
     filename,
@@ -91,11 +98,8 @@ function writeXlsxDownload(filename: string, sheetName: string, aoa: (string | n
 
 /**
  * خروجی واقعی Excel (.xlsx)
- * - هر ستون یک سلول جدا
- * - تاریخ عضویت شمسی
- * - بدون وابستگی به HTML جعلی
  */
-export function exportMembersExcel(rows: TenantUserDto[]) {
+export async function exportMembersExcel(rows: TenantUserDto[]) {
   const aoa: (string | number)[][] = [
     ["نام", "ایمیل", "موبایل", "وضعیت", "مدیر اصلی", "تاریخ عضویت"],
   ];
@@ -110,21 +114,20 @@ export function exportMembersExcel(rows: TenantUserDto[]) {
     ]);
   }
   const stamp = formatJalaliDate(new Date().toISOString()).replace(/\//g, "-");
-  writeXlsxDownload(`karbaran-sazman-${stamp}.xlsx`, "کاربران", aoa);
+  await writeXlsxDownload(`karbaran-sazman-${stamp}.xlsx`, "کاربران", aoa);
   toast.success("فایل اکسل آماده شد");
 }
 
 /**
  * الگوی ثبت گروهی — فایل واقعی .xlsx
- * ستون‌ها: نام | نام خانوادگی | ایمیل | موبایل
  */
-export function downloadMembersImportTemplate() {
+export async function downloadMembersImportTemplate() {
   const aoa: (string | number)[][] = [
     ["نام", "نام خانوادگی", "ایمیل", "موبایل"],
     ["علی", "رضایی", "ali.rezaei.import@example.com", "09121234567"],
     ["سارا", "محمدی", "sara.mohammadi.import@example.com", "09129876543"],
   ];
-  writeXlsxDownload("olgu-karbaran.xlsx", "الگو", aoa);
+  await writeXlsxDownload("olgu-karbaran.xlsx", "الگو", aoa);
   toast.message(
     "الگوی اکسل دانلود شد. ردیف‌های نمونه را پاک کنید، کاربران را وارد کنید و همان فایل .xlsx را بارگذاری کنید."
   );
@@ -143,10 +146,11 @@ export async function readSpreadsheetTable(file: File): Promise<string[][]> {
     file.type.includes("excel");
 
   if (isExcel || name.endsWith(".csv") || name.endsWith(".tsv") || name.endsWith(".txt")) {
+    const XLSX = await loadXlsx();
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, {
       type: "array",
-      codepage: 65001, // UTF-8
+      codepage: 65001,
       cellDates: false,
       raw: false,
     });
