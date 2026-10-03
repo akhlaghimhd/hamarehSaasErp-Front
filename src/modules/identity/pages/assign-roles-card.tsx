@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronDown,
   ChevronLeft,
@@ -228,6 +228,7 @@ function RoleTreeRow({
 }
 
 export function AssignRolesCard({ userId }: { userId: string }) {
+  const qc = useQueryClient();
   const canAssign = usePermission(IdentityPermissions.roleAssign);
   const { data: allRoles, isLoading: loadingAll } = useRoles();
   const {
@@ -369,6 +370,7 @@ export function AssignRolesCard({ userId }: { userId: string }) {
       }
       setEditing(false);
       void refetchUserRoles();
+      void qc.invalidateQueries({ queryKey: ["identity", "role-assignment-requests"] });
     } catch (e) {
       toast.error(
         e instanceof ApiClientError && e.message
