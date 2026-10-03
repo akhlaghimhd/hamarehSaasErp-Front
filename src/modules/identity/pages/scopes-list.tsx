@@ -61,6 +61,15 @@ const TYPE_LABEL: Record<string, string> = {
   CUSTOM: "سفارشی",
 };
 
+/** انواع قابل ایجاد از UI — CUSTOM در این فاز اعمال عملی روی منابع ندارد */
+const CREATE_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: "COMPANY", label: "شرکت" },
+  { value: "BRANCH", label: "شعبه" },
+  { value: "DEPARTMENT", label: "واحد سازمانی" },
+  { value: "BUSINESS_UNIT", label: "واحد کسب‌وکار" },
+  { value: "COST_CENTER", label: "مرکز هزینه" },
+];
+
 type RefOption = { id: string; label: string };
 
 type CreateForm = {
@@ -257,14 +266,24 @@ export function ScopesListPage() {
       return;
     }
     try {
-      await createMutation.mutateAsync({
+      const payload: {
+        scope_name: string;
+        scope_type: string;
+        reference_ids?: string[];
+        reference_id?: string | null;
+        description: string | null;
+        is_active: boolean;
+      } = {
         scope_name: name,
         scope_type: type,
-        reference_ids: refIds,
-        reference_id: refIds[0] ?? null,
         description: values.description?.trim() || null,
         is_active: true,
-      });
+      };
+      if (refIds.length > 0) {
+        payload.reference_ids = refIds;
+        payload.reference_id = refIds[0];
+      }
+      await createMutation.mutateAsync(payload);
       toast.success("محدوده دسترسی ثبت شد");
       setCreateOpen(false);
       form.reset({
@@ -407,7 +426,7 @@ export function ScopesListPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(TYPE_LABEL).map(([value, label]) => (
+                    {CREATE_TYPE_OPTIONS.map(({ value, label }) => (
                       <SelectItem key={value} value={value}>
                         {label}
                       </SelectItem>
