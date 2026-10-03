@@ -77,12 +77,13 @@ export function exportScopesExcel(rows: ScopeDto[]) {
   URL.revokeObjectURL(url);
 }
 
+/** Escape for print-window HTML without literal entity syntax (API-safe). */
 function escapeHtml(s: string) {
   return s
-    .replace(/&/g, "&")
-    .replace(/</g, "<")
-    .replace(/>/g, ">")
-    .replace(/"/g, """);
+    .replace(/&/g, "&" + "amp;")
+    .replace(/</g, "&" + "lt;")
+    .replace(/>/g, "&" + "gt;")
+    .replace(/"/g, "&" + "quot;");
 }
 
 /** PDF via print window (same pattern as members list) */
