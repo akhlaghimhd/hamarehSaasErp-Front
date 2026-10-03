@@ -36,6 +36,11 @@ import {
 import type { ScopeDto } from "@/modules/identity/services/scope-service";
 import { companyService } from "@/modules/organization/services/company-service";
 import { branchService } from "@/modules/organization/services/branch-service";
+import { departmentService } from "@/modules/organization/services/department-service";
+import {
+  businessUnitService,
+  costCenterService,
+} from "@/modules/organization/services/org-extended-service";
 
 const STRUCTURAL = new Set([
   "COMPANY",
@@ -133,6 +138,88 @@ export function ScopesListPage() {
               };
             })
             .filter(Boolean) as RefOption[];
+        } else if (type === "DEPARTMENT") {
+          const companies = await companyService.list("active");
+          const batches = await Promise.all(
+            companies.map(async (c) => {
+              const cid = c.company_id || (c as { id?: string }).id;
+              if (!cid) return [] as RefOption[];
+              try {
+                const deps = await departmentService.listByCompany(
+                  String(cid),
+                  "active"
+                );
+                const companyLabel = c.name || c.legal_name || c.code || "";
+                return deps
+                  .map((d) => {
+                    const id = (d as { department_id?: string }).department_id;
+                    if (!id) return null;
+                    const name = (d as { name?: string }).name || "";
+                    const code = (d as { code?: string }).code || "";
+                    return {
+                      id: String(id),
+                      label: [name, code, companyLabel].filter(Boolean).join(" · "),
+                    };
+                  })
+                  .filter(Boolean) as RefOption[];
+              } catch {
+                return [] as RefOption[];
+              }
+            })
+          );
+          options = batches.flat();
+        } else if (type === "BUSINESS_UNIT") {
+          const list = await businessUnitService.list({ membership: "active" });
+          options = list
+            .map((bu) => {
+              const id = bu.business_unit_id;
+              if (!id) return null;
+              return {
+                id: String(id),
+                label: [bu.name, bu.code].filter(Boolean).join(" · ") || String(id),
+              };
+            })
+            .filter(Boolean) as RefOption[];
+        } else if (type === "COST_CENTER") {
+          const companies = await companyService.list("active");
+          const batches = await Promise.all(
+            companies.map(async (c) => {
+              const cid = c.company_id || (c as { id?: string }).id;
+              if (!cid) return [] as RefOption[];
+              try {
+                const ccs = await costCenterService.list(String(cid));
+                const companyLabel = c.name || c.legal_name || c.code || "";
+                return ccs
+                  .map((cc) => {
+                    const row = cc as {
+                      cost_center_id?: string;
+                      id?: string;
+                      name?: string;
+                      code?: string;
+                    };
+                    const id = row.cost_center_id || row.id;
+                    if (!id) return null;
+                    return {
+                      id: String(id),
+                      label: [row.name, row.code, companyLabel]
+                        .filter(Boolean)
+                        .join(" · "),
+                    };
+                  })
+                  .filter(Boolean) as RefOption[];
+              } catch {
+                return [] as RefOption[];
+              }
+            })
+          );
+          options = batches.flat();
+        } else if (type === "WAREHOUSE") {
+          options = [];
+          if (!cancelled) {
+            toast.message(
+              "انتخاب انبار به‌عنوان مرجع محدوده فعلاً از این فرم پشتیبانی نمی‌شود."
+            );
+          }
         }
         if (!cancelled) setRefOptions(options);
       } catch {
