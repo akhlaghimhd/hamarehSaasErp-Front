@@ -1,5 +1,5 @@
-/**
- * FE-ORG — فهرست سراسری واحدهای سازمانی (هم‌تراز شعب: عملیات گروهی کامل)
+﻿/**
+ * FE-ORG ظ¤ ┘┘ç╪▒╪│╪ز ╪│╪▒╪د╪│╪▒█î ┘ê╪د╪ص╪»┘ç╪د█î ╪│╪د╪▓┘à╪د┘█î (┘ç┘àظî╪ز╪▒╪د╪▓ ╪┤╪╣╪ذ: ╪╣┘à┘█î╪د╪ز ┌»╪▒┘ê┘ç█î ┌ر╪د┘à┘)
  */
 "use client";
 
@@ -48,8 +48,8 @@ import { companyDetailPath } from "../lib/company-ref";
 import { OrganizationPermissions, type DepartmentDto } from "../types";
 import { IconAction, fd } from "./companies-list-helpers";
 
-const MSG_ERR = "انجام این کار ممکن نشد. کمی بعد دوباره تلاش کنید.";
-const MSG_NO_ACCESS = "برای مشاهده این بخش مجوز لازم را ندارید.";
+const MSG_ERR = "╪د┘╪ش╪د┘à ╪د█î┘ ┌ر╪د╪▒ ┘à┘à┌ر┘ ┘╪┤╪». ┌ر┘à█î ╪ذ╪╣╪» ╪»┘ê╪ذ╪د╪▒┘ç ╪ز┘╪د╪┤ ┌ر┘█î╪».";
+const MSG_NO_ACCESS = "╪ذ╪▒╪د█î ┘à╪┤╪د┘ç╪»┘ç ╪د█î┘ ╪ذ╪«╪┤ ┘à╪ش┘ê╪▓ ┘╪د╪▓┘à ╪▒╪د ┘╪»╪د╪▒█î╪».";
 const COL_STORAGE = "organization.departments.columns.v1";
 const ALL = "__all__";
 
@@ -68,13 +68,13 @@ type DeptForm = {
 };
 
 const COLS: { id: ColumnId; label: string; hideable?: boolean; sort?: SortKey }[] = [
-  { id: "name", label: "نام واحد", hideable: false, sort: "name" },
-  { id: "code", label: "کد", sort: "code" },
-  { id: "company", label: "شرکت", sort: "company" },
-  { id: "branch", label: "شعبه", sort: "branch" },
-  { id: "status", label: "وضعیت", sort: "status" },
-  { id: "created", label: "تاریخ ایجاد", sort: "created" },
-  { id: "actions", label: "عملیات", hideable: false },
+  { id: "name", label: "┘╪د┘à ┘ê╪د╪ص╪»", hideable: false, sort: "name" },
+  { id: "code", label: "┌ر╪»", sort: "code" },
+  { id: "company", label: "╪┤╪▒┌ر╪ز", sort: "company" },
+  { id: "branch", label: "╪┤╪╣╪ذ┘ç", sort: "branch" },
+  { id: "status", label: "┘ê╪╢╪╣█î╪ز", sort: "status" },
+  { id: "created", label: "╪ز╪د╪▒█î╪« ╪د█î╪ش╪د╪»", sort: "created" },
+  { id: "actions", label: "╪╣┘à┘█î╪د╪ز", hideable: false },
 ];
 
 const emptyForm = (): DeptForm => ({
@@ -102,7 +102,7 @@ function hasAuthContext(): boolean {
 
 function formatCodeDisplay(code?: string | null): { text: string; dir: "ltr" | "rtl" } {
   const s = (code ?? "").trim();
-  if (!s) return { text: "—", dir: "rtl" };
+  if (!s) return { text: "ظ¤", dir: "rtl" };
   if (/[A-Za-z]/.test(s)) return { text: s, dir: "ltr" };
   return { text: toFaDigits(s), dir: "rtl" };
 }
@@ -217,7 +217,7 @@ export function DepartmentsListPage() {
         out.push({
           ...d,
           company_name: c.legal_name || c.name,
-          branch_name: branchNameById.get(d.branch_id) ?? "—",
+          branch_name: branchNameById.get(d.branch_id) ?? "ظ¤",
         });
       }
     });
@@ -338,11 +338,11 @@ export function DepartmentsListPage() {
 
   const onCreate = form.handleSubmit(async (values) => {
     if (!values.company_id) {
-      toast.error("شرکت را انتخاب کنید.");
+      toast.error("╪┤╪▒┌ر╪ز ╪▒╪د ╪د┘╪ز╪«╪د╪ذ ┌ر┘█î╪».");
       return;
     }
     if (!values.branch_id) {
-      toast.error("شعبه را انتخاب کنید.");
+      toast.error("╪┤╪╣╪ذ┘ç ╪▒╪د ╪د┘╪ز╪«╪د╪ذ ┌ر┘█î╪».");
       return;
     }
     try {
@@ -352,7 +352,7 @@ export function DepartmentsListPage() {
         name: values.name.trim(),
         is_active: values.is_active,
       });
-      toast.success("واحد سازمانی ثبت شد");
+      toast.success("┘ê╪د╪ص╪» ╪│╪د╪▓┘à╪د┘█î ╪س╪ذ╪ز ╪┤╪»");
       forceCloseCreate();
       invalidateDeptLists(values.company_id);
     } catch (e) {
@@ -372,7 +372,7 @@ export function DepartmentsListPage() {
           branch_id: values.branch_id || editing.branch_id,
         },
       });
-      toast.success("اطلاعات واحد به‌روز شد");
+      toast.success("╪د╪╖┘╪د╪╣╪د╪ز ┘ê╪د╪ص╪» ╪ذ┘çظî╪▒┘ê╪▓ ╪┤╪»");
       forceCloseEdit();
       invalidateDeptLists(editing.company_id ?? values.company_id);
     } catch (e) {
@@ -391,7 +391,7 @@ export function DepartmentsListPage() {
           branch_id: row.branch_id,
         },
       });
-      toast.success(active ? "واحد فعال شد" : "واحد غیرفعال شد");
+      toast.success(active ? "┘ê╪د╪ص╪» ┘╪╣╪د┘ ╪┤╪»" : "┘ê╪د╪ص╪» ╪║█î╪▒┘╪╣╪د┘ ╪┤╪»");
       invalidateDeptLists(row.company_id ?? undefined);
     } catch (e) {
       toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
@@ -407,9 +407,9 @@ export function DepartmentsListPage() {
   const requestBulk = (kind: BulkKind, targets: DeptRow[]) => {
     const filtered = filterTargetsForKind(kind, targets);
     if (filtered.length === 0) {
-      if (kind === "activate") toast.message("همهٔ موارد انتخاب‌شده از قبل فعال هستند.");
-      else if (kind === "deactivate") toast.message("مورد قابل غیرفعال‌سازی در انتخاب نیست.");
-      else toast.message("موردی برای انجام عملیات نیست.");
+      if (kind === "activate") toast.message("┘ç┘à┘ç┘¤ ┘à┘ê╪د╪▒╪» ╪د┘╪ز╪«╪د╪ذظî╪┤╪»┘ç ╪د╪▓ ┘é╪ذ┘ ┘╪╣╪د┘ ┘ç╪│╪ز┘╪».");
+      else if (kind === "deactivate") toast.message("┘à┘ê╪▒╪» ┘é╪د╪ذ┘ ╪║█î╪▒┘╪╣╪د┘ظî╪│╪د╪▓█î ╪»╪▒ ╪د┘╪ز╪«╪د╪ذ ┘█î╪│╪ز.");
+      else toast.message("┘à┘ê╪▒╪»█î ╪ذ╪▒╪د█î ╪د┘╪ش╪د┘à ╪╣┘à┘█î╪د╪ز ┘█î╪│╪ز.");
       return;
     }
     setConfirmBulk({ kind, targets: filtered });
@@ -448,21 +448,21 @@ export function DepartmentsListPage() {
       const msgs: Record<BulkKind, string> = {
         restore:
           ok === 1
-            ? "۱ واحد بازگردانی شد و غیرفعال باقی ماند."
-            : `${toFaDigits(ok)} واحد بازگردانی شد و غیرفعال باقی ماندند.`,
-        delete: ok === 1 ? "۱ واحد حذف شد." : `${toFaDigits(ok)} واحد حذف شد.`,
-        activate: ok === 1 ? "۱ واحد فعال شد." : `${toFaDigits(ok)} واحد فعال شد.`,
-        deactivate: ok === 1 ? "۱ واحد غیرفعال شد." : `${toFaDigits(ok)} واحد غیرفعال شد.`,
+            ? "█▒ ┘ê╪د╪ص╪» ╪ذ╪د╪▓┌»╪▒╪»╪د┘█î ╪┤╪» ┘ê ╪║█î╪▒┘╪╣╪د┘ ╪ذ╪د┘é█î ┘à╪د┘╪»."
+            : `${toFaDigits(ok)} ┘ê╪د╪ص╪» ╪ذ╪د╪▓┌»╪▒╪»╪د┘█î ╪┤╪» ┘ê ╪║█î╪▒┘╪╣╪د┘ ╪ذ╪د┘é█î ┘à╪د┘╪»┘╪».`,
+        delete: ok === 1 ? "█▒ ┘ê╪د╪ص╪» ╪ص╪░┘ ╪┤╪»." : `${toFaDigits(ok)} ┘ê╪د╪ص╪» ╪ص╪░┘ ╪┤╪».`,
+        activate: ok === 1 ? "█▒ ┘ê╪د╪ص╪» ┘╪╣╪د┘ ╪┤╪»." : `${toFaDigits(ok)} ┘ê╪د╪ص╪» ┘╪╣╪د┘ ╪┤╪».`,
+        deactivate: ok === 1 ? "█▒ ┘ê╪د╪ص╪» ╪║█î╪▒┘╪╣╪د┘ ╪┤╪»." : `${toFaDigits(ok)} ┘ê╪د╪ص╪» ╪║█î╪▒┘╪╣╪د┘ ╪┤╪».`,
       };
       toast.success(msgs[kind]);
-    } else if (ok > 0) toast.success(`${toFaDigits(ok)} انجام شد؛ ${toFaDigits(fail)} ناموفق.`);
+    } else if (ok > 0) toast.success(`${toFaDigits(ok)} ╪د┘╪ش╪د┘à ╪┤╪»╪ؤ ${toFaDigits(fail)} ┘╪د┘à┘ê┘┘é.`);
     else toast.error(MSG_ERR);
   };
 
   const restoreOne = async (row: DeptRow) => {
     try {
       await departmentService.restore(row.department_id);
-      toast.success("واحد بازگردانی شد و غیرفعال باقی ماند.");
+      toast.success("┘ê╪د╪ص╪» ╪ذ╪د╪▓┌»╪▒╪»╪د┘█î ╪┤╪» ┘ê ╪║█î╪▒┘╪╣╪د┘ ╪ذ╪د┘é█î ┘à╪د┘╪».");
       setSelected((prev) => {
         const n = new Set(prev);
         n.delete(row.department_id);
@@ -478,7 +478,7 @@ export function DepartmentsListPage() {
     if (!confirmDelete) return;
     try {
       await deleteMutation.mutateAsync(confirmDelete.department_id);
-      toast.success("واحد حذف شد");
+      toast.success("┘ê╪د╪ص╪» ╪ص╪░┘ ╪┤╪»");
       setConfirmDelete(null);
       setSelected((prev) => {
         const n = new Set(prev);
@@ -495,14 +495,14 @@ export function DepartmentsListPage() {
     <div className="space-y-4">
       {companyList.length === 1 ? (
         <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-          شرکت:{" "}
+          ╪┤╪▒┌ر╪ز:{" "}
           <span className="font-medium text-foreground">
             {companyList[0].legal_name || companyList[0].name}
           </span>
         </div>
       ) : (
         <div className="space-y-1.5">
-          <Label htmlFor="dept-company">شرکت *</Label>
+          <Label htmlFor="dept-company">╪┤╪▒┌ر╪ز *</Label>
           <select
             id="dept-company"
             className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
@@ -513,11 +513,11 @@ export function DepartmentsListPage() {
               form.setValue("branch_id", "", { shouldDirty: true });
             }}
           >
-            <option value="">— انتخاب شرکت —</option>
+            <option value="">ظ¤ ╪د┘╪ز╪«╪د╪ذ ╪┤╪▒┌ر╪ز ظ¤</option>
             {companyList.map((c) => (
               <option key={c.company_id} value={c.company_id}>
                 {c.legal_name || c.name}
-                {c.is_primary ? " (اصلی)" : ""}
+                {c.is_primary ? " (╪د╪╡┘█î)" : ""}
               </option>
             ))}
           </select>
@@ -526,19 +526,19 @@ export function DepartmentsListPage() {
 
       {formBranches.length === 1 ? (
         <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-          شعبه: <span className="font-medium text-foreground">{formBranches[0].name}</span>
-          <span className="ms-1">(تنها شعبه — خودکار)</span>
+          ╪┤╪╣╪ذ┘ç: <span className="font-medium text-foreground">{formBranches[0].name}</span>
+          <span className="ms-1">(╪ز┘┘ç╪د ╪┤╪╣╪ذ┘ç ظ¤ ╪«┘ê╪»┌ر╪د╪▒)</span>
         </div>
       ) : (
         <div className="space-y-1.5">
-          <Label htmlFor="dept-branch">شعبه *</Label>
+          <Label htmlFor="dept-branch">╪┤╪╣╪ذ┘ç *</Label>
           <select
             id="dept-branch"
             className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
             {...form.register("branch_id", { required: true })}
             disabled={!formCompanyId}
           >
-            <option value="">— انتخاب شعبه —</option>
+            <option value="">ظ¤ ╪د┘╪ز╪«╪د╪ذ ╪┤╪╣╪ذ┘ç ظ¤</option>
             {formBranches.map((b) => (
               <option key={b.branch_id} value={b.branch_id}>
                 {b.name}
@@ -550,17 +550,17 @@ export function DepartmentsListPage() {
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="dept-code">کد *</Label>
+          <Label htmlFor="dept-code">┌ر╪» *</Label>
           <Input id="dept-code" className="h-9" dir="ltr" {...form.register("code", { required: true })} />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="dept-name">نام *</Label>
+          <Label htmlFor="dept-name">┘╪د┘à *</Label>
           <Input id="dept-name" className="h-9" {...form.register("name", { required: true })} />
         </div>
       </div>
 
       <div className="space-y-3 rounded-lg border border-border/80 p-3">
-        <p className="text-xs font-medium text-muted-foreground">وضعیت</p>
+        <p className="text-xs font-medium text-muted-foreground">┘ê╪╢╪╣█î╪ز</p>
         <div className="flex items-center justify-between gap-3">
           <button
             type="button"
@@ -569,7 +569,7 @@ export function DepartmentsListPage() {
               form.setValue("is_active", !form.getValues("is_active"), { shouldDirty: true })
             }
           >
-            <span>فعال</span>
+            <span>┘╪╣╪د┘</span>
             <Tooltip>
               <TooltipTrigger asChild>
                 <span
@@ -578,13 +578,13 @@ export function DepartmentsListPage() {
                   className="inline-flex shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
                   onClick={(e) => e.stopPropagation()}
                   onKeyDown={(e) => e.stopPropagation()}
-                  aria-label="راهنمای فعال"
+                  aria-label="╪▒╪د┘ç┘┘à╪د█î ┘╪╣╪د┘"
                 >
                   <CircleHelp className="h-3.5 w-3.5" />
                 </span>
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[14rem] text-right leading-relaxed">
-                اگر خاموش باشد، این واحد در عملیات روزمره قابل استفاده نیست.
+                ╪د┌»╪▒ ╪«╪د┘à┘ê╪┤ ╪ذ╪د╪┤╪»╪î ╪د█î┘ ┘ê╪د╪ص╪» ╪»╪▒ ╪╣┘à┘█î╪د╪ز ╪▒┘ê╪▓┘à╪▒┘ç ┘é╪د╪ذ┘ ╪د╪│╪ز┘╪د╪»┘ç ┘█î╪│╪ز.
               </TooltipContent>
             </Tooltip>
           </button>
@@ -601,11 +601,11 @@ export function DepartmentsListPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="واحدهای سازمانی"
+          title="┘ê╪د╪ص╪»┘ç╪د█î ╪│╪د╪▓┘à╪د┘█î"
           icon={<Network className="h-4 w-4" />}
           breadcrumbs={[
-            { label: "سازمان", href: "/dashboard/organization" },
-            { label: "واحدها" },
+            { label: "╪│╪د╪▓┘à╪د┘", href: "/dashboard/organization" },
+            { label: "┘ê╪د╪ص╪»┘ç╪د" },
           ]}
         />
         <div className="rounded-xl border border-dashed px-6 py-12 text-center text-sm text-muted-foreground">
@@ -619,19 +619,19 @@ export function DepartmentsListPage() {
     <TooltipProvider delayDuration={200}>
       <div className="flex min-h-0 flex-col gap-3">
         <PageHeader
-          title="واحدهای سازمانی"
+          title="┘ê╪د╪ص╪»┘ç╪د█î ╪│╪د╪▓┘à╪د┘█î"
           icon={<Network className="h-4 w-4" />}
-          description="فهرست واحدهای همه شرکت‌ها — ثبت، ویرایش و مدیریت وضعیت"
+          description="┘┘ç╪▒╪│╪ز ┘ê╪د╪ص╪»┘ç╪د█î ┘ç┘à┘ç ╪┤╪▒┌ر╪زظî┘ç╪د ظ¤ ╪س╪ذ╪ز╪î ┘ê█î╪▒╪د█î╪┤ ┘ê ┘à╪»█î╪▒█î╪ز ┘ê╪╢╪╣█î╪ز"
           breadcrumbs={[
-            { label: "داشبورد", href: "/dashboard" },
-            { label: "سازمان", href: "/dashboard/organization" },
-            { label: "واحدها" },
+            { label: "╪»╪د╪┤╪ذ┘ê╪▒╪»", href: "/dashboard" },
+            { label: "╪│╪د╪▓┘à╪د┘", href: "/dashboard/organization" },
+            { label: "┘ê╪د╪ص╪»┘ç╪د" },
           ]}
           actions={
             canCreate && !isDeletedView ? (
               <Button size="sm" className="h-8 gap-1.5" onClick={openCreate}>
                 <Plus className="h-4 w-4" />
-                واحد جدید
+                ┘ê╪د╪ص╪» ╪ش╪»█î╪»
               </Button>
             ) : null
           }
@@ -639,7 +639,7 @@ export function DepartmentsListPage() {
 
         {isError ? (
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            بارگذاری بخشی از واحدها ممکن نشد. صفحه را تازه کنید.
+            ╪ذ╪د╪▒┌»╪░╪د╪▒█î ╪ذ╪«╪┤█î ╪د╪▓ ┘ê╪د╪ص╪»┘ç╪د ┘à┘à┌ر┘ ┘╪┤╪». ╪╡┘╪ص┘ç ╪▒╪د ╪ز╪د╪▓┘ç ┌ر┘█î╪».
           </div>
         ) : null}
 
@@ -648,7 +648,7 @@ export function DepartmentsListPage() {
             <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               className={cn("h-8 ps-8 text-sm", query && "pe-8")}
-              placeholder="نام، کد، شرکت، شعبه…"
+              placeholder="┘╪د┘à╪î ┌ر╪»╪î ╪┤╪▒┌ر╪ز╪î ╪┤╪╣╪ذ┘çظخ"
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
@@ -659,7 +659,7 @@ export function DepartmentsListPage() {
               <button
                 type="button"
                 className="absolute end-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted"
-                aria-label="پاک کردن جستجو"
+                aria-label="┘╛╪د┌ر ┌ر╪▒╪»┘ ╪ش╪│╪ز╪ش┘ê"
                 onClick={() => {
                   setQuery("");
                   setPage(1);
@@ -677,14 +677,14 @@ export function DepartmentsListPage() {
             }}
           >
             <SelectTrigger className="h-8 w-[12rem]">
-              <SelectValue placeholder="شرکت" />
+              <SelectValue placeholder="╪┤╪▒┌ر╪ز" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL}>همه شرکت‌ها</SelectItem>
+              <SelectItem value={ALL}>┘ç┘à┘ç ╪┤╪▒┌ر╪زظî┘ç╪د</SelectItem>
               {companyList.map((c) => (
                 <SelectItem key={c.company_id} value={c.company_id}>
                   {c.legal_name || c.name}
-                  {c.is_primary ? " (اصلی)" : ""}
+                  {c.is_primary ? " (╪د╪╡┘█î)" : ""}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -701,8 +701,8 @@ export function DepartmentsListPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="active">واحدهای جاری</SelectItem>
-              <SelectItem value="deleted">واحدهای حذف‌شده</SelectItem>
+              <SelectItem value="active">┘ê╪د╪ص╪»┘ç╪د█î ╪ش╪د╪▒█î</SelectItem>
+              <SelectItem value="deleted">┘ê╪د╪ص╪»┘ç╪د█î ╪ص╪░┘ظî╪┤╪»┘ç</SelectItem>
             </SelectContent>
           </Select>
           {!isDeletedView ? (
@@ -717,9 +717,9 @@ export function DepartmentsListPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">همه وضعیت‌ها</SelectItem>
-                <SelectItem value="active">فعال</SelectItem>
-                <SelectItem value="inactive">غیرفعال</SelectItem>
+                <SelectItem value="all">┘ç┘à┘ç ┘ê╪╢╪╣█î╪زظî┘ç╪د</SelectItem>
+                <SelectItem value="active">┘╪╣╪د┘</SelectItem>
+                <SelectItem value="inactive">╪║█î╪▒┘╪╣╪د┘</SelectItem>
               </SelectContent>
             </Select>
           ) : null}
@@ -727,11 +727,11 @@ export function DepartmentsListPage() {
             <DropdownMenuTrigger asChild>
               <Button type="button" variant="outline" size="sm" className="h-8 gap-1">
                 <Columns3 className="h-3.5 w-3.5" />
-                ستون‌ها
+                ╪│╪ز┘ê┘ظî┘ç╪د
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel>نمایش ستون‌ها</DropdownMenuLabel>
+              <DropdownMenuLabel>┘┘à╪د█î╪┤ ╪│╪ز┘ê┘ظî┘ç╪د</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {COLS.filter((c) => c.hideable !== false).map((c) => (
                 <DropdownMenuItem
@@ -752,13 +752,13 @@ export function DepartmentsListPage() {
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted/30 px-3 py-2">
             <span className="text-xs text-muted-foreground">
               {bulkBusy
-                ? "در حال انجام عملیات گروهی…"
-                : `${toFaDigits(selected.size)} مورد انتخاب‌شده`}
+                ? "╪»╪▒ ╪ص╪د┘ ╪د┘╪ش╪د┘à ╪╣┘à┘█î╪د╪ز ┌»╪▒┘ê┘ç█îظخ"
+                : `${toFaDigits(selected.size)} ┘à┘ê╪▒╪» ╪د┘╪ز╪«╪د╪ذظî╪┤╪»┘ç`}
             </span>
             {!bulkBusy && isDeletedView && canUpdate ? (
               <Button type="button" size="sm" className="h-7 gap-1" onClick={() => requestBulk("restore", selectedRows)}>
                 <RotateCcw className="h-3.5 w-3.5" />
-                بازگردانی
+                ╪ذ╪د╪▓┌»╪▒╪»╪د┘█î
               </Button>
             ) : null}
             {!bulkBusy && !isDeletedView ? (
@@ -766,23 +766,23 @@ export function DepartmentsListPage() {
                 {canUpdate ? (
                   <>
                     <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => requestBulk("activate", selectedRows)}>
-                      فعال‌سازی
+                      ┘╪╣╪د┘ظî╪│╪د╪▓█î
                     </Button>
                     <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => requestBulk("deactivate", selectedRows)}>
-                      غیرفعال‌سازی
+                      ╪║█î╪▒┘╪╣╪د┘ظî╪│╪د╪▓█î
                     </Button>
                   </>
                 ) : null}
                 {canDelete ? (
                   <Button type="button" size="sm" variant="destructive" className="h-7" onClick={() => requestBulk("delete", selectedRows)}>
-                    حذف
+                    ╪ص╪░┘
                   </Button>
                 ) : null}
               </>
             ) : null}
             {!bulkBusy ? (
               <Button type="button" size="sm" variant="ghost" className="h-7" onClick={() => setSelected(new Set())}>
-                لغو انتخاب
+                ┘╪║┘ê ╪د┘╪ز╪«╪د╪ذ
               </Button>
             ) : null}
           </div>
@@ -803,13 +803,13 @@ export function DepartmentsListPage() {
           ) : pageRows.length === 0 ? (
             <EmptyState
               icon={Network}
-              title={isFiltered ? "نتیجه‌ای پیدا نشد" : isDeletedView ? "واحد حذف‌شده‌ای نیست" : "واحدی ثبت نشده"}
+              title={isFiltered ? "┘╪ز█î╪ش┘çظî╪د█î ┘╛█î╪»╪د ┘╪┤╪»" : isDeletedView ? "┘ê╪د╪ص╪» ╪ص╪░┘ظî╪┤╪»┘çظî╪د█î ┘█î╪│╪ز" : "┘ê╪د╪ص╪»█î ╪س╪ذ╪ز ┘╪┤╪»┘ç"}
               description={
                 isFiltered
-                  ? "عبارت جستجو یا فیلتر را تغییر دهید."
+                  ? "╪╣╪ذ╪د╪▒╪ز ╪ش╪│╪ز╪ش┘ê █î╪د ┘█î┘╪ز╪▒ ╪▒╪د ╪ز╪║█î█î╪▒ ╪»┘ç█î╪»."
                   : isDeletedView
-                    ? "موارد حذف‌شده در این فهرست نمایش داده می‌شوند."
-                    : "اولین واحد را برای یکی از شعب ثبت کنید."
+                    ? "┘à┘ê╪د╪▒╪» ╪ص╪░┘ظî╪┤╪»┘ç ╪»╪▒ ╪د█î┘ ┘┘ç╪▒╪│╪ز ┘┘à╪د█î╪┤ ╪»╪د╪»┘ç ┘à█îظî╪┤┘ê┘╪»."
+                    : "╪د┘ê┘█î┘ ┘ê╪د╪ص╪» ╪▒╪د ╪ذ╪▒╪د█î █î┌ر█î ╪د╪▓ ╪┤╪╣╪ذ ╪س╪ذ╪ز ┌ر┘█î╪»."
               }
             />
           ) : (
@@ -827,7 +827,7 @@ export function DepartmentsListPage() {
                           return n;
                         });
                       }}
-                      aria-label="انتخاب صفحه"
+                      aria-label="╪د┘╪ز╪«╪د╪ذ ╪╡┘╪ص┘ç"
                     />
                   </TableHead>
                   {COLS.map((c) =>
@@ -860,7 +860,7 @@ export function DepartmentsListPage() {
                             return n;
                           });
                         }}
-                        aria-label={`انتخاب ${row.name}`}
+                        aria-label={`╪د┘╪ز╪«╪د╪ذ ${row.name}`}
                       />
                     </TableCell>
                     {visible.name !== false ? (
@@ -873,9 +873,9 @@ export function DepartmentsListPage() {
                             {row.name}
                           </Link>
                           {isRecentCreated(row.created_at) ? (
-                            <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300" title="به‌تازگی ثبت شده">
+                            <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300" title="╪ذ┘çظî╪ز╪د╪▓┌»█î ╪س╪ذ╪ز ╪┤╪»┘ç">
                               <Sparkles className="h-3 w-3" />
-                              تازه
+                              ╪ز╪د╪▓┘ç
                             </span>
                           ) : null}
                         </div>
@@ -899,9 +899,9 @@ export function DepartmentsListPage() {
                     {visible.status !== false ? (
                       <TableCell className="px-2">
                         {row.is_active !== false ? (
-                          <StatusChip label="فعال" tone="success" />
+                          <StatusChip label="┘╪╣╪د┘" tone="success" />
                         ) : (
-                          <StatusChip label="غیرفعال" tone="neutral" />
+                          <StatusChip label="╪║█î╪▒┘╪╣╪د┘" tone="neutral" />
                         )}
                       </TableCell>
                     ) : null}
@@ -913,7 +913,7 @@ export function DepartmentsListPage() {
                         <div className="flex items-center gap-0.5">
                           {isDeletedView ? (
                             canUpdate ? (
-                              <IconAction label="بازگردانی" onClick={() => void restoreOne(row)}>
+                              <IconAction label="╪ذ╪د╪▓┌»╪▒╪»╪د┘█î" onClick={() => void restoreOne(row)}>
                                 <RotateCcw className="h-3.5 w-3.5" />
                               </IconAction>
                             ) : null
@@ -921,22 +921,22 @@ export function DepartmentsListPage() {
                             <>
                               {canUpdate ? (
                                 <>
-                                  <IconAction label="ویرایش" onClick={() => openEdit(row)}>
+                                  <IconAction label="┘ê█î╪▒╪د█î╪┤" onClick={() => openEdit(row)}>
                                     <Pencil className="h-3.5 w-3.5" />
                                   </IconAction>
                                   {row.is_active !== false ? (
-                                    <IconAction label="غیرفعال‌سازی" onClick={() => void setActive(row, false)}>
+                                    <IconAction label="╪║█î╪▒┘╪╣╪د┘ظî╪│╪د╪▓█î" onClick={() => void setActive(row, false)}>
                                       <PowerOff className="h-3.5 w-3.5" />
                                     </IconAction>
                                   ) : (
-                                    <IconAction label="فعال‌سازی" onClick={() => void setActive(row, true)}>
+                                    <IconAction label="┘╪╣╪د┘ظî╪│╪د╪▓█î" onClick={() => void setActive(row, true)}>
                                       <Power className="h-3.5 w-3.5" />
                                     </IconAction>
                                   )}
                                 </>
                               ) : null}
                               {canDelete ? (
-                                <IconAction label="حذف" variant="destructive" onClick={() => setConfirmDelete(row)}>
+                                <IconAction label="╪ص╪░┘" variant="destructive" onClick={() => setConfirmDelete(row)}>
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </IconAction>
                               ) : null}
@@ -955,14 +955,14 @@ export function DepartmentsListPage() {
         {total > 0 ? (
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>
-              {toFaDigits(total)} مورد — صفحه {toFaDigits(safePage)} از {toFaDigits(totalPages)}
+              {toFaDigits(total)} ┘à┘ê╪▒╪» ظ¤ ╪╡┘╪ص┘ç {toFaDigits(safePage)} ╪د╪▓ {toFaDigits(totalPages)}
             </span>
             <div className="flex items-center gap-1">
               <Button type="button" variant="outline" size="sm" className="h-7" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                قبلی
+                ┘é╪ذ┘█î
               </Button>
               <Button type="button" variant="outline" size="sm" className="h-7" disabled={safePage >= totalPages} onClick={() => setPage((p) => p + 1)}>
-                بعدی
+                ╪ذ╪╣╪»█î
               </Button>
               <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
                 <SelectTrigger className="h-7 w-[4.5rem]">
@@ -985,28 +985,28 @@ export function DepartmentsListPage() {
             <DialogHeader>
               <DialogTitle>
                 {confirmBulk?.kind === "delete"
-                  ? "تأیید حذف"
+                  ? "╪ز╪ث█î█î╪» ╪ص╪░┘"
                   : confirmBulk?.kind === "restore"
-                    ? "تأیید بازگردانی"
+                    ? "╪ز╪ث█î█î╪» ╪ذ╪د╪▓┌»╪▒╪»╪د┘█î"
                     : confirmBulk?.kind === "activate"
-                      ? "تأیید فعال‌سازی"
-                      : "تأیید غیرفعال‌سازی"}
+                      ? "╪ز╪ث█î█î╪» ┘╪╣╪د┘ظî╪│╪د╪▓█î"
+                      : "╪ز╪ث█î█î╪» ╪║█î╪▒┘╪╣╪د┘ظî╪│╪د╪▓█î"}
               </DialogTitle>
               <DialogDescription className="text-right leading-relaxed">
                 {confirmBulk
                   ? confirmBulk.kind === "delete"
-                    ? `${toFaDigits(confirmBulk.targets.length)} واحد انتخاب‌شده حذف می‌شوند. سوابق حفظ می‌شود.`
+                    ? `${toFaDigits(confirmBulk.targets.length)} ┘ê╪د╪ص╪» ╪د┘╪ز╪«╪د╪ذظî╪┤╪»┘ç ╪ص╪░┘ ┘à█îظî╪┤┘ê┘╪». ╪│┘ê╪د╪ذ┘é ╪ص┘╪╕ ┘à█îظî╪┤┘ê╪».`
                     : confirmBulk.kind === "restore"
-                      ? `${toFaDigits(confirmBulk.targets.length)} واحد بازگردانی می‌شوند و تا فعال‌سازی دستی غیرفعال می‌مانند.`
+                      ? `${toFaDigits(confirmBulk.targets.length)} ┘ê╪د╪ص╪» ╪ذ╪د╪▓┌»╪▒╪»╪د┘█î ┘à█îظî╪┤┘ê┘╪» ┘ê ╪ز╪د ┘╪╣╪د┘ظî╪│╪د╪▓█î ╪»╪│╪ز█î ╪║█î╪▒┘╪╣╪د┘ ┘à█îظî┘à╪د┘┘╪».`
                       : confirmBulk.kind === "activate"
-                        ? `${toFaDigits(confirmBulk.targets.length)} واحد فعال می‌شوند.`
-                        : `${toFaDigits(confirmBulk.targets.length)} واحد غیرفعال می‌شوند.`
+                        ? `${toFaDigits(confirmBulk.targets.length)} ┘ê╪د╪ص╪» ┘╪╣╪د┘ ┘à█îظî╪┤┘ê┘╪».`
+                        : `${toFaDigits(confirmBulk.targets.length)} ┘ê╪د╪ص╪» ╪║█î╪▒┘╪╣╪د┘ ┘à█îظî╪┤┘ê┘╪».`
                   : ""}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
               <Button type="button" variant="outline" size="sm" disabled={bulkBusy} onClick={() => setConfirmBulk(null)}>
-                انصراف
+                ╪د┘╪╡╪▒╪د┘
               </Button>
               <Button
                 type="button"
@@ -1015,7 +1015,7 @@ export function DepartmentsListPage() {
                 disabled={bulkBusy || !confirmBulk}
                 onClick={() => confirmBulk && void runBulk(confirmBulk.kind, confirmBulk.targets)}
               >
-                {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "تأیید"}
+                {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "╪ز╪ث█î█î╪»"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1024,17 +1024,17 @@ export function DepartmentsListPage() {
         <Dialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>تأیید حذف واحد</DialogTitle>
+              <DialogTitle>╪ز╪ث█î█î╪» ╪ص╪░┘ ┘ê╪د╪ص╪»</DialogTitle>
               <DialogDescription className="text-right leading-relaxed">
-                واحد «{confirmDelete?.name}» حذف می‌شود. سوابق حفظ می‌شود.
+                ┘ê╪د╪ص╪» ┬س{confirmDelete?.name}┬╗ ╪ص╪░┘ ┘à█îظî╪┤┘ê╪». ╪│┘ê╪د╪ذ┘é ╪ص┘╪╕ ┘à█îظî╪┤┘ê╪».
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
               <Button type="button" variant="outline" size="sm" onClick={() => setConfirmDelete(null)}>
-                انصراف
+                ╪د┘╪╡╪▒╪د┘
               </Button>
               <Button type="button" size="sm" variant="destructive" disabled={deleteMutation.isPending} onClick={() => void doDelete()}>
-                {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "حذف"}
+                {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "╪ص╪░┘"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1048,16 +1048,16 @@ export function DepartmentsListPage() {
             onEscapeKeyDown={(e) => { if (isDirty) e.preventDefault(); }}
           >
             <SheetHeader>
-              <SheetTitle>واحد جدید</SheetTitle>
+              <SheetTitle>┘ê╪د╪ص╪» ╪ش╪»█î╪»</SheetTitle>
             </SheetHeader>
             <form className="flex min-h-0 flex-1 flex-col" onSubmit={onCreate}>
               <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">{formFields}</div>
               <SheetFooter>
                 <Button type="button" variant="outline" size="sm" onClick={forceCloseCreate}>
-                  انصراف
+                  ╪د┘╪╡╪▒╪د┘
                 </Button>
                 <Button type="submit" size="sm" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ثبت"}
+                  {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "╪س╪ذ╪ز"}
                 </Button>
               </SheetFooter>
             </form>
@@ -1072,16 +1072,16 @@ export function DepartmentsListPage() {
             onEscapeKeyDown={(e) => { if (isDirty) e.preventDefault(); }}
           >
             <SheetHeader>
-              <SheetTitle>ویرایش واحد</SheetTitle>
+              <SheetTitle>┘ê█î╪▒╪د█î╪┤ ┘ê╪د╪ص╪»</SheetTitle>
             </SheetHeader>
             <form className="flex min-h-0 flex-1 flex-col" onSubmit={onEdit}>
               <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">{formFields}</div>
               <SheetFooter>
                 <Button type="button" variant="outline" size="sm" onClick={forceCloseEdit}>
-                  انصراف
+                  ╪د┘╪╡╪▒╪د┘
                 </Button>
                 <Button type="submit" size="sm" disabled={updateMutation.isPending}>
-                  {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
+                  {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "╪░╪«█î╪▒┘ç"}
                 </Button>
               </SheetFooter>
             </form>
