@@ -37,45 +37,100 @@ export function CompaniesListDialogs({ c }: { c: Ctx }) {
             <DialogDescription>{c.confirm ? confirmBody(c.confirm.kind, c.confirm.count) : ""}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="outline" disabled={c.bulkBusy} onClick={() => c.setConfirm(null)}>انصراف</Button>
-            <Button type="button" variant={c.confirm?.kind === "delete" ? "destructive" : "default"} disabled={c.bulkBusy}
-              onClick={() => c.confirm && void c.runBulk(c.confirm.kind, c.confirm.targets)}>
-              {c.bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : c.confirm ? confirmActionLabel(c.confirm.kind) : ""}
+            <Button type="button" variant="outline" disabled={c.bulkBusy} onClick={() => c.setConfirm(null)}>
+              انصراف
+            </Button>
+            <Button
+              type="button"
+              variant={c.confirm?.kind === "delete" ? "destructive" : "default"}
+              disabled={c.bulkBusy}
+              onClick={() => c.confirm && void c.runBulk(c.confirm.kind, c.confirm.targets)}
+            >
+              {c.bulkBusy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : c.confirm ? (
+                confirmActionLabel(c.confirm.kind)
+              ) : (
+                ""
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Sheet open={c.createOpen} onOpenChange={(o) => { if (!o) { if (c.isDirty && !window.confirm("تغییرات ذخیره نشده. انصراف؟")) return; c.forceCloseCreate(); } }}>
+      <Sheet
+        open={c.createOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            if (c.isDirty && !window.confirm("تغییرات ذخیره نشده. انصراف؟")) return;
+            c.forceCloseCreate();
+          }
+        }}
+      >
         <SheetContent className="sm:max-w-md overflow-y-auto">
-          <SheetHeader><SheetTitle>شرکت جدید</SheetTitle></SheetHeader>
+          <SheetHeader>
+            <SheetTitle>شرکت جدید</SheetTitle>
+          </SheetHeader>
           <form className="mt-4 space-y-3" onSubmit={c.onCreate}>
-            <div className="space-y-1.5"><Label>کد *</Label><Input className="h-9" dir="ltr" {...c.form.register("code", { required: true })} /></div>
-            <div className="space-y-1.5"><Label>نام نمایشی *</Label><Input className="h-9" {...c.form.register("name", { required: true })} /></div>
-            <div className="space-y-1.5"><Label>نام حقوقی</Label><Input className="h-9" {...c.form.register("legal_name")} /></div>
-            <div className="space-y-1.5"><Label>نام تجاری</Label><Input className="h-9" {...c.form.register("trade_name")} /></div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5"><Label>شماره ثبت</Label><Input className="h-9" dir="ltr" {...c.form.register("registration_number")} /></div>
-              <div className="space-y-1.5"><Label>کد اقتصادی</Label><Input className="h-9" dir="ltr" {...c.form.register("economic_code")} /></div>
-            </div>
-            <div className="space-y-1.5"><Label>شناسه مالیاتی</Label><Input className="h-9" dir="ltr" {...c.form.register("tax_identifier")} /></div>
             <div className="space-y-1.5">
-              <Label>{ENTITY_KIND_FIELD_LABEL ?? "نوع"}</Label>
-              <Select value={c.selectedKind} onValueChange={(v) => c.form.setValue("entity_kind", v, { shouldDirty: true })}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <Label>کد *</Label>
+              <Input className="h-9" dir="ltr" {...c.form.register("code", { required: true })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>نام نمایشی *</Label>
+              <Input className="h-9" {...c.form.register("name", { required: true })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>نام حقوقی</Label>
+              <Input className="h-9" {...c.form.register("legal_name")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>نام تجاری</Label>
+              <Input className="h-9" {...c.form.register("trade_name")} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>شماره ثبت</Label>
+                <Input className="h-9" dir="ltr" {...c.form.register("registration_number")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>کد اقتصادی</Label>
+                <Input className="h-9" dir="ltr" {...c.form.register("economic_code")} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>شناسه مالیاتی</Label>
+              <Input className="h-9" dir="ltr" {...c.form.register("tax_identifier")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{ENTITY_KIND_FIELD_LABEL}</Label>
+              <Select
+                value={c.selectedKind}
+                onValueChange={(v) => c.form.setValue("entity_kind", v, { shouldDirty: true })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {(ENTITY_KIND_OPTIONS ?? Object.keys(ENTITY_KIND_LABELS)).map((k: string) => (
-                    <SelectItem key={k} value={k}>{ENTITY_KIND_LABELS[k] ?? k}</SelectItem>
+                  {ENTITY_KIND_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex items-center justify-between gap-2 rounded-lg border border-border/80 px-3 py-2">
               <Label>فعال</Label>
-              <Switch checked={c.form.watch("is_active")} onCheckedChange={(v) => c.form.setValue("is_active", v, { shouldDirty: true })} />
+              <Switch
+                checked={c.form.watch("is_active")}
+                onCheckedChange={(v) => c.form.setValue("is_active", v, { shouldDirty: true })}
+              />
             </div>
             <SheetFooter>
-              <Button type="button" variant="outline" size="sm" onClick={c.forceCloseCreate}>انصراف</Button>
+              <Button type="button" variant="outline" size="sm" onClick={c.forceCloseCreate}>
+                انصراف
+              </Button>
               <Button type="submit" size="sm" disabled={c.createMutation.isPending}>
                 {c.createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ایجاد"}
               </Button>
@@ -84,25 +139,61 @@ export function CompaniesListDialogs({ c }: { c: Ctx }) {
         </SheetContent>
       </Sheet>
 
-      <Sheet open={c.editOpen} onOpenChange={(o) => { if (!o) { if (c.isDirty && !window.confirm("تغییرات ذخیره نشده. انصراف؟")) return; c.forceCloseEdit(); } }}>
+      <Sheet
+        open={c.editOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            if (c.isDirty && !window.confirm("تغییرات ذخیره نشده. انصراف؟")) return;
+            c.forceCloseEdit();
+          }
+        }}
+      >
         <SheetContent className="sm:max-w-md overflow-y-auto">
-          <SheetHeader><SheetTitle>ویرایش شرکت</SheetTitle></SheetHeader>
+          <SheetHeader>
+            <SheetTitle>ویرایش شرکت</SheetTitle>
+          </SheetHeader>
           <form className="mt-4 space-y-3" onSubmit={c.onEdit}>
-            <div className="space-y-1.5"><Label>کد *</Label><Input className="h-9" dir="ltr" {...c.form.register("code", { required: true })} /></div>
-            <div className="space-y-1.5"><Label>نام نمایشی *</Label><Input className="h-9" {...c.form.register("name", { required: true })} /></div>
-            <div className="space-y-1.5"><Label>نام حقوقی</Label><Input className="h-9" {...c.form.register("legal_name")} /></div>
-            <div className="space-y-1.5"><Label>نام تجاری</Label><Input className="h-9" {...c.form.register("trade_name")} /></div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5"><Label>شماره ثبت</Label><Input className="h-9" dir="ltr" {...c.form.register("registration_number")} /></div>
-              <div className="space-y-1.5"><Label>کد اقتصادی</Label><Input className="h-9" dir="ltr" {...c.form.register("economic_code")} /></div>
+            <div className="space-y-1.5">
+              <Label>کد *</Label>
+              <Input className="h-9" dir="ltr" {...c.form.register("code", { required: true })} />
             </div>
-            <div className="space-y-1.5"><Label>شناسه مالیاتی</Label><Input className="h-9" dir="ltr" {...c.form.register("tax_identifier")} /></div>
+            <div className="space-y-1.5">
+              <Label>نام نمایشی *</Label>
+              <Input className="h-9" {...c.form.register("name", { required: true })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>نام حقوقی</Label>
+              <Input className="h-9" {...c.form.register("legal_name")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>نام تجاری</Label>
+              <Input className="h-9" {...c.form.register("trade_name")} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>شماره ثبت</Label>
+                <Input className="h-9" dir="ltr" {...c.form.register("registration_number")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>کد اقتصادی</Label>
+                <Input className="h-9" dir="ltr" {...c.form.register("economic_code")} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>شناسه مالیاتی</Label>
+              <Input className="h-9" dir="ltr" {...c.form.register("tax_identifier")} />
+            </div>
             <div className="flex items-center justify-between gap-2 rounded-lg border border-border/80 px-3 py-2">
               <Label>فعال</Label>
-              <Switch checked={c.form.watch("is_active")} onCheckedChange={(v) => c.form.setValue("is_active", v, { shouldDirty: true })} />
+              <Switch
+                checked={c.form.watch("is_active")}
+                onCheckedChange={(v) => c.form.setValue("is_active", v, { shouldDirty: true })}
+              />
             </div>
             <SheetFooter>
-              <Button type="button" variant="outline" size="sm" onClick={c.forceCloseEdit}>انصراف</Button>
+              <Button type="button" variant="outline" size="sm" onClick={c.forceCloseEdit}>
+                انصراف
+              </Button>
               <Button type="submit" size="sm" disabled={c.updateMutation.isPending}>
                 {c.updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
               </Button>
