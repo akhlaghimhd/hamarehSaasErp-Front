@@ -58,13 +58,31 @@ export function isRecentCreated(iso?: string | null, days = 3): boolean {
   return Date.now() - t <= days * 86_400_000;
 }
 
-export function companyLabels(bu: BusinessUnitDto): string {
+export type CompanyLabelSource = {
+  company_id: string;
+  name?: string | null;
+  legal_name?: string | null;
+};
+
+/** Prefer company catalog so nested assignment.company blanks (ScopeScoped) do not hide names. */
+export function companyLabels(
+  bu: BusinessUnitDto,
+  companyCatalog?: CompanyLabelSource[] | null
+): string {
   const rows = bu.company_assignments ?? [];
   if (!rows.length) return "—";
+  const byId = new Map<string, CompanyLabelSource>();
+  for (const c of companyCatalog ?? []) {
+    if (c?.company_id) byId.set(c.company_id, c);
+  }
   return rows
     .map((a) => {
-      const n = a.company?.legal_name || a.company?.name || "شرکت";
-      return a.is_primary ? `${n} (اصلی)` : n;
+      const fromCatalog = byId.get(a.company_id);
+      const n =
+        (fromCatalog?.legal_name || fromCatalog?.name || "").trim() ||
+        (a.company?.legal_name || a.company?.name || "").trim() ||
+        "شرکت";
+      return a.is_primary ? `${n} (اصلی این واحد)` : n;
     })
     .join("، ");
 }

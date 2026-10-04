@@ -307,8 +307,10 @@ export function BusinessUnitsListPage() {
                         </TableCell>
                       ) : null}
                       {c.visibleCols.has("companies") ? (
-                        <TableCell className="max-w-[16rem] truncate px-3 text-start text-xs text-muted-foreground" title={companyLabels(row)}>
-                          {companyLabels(row)}
+                        <TableCell className="max-w-[20rem] px-3 text-start text-xs text-muted-foreground">
+                          <span className="line-clamp-2 break-words" title={companyLabels(row, c.companies)}>
+                            {companyLabels(row, c.companies)}
+                          </span>
                         </TableCell>
                       ) : null}
                       {c.visibleCols.has("status") ? (
