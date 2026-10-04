@@ -1,13 +1,34 @@
 /**
- * FE-ORG — فهرست شرکت‌ها (working baseline)
- * Full FINAL (DataTable/bulk/feature-pack) is in project artifacts:
- * companies-list.FINAL.tsx / companies-list.PUSH-READY.tsx — apply locally then push.
+ * FE-ORG — فهرست شرکت‌ها
+ * STAGE 1/4: full logic from FINAL (CRUD, bulk, multi_company gate).
+ * UI table/sheets continue in subsequent commits.
  */
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Building2, Loader2, Plus, Search } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Building2,
+  CircleHelp,
+  Columns3,
+  Download,
+  Eye,
+  FileSpreadsheet,
+  FileText,
+  Loader2,
+  Pencil,
+  Plus,
+  Power,
+  PowerOff,
+  RotateCcw,
+  Search,
+  Trash2,
+  X,
+  Sparkles,
+} from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/layout/page-header";
@@ -15,9 +36,8 @@ import { StatusChip } from "@/shared/components/data-display/status-chip";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { Input } from "@/shared/components/ui/input";
 import { Button } from "@/shared/components/ui/button";
+import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Skeleton } from "@/shared/components/ui/skeleton";
-import { Label } from "@/shared/components/ui/label";
-import { Switch } from "@/shared/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -26,12 +46,19 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select";
 import {
-  Sheet,
-  SheetContent,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/shared/components/ui/sheet";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/shared/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/shared/components/ui/tooltip";
 import {
   Table,
   TableBody,
@@ -40,91 +67,270 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/components/ui/table";
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/shared/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog";
+import { Label } from "@/shared/components/ui/label";
+import { Switch } from "@/shared/components/ui/switch";
 import { usePermission } from "@/auth";
 import { ApiClientError } from "@/api";
-import { toFaDigits } from "@/shared/lib/utils";
-import { useCompanies, useCreateCompany } from "../hooks/use-companies";
-import { companyDetailPath } from "../lib/company-ref";
+import { cn, toFaDigits } from "@/shared/lib/utils";
+import {
+  useCompanies,
+  useCreateCompany,
+  useRestoreCompany,
+  useSoftDeleteCompany,
+  useUpdateCompany,
+} from "../hooks/use-companies";
+import {
+  FEATURE_PACK_CODES,
+  useFeaturePackEnabled,
+} from "../hooks/use-feature-packs";
+import type { CompanyListFilter } from "../services/company-service";
 import {
   OrganizationPermissions,
   ENTITY_KIND_LABELS,
+  ENTITY_KIND_FIELD_LABEL,
+  ENTITY_KIND_OPTIONS,
   type CompanyDto,
 } from "../types";
+import { companyDetailPath } from "../lib/company-ref";
+import { exportCompaniesExcel, exportCompaniesPdf } from "../lib/companies-export";
+import {
+  MSG_LOAD,
+  MSG_ERR,
+  MSG_NO_ACCESS,
+  COL_STORAGE,
+  type StatusFilter,
+  type SortKey,
+  type SortDir,
+  type ColumnId,
+  type BulkKind,
+  type ConfirmState,
+  RESTORE_ONE_MSG,
+  BULK_SUCCESS,
+  confirmTitle,
+  confirmBody,
+  confirmActionLabel,
+  COLS,
+  type CompanyForm,
+  emptyForm,
+  companyToForm,
+  displayName,
+  fd,
+  sortValue,
+  IconAction,
+} from "./companies-list-helpers";
 
-type CompanyForm = {
-  code: string;
-  name: string;
-  legal_name: string;
-  entity_kind: string;
-  is_active: boolean;
-};
-
-const emptyForm = (): CompanyForm => ({
-  code: "",
-  name: "",
-  legal_name: "",
-  entity_kind: "OPERATING",
-  is_active: true,
-});
+function isRecentCreated(iso?: string | null, days = 3): boolean {
+  if (!iso) return false;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return false;
+  return Date.now() - t <= days * 86_400_000;
+}
 
 export function CompaniesListPage() {
   const canView = usePermission(OrganizationPermissions.companyView);
   const canCreate = usePermission(OrganizationPermissions.companyCreate);
-  const { data, isLoading, isError, refetch, isFetching } = useCompanies("active");
+  const canUpdate = usePermission(OrganizationPermissions.companyUpdate);
+  const canDelete = usePermission(OrganizationPermissions.companyDelete);
+  const { enabled: hasMultiCompany, isLoading: multiCompanyPackLoading } =
+    useFeaturePackEnabled(FEATURE_PACK_CODES.multiCompany);
+
+  const [membershipFilter, setMembershipFilter] = useState<CompanyListFilter>("active");
+  const { data, isLoading, isError, error, refetch, isFetching } = useCompanies(membershipFilter);
   const createMutation = useCreateCompany();
+  const updateMutation = useUpdateCompany();
+  const deleteMutation = useSoftDeleteCompany();
+  const restoreMutation = useRestoreCompany();
+
   const [query, setQuery] = useState("");
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const form = useForm<CompanyForm>({ defaultValues: emptyForm() });
-
-  const rows = useMemo(() => {
-    const list = (data ?? []) as CompanyDto[];
-    const q = query.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((r) =>
-      [r.name, r.legal_name, r.code]
-        .map((x) => String(x ?? "").toLowerCase())
-        .join(" ")
-        .includes(q)
-    );
-  }, [data, query]);
-
-  function openCreate() {
-    form.reset(emptyForm());
-    setSheetOpen(true);
-  }
-
-  async function onSubmit(values: CompanyForm) {
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [visible, setVisible] = useState<Record<ColumnId, boolean>>(() => {
+    const base = Object.fromEntries(COLS.map((c) => [c.id, true])) as Record<ColumnId, boolean>;
+    if (typeof window === "undefined") return base;
     try {
-      await createMutation.mutateAsync({
-        code: values.code.trim(),
-        name: values.name.trim(),
-        legal_name: values.legal_name.trim() || values.name.trim(),
-        entity_kind: values.entity_kind || "OPERATING",
-        is_active: values.is_active,
-        status: values.is_active ? 1 : 2,
-      });
-      toast.success("شرکت ایجاد شد");
-      setSheetOpen(false);
-      form.reset(emptyForm());
-      void refetch();
-    } catch (e) {
-      toast.error(e instanceof ApiClientError ? e.message : "خطا در ایجاد شرکت");
+      const raw = localStorage.getItem(COL_STORAGE);
+      return raw ? { ...base, ...JSON.parse(raw) } : base;
+    } catch {
+      return base;
     }
-  }
+  });
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
+  const cancelRef = useRef(false);
+  const [confirm, setConfirm] = useState<ConfirmState>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing] = useState<CompanyDto | null>(null);
+
+  const form = useForm<CompanyForm>({ defaultValues: emptyForm() });
+  const selectedKind = form.watch("entity_kind") || "OPERATING";
+  const isDirty = form.formState.isDirty;
+  const isDeletedView = membershipFilter === "deleted";
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COL_STORAGE, JSON.stringify(visible));
+    } catch {
+      /* ignore */
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    setSelected(new Set());
+    setPage(1);
+  }, [membershipFilter]);
+
+  const rows = data ?? [];
+  const createBlockedByPack =
+    !multiCompanyPackLoading && !hasMultiCompany && rows.length >= 1;
+
+  const parentMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of rows) m.set(c.company_id, displayName(c));
+    return m;
+  }, [rows]);
+
+  const filteredSorted = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = rows.filter((r) => {
+      if (!isDeletedView) {
+        if (statusFilter === "active" && r.is_active === false) return false;
+        if (statusFilter === "inactive" && r.is_active !== false) return false;
+      }
+      if (!q) return true;
+      return [r.code, r.name, r.legal_name, r.registration_number, r.economic_code]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    });
+    return [...list].sort((a, b) => {
+      const va = sortValue(a, sortKey, parentMap);
+      const vb = sortValue(b, sortKey, parentMap);
+      if (va < vb) return sortDir === "asc" ? -1 : 1;
+      if (va > vb) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [rows, query, statusFilter, sortKey, sortDir, parentMap, isDeletedView]);
+
+  const total = filteredSorted.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = filteredSorted.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const isFiltered = query.trim().length > 0 || (!isDeletedView && statusFilter !== "all");
+  const pageIds = pageRows.map((r) => r.company_id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+  const somePageSelected = pageIds.some((id) => selected.has(id));
+  const selectedRows = useMemo(
+    () => filteredSorted.filter((r) => selected.has(r.company_id)),
+    [filteredSorted, selected]
+  );
+  const exportTarget = selectedRows.length > 0 ? selectedRows : filteredSorted;
+  const exportLabel = isDeletedView
+    ? selected.size > 0
+      ? `خروجی حذف‌شده‌های انتخاب‌شده (${toFaDigits(selected.size)})`
+      : `خروجی حذف‌شده‌ها (${toFaDigits(total)})`
+    : selected.size > 0
+      ? `خروجی انتخاب‌شده‌ها (${toFaDigits(selected.size)})`
+      : `خروجی فهرست فعلی (${toFaDigits(total)})`;
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDir(key === "created" ? "desc" : "asc");
+    }
+  };
+
+  const SortIcon = ({ k }: { k: SortKey }) => {
+    if (sortKey !== k) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
+    return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+  };
+
+  const openCreate = () => {
+    if (createBlockedByPack) {
+      toast.message("بسته multi_company فعال نیست؛ ایجاد شرکت دوم مجاز نیست.");
+      return;
+    }
+    form.reset(emptyForm());
+    setEditing(null);
+    setCreateOpen(true);
+  };
+
+  const openEdit = (c: CompanyDto) => {
+    setEditing(c);
+    form.reset(companyToForm(c));
+    setEditOpen(true);
+  };
+
+  const forceCloseCreate = () => {
+    setCreateOpen(false);
+    form.reset(emptyForm());
+  };
+
+  const forceCloseEdit = () => {
+    setEditOpen(false);
+    setEditing(null);
+    form.reset(emptyForm());
+  };
+
+  const payloadFromForm = (values: CompanyForm) => ({
+    code: values.code.trim(),
+    name: values.name.trim(),
+    legal_name: values.legal_name.trim() || values.name.trim(),
+    trade_name: values.trade_name.trim() || null,
+    registration_number: values.registration_number.trim() || null,
+    economic_code: values.economic_code.trim() || null,
+    tax_identifier: values.tax_identifier.trim() || null,
+    entity_kind: values.entity_kind || "OPERATING",
+    is_primary: values.is_primary,
+    parent_company_id: values.parent_company_id || null,
+    is_active: values.is_active,
+    status: values.is_active ? 1 : 2,
+  });
+
+  const onCreate = form.handleSubmit(async (values) => {
+    try {
+      await createMutation.mutateAsync(payloadFromForm(values));
+      toast.success("شرکت ثبت شد");
+      forceCloseCreate();
+    } catch (e) {
+      toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
+    }
+  });
 
   if (!canView) {
     return (
       <div className="p-6">
-        <EmptyState title="مجوز مشاهده شرکت‌ها را ندارید" />
+        <EmptyState title={MSG_NO_ACCESS} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 p-6">
       <PageHeader
         title="شرکت‌ها"
-        description="فهرست شرکت‌های مستأجر"
+        description="بازیابی تدریجی — مرحله ۱/۴ (منطق کامل)"
         breadcrumbs={[
           { label: "سازمان", href: "/dashboard/organization" },
           { label: "شرکت‌ها" },
@@ -132,149 +338,19 @@ export function CompaniesListPage() {
         icon={<Building2 className="h-4 w-4" />}
         actions={
           canCreate ? (
-            <Button size="sm" onClick={openCreate}>
+            <Button size="sm" className="h-8 gap-1.5" onClick={openCreate} disabled={createBlockedByPack}>
               <Plus className="h-4 w-4" /> شرکت جدید
             </Button>
           ) : null
         }
       />
-
-      <div className="relative max-w-md">
-        <Search className="absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          className="h-9 ps-9"
-          placeholder="جستجو…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </div>
-
-      {isLoading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-        </div>
-      ) : isError ? (
-        <EmptyState
-          title="بارگذاری ناموفق"
-          actionLabel="تلاش مجدد"
-          onAction={() => void refetch()}
-        />
-      ) : rows.length === 0 ? (
-        <EmptyState
-          title="شرکتی یافت نشد"
-          actionLabel={canCreate ? "شرکت جدید" : undefined}
-          onAction={canCreate ? openCreate : undefined}
-        />
-      ) : (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>نام</TableHead>
-                <TableHead>کد</TableHead>
-                <TableHead>نوع</TableHead>
-                <TableHead>وضعیت</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.company_id}>
-                  <TableCell className="font-medium">
-                    <Link
-                      href={companyDetailPath(row.company_id)}
-                      className="text-primary hover:underline"
-                    >
-                      {row.legal_name || row.name || "—"}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs" dir="ltr">
-                    {row.code || "—"}
-                  </TableCell>
-                  <TableCell>
-                    {ENTITY_KIND_LABELS?.[row.entity_kind as string] ??
-                      row.entity_kind ??
-                      "—"}
-                  </TableCell>
-                  <TableCell>
-                    <StatusChip
-                      tone={row.is_active !== false ? "success" : "neutral"}
-                      label={row.is_active !== false ? "فعال" : "غیرفعال"}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <div className="border-t px-3 py-2 text-sm text-muted-foreground">
-            {toFaDigits(String(rows.length))} شرکت
-            {isFetching ? (
-              <Loader2 className="ms-2 inline h-3.5 w-3.5 animate-spin" />
-            ) : null}
-          </div>
-        </div>
-      )}
-
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle>شرکت جدید</SheetTitle>
-          </SheetHeader>
-          <form className="mt-4 space-y-3" onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="space-y-1">
-              <Label>کد</Label>
-              <Input {...form.register("code", { required: true })} />
-            </div>
-            <div className="space-y-1">
-              <Label>نام</Label>
-              <Input {...form.register("name", { required: true })} />
-            </div>
-            <div className="space-y-1">
-              <Label>نام قانونی</Label>
-              <Input {...form.register("legal_name")} />
-            </div>
-            <div className="space-y-1">
-              <Label>نوع</Label>
-              <Select
-                value={form.watch("entity_kind") || "OPERATING"}
-                onValueChange={(v) => form.setValue("entity_kind", v, { shouldDirty: true })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(ENTITY_KIND_LABELS ?? { OPERATING: "عملیاتی" }).map(
-                    ([k, v]) => (
-                      <SelectItem key={k} value={k}>
-                        {v}
-                      </SelectItem>
-                    )
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={form.watch("is_active") !== false}
-                onCheckedChange={(c) => form.setValue("is_active", c, { shouldDirty: true })}
-              />
-              <Label>فعال</Label>
-            </div>
-            <SheetFooter>
-              <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>
-                انصراف
-              </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  "ایجاد"
-                )}
-              </Button>
-            </SheetFooter>
-          </form>
-        </SheetContent>
-      </Sheet>
+      <p className="text-sm text-muted-foreground">
+        مرحله ۱/۴ روی گیت: منطق CRUD، bulk، feature-pack و form. جدول و Drawer در مراحل بعد.
+      </p>
+      <p className="text-xs text-muted-foreground">
+        شرکت‌ها: {toFaDigits(String(rows.length))}
+        {isFetching ? " …" : ""}
+      </p>
     </div>
   );
 }
