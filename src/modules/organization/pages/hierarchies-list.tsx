@@ -1,10 +1,10 @@
 /**
- * FE-ORG — سلسله‌مراتب (derived map) RESTORED
+ * FE-ORG — سلسله‌مراتب (derived map)
  * Product law:
  * - SYS trees: read-only mirror of company/branch/BU (auto-synced on backend).
  * - No user-triggered rebuild.
  * - CUSTOM trees: only when tenant feature pack custom_org_hierarchy is enabled.
- * - Expand by clicking tree title.
+ * - Expand by clicking tree title (no separate "nodes" button).
  */
 "use client";
 
@@ -13,6 +13,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronLeft, Info, Loader2, Network, Plus, Search } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import Link from "next/link";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { StatusChip } from "@/shared/components/data-display/status-chip";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
@@ -23,12 +24,17 @@ import { Skeleton } from "@/shared/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/components/ui/table";
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/shared/components/ui/sheet";
+import { Checkbox } from "@/shared/components/ui/checkbox";
 import { usePermission } from "@/auth";
 import { ApiClientError, tokenStorage } from "@/api";
 import { cn, toFaDigits } from "@/shared/lib/utils";
 import { useCompanies } from "../hooks/use-companies";
-import { FEATURE_PACK_CODES, useFeaturePackEnabled } from "../hooks/use-feature-packs";
 import {
+  FEATURE_PACK_CODES,
+  useFeaturePackEnabled,
+} from "../hooks/use-feature-packs";
+import {
+  businessUnitService,
   hierarchyService,
   type HierarchyDto,
   type HierarchyNodeDto,
@@ -53,7 +59,9 @@ const ENTITY_LABEL: Record<string, string> = {
   COST_CENTER: "مرکز هزینه",
 };
 
+type CatalogItem = { id: string; label: string; sub?: string };
 type HierForm = { code: string; name: string };
+type NodeForm = { entity_type: string; entity_id: string; parent_node_id: string };
 
 function isSystemHierarchy(h: { code?: string; is_system?: boolean }): boolean {
   if (h.is_system === true) return true;
@@ -64,17 +72,18 @@ function purposeLabel(p?: string) {
   return PURPOSE_LABEL[p ?? ""] ?? p ?? "—";
 }
 
-function hasAuthContext(): boolean {
-  if (typeof window === "undefined") return false;
-  return Boolean(tokenStorage.getAccessToken() && tokenStorage.getTenantId());
+function nodeOriginBadge(origin?: string | null) {
+  if (origin === "SYSTEM") {
+    return <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-700">سیستمی</span>;
+  }
+  if (origin === "MANUAL") {
+    return <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] text-emerald-700">دستی</span>;
+  }
+  return null;
 }
 
-function nodeLabel(n: HierarchyNodeDto, companyMap: Map<string, string>): string {
-  if (n.entity_label) return n.entity_label;
-  if (n.entity_type === "COMPANY") {
-    return companyMap.get(n.entity_id) || n.entity_code || n.entity_id.slice(0, 8);
-  }
-  return n.entity_code || `${ENTITY_LABEL[n.entity_type] ?? n.entity_type} ${n.entity_id.slice(0, 8)}`;
+function hasAuthContext(): boolean {
+  return Boolean(tokenStorage.getAccessToken() && tokenStorage.getTenantId());
 }
 
 export function HierarchiesListPage() {
@@ -91,81 +100,262 @@ export function HierarchiesListPage() {
   const canCustom = canManage && hasCustomHierarchy;
   const { data: companies } = useCompanies();
 
-  const companyMap = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const c of companies ?? []) {
-      m.set(c.company_id, (c.legal_name || c.name || "").trim() || c.code || c.company_id);
-    }
-    return m;
-  }, [companies]);
-
   const [search, setSearch] = useState("");
-  const [membership, setMembership] = useState<"active" | "deleted">("active");
+  const [purposeFilter, setPurposeFilter] = useState("all");
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [nodeSheetOpen, setNodeSheetOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [activeHierarchy, setActiveHierarchy] = useState<HierarchyDto | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [membership, setMembership] = useState<"active" | "deleted">("active");
   const [nodeMembership, setNodeMembership] = useState<"active" | "deleted">("active");
+  const [confirmAction, setConfirmAction] = useState<{
+    kind: "hier" | "nodes";
+    action: "activate" | "deactivate" | "delete" | "restore";
+    ids: string[];
+  } | null>(null);
+
   const form = useForm<HierForm>({ defaultValues: { code: "", name: "" } });
+  const nodeForm = useForm<NodeForm>({
+    defaultValues: { entity_type: "COMPANY", entity_id: "", parent_node_id: "" },
+  });
 
   const listQuery = useQuery({
     queryKey: ["org", "hierarchies", membership],
     queryFn: () => hierarchyService.list({ membership }),
-    enabled: hasAuthContext() && canView,
+    enabled: canView && hasAuthContext(),
   });
 
   const healthQuery = useQuery({
     queryKey: ["org", "hierarchy-health"],
     queryFn: () => hierarchyService.health(),
-    enabled: hasAuthContext() && canView,
-    staleTime: 30_000,
+    enabled: canView && hasAuthContext(),
+    refetchInterval: 90_000,
   });
 
   const nodesQuery = useQuery({
     queryKey: ["org", "hierarchy-nodes", expandedId, nodeMembership],
     queryFn: () => hierarchyService.listNodes(expandedId!, { membership: nodeMembership }),
-    enabled: Boolean(expandedId) && hasAuthContext(),
+    enabled: !!expandedId && hasAuthContext(),
   });
 
-  const rows = useMemo(() => {
-    const list = listQuery.data ?? [];
+  const buQuery = useQuery({
+    queryKey: ["org", "business-units", "active"],
+    queryFn: () => businessUnitService.list({ membership: "active" }),
+    enabled: canView && hasAuthContext() && canCustom,
+    staleTime: 60_000,
+  });
+
+  const companyCatalog: CatalogItem[] = useMemo(
+    () => (companies ?? []).map((c) => ({ id: c.company_id, label: c.legal_name || c.name || (c as { code?: string }).code || c.company_id, sub: (c as { code?: string }).code })),
+    [companies]
+  );
+  const buCatalog: CatalogItem[] = useMemo(
+    () => (buQuery.data ?? []).map((b) => ({ id: b.business_unit_id, label: b.name || b.code, sub: b.code })),
+    [buQuery.data]
+  );
+  const entityCatalog = useMemo(
+    () =>
+      ({
+        COMPANY: companyCatalog,
+        BRANCH: [] as CatalogItem[],
+        DEPARTMENT: [] as CatalogItem[],
+        BUSINESS_UNIT: buCatalog,
+        COST_CENTER: [] as CatalogItem[],
+      }) as Record<string, CatalogItem[]>,
+    [companyCatalog, buCatalog]
+  );
+
+  function resolveEntityLabel(entityType: string, entityId: string, apiLabel?: string | null): string {
+    if (apiLabel && apiLabel.trim()) return apiLabel.trim();
+    const hit = (entityCatalog[entityType] ?? []).find((x) => x.id === entityId);
+    if (hit?.label) return hit.label;
+    return ENTITY_LABEL[entityType] ?? "مورد";
+  }
+
+  function resolveEntityCode(entityType: string, entityId: string, apiCode?: string | null): string {
+    if (apiCode && apiCode.trim()) return apiCode.trim();
+    return (entityCatalog[entityType] ?? []).find((x) => x.id === entityId)?.sub ?? "";
+  }
+
+  const indentedNodes = useMemo(() => {
+    const nodes = nodesQuery.data ?? [];
+    const byParent = new Map<string, HierarchyNodeDto[]>();
+    for (const n of nodes) {
+      const k = n.parent_node_id || "__root__";
+      const arr = byParent.get(k) ?? [];
+      arr.push(n);
+      byParent.set(k, arr);
+    }
+    for (const arr of byParent.values()) arr.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    const out: { node: HierarchyNodeDto; depth: number }[] = [];
+    const walk = (parentKey: string, depth: number) => {
+      for (const n of byParent.get(parentKey) ?? []) {
+        out.push({ node: n, depth });
+        walk(n.node_id, depth + 1);
+      }
+    };
+    walk("__root__", 0);
+    const seen = new Set(out.map((x) => x.node.node_id));
+    for (const n of nodes) if (!seen.has(n.node_id)) out.push({ node: n, depth: 0 });
+    return out;
+  }, [nodesQuery.data]);
+
+  const rows = listQuery.data ?? [];
+  const filtered = useMemo(() => {
+    let list = rows;
+    if (purposeFilter !== "all") list = list.filter((r) => r.purpose === purposeFilter);
     const q = search.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((h) =>
-      [h.code, h.name, h.purpose].map((x) => String(x ?? "").toLowerCase()).join(" ").includes(q)
-    );
-  }, [listQuery.data, search]);
+    if (q) {
+      list = list.filter(
+        (r) =>
+          (r.name ?? "").toLowerCase().includes(q) ||
+          (r.code ?? "").toLowerCase().includes(q) ||
+          purposeLabel(r.purpose).includes(q)
+      );
+    }
+    return list;
+  }, [rows, purposeFilter, search]);
 
-  const healthStatus = (healthQuery.data as { status?: string; message?: string } | undefined)?.status;
-  const healthMessage = (healthQuery.data as { message?: string } | undefined)?.message;
-
-  async function onCreateCustom(v: HierForm) {
-    if (!canCustom) {
-      toast.message("بسته custom_org_hierarchy فعال نیست");
+  async function onCreateHier(v: HierForm) {
+    if (!canCustom) return;
+    if (!v.code.trim() || !v.name.trim()) {
+      toast.error("کد و نام الزامی است.");
       return;
     }
+    if (v.code.trim().toUpperCase().startsWith("SYS-")) {
+      toast.error("کد با پیشوند SYS رزرو شده است.");
+      return;
+    }
+    setBusy(true);
     try {
       await hierarchyService.create({ code: v.code.trim(), name: v.name.trim(), purpose: "CUSTOM" });
-      toast.success("سلسله‌مراتب سفارشی ایجاد شد");
+      toast.success("درخت سفارشی ساخته شد");
       setSheetOpen(false);
       form.reset({ code: "", name: "" });
       await qc.invalidateQueries({ queryKey: ["org", "hierarchies"] });
     } catch (e) {
-      toast.error(e instanceof ApiClientError ? e.message : MSG_ERR);
+      toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
+    } finally {
+      setBusy(false);
     }
   }
 
+  async function onAddNode(v: NodeForm) {
+    if (!canCustom || !activeHierarchy || !v.entity_id) return;
+    if (isSystemHierarchy(activeHierarchy)) {
+      toast.error("افزودن گره به درخت سیستمی مجاز نیست.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await hierarchyService.addNode(activeHierarchy.hierarchy_id, {
+        entity_type: v.entity_type,
+        entity_id: v.entity_id.trim(),
+        parent_node_id: v.parent_node_id || null,
+      });
+      toast.success("گره افزوده شد");
+      setNodeSheetOpen(false);
+      nodeForm.reset({ entity_type: "COMPANY", entity_id: "", parent_node_id: "" });
+      await qc.invalidateQueries({ queryKey: ["org", "hierarchy-nodes", expandedId] });
+    } catch (e) {
+      toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runHierBulk(action: "activate" | "deactivate" | "delete" | "restore") {
+    if (!canCustom || selectedIds.length === 0) return;
+    for (const h of rows.filter((x) => selectedIds.includes(x.hierarchy_id))) {
+      if (isSystemHierarchy(h)) {
+        toast.error(`درخت سیستمی «${h.code}» قابل تغییر از اینجا نیست.`);
+        return;
+      }
+    }
+    setConfirmAction({ kind: "hier", action, ids: [...selectedIds] });
+  }
+
+  async function runNodesBulk(action: "activate" | "deactivate" | "delete" | "restore") {
+    if (!canCustom || selectedNodeIds.length === 0) return;
+    if (activeHierarchy && isSystemHierarchy(activeHierarchy)) {
+      toast.error("گره‌های درخت سیستمی از اینجا قابل تغییر نیستند.");
+      return;
+    }
+    setConfirmAction({ kind: "nodes", action, ids: [...selectedNodeIds] });
+  }
+
+  async function executeConfirm() {
+    if (!confirmAction || !canCustom) return;
+    setBusy(true);
+    try {
+      if (confirmAction.kind === "hier") {
+        for (const id of confirmAction.ids) {
+          const a = confirmAction.action;
+          if (a === "activate") await hierarchyService.setActive(id, true);
+          else if (a === "deactivate") await hierarchyService.setActive(id, false);
+          else if (a === "delete") await hierarchyService.softDelete(id);
+          else await hierarchyService.restore(id);
+        }
+        toast.success("انجام شد");
+        setSelectedIds([]);
+        await qc.invalidateQueries({ queryKey: ["org", "hierarchies"] });
+      } else {
+        if (confirmAction.action === "restore") {
+          for (const id of confirmAction.ids) await hierarchyService.restoreNode(id);
+          toast.success("گره‌ها بازیابی شدند");
+        } else {
+          await hierarchyService.bulkNodes(
+            confirmAction.ids,
+            confirmAction.action as "activate" | "deactivate" | "delete"
+          );
+          toast.success("گره‌ها به‌روز شدند");
+        }
+        setSelectedNodeIds([]);
+        await qc.invalidateQueries({ queryKey: ["org", "hierarchy-nodes", expandedId] });
+      }
+      setConfirmAction(null);
+    } catch (e) {
+      toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function toggleExpand(h: HierarchyDto) {
+    const open = expandedId === h.hierarchy_id;
+    setExpandedId(open ? null : h.hierarchy_id);
+    setActiveHierarchy(h);
+    setSelectedNodeIds([]);
+    if (isSystemHierarchy(h)) setNodeMembership("active");
+  }
+
+  const healthStatus = (healthQuery.data as { status?: string } | undefined)?.status;
+
   if (!canView) {
     return (
-      <div className="p-6">
-        <EmptyState title="مجوز مشاهده این بخش را ندارید" />
+      <div className="space-y-6">
+        <PageHeader
+          title="سلسله‌مراتب"
+          description="نقشه سازمان"
+          breadcrumbs={[
+            { label: "سازمان", href: "/dashboard/organization" },
+            { label: "سلسله‌مراتب" },
+          ]}
+          icon={<Network className="h-4 w-4" />}
+        />
+        <p className="text-sm text-muted-foreground">دسترسی ندارید.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <PageHeader
-        title="سلسله‌مراتب سازمانی"
-        description="نقشه مشتق‌شده از شرکت/شعبه/واحد + درخت‌های سفارشی"
+        title="سلسله‌مراتب"
+        description="نقشهٔ مشتق‌شده از شرکت، شعبه و واحد کسب‌وکار. به‌روزرسانی خودکار است."
         breadcrumbs={[
           { label: "سازمان", href: "/dashboard/organization" },
           { label: "سلسله‌مراتب" },
@@ -173,192 +363,316 @@ export function HierarchiesListPage() {
         icon={<Network className="h-4 w-4" />}
         actions={
           canCustom ? (
-            <Button size="sm" className="h-8 gap-1.5" onClick={() => setSheetOpen(true)}>
+            <Button
+              size="sm"
+              onClick={() => {
+                form.reset({ code: "", name: "" });
+                setSheetOpen(true);
+              }}
+            >
               <Plus className="h-4 w-4" />
-              درخت CUSTOM
+              درخت سفارشی (گزارشی)
             </Button>
           ) : null
         }
       />
 
-      {healthQuery.isLoading ? (
-        <Skeleton className="h-12 w-full rounded-xl" />
-      ) : healthQuery.data ? (
+      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800">
+        <p className="font-medium">نقشهٔ مشتق‌شده از ساختار سازمان</p>
+        <p className="mt-1 text-muted-foreground leading-relaxed">
+          درخت‌های سیستمی فقط‌خواندنی‌اند و با تغییر در{" "}
+          <Link className="underline underline-offset-2" href="/dashboard/organization/companies">
+            شرکت‌ها
+          </Link>{" "}
+          یا{" "}
+          <Link className="underline underline-offset-2" href="/dashboard/organization/branches">
+            شعبه‌ها
+          </Link>{" "}
+          به‌صورت خودکار هم‌تراز می‌شوند. برای تغییر ساختار به همان صفحات بروید.
+          {!customPackLoading && !hasCustomHierarchy ? (
+            <span className="block mt-1">درخت گزارش سفارشی پس از خرید پک مربوط در کاتالوگ ویژگی در دسترس قرار می‌گیرد.</span>
+          ) : null}
+        </p>
+      </div>
+
+      {healthQuery.data ? (
         <div
           className={cn(
-            "flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 text-sm",
+            "rounded-xl border px-4 py-3 text-sm flex flex-wrap items-center gap-3",
             healthStatus === "healthy"
               ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-              : healthStatus === "needs_sync"
-                ? "border-amber-200 bg-amber-50 text-amber-900"
-                : "border-border bg-muted/40 text-foreground"
+              : "border-amber-200 bg-amber-50 text-amber-900"
           )}
         >
           <Info className="h-4 w-4 shrink-0" />
-          <div className="min-w-0 flex-1">
-            <div className="font-medium">
-              وضعیت نقشه:{" "}
-              {healthStatus === "healthy"
-                ? "سالم"
-                : healthStatus === "needs_sync"
-                  ? "نیاز به همگام‌سازی"
-                  : String(healthStatus ?? "—")}
-            </div>
-            {healthMessage ? (
-              <p className="mt-0.5 text-xs opacity-90">{healthMessage}</p>
-            ) : (
-              <p className="mt-0.5 text-xs opacity-90">
-                درخت‌های SYS از CRUD شرکت/شعبه/واحد به‌صورت خودکار همگام می‌شوند؛ بازسازی دستی توسط کاربر وجود ندارد.
-              </p>
-            )}
-          </div>
-          {healthQuery.isFetching ? <Loader2 className="h-4 w-4 animate-spin opacity-60" /> : null}
-        </div>
-      ) : null}
-
-      {!customPackLoading && !hasCustomHierarchy ? (
-        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>
-            بسته <span className="font-mono text-xs">custom_org_hierarchy</span> فعال نیست. درخت‌های SYS
-            همچنان همگام می‌شوند؛ ایجاد CUSTOM مسدود است.
+          <span className="font-medium">
+            وضعیت سلامت:{" "}
+            {healthStatus === "healthy"
+              ? "سالم"
+              : healthStatus === "needs_sync"
+                ? "در حال هم‌ترازی خودکار"
+                : String(healthStatus ?? "—")}
           </span>
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        <div className="relative min-w-[200px] flex-1">
-          <Search className="absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="h-9 ps-9"
-            placeholder="جستجو در کد، نام، هدف…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[12rem]">
+          <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input className="pr-9" placeholder="جستجو…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Select value={membership} onValueChange={(v) => setMembership(v as "active" | "deleted")}>
-          <SelectTrigger className="h-9 w-[150px]">
-            <SelectValue />
+        <Select value={purposeFilter} onValueChange={setPurposeFilter}>
+          <SelectTrigger className="w-[10rem]">
+            <SelectValue placeholder="هدف" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="active">جاری</SelectItem>
-            <SelectItem value="deleted">حذف‌شده</SelectItem>
+            <SelectItem value="all">همه اهداف</SelectItem>
+            {Object.entries(PURPOSE_LABEL).map(([k, v]) => (
+              <SelectItem key={k} value={k}>
+                {v}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
+        {canCustom ? (
+          <Select value={membership} onValueChange={(v) => setMembership(v as "active" | "deleted")}>
+            <SelectTrigger className="w-[8rem]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">فعال</SelectItem>
+              <SelectItem value="deleted">حذف‌شده</SelectItem>
+            </SelectContent>
+          </Select>
+        ) : null}
       </div>
+
+      {canCustom && selectedIds.length > 0 ? (
+        <div className="flex flex-wrap gap-2 rounded-lg border bg-muted/40 px-3 py-2">
+          <span className="text-xs text-muted-foreground self-center">
+            {toFaDigits(String(selectedIds.length))} انتخاب
+          </span>
+          {membership === "active" ? (
+            <>
+              <Button size="sm" variant="outline" onClick={() => runHierBulk("activate")}>
+                فعال
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => runHierBulk("deactivate")}>
+                غیرفعال
+              </Button>
+              <Button size="sm" variant="destructive" onClick={() => runHierBulk("delete")}>
+                حذف
+              </Button>
+            </>
+          ) : (
+            <Button size="sm" variant="outline" onClick={() => runHierBulk("restore")}>
+              بازیابی
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => setSelectedIds([])}>
+            لغو
+          </Button>
+        </div>
+      ) : null}
 
       {listQuery.isLoading ? (
         <div className="space-y-2">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
         </div>
-      ) : rows.length === 0 ? (
-        <EmptyState title="سلسله‌مراتبی یافت نشد" />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          title="درختی نیست"
+          description="با ساخت یا ویرایش شرکت و شعبه، درخت‌های سیستمی به‌صورت خودکار ظاهر می‌شوند."
+        />
       ) : (
-        <div className="overflow-auto rounded-xl border">
+        <div className="rounded-xl border bg-card overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="px-3">کد</TableHead>
-                <TableHead className="px-3">نام</TableHead>
-                <TableHead className="px-3">هدف</TableHead>
-                <TableHead className="px-3">نوع</TableHead>
-                <TableHead className="px-3">گره‌ها</TableHead>
-                <TableHead className="px-3">وضعیت</TableHead>
+                {canCustom ? (
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={
+                        filtered.filter((h) => !isSystemHierarchy(h)).length > 0 &&
+                        selectedIds.length === filtered.filter((h) => !isSystemHierarchy(h)).length
+                      }
+                      onCheckedChange={(c) => {
+                        if (c) setSelectedIds(filtered.filter((h) => !isSystemHierarchy(h)).map((h) => h.hierarchy_id));
+                        else setSelectedIds([]);
+                      }}
+                    />
+                  </TableHead>
+                ) : null}
+                <TableHead>نام</TableHead>
+                <TableHead>کد</TableHead>
+                <TableHead>هدف</TableHead>
+                <TableHead>وضعیت</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((h: HierarchyDto) => {
+              {filtered.map((h) => {
+                const sys = isSystemHierarchy(h);
                 const open = expandedId === h.hierarchy_id;
                 return (
                   <Fragment key={h.hierarchy_id}>
-                    <TableRow
-                      className="cursor-pointer"
-                      onClick={() => {
-                        setExpandedId(open ? null : h.hierarchy_id);
-                        setNodeMembership("active");
-                      }}
-                    >
-                      <TableCell className="px-3 font-mono text-xs" dir="ltr">
-                        <span className="inline-flex items-center gap-1">
+                    <TableRow className={cn(open && "bg-muted/30")}>
+                      {canCustom ? (
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedIds.includes(h.hierarchy_id)}
+                            disabled={sys}
+                            onCheckedChange={(c) => {
+                              if (c) setSelectedIds((prev) => [...prev, h.hierarchy_id]);
+                              else setSelectedIds((prev) => prev.filter((id) => id !== h.hierarchy_id));
+                            }}
+                          />
+                        </TableCell>
+                      ) : null}
+                      <TableCell>
+                        <button
+                          type="button"
+                          className="flex items-center gap-2 text-start hover:underline underline-offset-2"
+                          onClick={() => toggleExpand(h)}
+                        >
                           {open ? (
-                            <ChevronDown className="h-3.5 w-3.5" />
+                            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
                           ) : (
-                            <ChevronLeft className="h-3.5 w-3.5" />
+                            <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground" />
                           )}
-                          {h.code}
-                        </span>
+                          {sys ? (
+                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-700">
+                              سیستمی
+                            </span>
+                          ) : null}
+                          <span className="font-medium">{h.name}</span>
+                        </button>
                       </TableCell>
-                      <TableCell className="px-3 font-medium">{h.name}</TableCell>
-                      <TableCell className="px-3">{purposeLabel(h.purpose)}</TableCell>
-                      <TableCell className="px-3">
-                        {isSystemHierarchy(h) ? (
-                          <StatusChip tone="neutral" label="SYS" />
-                        ) : (
-                          <StatusChip tone="success" label="CUSTOM" />
-                        )}
-                      </TableCell>
-                      <TableCell className="px-3 text-xs text-muted-foreground">
-                        {h.nodes_count != null ? toFaDigits(h.nodes_count) : "—"}
-                      </TableCell>
-                      <TableCell className="px-3">
+                      <TableCell className="font-mono text-xs">{h.code}</TableCell>
+                      <TableCell>{purposeLabel(h.purpose)}</TableCell>
+                      <TableCell>
                         <StatusChip
-                          tone={h.is_active !== false ? "success" : "neutral"}
-                          label={h.is_active !== false ? "فعال" : "غیرفعال"}
+                          label={h.is_active === false ? "غیرفعال" : "فعال"}
+                          tone={h.is_active === false ? "neutral" : "success"}
                         />
                       </TableCell>
                     </TableRow>
                     {open ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="bg-muted/30 px-3 py-3">
+                        <TableCell colSpan={canCustom ? 5 : 4} className="bg-muted/20 p-3">
                           <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <span className="text-xs text-muted-foreground">گره‌های درخت</span>
-                            <Select
-                              value={nodeMembership}
-                              onValueChange={(v) => setNodeMembership(v as "active" | "deleted")}
-                            >
-                              <SelectTrigger className="h-7 w-[8rem] text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="active">جاری</SelectItem>
-                                <SelectItem value="deleted">حذف‌شده</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <span className="text-xs text-muted-foreground">
+                              {toFaDigits(String(indentedNodes.length))} گره
+                            </span>
+                            {sys ? (
+                              <span className="text-[11px] text-muted-foreground">
+                                فقط‌خواندنی · منبع: شرکت / شعبه / واحد کسب‌وکار
+                              </span>
+                            ) : canCustom ? (
+                              <>
+                                <Select
+                                  value={nodeMembership}
+                                  onValueChange={(v) => setNodeMembership(v as "active" | "deleted")}
+                                >
+                                  <SelectTrigger className="h-8 w-[7rem]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="active">فعال</SelectItem>
+                                    <SelectItem value="deleted">حذف‌شده</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8"
+                                  onClick={() => {
+                                    setActiveHierarchy(h);
+                                    nodeForm.reset({
+                                      entity_type: "COMPANY",
+                                      entity_id: "",
+                                      parent_node_id: "",
+                                    });
+                                    setNodeSheetOpen(true);
+                                  }}
+                                >
+                                  <Plus className="h-3.5 w-3.5" />
+                                  گره از موجودیت موجود
+                                </Button>
+                              </>
+                            ) : null}
                           </div>
                           {nodesQuery.isLoading ? (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Loader2 className="h-4 w-4 animate-spin" /> بارگذاری گره‌ها…
-                            </div>
-                          ) : (nodesQuery.data ?? []).length === 0 ? (
-                            <div className="text-sm text-muted-foreground">گره‌ای ثبت نشده</div>
+                            <Skeleton className="h-16 w-full" />
+                          ) : indentedNodes.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                              {sys
+                                ? "گره‌ای نیست. با تعریف شرکت و شعبه، گره‌ها خودکار ظاهر می‌شوند."
+                                : "گره‌ای نیست."}
+                            </p>
                           ) : (
-                            <ul className="space-y-1.5 text-sm">
-                              {(nodesQuery.data ?? []).map((n: HierarchyNodeDto) => (
-                                <li
-                                  key={n.node_id}
-                                  className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-background px-2 py-1.5"
-                                >
-                                  <span className="text-xs text-muted-foreground">
-                                    {ENTITY_LABEL[n.entity_type] ?? n.entity_type}
-                                  </span>
-                                  <span className="font-medium">{nodeLabel(n, companyMap)}</span>
-                                  {n.node_origin === "SYSTEM" ? (
-                                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-700">
-                                      سیستمی
+                            <ul className="space-y-1.5">
+                              {indentedNodes.map(({ node: n, depth }) => {
+                                const label = resolveEntityLabel(n.entity_type, n.entity_id, n.entity_label);
+                                const code = resolveEntityCode(n.entity_type, n.entity_id, n.entity_code);
+                                return (
+                                  <li
+                                    key={n.node_id}
+                                    className={cn(
+                                      "flex flex-wrap items-center gap-2 rounded-md border bg-background px-3 py-1.5",
+                                      depth > 0 && "border-s-2 border-s-primary/30"
+                                    )}
+                                    style={{ marginInlineStart: depth * 20 }}
+                                  >
+                                    {canCustom && !sys ? (
+                                      <Checkbox
+                                        checked={selectedNodeIds.includes(n.node_id)}
+                                        onCheckedChange={(c) => {
+                                          if (c) setSelectedNodeIds((prev) => [...prev, n.node_id]);
+                                          else setSelectedNodeIds((prev) => prev.filter((id) => id !== n.node_id));
+                                        }}
+                                      />
+                                    ) : null}
+                                    <span className="text-[11px] text-muted-foreground">
+                                      {ENTITY_LABEL[n.entity_type] ?? n.entity_type}
                                     </span>
-                                  ) : n.node_origin === "MANUAL" ? (
-                                    <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] text-emerald-700">
-                                      دستی
-                                    </span>
-                                  ) : null}
-                                  {n.is_active === false ? (
-                                    <StatusChip tone="neutral" label="غیرفعال" />
-                                  ) : null}
-                                </li>
-                              ))}
+                                    <span className="font-medium">{label}</span>
+                                    {code ? (
+                                      <span className="font-mono text-[11px] text-muted-foreground">{code}</span>
+                                    ) : null}
+                                    {nodeOriginBadge(n.node_origin)}
+                                    {!n.parent_node_id ? (
+                                      <span className="text-[11px] text-emerald-700">ریشه</span>
+                                    ) : null}
+                                  </li>
+                                );
+                              })}
                             </ul>
                           )}
+                          {canCustom && !sys && selectedNodeIds.length > 0 ? (
+                            <div className="mt-2 flex gap-2">
+                              {nodeMembership === "deleted" ? (
+                                <Button size="sm" variant="outline" className="h-7" disabled={busy} onClick={() => runNodesBulk("restore")}>
+                                  بازیابی
+                                </Button>
+                              ) : (
+                                <>
+                                  <Button size="sm" variant="outline" className="h-7" disabled={busy} onClick={() => runNodesBulk("activate")}>
+                                    فعال
+                                  </Button>
+                                  <Button size="sm" variant="outline" className="h-7" disabled={busy} onClick={() => runNodesBulk("deactivate")}>
+                                    غیرفعال
+                                  </Button>
+                                  <Button size="sm" variant="destructive" className="h-7" disabled={busy} onClick={() => runNodesBulk("delete")}>
+                                    حذف
+                                  </Button>
+                                </>
+                              )}
+                              <Button size="sm" variant="ghost" className="h-7" onClick={() => setSelectedNodeIds([])}>
+                                لغو
+                              </Button>
+                            </div>
+                          ) : null}
                         </TableCell>
                       </TableRow>
                     ) : null}
@@ -370,39 +684,131 @@ export function HierarchiesListPage() {
         </div>
       )}
 
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle>درخت CUSTOM جدید</SheetTitle>
-          </SheetHeader>
-          <form
-            className="flex flex-1 flex-col"
-            onSubmit={form.handleSubmit(onCreateCustom)}
-          >
-            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
-              <div className="space-y-1.5">
-                <Label>کد *</Label>
-                <Input dir="ltr" className="h-9" {...form.register("code", { required: true })} />
+      {canCustom ? (
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
+            <SheetHeader className="border-b px-5 py-4 text-start">
+              <SheetTitle>درخت سفارشی (گزارشی)</SheetTitle>
+            </SheetHeader>
+            <form className="flex flex-1 flex-col" onSubmit={form.handleSubmit(onCreateHier)}>
+              <div className="flex-1 space-y-3 overflow-auto px-5 py-4">
+                <p className="text-xs text-muted-foreground">
+                  فقط برای چیدمان گزارش جایگزین. موجودیت جدید از اینجا ساخته نمی‌شود. دسترسی کاربران همچنان از Scope است، نه از این درخت.
+                </p>
+                <div className="space-y-1.5">
+                  <Label>کد</Label>
+                  <Input {...form.register("code", { required: true })} placeholder="مثلاً SALES-REGION" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>نام</Label>
+                  <Input {...form.register("name", { required: true })} />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>نام *</Label>
-                <Input className="h-9" {...form.register("name", { required: true })} />
+              <SheetFooter className="gap-2 border-t px-5 py-3">
+                <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>
+                  انصراف
+                </Button>
+                <Button type="submit" disabled={busy}>
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "ایجاد"}
+                </Button>
+              </SheetFooter>
+            </form>
+          </SheetContent>
+        </Sheet>
+      ) : null}
+
+      {canCustom ? (
+        <Sheet open={nodeSheetOpen} onOpenChange={setNodeSheetOpen}>
+          <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
+            <SheetHeader className="border-b px-5 py-4 text-start">
+              <SheetTitle>افزودن گره از موجودیت موجود</SheetTitle>
+            </SheetHeader>
+            <form className="flex flex-1 flex-col" onSubmit={nodeForm.handleSubmit(onAddNode)}>
+              <div className="flex-1 space-y-3 overflow-auto px-5 py-4">
+                <div className="space-y-1.5">
+                  <Label>نوع</Label>
+                  <Select
+                    value={nodeForm.watch("entity_type")}
+                    onValueChange={(v) => {
+                      nodeForm.setValue("entity_type", v);
+                      nodeForm.setValue("entity_id", "");
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(ENTITY_LABEL).map(([k, v]) => (
+                        <SelectItem key={k} value={k}>
+                          {v}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>موجودیت (همین مستأجر)</Label>
+                  <select
+                    className="flex h-9 w-full rounded-md border px-3 text-sm"
+                    {...nodeForm.register("entity_id", { required: true })}
+                  >
+                    <option value="">انتخاب…</option>
+                    {(entityCatalog[nodeForm.watch("entity_type")] ?? []).map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.label}
+                        {x.sub ? ` (${x.sub})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {(entityCatalog[nodeForm.watch("entity_type")] ?? []).length === 0 ? (
+                    <p className="text-[11px] text-amber-700">
+                      موردی در کاتالوگ نیست. ابتدا در باکس مربوط بسازید. (شعبه/دپارتمان از مسیر شرکت)
+                    </p>
+                  ) : null}
+                </div>
+                <div className="space-y-1.5">
+                  <Label>والد (اختیاری)</Label>
+                  <select className="flex h-9 w-full rounded-md border px-3 text-sm" {...nodeForm.register("parent_node_id")}>
+                    <option value="">ریشه</option>
+                    {(nodesQuery.data ?? []).map((n) => (
+                      <option key={n.node_id} value={n.node_id}>
+                        {ENTITY_LABEL[n.entity_type]} · {resolveEntityLabel(n.entity_type, n.entity_id, n.entity_label)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                هدف این درخت به‌صورت CUSTOM ثبت می‌شود.
-              </p>
-            </div>
-            <SheetFooter className="gap-2 border-t px-5 py-3">
-              <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>
+              <SheetFooter className="gap-2 border-t px-5 py-3">
+                <Button type="button" variant="outline" onClick={() => setNodeSheetOpen(false)}>
+                  انصراف
+                </Button>
+                <Button type="submit" disabled={busy}>
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "افزودن"}
+                </Button>
+              </SheetFooter>
+            </form>
+          </SheetContent>
+        </Sheet>
+      ) : null}
+
+      {confirmAction ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-xl border bg-background p-5 shadow-lg">
+            <p className="text-sm font-medium">تأیید عملیات؟</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {toFaDigits(String(confirmAction.ids.length))} مورد · {confirmAction.action}
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setConfirmAction(null)}>
                 انصراف
               </Button>
-              <Button type="submit" disabled={!canCustom}>
-                ایجاد
+              <Button size="sm" disabled={busy} onClick={executeConfirm}>
+                تأیید
               </Button>
-            </SheetFooter>
-          </form>
-        </SheetContent>
-      </Sheet>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
