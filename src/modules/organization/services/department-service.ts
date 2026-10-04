@@ -25,6 +25,19 @@ function asArray<T>(data: T[] | { data?: T[] } | null | undefined): T[] {
 }
 
 export const departmentService = {
+  /**
+   * Tenant-wide list — single request for /dashboard/organization/departments.
+   * Backend: GET /organization/departments?membership=
+   */
+  async listAll(membership: DepartmentListFilter = "active"): Promise<DepartmentDto[]> {
+    const qs =
+      membership === "deleted" ? "?membership=deleted" : "?membership=active";
+    const envelope = await apiGet(`${organizationPaths.departments}${qs}`);
+    return asArray(
+      unwrapData<DepartmentDto[] | { data?: DepartmentDto[] }>(envelope)
+    );
+  },
+
   async listByCompany(
     companyId: string,
     membership: DepartmentListFilter = "active"
