@@ -20,17 +20,16 @@ function hasAuthContext(): boolean {
 }
 
 /**
- * Global branches list with automatic fallback to per-company aggregation
- * when tenant-wide endpoint returns empty or fails.
+ * Global branches list — ONE request to GET /organization/branches.
+ * Does NOT fall back to per-company N+1 (that caused multi-second waterfalls).
  */
 export function useAllBranches(
   membership: BranchListFilter = "active",
-  companyIds: string[] = []
+  _companyIds: string[] = []
 ) {
-  const idsKey = companyIds.slice().sort().join(",");
   return useQuery({
-    queryKey: [...allBranchesQueryKey(membership), idsKey] as const,
-    queryFn: () => branchService.listAllOrByCompanies(companyIds, membership),
+    queryKey: allBranchesQueryKey(membership),
+    queryFn: () => branchService.listAll(membership),
     enabled: hasAuthContext(),
     staleTime: 30_000,
     retry: 1,
