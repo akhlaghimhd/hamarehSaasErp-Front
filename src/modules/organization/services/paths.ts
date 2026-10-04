@@ -10,6 +10,8 @@ export const organizationPaths = {
     `${ORGANIZATION_BASE}/companies/${companyId}/branches`,
   /** Tenant-wide branches list (no company nest) */
   branches: `${ORGANIZATION_BASE}/branches`,
+  /** Tenant-wide departments list (no company nest) — avoids N+1 */
+  departments: `${ORGANIZATION_BASE}/departments`,
   companyDepartments: (companyId: string) =>
     `${ORGANIZATION_BASE}/companies/${companyId}/departments`,
   companyBankAccounts: (companyId: string) =>
