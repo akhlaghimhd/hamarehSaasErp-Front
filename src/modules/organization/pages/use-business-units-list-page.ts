@@ -178,7 +178,7 @@ export function useBusinessUnitsListPage() {
         await businessUnitService.update(editing.business_unit_id, {
           code: v.code.trim(),
           name: v.name.trim(),
-          description: v.description.trim() || null,
+          description: v.description.trim() || undefined,
           is_active: v.is_active,
         });
         toast.success("واحد به‌روز شد");
@@ -186,7 +186,7 @@ export function useBusinessUnitsListPage() {
         await businessUnitService.create({
           code: v.code.trim(),
           name: v.name.trim(),
-          description: v.description.trim() || null,
+          description: v.description.trim() || undefined,
           is_active: v.is_active,
         });
         toast.success("واحد ثبت شد");
@@ -210,72 +210,97 @@ export function useBusinessUnitsListPage() {
     if (assignTarget) {
       const prevPrimary = (assignTarget.company_assignments ?? []).find((a) => a.is_primary)?.company_id;
       const removingPrimary = !!prevPrimary && !companyIds.includes(prevPrimary);
-      if (!skip && companyIds.length === 0 && (assignTarget.company_assignments ?? []).length > 0) {
+      if (removingPrimary && companyIds.length > 0 && !primaryCompanyId) {
+        toast.message("شرکت اصلی قطع می‌شود. لطفاً شرکت اصلی جدید را انتخاب کنید.");
+        return;
+      }
+      if (!skip && removingPrimary && companyIds.length === 0) {
         setLinkConfirm({ kind: "leave_all" });
         return;
       }
-      if (!skip && removingPrimary && primaryCompanyId && primaryCompanyId !== prevPrimary) {
+      if (!skip && removingPrimary && companyIds.length > 0 && primaryCompanyId) {
         setLinkConfirm({ kind: "swap_primary" });
         return;
       }
       setBusy(true);
       try {
-        const primary = primaryCompanyId && companyIds.includes(primaryCompanyId) ? primaryCompanyId : undefined;
-        const res = await businessUnitService.syncCompanies(assignTarget.business_unit_id, {
-          company_ids: companyIds,
-          primary_company_id: primary,
-        });
+        const primary = primaryCompanyId && companyIds.includes(primaryCompanyId) ? primaryCompanyId : null;
+        const res = await businessUnitService.syncCompanies(assignTarget.business_unit_id, companyIds, primary);
         const att = res?.attached ?? 0;
         const det = res?.detached ?? 0;
-        toast.success(`اتصالات به‌روز شد (پیوست: ${toFaDigits(att)}، جدا: ${toFaDigits(det)})`);
+        if (att === 0 && det === 0) toast.message("تغییری در اتصالات اعمال نشد.");
+        else {
+          const parts: string[] = [];
+          if (att) parts.push(`${toFaDigits(att)} اتصال جدید`);
+          if (det) parts.push(`${toFaDigits(det)} انفصال`);
+          toast.success(parts.join(" و ") + " ثبت شد.");
+        }
         setAssignOpen(false);
-        void qc.invalidateQueries({ queryKey: ["org", "business-units"] });
+        setLinkConfirm(null);
+        await qc.invalidateQueries({ queryKey: ["org", "business-units"] });
       } catch (e) {
         toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR);
-      } finally {
-        setBusy(false);
-      }
+      } finally { setBusy(false); }
       return;
     }
 
     const targets = assignTargets;
     if (!targets.length) return;
-    if (bulkLinkMode === "disconnect" && !skip) {
+    if (!companyIds.length) { toast.message("حداقل یک شرکت را انتخاب کنید."); return; }
+
+    if (!skip && bulkLinkMode === "disconnect") {
       const affected: string[] = [];
       for (const bu of targets) {
         const prim = (bu.company_assignments ?? []).find((a) => a.is_primary)?.company_id;
-        if (prim && companyIds.includes(prim)) affected.push(bu.name);
+        if (prim && companyIds.includes(prim)) affected.push(bu.name || bu.code);
       }
       if (affected.length) {
         setLinkConfirm({ kind: "bulk_disconnect_primary", names: affected });
         return;
       }
     }
+
+    if (bulkLinkMode === "connect" && primaryCompanyId && !companyIds.includes(primaryCompanyId)) {
+      toast.message("شرکت اصلی باید در فهرست شرکت‌های انتخاب‌شده باشد.");
+      return;
+    }
+
     setBusy(true);
-    let ok = 0, fail = 0;
+    let ok = 0;
+    let skipped = 0;
     try {
       for (const bu of targets) {
-        try {
-          if (bulkLinkMode === "connect") {
-            for (const cid of companyIds) {
+        if (bu.is_active === false && bulkLinkMode === "connect") { skipped += 1; continue; }
+        const linked = new Set((bu.company_assignments ?? []).map((a) => a.company_id));
+        for (const cid of companyIds) {
+          try {
+            if (bulkLinkMode === "connect") {
+              if (linked.has(cid)) { skipped += 1; continue; }
               const makePrimary = !!primaryCompanyId && cid === primaryCompanyId;
-              await businessUnitService.attachCompany(bu.business_unit_id, cid, makePrimary);
+              await businessUnitService.assignCompany(bu.business_unit_id, cid, makePrimary);
+              ok += 1;
+            } else {
+              if (!linked.has(cid)) { skipped += 1; continue; }
+              await businessUnitService.unassignCompany(bu.business_unit_id, cid);
+              ok += 1;
             }
-          } else {
-            for (const cid of companyIds) {
-              await businessUnitService.detachCompany(bu.business_unit_id, cid);
-            }
-          }
-          ok += 1;
-        } catch {
-          fail += 1;
+          } catch { skipped += 1; }
         }
       }
-      if (ok > 0 && fail === 0) toast.success(`${toFaDigits(ok)} واحد به‌روز شد`);
-      else if (ok > 0) toast.success(`${toFaDigits(ok)} موفق؛ ${toFaDigits(fail)} ناموفق`);
-      else toast.error(MSG_ERR);
-      setAssignOpen(false);
-      void qc.invalidateQueries({ queryKey: ["org", "business-units"] });
+      if (ok) {
+        toast.success(bulkLinkMode === "connect" ? `${toFaDigits(ok)} اتصال انجام شد.` : `${toFaDigits(ok)} انفصال انجام شد.`);
+        setAssignOpen(false);
+        setAssignTargets([]);
+        setSelected(new Set());
+        setLinkConfirm(null);
+        await qc.invalidateQueries({ queryKey: ["org", "business-units"] });
+      } else if (skipped) {
+        toast.message(bulkLinkMode === "connect"
+          ? "همهٔ جفت‌ها از قبل متصل بودند یا واحد غیرفعال است."
+          : "هیچ اتصال فعالی برای انفصال یافت نشد.");
+      } else {
+        toast.error(MSG_ERR);
+      }
     } finally {
       setBusy(false);
     }
@@ -302,7 +327,12 @@ export function useBusinessUnitsListPage() {
       try {
         if (kind === "delete") await businessUnitService.softDelete(row.business_unit_id);
         else if (kind === "restore") await businessUnitService.restore(row.business_unit_id);
-        else await businessUnitService.update(row.business_unit_id, { is_active: kind === "activate" });
+        else await businessUnitService.update(row.business_unit_id, {
+          code: row.code,
+          name: row.name,
+          description: row.description ?? undefined,
+          is_active: kind === "activate",
+        });
         ok += 1;
       } catch { fail += 1; }
     }
