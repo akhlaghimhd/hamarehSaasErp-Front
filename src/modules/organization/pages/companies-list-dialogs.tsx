@@ -1,9 +1,9 @@
 /**
- * FE-ORG companies list — confirm + create/edit sheets
+ * FE-ORG companies list — confirm + create/edit sheets (FINAL polish)
  */
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { CircleHelp, Loader2 } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
@@ -15,10 +15,10 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/shared/components/ui/dialog";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/shared/components/ui/select";
+  Tooltip, TooltipContent, TooltipTrigger,
+} from "@/shared/components/ui/tooltip";
 import {
-  ENTITY_KIND_LABELS, ENTITY_KIND_FIELD_LABEL, ENTITY_KIND_OPTIONS,
+  ENTITY_KIND_FIELD_LABEL, ENTITY_KIND_OPTIONS,
 } from "../types";
 import {
   confirmTitle, confirmBody, confirmActionLabel,
@@ -34,7 +34,9 @@ export function CompaniesListDialogs({ c }: { c: Ctx }) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{c.confirm ? confirmTitle(c.confirm.kind, c.confirm.count) : ""}</DialogTitle>
-            <DialogDescription>{c.confirm ? confirmBody(c.confirm.kind, c.confirm.count) : ""}</DialogDescription>
+            <DialogDescription>
+              {c.confirm ? confirmBody(c.confirm.kind, c.confirm.count) : ""}
+            </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button type="button" variant="outline" disabled={c.bulkBusy} onClick={() => c.setConfirm(null)}>
@@ -72,13 +74,15 @@ export function CompaniesListDialogs({ c }: { c: Ctx }) {
             <SheetTitle>شرکت جدید</SheetTitle>
           </SheetHeader>
           <form className="mt-4 space-y-3" onSubmit={c.onCreate}>
-            <div className="space-y-1.5">
-              <Label>کد *</Label>
-              <Input className="h-9" dir="ltr" {...c.form.register("code", { required: true })} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>نام نمایشی *</Label>
-              <Input className="h-9" {...c.form.register("name", { required: true })} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>کد *</Label>
+                <Input className="h-9" dir="ltr" {...c.form.register("code", { required: true })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>نام نمایشی *</Label>
+                <Input className="h-9" {...c.form.register("name", { required: true })} />
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label>نام حقوقی</Label>
@@ -102,24 +106,42 @@ export function CompaniesListDialogs({ c }: { c: Ctx }) {
               <Label>شناسه مالیاتی</Label>
               <Input className="h-9" dir="ltr" {...c.form.register("tax_identifier")} />
             </div>
-            <div className="space-y-1.5">
-              <Label>{ENTITY_KIND_FIELD_LABEL}</Label>
-              <Select
-                value={c.selectedKind}
-                onValueChange={(v) => c.form.setValue("entity_kind", v, { shouldDirty: true })}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ENTITY_KIND_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">{ENTITY_KIND_FIELD_LABEL}</legend>
+              <div className="space-y-1.5">
+                {ENTITY_KIND_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className="flex cursor-pointer items-start gap-2 rounded-lg border border-border/80 px-3 py-2 hover:bg-muted/40"
+                  >
+                    <input
+                      type="radio"
+                      className="mt-1"
+                      checked={c.selectedKind === opt.value}
+                      onChange={() =>
+                        c.form.setValue("entity_kind", opt.value, { shouldDirty: true })
+                      }
+                    />
+                    <span className="min-w-0 flex-1 text-sm leading-snug">{opt.label}</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="mt-0.5 shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+                          aria-label={`راهنمای ${opt.label}`}
+                          onClick={(e) => e.preventDefault()}
+                        >
+                          <CircleHelp className="h-3.5 w-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[16rem] text-right leading-relaxed">
+                        {opt.tooltip}
+                      </TooltipContent>
+                    </Tooltip>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             <div className="flex items-center justify-between gap-2 rounded-lg border border-border/80 px-3 py-2">
               <Label>فعال</Label>
               <Switch
@@ -132,7 +154,7 @@ export function CompaniesListDialogs({ c }: { c: Ctx }) {
                 انصراف
               </Button>
               <Button type="submit" size="sm" disabled={c.createMutation.isPending}>
-                {c.createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ایجاد"}
+                {c.createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ثبت"}
               </Button>
             </SheetFooter>
           </form>
@@ -153,13 +175,15 @@ export function CompaniesListDialogs({ c }: { c: Ctx }) {
             <SheetTitle>ویرایش شرکت</SheetTitle>
           </SheetHeader>
           <form className="mt-4 space-y-3" onSubmit={c.onEdit}>
-            <div className="space-y-1.5">
-              <Label>کد *</Label>
-              <Input className="h-9" dir="ltr" {...c.form.register("code", { required: true })} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>نام نمایشی *</Label>
-              <Input className="h-9" {...c.form.register("name", { required: true })} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>کد *</Label>
+                <Input className="h-9" dir="ltr" {...c.form.register("code", { required: true })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>نام نمایشی *</Label>
+                <Input className="h-9" {...c.form.register("name", { required: true })} />
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label>نام حقوقی</Label>

@@ -1,6 +1,6 @@
 /**
  * FE-ORG companies list — page controller (state + handlers)
- * Extracted from FINAL for staged GitHub restore.
+ * FINAL-aligned: filterTargetsForKind, bulk cancel rollback, primary guards.
  */
 "use client";
 
@@ -256,7 +256,7 @@ export function useCompaniesListPage() {
 
   const requestDeactivate = (row: CompanyDto) => {
     if (row.is_primary) {
-      toast.error("شرکت اصلی قابل غیرفعال‌سازی نیست.");
+      toast.error("شرکت اصلی قابل غیرفعال‌سازی نیست. ابتدا شرکت دیگری را اصلی کنید.");
       return;
     }
     setConfirm({ kind: "deactivate", count: 1, targets: [row] });
@@ -264,7 +264,7 @@ export function useCompaniesListPage() {
 
   const requestDelete = (row: CompanyDto) => {
     if (row.is_primary) {
-      toast.error("شرکت اصلی قابل حذف نیست.");
+      toast.error("شرکت اصلی قابل حذف نیست. ابتدا شرکت دیگری را اصلی کنید.");
       return;
     }
     setConfirm({ kind: "delete", count: 1, targets: [row] });
@@ -284,24 +284,44 @@ export function useCompaniesListPage() {
     }
   };
 
+  const filterTargetsForKind = (kind: BulkKind, targets: CompanyDto[]): CompanyDto[] => {
+    if (kind === "activate") return targets.filter((r) => r.is_active === false);
+    if (kind === "deactivate") return targets.filter((r) => r.is_active !== false && !r.is_primary);
+    if (kind === "delete") return targets.filter((r) => !r.is_primary);
+    return targets;
+  };
+
   const requestBulk = (kind: BulkKind, targets: CompanyDto[]) => {
-    if (!targets.length) return;
-    setConfirm({ kind, count: targets.length, targets });
+    const filtered = filterTargetsForKind(kind, targets);
+    if (filtered.length === 0) {
+      if (kind === "activate") toast.message("همهٔ موارد انتخاب‌شده از قبل فعال هستند.");
+      else if (kind === "deactivate") toast.message("مورد قابل غیرفعال‌سازی در انتخاب نیست.");
+      else if (kind === "delete") toast.message("شرکت اصلی قابل حذف نیست یا موردی انتخاب نشده.");
+      else toast.message("موردی برای انجام عملیات نیست.");
+      return;
+    }
+    setConfirm({ kind, count: filtered.length, targets: filtered });
   };
 
   const runBulk = async (kind: BulkKind, targets: CompanyDto[]) => {
     cancelRef.current = false;
+    const filtered = filterTargetsForKind(kind, targets);
+    if (filtered.length === 0) {
+      setConfirm(null);
+      return;
+    }
     setBulkBusy(true);
-    setBulkProgress({ done: 0, total: targets.length });
+    setBulkProgress({ done: 0, total: filtered.length });
     let ok = 0;
     let fail = 0;
     let cancelled = false;
-    for (let i = 0; i < targets.length; i++) {
+    const completed: CompanyDto[] = [];
+    for (let i = 0; i < filtered.length; i++) {
       if (cancelRef.current) {
         cancelled = true;
         break;
       }
-      const r = targets[i];
+      const r = filtered[i];
       try {
         if (kind === "activate") {
           await updateMutation.mutateAsync({
@@ -321,16 +341,52 @@ export function useCompaniesListPage() {
           await restoreMutation.mutateAsync(r.company_id);
         }
         ok += 1;
+        completed.push(r);
       } catch {
         fail += 1;
       }
-      setBulkProgress({ done: i + 1, total: targets.length });
+      setBulkProgress({ done: i + 1, total: filtered.length });
     }
+
+    let rolled = 0;
+    if (cancelled && completed.length > 0) {
+      for (const r of completed) {
+        try {
+          if (kind === "activate") {
+            await updateMutation.mutateAsync({
+              companyId: r.company_id,
+              payload: { ...payloadFromForm(companyToForm(r)), is_active: false, status: 2 },
+            });
+          } else if (kind === "deactivate") {
+            await updateMutation.mutateAsync({
+              companyId: r.company_id,
+              payload: { ...payloadFromForm(companyToForm(r)), is_active: true, status: 1 },
+            });
+          } else if (kind === "delete") {
+            await restoreMutation.mutateAsync(r.company_id);
+          } else {
+            await deleteMutation.mutateAsync(r.company_id);
+          }
+          rolled += 1;
+        } catch {
+          /* keep as-is if reverse fails */
+        }
+      }
+    }
+
     setBulkBusy(false);
     setConfirm(null);
     setSelected(new Set());
     if (cancelled) {
-      toast.message(`عملیات متوقف شد · انجام‌شده: ${toFaDigits(ok)}`);
+      if (completed.length === 0) {
+        toast.message("عملیات قبل از انجام هر مورد متوقف شد.");
+      } else if (rolled === completed.length) {
+        toast.message(`عملیات متوقف و ${toFaDigits(rolled)} مورد انجام‌شده بازگردانی شد.`);
+      } else {
+        toast.message(
+          `عملیات متوقف شد. ${toFaDigits(ok)} انجام شد؛ ${toFaDigits(rolled)} بازگردانی شد.`
+        );
+      }
     } else if (ok) {
       toast.success(BULK_SUCCESS[kind](ok));
     }
@@ -338,25 +394,77 @@ export function useCompaniesListPage() {
   };
 
   return {
-    canView, canCreate, canUpdate, canDelete,
-    hasMultiCompany, multiCompanyPackLoading,
-    membershipFilter, setMembershipFilter,
-    isLoading, isError, error, refetch, isFetching,
-    createMutation, updateMutation,
-    query, setQuery, statusFilter, setStatusFilter,
-    page, setPage, pageSize, setPageSize,
-    sortKey, sortDir, visible, setVisible,
-    selected, setSelected, bulkBusy, bulkProgress, cancelRef,
-    confirm, setConfirm,
-    createOpen, setCreateOpen, editOpen, setEditOpen, editing,
-    form, selectedKind, isDirty, isDeletedView,
-    rows, createBlockedByPack, parentMap,
-    total, totalPages, safePage, pageRows, isFiltered,
-    pageIds, allPageSelected, somePageSelected, selectedRows,
-    exportTarget, exportLabel,
-    toggleSort, SortIcon,
-    openCreate, openEdit, forceCloseCreate, forceCloseEdit,
-    onCreate, onEdit, activateOne, requestDeactivate, requestDelete,
-    restoreOne, runBulk, requestBulk, isRecentCreated,
+    canView,
+    canCreate,
+    canUpdate,
+    canDelete,
+    hasMultiCompany,
+    multiCompanyPackLoading,
+    membershipFilter,
+    setMembershipFilter,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+    createMutation,
+    updateMutation,
+    query,
+    setQuery,
+    statusFilter,
+    setStatusFilter,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    sortKey,
+    sortDir,
+    visible,
+    setVisible,
+    selected,
+    setSelected,
+    bulkBusy,
+    bulkProgress,
+    cancelRef,
+    confirm,
+    setConfirm,
+    createOpen,
+    setCreateOpen,
+    editOpen,
+    setEditOpen,
+    editing,
+    form,
+    selectedKind,
+    isDirty,
+    isDeletedView,
+    rows,
+    createBlockedByPack,
+    parentMap,
+    total,
+    totalPages,
+    safePage,
+    pageRows,
+    isFiltered,
+    pageIds,
+    allPageSelected,
+    somePageSelected,
+    selectedRows,
+    exportTarget,
+    exportLabel,
+    toggleSort,
+    SortIcon,
+    openCreate,
+    openEdit,
+    forceCloseCreate,
+    forceCloseEdit,
+    onCreate,
+    onEdit,
+    activateOne,
+    requestDeactivate,
+    requestDelete,
+    restoreOne,
+    runBulk,
+    requestBulk,
+    isRecentCreated,
   };
 }
