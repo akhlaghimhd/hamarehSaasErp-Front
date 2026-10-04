@@ -119,6 +119,7 @@ export function BusinessUnitsListDialogs({ c }: { c: Ctx }) {
               {companyList.map((co) => {
                 const id = co.company_id;
                 const checked = c.selectedCompanyIds.has(id);
+                const isBuPrimary = checked && c.primaryCompanyId === id;
                 return (
                   <label
                     key={id}
@@ -139,8 +140,10 @@ export function BusinessUnitsListDialogs({ c }: { c: Ctx }) {
                       }}
                     />
                     <span className="flex-1 truncate text-sm">{co.legal_name || co.name}</span>
-                    {co.is_primary ? (
-                      <span className="shrink-0 text-[10px] text-muted-foreground">شرکت اصلی</span>
+                    {isBuPrimary ? (
+                      <span className="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] text-emerald-700">
+                        اصلی این واحد
+                      </span>
                     ) : null}
                   </label>
                 );
@@ -148,7 +151,7 @@ export function BusinessUnitsListDialogs({ c }: { c: Ctx }) {
             </div>
             {c.selectedCompanyIds.size > 0 ? (
               <div className="space-y-1.5">
-                <Label>شرکت اصلی (اختیاری)</Label>
+                <Label>شرکت اصلی این واحد (اختیاری)</Label>
                 <select
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={
@@ -158,13 +161,16 @@ export function BusinessUnitsListDialogs({ c }: { c: Ctx }) {
                   }
                   onChange={(e) => c.setPrimaryCompanyId(e.target.value)}
                 >
-                  <option value="">— بدون تغییر / خودکار —</option>
+                  <option value="">— خودکار (اولین شرکت متصل) —</option>
                   {[...c.selectedCompanyIds].map((id) => (
                     <option key={id} value={id}>
                       {resolveCompanyLabel(id, companyList, c.assignTarget)}
                     </option>
                   ))}
                 </select>
+                <p className="text-[11px] text-muted-foreground">
+                  فقط یکی از شرکت‌های متصل می‌تواند «اصلی این واحد» باشد؛ برای گزارش و سلسله‌مراتب استفاده می‌شود. با «شرکت اصلی مستأجر (HQ)» فرق دارد.
+                </p>
               </div>
             ) : null}
           </div>
