@@ -1,5 +1,5 @@
 /**
- * FE-ORG companies list — confirm + create/edit sheets (FINAL polish)
+ * FE-ORG companies list — confirm + create/edit sheets (FINAL layout)
  */
 "use client";
 
@@ -62,92 +62,105 @@ export function CompaniesListDialogs({ c }: { c: Ctx }) {
 
       <Sheet
         open={c.createOpen}
-        onOpenChange={(o) => {
-          if (!o) {
+        onOpenChange={(open) => {
+          if (!open) {
             if (c.isDirty && !window.confirm("تغییرات ذخیره نشده. انصراف؟")) return;
             c.forceCloseCreate();
+          } else {
+            c.setCreateOpen(true);
           }
         }}
       >
-        <SheetContent className="sm:max-w-md overflow-y-auto">
+        <SheetContent
+          className="flex w-full flex-col sm:max-w-lg"
+          side="right"
+          onInteractOutside={(e) => {
+            if (c.isDirty) e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            if (c.isDirty) e.preventDefault();
+          }}
+        >
           <SheetHeader>
             <SheetTitle>شرکت جدید</SheetTitle>
           </SheetHeader>
-          <form className="mt-4 space-y-3" onSubmit={c.onCreate}>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label>کد *</Label>
-                <Input className="h-9" dir="ltr" {...c.form.register("code", { required: true })} />
+          <form className="flex min-h-0 flex-1 flex-col" onSubmit={c.onCreate}>
+            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>کد *</Label>
+                  <Input className="h-9" dir="ltr" {...c.form.register("code", { required: true })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>نام نمایشی *</Label>
+                  <Input className="h-9" {...c.form.register("name", { required: true })} />
+                </div>
               </div>
               <div className="space-y-1.5">
-                <Label>نام نمایشی *</Label>
-                <Input className="h-9" {...c.form.register("name", { required: true })} />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>نام حقوقی</Label>
-              <Input className="h-9" {...c.form.register("legal_name")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>نام تجاری</Label>
-              <Input className="h-9" {...c.form.register("trade_name")} />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label>شماره ثبت</Label>
-                <Input className="h-9" dir="ltr" {...c.form.register("registration_number")} />
+                <Label>نام حقوقی</Label>
+                <Input className="h-9" {...c.form.register("legal_name")} />
               </div>
               <div className="space-y-1.5">
-                <Label>کد اقتصادی</Label>
-                <Input className="h-9" dir="ltr" {...c.form.register("economic_code")} />
+                <Label>نام تجاری</Label>
+                <Input className="h-9" {...c.form.register("trade_name")} />
               </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>شناسه مالیاتی</Label>
-              <Input className="h-9" dir="ltr" {...c.form.register("tax_identifier")} />
-            </div>
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">{ENTITY_KIND_FIELD_LABEL}</legend>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>شماره ثبت</Label>
+                  <Input className="h-9" dir="ltr" {...c.form.register("registration_number")} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>کد اقتصادی</Label>
+                  <Input className="h-9" dir="ltr" {...c.form.register("economic_code")} />
+                </div>
+              </div>
               <div className="space-y-1.5">
-                {ENTITY_KIND_OPTIONS.map((opt) => (
-                  <label
-                    key={opt.value}
-                    className="flex cursor-pointer items-start gap-2 rounded-lg border border-border/80 px-3 py-2 hover:bg-muted/40"
-                  >
-                    <input
-                      type="radio"
-                      className="mt-1"
-                      checked={c.selectedKind === opt.value}
-                      onChange={() =>
-                        c.form.setValue("entity_kind", opt.value, { shouldDirty: true })
-                      }
-                    />
-                    <span className="min-w-0 flex-1 text-sm leading-snug">{opt.label}</span>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          className="mt-0.5 shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
-                          aria-label={`راهنمای ${opt.label}`}
-                          onClick={(e) => e.preventDefault()}
-                        >
-                          <CircleHelp className="h-3.5 w-3.5" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-[16rem] text-right leading-relaxed">
-                        {opt.tooltip}
-                      </TooltipContent>
-                    </Tooltip>
-                  </label>
-                ))}
+                <Label>شناسه مالیاتی</Label>
+                <Input className="h-9" dir="ltr" {...c.form.register("tax_identifier")} />
               </div>
-            </fieldset>
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-border/80 px-3 py-2">
-              <Label>فعال</Label>
-              <Switch
-                checked={c.form.watch("is_active")}
-                onCheckedChange={(v) => c.form.setValue("is_active", v, { shouldDirty: true })}
-              />
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium">{ENTITY_KIND_FIELD_LABEL}</legend>
+                <div className="space-y-1.5">
+                  {ENTITY_KIND_OPTIONS.map((opt) => (
+                    <label
+                      key={opt.value}
+                      className="flex cursor-pointer items-start gap-2 rounded-lg border border-border/80 px-3 py-2 hover:bg-muted/40"
+                    >
+                      <input
+                        type="radio"
+                        className="mt-1"
+                        checked={c.selectedKind === opt.value}
+                        onChange={() =>
+                          c.form.setValue("entity_kind", opt.value, { shouldDirty: true })
+                        }
+                      />
+                      <span className="min-w-0 flex-1 text-sm leading-snug">{opt.label}</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="mt-0.5 shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+                            aria-label={`راهنمای ${opt.label}`}
+                            onClick={(e) => e.preventDefault()}
+                          >
+                            <CircleHelp className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[16rem] text-right leading-relaxed">
+                          {opt.tooltip}
+                        </TooltipContent>
+                      </Tooltip>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-border/80 px-3 py-2">
+                <Label>فعال</Label>
+                <Switch
+                  checked={c.form.watch("is_active")}
+                  onCheckedChange={(v) => c.form.setValue("is_active", v, { shouldDirty: true })}
+                />
+              </div>
             </div>
             <SheetFooter>
               <Button type="button" variant="outline" size="sm" onClick={c.forceCloseCreate}>
@@ -163,56 +176,69 @@ export function CompaniesListDialogs({ c }: { c: Ctx }) {
 
       <Sheet
         open={c.editOpen}
-        onOpenChange={(o) => {
-          if (!o) {
+        onOpenChange={(open) => {
+          if (!open) {
             if (c.isDirty && !window.confirm("تغییرات ذخیره نشده. انصراف؟")) return;
             c.forceCloseEdit();
+          } else {
+            c.setEditOpen(true);
           }
         }}
       >
-        <SheetContent className="sm:max-w-md overflow-y-auto">
+        <SheetContent
+          className="flex w-full flex-col sm:max-w-lg"
+          side="right"
+          onInteractOutside={(e) => {
+            if (c.isDirty) e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            if (c.isDirty) e.preventDefault();
+          }}
+        >
           <SheetHeader>
             <SheetTitle>ویرایش شرکت</SheetTitle>
           </SheetHeader>
-          <form className="mt-4 space-y-3" onSubmit={c.onEdit}>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label>کد *</Label>
-                <Input className="h-9" dir="ltr" {...c.form.register("code", { required: true })} />
+          <form className="flex min-h-0 flex-1 flex-col" onSubmit={c.onEdit}>
+            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>کد *</Label>
+                  <Input className="h-9" dir="ltr" {...c.form.register("code", { required: true })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>نام نمایشی *</Label>
+                  <Input className="h-9" {...c.form.register("name", { required: true })} />
+                </div>
               </div>
               <div className="space-y-1.5">
-                <Label>نام نمایشی *</Label>
-                <Input className="h-9" {...c.form.register("name", { required: true })} />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>نام حقوقی</Label>
-              <Input className="h-9" {...c.form.register("legal_name")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>نام تجاری</Label>
-              <Input className="h-9" {...c.form.register("trade_name")} />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label>شماره ثبت</Label>
-                <Input className="h-9" dir="ltr" {...c.form.register("registration_number")} />
+                <Label>نام حقوقی</Label>
+                <Input className="h-9" {...c.form.register("legal_name")} />
               </div>
               <div className="space-y-1.5">
-                <Label>کد اقتصادی</Label>
-                <Input className="h-9" dir="ltr" {...c.form.register("economic_code")} />
+                <Label>نام تجاری</Label>
+                <Input className="h-9" {...c.form.register("trade_name")} />
               </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>شناسه مالیاتی</Label>
-              <Input className="h-9" dir="ltr" {...c.form.register("tax_identifier")} />
-            </div>
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-border/80 px-3 py-2">
-              <Label>فعال</Label>
-              <Switch
-                checked={c.form.watch("is_active")}
-                onCheckedChange={(v) => c.form.setValue("is_active", v, { shouldDirty: true })}
-              />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>شماره ثبت</Label>
+                  <Input className="h-9" dir="ltr" {...c.form.register("registration_number")} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>کد اقتصادی</Label>
+                  <Input className="h-9" dir="ltr" {...c.form.register("economic_code")} />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>شناسه مالیاتی</Label>
+                <Input className="h-9" dir="ltr" {...c.form.register("tax_identifier")} />
+              </div>
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-border/80 px-3 py-2">
+                <Label>فعال</Label>
+                <Switch
+                  checked={c.form.watch("is_active")}
+                  onCheckedChange={(v) => c.form.setValue("is_active", v, { shouldDirty: true })}
+                />
+              </div>
             </div>
             <SheetFooter>
               <Button type="button" variant="outline" size="sm" onClick={c.forceCloseEdit}>
