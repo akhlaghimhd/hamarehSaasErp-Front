@@ -35,11 +35,8 @@ import { ApiClientError, apiPut } from "@/api";
 import {
   toFaDigits,
   formatJalaliDate,
-  isoToJalali,
-  jalaliToIso,
-  jalaliMonthLength,
-  currentJalaliYear,
 } from "@/shared/lib/utils";
+import { ShamsiDatePicker } from "@/shared/components/ui/shamsi-date-picker";
 import { CollapsibleSection } from "./collapsible-section";
 import {
   bankAccountService,
@@ -68,83 +65,6 @@ const LEGAL_OFFICER_ROLES: { value: string; label: string }[] = [
 const LEGAL_OFFICER_LABELS: Record<string, string> = Object.fromEntries(
   LEGAL_OFFICER_ROLES.map((x) => [x.value, x.label])
 );
-
-const JALALI_MONTHS = [
-  "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
-  "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند",
-];
-
-function ShamsiDateInput({
-  value,
-  onChange,
-  yearSpan = 10,
-}: {
-  value: string;
-  onChange: (iso: string) => void;
-  yearSpan?: number;
-}) {
-  const cur = currentJalaliYear();
-  const years = Array.from({ length: yearSpan }, (_, i) => cur - Math.floor(yearSpan / 2) + i);
-  const parts = isoToJalali(value);
-  const jy = parts?.jy ?? 0;
-  const jm = parts?.jm ?? 0;
-  const jd = parts?.jd ?? 0;
-  const maxDay = jy && jm ? jalaliMonthLength(jy, jm) : 31;
-
-  const setPart = (nextJy: number, nextJm: number, nextJd: number) => {
-    if (!nextJy || !nextJm || !nextJd) {
-      onChange("");
-      return;
-    }
-    const md = jalaliMonthLength(nextJy, nextJm);
-    const day = Math.min(nextJd, md);
-    onChange(jalaliToIso(nextJy, nextJm, day));
-  };
-
-  return (
-    <div className="flex h-9 items-center gap-1 rounded-md border border-input bg-transparent px-1.5">
-      <select
-        className="h-8 flex-1 rounded border-0 bg-transparent px-1 text-sm outline-none"
-        value={jy || ""}
-        onChange={(e) => {
-          const y = Number(e.target.value) || 0;
-          setPart(y, jm || 1, jd || 1);
-        }}
-      >
-        <option value="">سال</option>
-        {years.map((y) => (
-          <option key={y} value={y}>{toFaDigits(y)}</option>
-        ))}
-      </select>
-      <select
-        className="h-8 flex-[1.2] rounded border-0 bg-transparent px-1 text-sm outline-none"
-        value={jm || ""}
-        onChange={(e) => {
-          const m = Number(e.target.value) || 0;
-          setPart(jy || cur, m, jd || 1);
-        }}
-      >
-        <option value="">ماه</option>
-        {JALALI_MONTHS.map((label, idx) => (
-          <option key={label} value={idx + 1}>{label}</option>
-        ))}
-      </select>
-      <select
-        className="h-8 w-16 rounded border-0 bg-transparent px-1 text-sm outline-none"
-        value={jd || ""}
-        onChange={(e) => {
-          const d = Number(e.target.value) || 0;
-          setPart(jy || cur, jm || 1, d);
-        }}
-      >
-        <option value="">روز</option>
-        {Array.from({ length: maxDay }, (_, i) => i + 1).map((d) => (
-          <option key={d} value={d}>{toFaDigits(d)}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
 
 const IRAN_BANKS = [
   "بانک ملی ایران", "بانک سپه", "بانک صنعت و معدن", "بانک کشاورزی", "بانک مسکن",
@@ -764,11 +684,11 @@ export function CompanyExtendedPanels({
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>شروع دوره (شمسی)</Label>
-                  <ShamsiDateInput value={officerForm.watch("mandate_from") || ""} onChange={(iso) => officerForm.setValue("mandate_from", iso, { shouldDirty: true })} />
+                  <ShamsiDatePicker value={officerForm.watch("mandate_from") || ""} onChange={(iso) => officerForm.setValue("mandate_from", iso, { shouldDirty: true })} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>پایان دوره (شمسی)</Label>
-                  <ShamsiDateInput value={officerForm.watch("mandate_to") || ""} onChange={(iso) => officerForm.setValue("mandate_to", iso, { shouldDirty: true })} />
+                  <ShamsiDatePicker value={officerForm.watch("mandate_to") || ""} onChange={(iso) => officerForm.setValue("mandate_to", iso, { shouldDirty: true })} />
                 </div>
               </div>
               <div className="flex h-9 items-center justify-between rounded-md border px-3">
