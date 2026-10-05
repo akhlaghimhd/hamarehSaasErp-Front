@@ -1,32 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getCompanyFocusId } from "../lib/company-ref";
-import { useCompany } from "../hooks/use-companies";
 import { CompanyDetailPage } from "./company-detail";
-import { CompanyAddressContactPanel } from "./company-address-contact-panel";
-import { CompanyOwnershipPanel } from "./company-ownership-panel";
-import { CompanyExtendedPanels } from "./company-extended-panels";
 
+/**
+ * Route entry for /dashboard/organization/companies/detail.
+ * Panels (address/contact, ownership, extended) live inside CompanyDetailPage —
+ * do not re-render them here or they appear twice.
+ */
 export function CompanyDetailShell() {
-  const [companyId, setCompanyId] = useState("");
-  useEffect(() => {
-    setCompanyId(getCompanyFocusId() ?? "");
-  }, []);
-  const { data: company } = useCompany(companyId || null);
-  const readOnly =
-    Boolean(company?.deleted_at) || company?.is_active === false;
-
-  return (
-    <div className="space-y-8">
-      <CompanyDetailPage />
-      {companyId ? (
-        <>
-          <CompanyAddressContactPanel companyId={companyId} readOnly={readOnly} />
-          <CompanyOwnershipPanel companyId={companyId} readOnly={readOnly} />
-          <CompanyExtendedPanels companyId={companyId} readOnly={readOnly} />
-        </>
-      ) : null}
-    </div>
-  );
+  return <CompanyDetailPage />;
 }
