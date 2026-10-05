@@ -133,10 +133,30 @@ function formatIbanGrouped(iban: string | null | undefined): string {
   if (!iban) return "";
   const n = normalizeIban(iban);
   if (!n) return "";
-  const body = n.slice(2);
-  const parts = [n.slice(0, 4)];
-  for (let i = 0; i < body.length; i += 4) {
-    parts.push(body.slice(i, i + 4));
+  // n = IR + up to 24 digits — group as IR12 3456 7890 … (no digit duplication)
+  const digits = n.slice(2);
+  if (!digits) return "IR";
+  const first = digits.slice(0, 2);
+  const rest = digits.slice(2);
+  const parts = [`IR${first}`];
+  for (let i = 0; i < rest.length; i += 4) {
+    parts.push(rest.slice(i, i + 4));
+  }
+  return parts.join(" ");
+}
+
+/** Digits-only grouped display for the input (without IR prefix). */
+function formatIbanDigitsOnly(iban: string | null | undefined): string {
+  if (!iban) return "";
+  const n = normalizeIban(iban);
+  const digits = n.startsWith("IR") ? n.slice(2) : n.replace(/\D/g, "");
+  if (!digits) return "";
+  // Group: 2 + 4 + 4 + …
+  const first = digits.slice(0, 2);
+  const rest = digits.slice(2);
+  const parts = [first];
+  for (let i = 0; i < rest.length; i += 4) {
+    parts.push(rest.slice(i, i + 4));
   }
   return parts.join(" ");
 }
@@ -734,24 +754,37 @@ export function CompanyExtendedPanels({
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="iban">شماره شبا (اختیاری)</Label>
-                <Input
-                  id="iban"
-                  className="h-9 font-mono tabular-nums tracking-wide"
-                  dir="ltr"
-                  inputMode="text"
-                  autoComplete="off"
-                  spellCheck={false}
-                  placeholder="IR00 0000 0000 0000 0000 0000 00"
-                  value={formatIbanGrouped(watchedIban)}
-                  onChange={(e) => {
-                    const n = normalizeIban(e.target.value);
-                    bankForm.setValue("iban", n, { shouldDirty: true });
-                  }}
-                />
+                <div className="flex items-center gap-1.5" dir="ltr">
+                  <span className="shrink-0 select-none rounded-md border bg-muted/50 px-2 py-1.5 font-mono text-sm text-muted-foreground">
+                    IR
+                  </span>
+                  <Input
+                    id="iban"
+                    className="h-9 flex-1 font-mono tabular-nums tracking-wide"
+                    dir="ltr"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="00 0000 0000 0000 0000 0000 00"
+                    value={formatIbanDigitsOnly(watchedIban)}
+                    onChange={(e) => {
+                      const digits = toAsciiDigits(e.target.value).slice(0, 24);
+                      bankForm.setValue(
+                        "iban",
+                        digits ? `IR${digits}` : "",
+                        { shouldDirty: true }
+                      );
+                    }}
+                  />
+                </div>
                 <p className="text-[11px] text-muted-foreground">
-                  قالب استاندارد: IR + ۲۴ رقم — {toFaDigits(ibanHintLen)} از ۲۴
-                  {ibanHintLen > 0 && ibanHintLen < 24 ? " (ناقص)" : ibanHintLen === 24 ? " (کامل)" : ""}.
-                  ارقام فارسی هم پذیرفته می‌شود.
+                  فقط ۲۴ رقم بعد از IR — {toFaDigits(ibanHintLen)} از ۲۴
+                  {ibanHintLen > 0 && ibanHintLen < 24
+                    ? " (ناقص)"
+                    : ibanHintLen === 24
+                      ? " (کامل)"
+                      : ""}
+                  . ارقام فارسی پذیرفته می‌شود.
                 </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
