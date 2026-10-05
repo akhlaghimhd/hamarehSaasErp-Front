@@ -23,7 +23,7 @@ import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/components/ui/table";
 import { cn, toFaDigits } from "@/shared/lib/utils";
 import { ENTITY_KIND_LABELS } from "../types";
-import { companyDetailPath } from "../lib/company-ref";
+import { COMPANY_DETAIL_HREF, setCompanyFocus } from "../lib/company-ref";
 import { exportCompaniesExcel, exportCompaniesPdf } from "../lib/companies-export";
 import {
   MSG_NO_ACCESS, COLS,
@@ -280,7 +280,7 @@ export function CompaniesListPage() {
                     </TableCell>
                     {c.visible.name !== false ? (
                       <TableCell className="px-2 font-medium">
-                        <Link href={companyDetailPath(row.company_id)} className="text-primary hover:underline">
+                        <Link href={COMPANY_DETAIL_HREF} onClick={() => setCompanyFocus(row.company_id, "companies")} className="text-primary hover:underline">
                           {displayName(row)}
                         </Link>
                         {row.is_primary ? (
@@ -347,7 +347,7 @@ export function CompaniesListPage() {
                           <IconAction
                             label="جزئیات"
                             onClick={() => {
-                              window.location.href = companyDetailPath(row.company_id);
+                              setCompanyFocus(row.company_id, "companies"); window.location.href = COMPANY_DETAIL_HREF;
                             }}
                           >
                             <Eye className="h-3.5 w-3.5" />
