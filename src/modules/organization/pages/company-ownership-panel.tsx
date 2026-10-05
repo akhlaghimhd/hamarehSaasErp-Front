@@ -70,13 +70,12 @@ function formatPercent(value: number | string | null | undefined): string {
   const num = Number(value);
   if (!Number.isFinite(num)) return toFaDigits("0");
   const rounded = Math.round(num * 10000) / 10000;
-  const asStr =
-    Number.isInteger(rounded) || Math.abs(rounded - Math.round(rounded)) < 1e-9
-      ? String(Math.round(rounded))
-      : String(rounded)
-          .replace(/(\.
-\d*?[1-9])0+$/, "$1")
-          .replace(/\.0+$/, "");
+  let asStr: string;
+  if (Number.isInteger(rounded) || Math.abs(rounded - Math.round(rounded)) < 1e-9) {
+    asStr = String(Math.round(rounded));
+  } else {
+    asStr = rounded.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+  }
   return toFaDigits(asStr);
 }
 
@@ -259,7 +258,6 @@ export function CompanyOwnershipPanel({
   return (
     <section id="ownerships" className="scroll-mt-20">
       <div className="overflow-hidden rounded-xl border border-border/70 bg-card/40">
-        {/* هدر کشو */}
         <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2.5">
           <button
             type="button"
@@ -332,19 +330,11 @@ export function CompanyOwnershipPanel({
                   </colgroup>
                   <thead>
                     <tr className="border-b bg-muted/40 text-[11px] text-muted-foreground">
-                      <th className="px-3 py-2 text-start font-medium">
-                        سهامدار
-                      </th>
-                      <th className="hidden px-2 py-2 text-start font-medium sm:table-cell">
-                        نوع
-                      </th>
-                      <th className="hidden px-2 py-2 text-start font-medium md:table-cell">
-                        رابطه
-                      </th>
+                      <th className="px-3 py-2 text-start font-medium">سهامدار</th>
+                      <th className="hidden px-2 py-2 text-start font-medium sm:table-cell">نوع</th>
+                      <th className="hidden px-2 py-2 text-start font-medium md:table-cell">رابطه</th>
                       <th className="px-2 py-2 text-end font-medium">درصد</th>
-                      {!readOnly ? (
-                        <th className="px-1 py-2 text-end font-medium" />
-                      ) : null}
+                      {!readOnly ? <th className="px-1 py-2 text-end font-medium" /> : null}
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -361,14 +351,9 @@ export function CompanyOwnershipPanel({
                                 <Building2 className="h-3.5 w-3.5 shrink-0 text-primary" />
                               )}
                               <div className="min-w-0">
-                                <div className="truncate font-medium">
-                                  {ownerLabel(o, nameOf)}
-                                </div>
+                                <div className="truncate font-medium">{ownerLabel(o, nameOf)}</div>
                                 {o.owner_identifier ? (
-                                  <div
-                                    dir="ltr"
-                                    className="font-mono text-[10px] text-muted-foreground"
-                                  >
+                                  <div dir="ltr" className="font-mono text-[10px] text-muted-foreground">
                                     {toFaDigits(o.owner_identifier)}
                                   </div>
                                 ) : null}
@@ -379,8 +364,7 @@ export function CompanyOwnershipPanel({
                             {KIND_LABELS[kind] ?? kind}
                           </td>
                           <td className="hidden px-2 py-2 text-[11px] text-muted-foreground md:table-cell">
-                            {REL_LABELS[o.relation_type ?? "EQUITY"] ??
-                              o.relation_type}
+                            {REL_LABELS[o.relation_type ?? "EQUITY"] ?? o.relation_type}
                           </td>
                           <td className="px-2 py-2 text-end tabular-nums font-medium">
                             {formatPercent(o.ownership_percent)}٪
@@ -388,23 +372,10 @@ export function CompanyOwnershipPanel({
                           {!readOnly ? (
                             <td className="px-1 py-2 text-end">
                               <div className="inline-flex">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 w-7 p-0"
-                                  onClick={() => {
-                                    setEditing(o);
-                                    setOpen(true);
-                                  }}
-                                >
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setEditing(o); setOpen(true); }}>
                                   <Pencil className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 w-7 p-0 text-destructive"
-                                  onClick={() => setPendingDelete(o)}
-                                >
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setPendingDelete(o)}>
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                               </div>
@@ -425,12 +396,7 @@ export function CompanyOwnershipPanel({
         ) : null}
       </div>
 
-      <Dialog
-        open={!!pendingDelete}
-        onOpenChange={(o) => {
-          if (!o && !deleteBusy) setPendingDelete(null);
-        }}
-      >
+      <Dialog open={!!pendingDelete} onOpenChange={(o) => { if (!o && !deleteBusy) setPendingDelete(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>حذف سهامدار</DialogTitle>
@@ -441,25 +407,9 @@ export function CompanyOwnershipPanel({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={deleteBusy}
-              onClick={() => setPendingDelete(null)}
-            >
-              انصراف
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={deleteBusy}
-              onClick={() => void runDelete()}
-            >
-              {deleteBusy ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                "حذف"
-              )}
+            <Button type="button" variant="outline" disabled={deleteBusy} onClick={() => setPendingDelete(null)}>انصراف</Button>
+            <Button type="button" variant="destructive" disabled={deleteBusy} onClick={() => void runDelete()}>
+              {deleteBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "حذف"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -469,25 +419,14 @@ export function CompanyOwnershipPanel({
         <SheetContent
           side="right"
           className="flex w-full flex-col gap-0 overflow-hidden sm:max-w-md"
-          onInteractOutside={(e) => {
-            if (isDirty) e.preventDefault();
-          }}
-          onPointerDownOutside={(e) => {
-            if (isDirty) e.preventDefault();
-          }}
+          onInteractOutside={(e) => { if (isDirty) e.preventDefault(); }}
+          onPointerDownOutside={(e) => { if (isDirty) e.preventDefault(); }}
         >
           <SheetHeader>
-            <SheetTitle>
-              {editing ? "ویرایش سهامدار" : "سهامدار جدید"}
-            </SheetTitle>
-            <SheetDescription>
-              شرکت عضو همین گروه، یا شخص حقیقی/حقوقی خارج از سیستم
-            </SheetDescription>
+            <SheetTitle>{editing ? "ویرایش سهامدار" : "سهامدار جدید"}</SheetTitle>
+            <SheetDescription>شرکت عضو همین گروه، یا شخص حقیقی/حقوقی خارج از سیستم</SheetDescription>
           </SheetHeader>
-          <form
-            className="flex min-h-0 flex-1 flex-col"
-            onSubmit={form.handleSubmit((v) => save.mutate(v))}
-          >
+          <form className="flex min-h-0 flex-1 flex-col" onSubmit={form.handleSubmit((v) => save.mutate(v))}>
             <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
               <div className="space-y-1.5">
                 <Label>نوع سهامدار *</Label>
@@ -495,9 +434,7 @@ export function CompanyOwnershipPanel({
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={watchedKind}
                   onChange={(e) => {
-                    form.setValue("owner_kind", e.target.value as OwnerKind, {
-                      shouldDirty: true,
-                    });
+                    form.setValue("owner_kind", e.target.value as OwnerKind, { shouldDirty: true });
                   }}
                 >
                   <option value="COMPANY">شرکت عضو گروه</option>
@@ -509,77 +446,40 @@ export function CompanyOwnershipPanel({
               {watchedKind === "COMPANY" ? (
                 <div className="space-y-1.5">
                   <Label>شرکت مالک *</Label>
-                  <select
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    {...form.register("owner_company_id")}
-                  >
+                  <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" {...form.register("owner_company_id")}>
                     <option value="">— انتخاب —</option>
-                    {(companies ?? [])
-                      .filter((c) => c.company_id !== companyId)
-                      .map((c) => (
-                        <option key={c.company_id} value={c.company_id}>
-                          {c.legal_name || c.name}
-                        </option>
-                      ))}
+                    {(companies ?? []).filter((c) => c.company_id !== companyId).map((c) => (
+                      <option key={c.company_id} value={c.company_id}>{c.legal_name || c.name}</option>
+                    ))}
                   </select>
                 </div>
               ) : (
                 <>
                   <div className="space-y-1.5">
-                    <Label>
-                      {watchedKind === "EXTERNAL_PERSON"
-                        ? "نام و نام خانوادگی *"
-                        : "نام شخص حقوقی *"}
-                    </Label>
-                    <Input
-                      className="h-9"
-                      {...form.register("owner_display_name")}
-                    />
+                    <Label>{watchedKind === "EXTERNAL_PERSON" ? "نام و نام خانوادگی *" : "نام شخص حقوقی *"}</Label>
+                    <Input className="h-9" {...form.register("owner_display_name")} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>
-                      {watchedKind === "EXTERNAL_PERSON"
-                        ? "کد ملی (اختیاری)"
-                        : "شناسه ملی / شماره ثبت (اختیاری)"}
-                    </Label>
-                    <Input
-                      className="h-9 font-mono"
-                      dir="ltr"
-                      maxLength={20}
-                      {...form.register("owner_identifier")}
-                    />
+                    <Label>{watchedKind === "EXTERNAL_PERSON" ? "کد ملی (اختیاری)" : "شناسه ملی / شماره ثبت (اختیاری)"}</Label>
+                    <Input className="h-9 font-mono" dir="ltr" maxLength={20} {...form.register("owner_identifier")} />
                   </div>
                 </>
               )}
 
               <div className="space-y-1.5">
                 <Label>درصد مالکیت *</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min={0.01}
-                  max={remainPercent || 100}
-                  className="h-9"
-                  dir="ltr"
-                  {...form.register("ownership_percent", { required: true })}
-                />
+                <Input type="number" step="0.01" min={0.01} max={remainPercent || 100} className="h-9" dir="ltr" {...form.register("ownership_percent", { required: true })} />
                 <p className="text-[11px] text-muted-foreground">
                   حداکثر قابل ثبت الان: {formatPercent(remainPercent)}٪
-                  {watchedPercent &&
-                  Number(watchedPercent) > remainPercent + 0.0001 ? (
-                    <span className="ms-1 text-destructive">
-                      (از سقف بیشتر است)
-                    </span>
+                  {watchedPercent && Number(watchedPercent) > remainPercent + 0.0001 ? (
+                    <span className="ms-1 text-destructive">(از سقف بیشتر است)</span>
                   ) : null}
                 </p>
               </div>
 
               <div className="space-y-1.5">
                 <Label>نوع رابطه</Label>
-                <select
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  {...form.register("relation_type")}
-                >
+                <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" {...form.register("relation_type")}>
                   <option value="EQUITY">سهامی</option>
                   <option value="CONTROL">کنترلی</option>
                   <option value="JOINT">مشترک</option>
@@ -587,19 +487,9 @@ export function CompanyOwnershipPanel({
               </div>
             </div>
             <SheetFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleOpen(false)}
-              >
-                انصراف
-              </Button>
+              <Button type="button" variant="outline" onClick={() => handleOpen(false)}>انصراف</Button>
               <Button type="submit" disabled={save.isPending}>
-                {save.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  "ذخیره"
-                )}
+                {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
               </Button>
             </SheetFooter>
           </form>
