@@ -386,7 +386,11 @@ export function CompanyAddressContactPanel({
                 <th className="px-3 py-2 text-start font-medium">آدرس</th>
                 <th className="hidden w-28 px-2 py-2 text-start font-medium sm:table-cell">کدپستی</th>
                 <th className="w-14 px-1 py-2 text-center font-medium">اصلی</th>
-                {!readOnly ? <th className="w-16 px-1 py-2 text-end font-medium" /> : null}
+                {!readOnly ? (
+                  <th className="w-[4.5rem] border-s border-border/50 px-2 py-2 text-center font-medium">
+                    عملیات
+                  </th>
+                ) : null}
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -412,15 +416,16 @@ export function CompanyAddressContactPanel({
                     )}
                   </td>
                   {!readOnly ? (
-                    <td className="px-1 py-2 text-end">
-                      <div className="inline-flex">
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEditAddr(a)}>
+                    <td className="border-s border-border/50 px-2 py-2 text-center">
+                      <div className="inline-flex items-center justify-center gap-0.5">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="ویرایش" onClick={() => openEditAddr(a)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
                           className="h-7 w-7 p-0 text-destructive"
+                          title="حذف"
                           onClick={() =>
                             setPendingDelete({
                               kind: "address",
@@ -474,7 +479,11 @@ export function CompanyAddressContactPanel({
                 <th className="px-3 py-1.5 text-start font-medium">نوع</th>
                 <th className="px-2 py-1.5 text-start font-medium">مقدار</th>
                 <th className="w-14 px-1 py-1.5 text-center font-medium">اصلی</th>
-                {!readOnly ? <th className="w-16 px-1 py-1.5 text-end font-medium" /> : null}
+                {!readOnly ? (
+                  <th className="w-[4.5rem] border-s border-border/50 px-2 py-1.5 text-center font-medium">
+                    عملیات
+                  </th>
+                ) : null}
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -490,15 +499,9 @@ export function CompanyAddressContactPanel({
                   const value = contactValueDisplay(c.contact_type, c.contact_value);
                   return (
                     <tr key={c.contact_point_id} className="hover:bg-muted/20">
-                      <td className="px-3 py-1.5 text-start text-[12px] text-muted-foreground">
-                        {typeLabel}
-                      </td>
+                      <td className="px-3 py-1.5 text-start text-[12px] text-muted-foreground">{typeLabel}</td>
                       <td className="px-2 py-1.5 text-start">
-                        <span
-                          dir="ltr"
-                          className="inline-block max-w-full truncate text-[13px] font-medium tabular-nums"
-                          title={value}
-                        >
+                        <span dir="ltr" className="inline-block max-w-full truncate text-[13px] font-medium tabular-nums" title={value}>
                           {value}
                         </span>
                       </td>
@@ -510,16 +513,9 @@ export function CompanyAddressContactPanel({
                         )}
                       </td>
                       {!readOnly ? (
-                        <td className="px-1 py-1.5 text-end">
-                          <div className="inline-flex">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={() => openEditContact(c)}
-                              aria-label="ویرایش"
-                            >
+                        <td className="border-s border-border/50 px-2 py-1.5 text-center">
+                          <div className="inline-flex items-center justify-center gap-0.5">
+                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0" title="ویرایش" onClick={() => openEditContact(c)} aria-label="ویرایش">
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
                             <Button
@@ -527,6 +523,7 @@ export function CompanyAddressContactPanel({
                               variant="ghost"
                               size="sm"
                               className="h-7 w-7 p-0 text-destructive"
+                              title="حذف"
                               onClick={() =>
                                 setPendingDelete({
                                   kind: "contact",
@@ -547,31 +544,18 @@ export function CompanyAddressContactPanel({
             </tbody>
           </table>
         ) : !contacts.isLoading ? (
-          <div className="px-3 py-6 text-center text-xs text-muted-foreground">
-            راه ارتباطی ثبت نشده است.
-          </div>
+          <div className="px-3 py-6 text-center text-xs text-muted-foreground">راه ارتباطی ثبت نشده است.</div>
         ) : null}
       </CollapsibleSection>
 
-      <Dialog
-        open={!!pendingDelete}
-        onOpenChange={(o) => {
-          if (!o && !deleteBusy) setPendingDelete(null);
-        }}
-      >
+      <Dialog open={!!pendingDelete} onOpenChange={(o) => { if (!o && !deleteBusy) setPendingDelete(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {pendingDelete?.kind === "address" ? "تأیید حذف آدرس" : "تأیید حذف راه ارتباطی"}
-            </DialogTitle>
-            <DialogDescription>
-              {pendingDelete ? `«${pendingDelete.label}» حذف شود؟` : ""}
-            </DialogDescription>
+            <DialogTitle>{pendingDelete?.kind === "address" ? "تأیید حذف آدرس" : "تأیید حذف راه ارتباطی"}</DialogTitle>
+            <DialogDescription>{pendingDelete ? `«${pendingDelete.label}» حذف شود؟` : ""}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="outline" disabled={deleteBusy} onClick={() => setPendingDelete(null)}>
-              انصراف
-            </Button>
+            <Button type="button" variant="outline" disabled={deleteBusy} onClick={() => setPendingDelete(null)}>انصراف</Button>
             <Button type="button" variant="destructive" disabled={deleteBusy} onClick={() => void runConfirmedDelete()}>
               {deleteBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "حذف"}
             </Button>
@@ -580,16 +564,7 @@ export function CompanyAddressContactPanel({
       </Dialog>
 
       <Sheet open={addrOpen && !readOnly} onOpenChange={handleAddrOpen}>
-        <SheetContent
-          side="right"
-          className="flex w-full flex-col gap-0 overflow-hidden sm:max-w-md"
-          onInteractOutside={(e) => {
-            if (addrDirty) e.preventDefault();
-          }}
-          onPointerDownOutside={(e) => {
-            if (addrDirty) e.preventDefault();
-          }}
-        >
+        <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-hidden sm:max-w-md" onInteractOutside={(e) => { if (addrDirty) e.preventDefault(); }} onPointerDownOutside={(e) => { if (addrDirty) e.preventDefault(); }}>
           <SheetHeader>
             <SheetTitle>{editingAddr ? "ویرایش آدرس" : "آدرس جدید"}</SheetTitle>
             <SheetDescription>آدرس پستی شرکت</SheetDescription>
@@ -608,41 +583,25 @@ export function CompanyAddressContactPanel({
                   maxLength={10}
                   value={toFaDigits(postalAscii)}
                   onChange={(e) =>
-                    addrForm.setValue("postal_code", normalizePostalAscii(e.target.value), {
-                      shouldDirty: true,
-                    })
+                    addrForm.setValue("postal_code", normalizePostalAscii(e.target.value), { shouldDirty: true })
                   }
                 />
               </div>
               <div className="flex items-center gap-2">
-                <Switch
-                  checked={addrForm.watch("is_primary")}
-                  onCheckedChange={(v) => addrForm.setValue("is_primary", v, { shouldDirty: true })}
-                />
+                <Switch checked={addrForm.watch("is_primary")} onCheckedChange={(v) => addrForm.setValue("is_primary", v, { shouldDirty: true })} />
                 <Label>آدرس اصلی</Label>
               </div>
             </div>
             <SheetFooter>
               <Button type="button" variant="outline" onClick={() => handleAddrOpen(false)}>انصراف</Button>
-              <Button type="submit" disabled={saveAddr.isPending}>
-                {saveAddr.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
-              </Button>
+              <Button type="submit" disabled={saveAddr.isPending}>{saveAddr.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}</Button>
             </SheetFooter>
           </form>
         </SheetContent>
       </Sheet>
 
       <Sheet open={contactOpen && !readOnly} onOpenChange={handleContactOpen}>
-        <SheetContent
-          side="right"
-          className="flex w-full flex-col gap-0 overflow-hidden sm:max-w-md"
-          onInteractOutside={(e) => {
-            if (contactDirty) e.preventDefault();
-          }}
-          onPointerDownOutside={(e) => {
-            if (contactDirty) e.preventDefault();
-          }}
-        >
+        <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-hidden sm:max-w-md" onInteractOutside={(e) => { if (contactDirty) e.preventDefault(); }} onPointerDownOutside={(e) => { if (contactDirty) e.preventDefault(); }}>
           <SheetHeader>
             <SheetTitle>{editingContact ? "ویرایش راه ارتباطی" : "راه ارتباطی جدید"}</SheetTitle>
             <SheetDescription>تلفن، موبایل، ایمیل، فکس یا وب‌سایت</SheetDescription>
@@ -681,18 +640,13 @@ export function CompanyAddressContactPanel({
                 {contactHint ? <p className="text-[11px] text-muted-foreground">{contactHint}</p> : null}
               </div>
               <div className="flex items-center gap-2">
-                <Switch
-                  checked={contactForm.watch("is_primary")}
-                  onCheckedChange={(v) => contactForm.setValue("is_primary", v, { shouldDirty: true })}
-                />
+                <Switch checked={contactForm.watch("is_primary")} onCheckedChange={(v) => contactForm.setValue("is_primary", v, { shouldDirty: true })} />
                 <Label>اصلی برای این نوع</Label>
               </div>
             </div>
             <SheetFooter>
               <Button type="button" variant="outline" onClick={() => handleContactOpen(false)}>انصراف</Button>
-              <Button type="submit" disabled={saveContact.isPending}>
-                {saveContact.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
-              </Button>
+              <Button type="submit" disabled={saveContact.isPending}>{saveContact.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}</Button>
             </SheetFooter>
           </form>
         </SheetContent>
