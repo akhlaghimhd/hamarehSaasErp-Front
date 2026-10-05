@@ -55,6 +55,9 @@ import {
 } from "../hooks/use-companies";
 import { useBranches } from "../hooks/use-branches";
 import { useDepartments } from "../hooks/use-departments";
+import { CompanyAddressContactPanel } from "./company-address-contact-panel";
+import { CompanyOwnershipPanel } from "./company-ownership-panel";
+import { CompanyExtendedPanels } from "./company-extended-panels";
 import {
   OrganizationPermissions,
   ENTITY_KIND_LABELS,
@@ -590,6 +593,21 @@ export function CompanyDetailPage() {
           )}
         </section>
       ) : null}
+
+      <CompanyAddressContactPanel
+        companyId={companyId}
+        readOnly={isDeleted || isInactive}
+      />
+
+      <CompanyOwnershipPanel
+        companyId={companyId}
+        readOnly={isDeleted || isInactive}
+      />
+
+      <CompanyExtendedPanels
+        companyId={companyId}
+        readOnly={isDeleted || isInactive}
+      />
 
       <Sheet open={editOpen} onOpenChange={handleEditOpenChange}>
         <SheetContent
