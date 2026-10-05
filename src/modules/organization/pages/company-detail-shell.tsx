@@ -1,7 +1,7 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { decodeCompanyRef } from "../lib/company-ref";
+import { useEffect, useState } from "react";
+import { getCompanyFocusId } from "../lib/company-ref";
 import { useCompany } from "../hooks/use-companies";
 import { CompanyDetailPage } from "./company-detail";
 import { CompanyAddressContactPanel } from "./company-address-contact-panel";
@@ -9,9 +9,10 @@ import { CompanyOwnershipPanel } from "./company-ownership-panel";
 import { CompanyExtendedPanels } from "./company-extended-panels";
 
 export function CompanyDetailShell() {
-  const params = useParams();
-  const companyId =
-    decodeCompanyRef(typeof params?.id === "string" ? params.id : "") ?? "";
+  const [companyId, setCompanyId] = useState("");
+  useEffect(() => {
+    setCompanyId(getCompanyFocusId() ?? "");
+  }, []);
   const { data: company } = useCompany(companyId || null);
   const readOnly =
     Boolean(company?.deleted_at) || company?.is_active === false;
