@@ -143,6 +143,36 @@ export type CostCenterDto = {
   company_id: string;
   code: string;
   name: string;
+  cost_center_type?: string | null;
+  parent_cost_center_id?: string | null;
+  department_id?: string | null;
+  manager_user_id?: string | null;
+  description?: string | null;
+  valid_from?: string | null;
+  valid_to?: string | null;
+  is_active?: boolean;
+};
+
+export const COST_CENTER_TYPES = [
+  { value: "ADMIN", label: "اداری" },
+  { value: "SALES", label: "فروش" },
+  { value: "PRODUCTION", label: "تولید" },
+  { value: "SUPPORT", label: "پشتیبانی" },
+  { value: "R_AND_D", label: "تحقیق و توسعه" },
+  { value: "SHARED", label: "مشترک / تسهیم" },
+  { value: "OTHER", label: "سایر" },
+] as const;
+
+export type CostCenterPayload = {
+  code: string;
+  name: string;
+  cost_center_type?: string;
+  parent_cost_center_id?: string | null;
+  department_id?: string | null;
+  manager_user_id?: string | null;
+  description?: string | null;
+  valid_from?: string | null;
+  valid_to?: string | null;
   is_active?: boolean;
 };
 
@@ -464,12 +494,16 @@ export const costCenterService = {
     const env = await apiGet(organizationPaths.companyCostCenters(companyId));
     return asArray(unwrapData(env));
   },
-  async create(
-    companyId: string,
-    payload: { code: string; name: string; is_active?: boolean }
-  ) {
+  async create(companyId: string, payload: CostCenterPayload) {
     const env = await apiPost(organizationPaths.companyCostCenters(companyId), payload);
     return unwrapData<CostCenterDto>(env);
+  },
+  async update(id: string, payload: Partial<CostCenterPayload>) {
+    const env = await apiPut(organizationPaths.costCenter(id), payload);
+    return unwrapData<CostCenterDto>(env);
+  },
+  async softDelete(id: string) {
+    await apiDelete(organizationPaths.costCenter(id));
   },
 };
 
