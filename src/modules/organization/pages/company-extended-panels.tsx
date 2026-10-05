@@ -1,7 +1,841 @@
 /**
  * Nested panels on company detail: bank accounts, officers, cost centers.
- * RESTORED BASELINE — apply officer Shamsi/OTHER patches next from artifacts.
+ * Create/edit via right Sheet with dirty-guard; soft-delete from list.
+ * Bank form follows Iranian banking identifiers (account + Sheba/IBAN).
  */
 "use client";
 
-export { CompanyExtendedPanels } from "./company-extended-panels-impl";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { Button } from "@/shared/components/ui/button";
+import { Input } from "@/shared/components/ui/input";
+import { Label } from "@/shared/components/ui/label";
+import { Switch } from "@/shared/components/ui/switch";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/shared/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog";
+import { StatusChip } from "@/shared/components/data-display/status-chip";
+import { ApiClientError, apiPut } from "@/api";
+import {
+  toFaDigits,
+  formatJalaliDate,
+  isoToJalali,
+  jalaliToIso,
+  jalaliMonthLength,
+  currentJalaliYear,
+} from "@/shared/lib/utils";
+import { CollapsibleSection } from "./collapsible-section";
+import {
+  bankAccountService,
+  officerService,
+  costCenterService,
+  ownershipService,
+  type BankAccountDto,
+  type OfficerDto,
+  type CostCenterDto,
+  type OwnershipDto,
+} from "../services/org-extended-service";
+import { organizationPaths } from "../services/paths";
+
+const MSG_ERR = "انجام این کار ممکن نشد.";
+
+const LEGAL_OFFICER_ROLES: { value: string; label: string }[] = [
+  { value: "CHAIRMAN", label: "رئیس هیئت‌مدیره" },
+  { value: "VICE_CHAIRMAN", label: "نایب‌رئیس هیئت‌مدیره" },
+  { value: "BOARD_MEMBER", label: "عضو هیئت‌مدیره" },
+  { value: "CEO", label: "مدیرعامل" },
+  { value: "INSPECTOR", label: "بازرس اصلی" },
+  { value: "ALT_INSPECTOR", label: "بازرس علی‌البدل" },
+  { value: "OTHER", label: "سایر (با عنوان دلخواه)" },
+];
+
+const LEGAL_OFFICER_LABELS: Record<string, string> = Object.fromEntries(
+  LEGAL_OFFICER_ROLES.map((x) => [x.value, x.label])
+);
+
+const JALALI_MONTHS = [
+  "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
+  "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند",
+];
+
+function ShamsiDateInput({
+  value,
+  onChange,
+  yearSpan = 10,
+}: {
+  value: string;
+  onChange: (iso: string) => void;
+  yearSpan?: number;
+}) {
+  const cur = currentJalaliYear();
+  const years = Array.from({ length: yearSpan }, (_, i) => cur - Math.floor(yearSpan / 2) + i);
+  const parts = isoToJalali(value);
+  const jy = parts?.jy ?? 0;
+  const jm = parts?.jm ?? 0;
+  const jd = parts?.jd ?? 0;
+  const maxDay = jy && jm ? jalaliMonthLength(jy, jm) : 31;
+
+  const setPart = (nextJy: number, nextJm: number, nextJd: number) => {
+    if (!nextJy || !nextJm || !nextJd) {
+      onChange("");
+      return;
+    }
+    const md = jalaliMonthLength(nextJy, nextJm);
+    const day = Math.min(nextJd, md);
+    onChange(jalaliToIso(nextJy, nextJm, day));
+  };
+
+  return (
+    <div className="flex h-9 items-center gap-1 rounded-md border border-input bg-transparent px-1.5">
+      <select
+        className="h-8 flex-1 rounded border-0 bg-transparent px-1 text-sm outline-none"
+        value={jy || ""}
+        onChange={(e) => {
+          const y = Number(e.target.value) || 0;
+          setPart(y, jm || 1, jd || 1);
+        }}
+      >
+        <option value="">سال</option>
+        {years.map((y) => (
+          <option key={y} value={y}>{toFaDigits(y)}</option>
+        ))}
+      </select>
+      <select
+        className="h-8 flex-[1.2] rounded border-0 bg-transparent px-1 text-sm outline-none"
+        value={jm || ""}
+        onChange={(e) => {
+          const m = Number(e.target.value) || 0;
+          setPart(jy || cur, m, jd || 1);
+        }}
+      >
+        <option value="">ماه</option>
+        {JALALI_MONTHS.map((label, idx) => (
+          <option key={label} value={idx + 1}>{label}</option>
+        ))}
+      </select>
+      <select
+        className="h-8 w-16 rounded border-0 bg-transparent px-1 text-sm outline-none"
+        value={jd || ""}
+        onChange={(e) => {
+          const d = Number(e.target.value) || 0;
+          setPart(jy || cur, jm || 1, d);
+        }}
+      >
+        <option value="">روز</option>
+        {Array.from({ length: maxDay }, (_, i) => i + 1).map((d) => (
+          <option key={d} value={d}>{toFaDigits(d)}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+const IRAN_BANKS = [
+  "بانک ملی ایران", "بانک سپه", "بانک صنعت و معدن", "بانک کشاورزی", "بانک مسکن",
+  "بانک توسعه صادرات", "بانک توسعه تعاون", "بانک اقتصاد نوین", "بانک پارسیان", "بانک پاسارگاد",
+  "بانک کارآفرین", "بانک سامان", "بانک سینا", "بانک خاورمیانه", "بانک شهر", "بانک دی",
+  "بانک صادرات ایران", "بانک ملت", "بانک تجارت", "بانک رفاه کارگران", "بانک آینده",
+  "بانک گردشگری", "پست بانک ایران", "موسسه اعتباری ملل",
+] as const;
+
+const OTHER_BANK = "__OTHER__";
+
+const ACCOUNT_TYPES: { value: string; label: string }[] = [
+  { value: "CURRENT", label: "جاری" },
+  { value: "SAVINGS", label: "پس‌انداز" },
+  { value: "SHORT_TERM", label: "سپرده‌ی کوتاه‌مدت" },
+  { value: "LONG_TERM", label: "سپرده‌ی بلندمدت" },
+  { value: "QARD_HASAN", label: "قرض‌الحسنه" },
+  { value: "INVESTMENT", label: "سرمایه‌گذاری" },
+];
+
+const ACCOUNT_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  ACCOUNT_TYPES.map((x) => [x.value, x.label])
+);
+
+type BankForm = {
+  bank_select: string;
+  bank_name_other: string;
+  label: string;
+  account_type: string;
+  account_number: string;
+  iban: string;
+  currency_code: string;
+  is_primary: boolean;
+};
+
+function toAsciiDigits(raw: string): string {
+  const map: Record<string, string> = {
+    "۰": "0", "۱": "1", "۲": "2", "۳": "3", "۴": "4",
+    "۵": "5", "۶": "6", "۷": "7", "۸": "8", "۹": "9",
+    "٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4",
+    "٥": "5", "٦": "6", "٧": "7", "٨": "8", "٩": "9",
+  };
+  let s = "";
+  for (const ch of raw) {
+    const d = map[ch] ?? ch;
+    if (d >= "0" && d <= "9") s += d;
+  }
+  return s;
+}
+
+function normalizeIban(raw: string): string {
+  let s = (raw || "").toUpperCase().replace(/[\s\-_.]/g, "");
+  const map: Record<string, string> = {
+    "۰": "0", "۱": "1", "۲": "2", "۳": "3", "۴": "4",
+    "۵": "5", "۶": "6", "۷": "7", "۸": "8", "۹": "9",
+    "٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4",
+    "٥": "5", "٦": "6", "٧": "7", "٨": "8", "٩": "9",
+  };
+  s = Array.from(s).map((ch) => map[ch] ?? ch).join("").replace(/[^0-9A-Z]/g, "");
+  if (s.startsWith("IR")) {
+    const digits = s.slice(2).replace(/\D/g, "").slice(0, 24);
+    return digits ? `IR${digits}` : "";
+  }
+  const digits = s.replace(/\D/g, "").slice(0, 24);
+  return digits ? `IR${digits}` : "";
+}
+
+function formatIbanGrouped(iban: string | null | undefined): string {
+  if (!iban) return "";
+  const n = normalizeIban(iban);
+  if (!n) return "";
+  const digits = n.slice(2);
+  if (!digits) return "IR";
+  const first = digits.slice(0, 2);
+  const rest = digits.slice(2);
+  const parts = [`IR${first}`];
+  for (let i = 0; i < rest.length; i += 4) parts.push(rest.slice(i, i + 4));
+  return parts.join(" ");
+}
+
+function formatIbanDigitsOnly(iban: string | null | undefined): string {
+  if (!iban) return "";
+  const n = normalizeIban(iban);
+  const digits = n.startsWith("IR") ? n.slice(2) : n.replace(/\D/g, "");
+  if (!digits) return "";
+  const first = digits.slice(0, 2);
+  const rest = digits.slice(2);
+  const parts = [first];
+  for (let i = 0; i < rest.length; i += 4) parts.push(rest.slice(i, i + 4));
+  return parts.join(" ");
+}
+
+function formatIbanDisplay(iban: string | null | undefined): string {
+  const g = formatIbanGrouped(iban);
+  return g ? toFaDigits(g) : "";
+}
+
+function validateIban(raw: string): string | null {
+  const n = normalizeIban(raw);
+  if (!n) return null;
+  if (!/^IR[0-9]{24}$/.test(n)) return "شبا باید با IR شروع شود و دقیقاً ۲۴ رقم بعد از آن داشته باشد.";
+  return null;
+}
+
+function validateAccountNumber(raw: string): string | null {
+  const d = toAsciiDigits(raw);
+  if (!d) return "شماره حساب الزامی است.";
+  if (d.length < 6 || d.length > 20) return "شماره حساب معمولاً بین ۶ تا ۲۰ رقم است.";
+  return null;
+}
+
+function resolveBankName(v: BankForm): string {
+  if (v.bank_select === OTHER_BANK) return v.bank_name_other.trim();
+  return (v.bank_select || "").trim();
+}
+
+function bankSelectFromName(name: string): { bank_select: string; bank_name_other: string } {
+  const t = (name || "").trim();
+  if (IRAN_BANKS.includes(t as (typeof IRAN_BANKS)[number])) return { bank_select: t, bank_name_other: "" };
+  if (t) return { bank_select: OTHER_BANK, bank_name_other: t };
+  return { bank_select: "", bank_name_other: "" };
+}
+
+export function CompanyExtendedPanels({
+  companyId,
+  readOnly = false,
+}: {
+  companyId: string;
+  readOnly?: boolean;
+}) {
+  const qc = useQueryClient();
+  const [bankOpen, setBankOpen] = useState(false);
+  const [officerOpen, setOfficerOpen] = useState(false);
+  const [ccOpen, setCcOpen] = useState(false);
+  const [editingBank, setEditingBank] = useState<BankAccountDto | null>(null);
+  const [editingOfficer, setEditingOfficer] = useState<OfficerDto | null>(null);
+  const [editingCc, setEditingCc] = useState<CostCenterDto | null>(null);
+  const [bankFieldError, setBankFieldError] = useState<string | null>(null);
+  const [pendingDeleteOfficer, setPendingDeleteOfficer] = useState<OfficerDto | null>(null);
+  const [deleteOfficerBusy, setDeleteOfficerBusy] = useState(false);
+
+  const bankForm = useForm<BankForm>({
+    defaultValues: {
+      bank_select: "",
+      bank_name_other: "",
+      label: "",
+      account_type: "CURRENT",
+      account_number: "",
+      iban: "",
+      currency_code: "IRR",
+      is_primary: false,
+    },
+  });
+  const officerForm = useForm({
+    defaultValues: {
+      role_code: "CEO",
+      role_title: "",
+      full_name: "",
+      national_id: "",
+      ownership_id: "",
+      has_signing_authority: false,
+      mandate_from: "",
+      mandate_to: "",
+      mandate_notes: "",
+      is_active: true,
+    },
+  });
+  const ccForm = useForm({ defaultValues: { code: "", name: "" } });
+  const { isDirty: bankDirty } = bankForm.formState;
+  const { isDirty: officerDirty } = officerForm.formState;
+  const { isDirty: ccDirty } = ccForm.formState;
+  const watchedBankSelect = bankForm.watch("bank_select");
+  const watchedIban = bankForm.watch("iban");
+  const watchedOfficerRole = officerForm.watch("role_code");
+
+  const banks = useQuery({
+    queryKey: ["org", "banks", companyId],
+    queryFn: () => bankAccountService.list(companyId),
+    enabled: !!companyId,
+  });
+  const officers = useQuery({
+    queryKey: ["org", "officers", companyId],
+    queryFn: () => officerService.list(companyId),
+    enabled: !!companyId,
+  });
+  const costCenters = useQuery({
+    queryKey: ["org", "cost-centers", companyId],
+    queryFn: () => costCenterService.list(companyId),
+    enabled: !!companyId,
+  });
+  const ownerships = useQuery({
+    queryKey: ["org", "ownerships", companyId],
+    queryFn: () => ownershipService.list(companyId),
+    enabled: !!companyId,
+  });
+
+  const sortedBanks = useMemo(() => {
+    return [...(banks.data ?? [])].sort((a, b) => {
+      const pa = a.is_primary ? 0 : 1;
+      const pb = b.is_primary ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return (a.bank_name || "").localeCompare(b.bank_name || "", "fa");
+    });
+  }, [banks.data]);
+
+  useEffect(() => {
+    if (!bankOpen) return;
+    setBankFieldError(null);
+    if (editingBank) {
+      const sel = bankSelectFromName(editingBank.bank_name);
+      bankForm.reset({
+        bank_select: sel.bank_select,
+        bank_name_other: sel.bank_name_other,
+        label: (editingBank as { label?: string | null }).label ?? (editingBank as { account_holder_name?: string | null }).account_holder_name ?? "",
+        account_type: editingBank.account_type || "CURRENT",
+        account_number: toAsciiDigits(editingBank.account_number || ""),
+        iban: normalizeIban(editingBank.iban ?? ""),
+        currency_code: editingBank.currency_code || "IRR",
+        is_primary: Boolean(editingBank.is_primary),
+      });
+    } else {
+      bankForm.reset({ bank_select: "", bank_name_other: "", label: "", account_type: "CURRENT", account_number: "", iban: "", currency_code: "IRR", is_primary: false });
+    }
+  }, [bankOpen, editingBank, bankForm]);
+
+  useEffect(() => {
+    if (!officerOpen) return;
+    if (editingOfficer) {
+      const o = editingOfficer;
+      officerForm.reset({
+        role_code: o.role_code ?? "CEO",
+        role_title: o.role_title || o.title || "",
+        full_name: o.full_name || "",
+        national_id: toAsciiDigits(o.national_id || ""),
+        ownership_id: o.ownership_id || "",
+        has_signing_authority: Boolean(o.has_signing_authority),
+        mandate_from: (o.mandate_from || "").toString().slice(0, 10),
+        mandate_to: (o.mandate_to || "").toString().slice(0, 10),
+        mandate_notes: o.mandate_notes || "",
+        is_active: o.is_active !== false,
+      });
+    } else {
+      officerForm.reset({
+        role_code: "CEO", role_title: "", full_name: "", national_id: "", ownership_id: "",
+        has_signing_authority: false, mandate_from: "", mandate_to: "", mandate_notes: "", is_active: true,
+      });
+    }
+  }, [officerOpen, editingOfficer, officerForm]);
+
+  useEffect(() => {
+    if (!ccOpen) return;
+    if (editingCc) ccForm.reset({ code: editingCc.code, name: editingCc.name });
+    else ccForm.reset({ code: "", name: "" });
+  }, [ccOpen, editingCc, ccForm]);
+
+  const saveBank = useMutation({
+    mutationFn: async (v: BankForm) => {
+      const bank_name = resolveBankName(v);
+      if (!bank_name) throw new Error("نام بانک را انتخاب یا وارد کنید.");
+      const accErr = validateAccountNumber(v.account_number);
+      if (accErr) throw new Error(accErr);
+      const ibanErr = validateIban(v.iban);
+      if (ibanErr) throw new Error(ibanErr);
+      const payload = {
+        bank_name,
+        label: v.label.trim() || undefined,
+        account_holder_name: v.label.trim() || undefined,
+        account_type: v.account_type || "CURRENT",
+        account_number: toAsciiDigits(v.account_number),
+        iban: normalizeIban(v.iban) || undefined,
+        currency_code: (v.currency_code || "IRR").trim() || "IRR",
+        is_primary: Boolean(v.is_primary),
+      };
+      if (editingBank) {
+        await apiPut(organizationPaths.bankAccount(editingBank.bank_account_id), payload);
+        return;
+      }
+      await bankAccountService.create(companyId, payload as never);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["org", "banks", companyId] });
+      toast.success(editingBank ? "حساب به‌روز شد" : "حساب بانکی ثبت شد");
+      setBankOpen(false);
+      setEditingBank(null);
+      setBankFieldError(null);
+      bankForm.reset();
+    },
+    onError: (e) => {
+      const msg = e instanceof ApiClientError && e.message ? e.message : e instanceof Error && e.message ? e.message : MSG_ERR;
+      setBankFieldError(msg);
+      toast.error(msg);
+    },
+  });
+
+  const deleteBank = useMutation({
+    mutationFn: (id: string) => bankAccountService.softDelete(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["org", "banks", companyId] });
+      toast.success("حساب حذف شد");
+    },
+    onError: (e) => toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR),
+  });
+
+  const saveOfficer = useMutation({
+    mutationFn: async (v: {
+      role_code: string;
+      role_title?: string;
+      full_name: string;
+      national_id?: string;
+      ownership_id?: string;
+      has_signing_authority?: boolean;
+      mandate_from?: string;
+      mandate_to?: string;
+      mandate_notes?: string;
+      is_active?: boolean;
+    }) => {
+      const payload = {
+        role_code: v.role_code,
+        role_title: (v.role_title || "").trim() || null,
+        full_name: v.full_name.trim(),
+        national_id: toAsciiDigits(v.national_id || "") || undefined,
+        ownership_id: v.ownership_id || null,
+        has_signing_authority: Boolean(v.has_signing_authority),
+        mandate_from: v.mandate_from || null,
+        mandate_to: v.mandate_to || null,
+        mandate_notes: (v.mandate_notes || "").trim() || null,
+        is_active: v.is_active !== false,
+      };
+      if (!payload.full_name) throw new Error("نام مقام الزامی است.");
+      if (payload.role_code === "OTHER" && !payload.role_title) throw new Error("برای نقش «سایر» عنوان نقش الزامی است.");
+      if (editingOfficer) {
+        await apiPut(organizationPaths.officer(editingOfficer.officer_id), payload);
+        return;
+      }
+      await officerService.create(companyId, payload as never);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["org", "officers", companyId] });
+      toast.success(editingOfficer ? "مقام به‌روز شد" : "مقام ثبت شد");
+      setOfficerOpen(false);
+      setEditingOfficer(null);
+      officerForm.reset();
+    },
+    onError: (e) => toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR),
+  });
+
+  const deleteOfficer = useMutation({
+    mutationFn: (id: string) => officerService.softDelete(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["org", "officers", companyId] });
+      toast.success("مقام حذف شد");
+    },
+    onError: (e) => toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR),
+  });
+
+  const saveCc = useMutation({
+    mutationFn: async (v: { code: string; name: string }) => {
+      if (editingCc) {
+        await apiPut(`${organizationPaths.companyCostCenters(companyId)}/${editingCc.cost_center_id}`, v);
+        return;
+      }
+      await costCenterService.create(companyId, v);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["org", "cost-centers", companyId] });
+      toast.success(editingCc ? "مرکز هزینه به‌روز شد" : "مرکز هزینه ثبت شد");
+      setCcOpen(false);
+      setEditingCc(null);
+      ccForm.reset();
+    },
+    onError: (e) => toast.error(e instanceof ApiClientError && e.message ? e.message : MSG_ERR),
+  });
+
+  const handleBankOpen = (next: boolean) => {
+    if (!next) { bankForm.reset(); setEditingBank(null); setBankFieldError(null); }
+    setBankOpen(next);
+  };
+  const handleOfficerOpen = (next: boolean) => {
+    if (!next) { officerForm.reset(); setEditingOfficer(null); }
+    setOfficerOpen(next);
+  };
+  const handleCcOpen = (next: boolean) => {
+    if (!next) { ccForm.reset(); setEditingCc(null); }
+    setCcOpen(next);
+  };
+
+  const ibanHintLen = toAsciiDigits((watchedIban || "").replace(/^IR/i, "")).length;
+
+  return (
+    <div className="space-y-5">
+      <CollapsibleSection id="bank-accounts" title="حساب‌های بانکی" subtitle="شماره حساب و شبا مطابق استاندارد بانکی ایران" count={sortedBanks.length}
+        action={readOnly ? <p className="text-xs text-amber-700 dark:text-amber-400">ثبت غیرفعال</p> : (
+          <Button size="sm" onClick={() => { setEditingBank(null); setBankOpen(true); }}><Plus className="h-4 w-4" /> حساب</Button>
+        )}>
+        {banks.isLoading ? (
+          <div className="flex gap-2 py-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> بارگذاری…</div>
+        ) : sortedBanks.length === 0 ? (
+          <div className="py-5 text-center text-xs text-muted-foreground">حساب بانکی ثبت نشده است.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/40 text-[11px] text-muted-foreground">
+                <th className="px-2 py-1.5 text-start font-medium">عنوان / بانک</th>
+                <th className="w-20 px-2 py-1.5 text-start font-medium">نوع</th>
+                <th className="px-2 py-1.5 text-start font-medium">شماره حساب</th>
+                <th className="hidden px-2 py-1.5 text-start font-medium lg:table-cell">شبا</th>
+                <th className="w-14 px-1 py-1.5 text-center font-medium">اصلی</th>
+                {!readOnly ? <th className="w-[4.5rem] border-s border-border/50 px-2 py-1.5 text-center font-medium">عملیات</th> : null}
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {sortedBanks.map((b) => (
+                <tr key={b.bank_account_id} className="hover:bg-muted/20">
+                  <td className="px-2 py-1.5 text-start">
+                    <div className="font-medium">{(b as { label?: string | null }).label || (b as { account_holder_name?: string | null }).account_holder_name || b.bank_name}</div>
+                  </td>
+                  <td className="px-2 py-1.5 text-start text-xs text-muted-foreground">{ACCOUNT_TYPE_LABELS[b.account_type ?? "CURRENT"] ?? "—"}</td>
+                  <td className="px-2 py-1.5 text-start"><span className="inline-block font-mono text-xs tabular-nums" dir="ltr">{toFaDigits(b.account_number)}</span></td>
+                  <td className="hidden px-2 py-1.5 text-start text-muted-foreground lg:table-cell">{b.iban ? <span className="inline-block font-mono text-[11px] tabular-nums" dir="ltr">{formatIbanDisplay(b.iban)}</span> : "—"}</td>
+                  <td className="px-1 py-1.5 text-center">{b.is_primary ? <StatusChip label="بله" tone="warning" /> : <span className="text-[11px] text-muted-foreground">—</span>}</td>
+                  {!readOnly ? (
+                    <td className="border-s border-border/50 px-2 py-1.5 text-center">
+                      <div className="inline-flex items-center justify-center gap-0.5">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="ویرایش" onClick={() => { setEditingBank(b); setBankOpen(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" title="حذف" onClick={() => { if (!window.confirm("حساب حذف شود؟")) return; deleteBank.mutate(b.bank_account_id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      </div>
+                    </td>
+                  ) : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </CollapsibleSection>
+
+      <CollapsibleSection id="officers" title="مقامات حقوقی شرکت" subtitle="هیئت‌مدیره، مدیرعامل و بازرسان — نه مدیران اجرایی" count={(officers.data ?? []).length}
+        action={readOnly ? <p className="text-xs text-amber-700 dark:text-amber-400">ثبت غیرفعال</p> : (
+          <Button size="sm" onClick={() => { setEditingOfficer(null); setOfficerOpen(true); }}><Plus className="h-4 w-4" /> مقام</Button>
+        )}>
+        {officers.isLoading ? (
+          <div className="flex gap-2 py-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> بارگذاری…</div>
+        ) : (officers.data ?? []).length === 0 ? (
+          <div className="py-5 text-center text-xs text-muted-foreground">مقام حقوقی ثبت نشده است.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/40 text-[11px] text-muted-foreground">
+                <th className="px-2 py-1.5 text-start font-medium">نقش حقوقی</th>
+                <th className="px-2 py-1.5 text-start font-medium">نام</th>
+                <th className="hidden px-2 py-1.5 text-start font-medium md:table-cell">سهامدار</th>
+                <th className="w-20 px-1 py-1.5 text-center font-medium">حق امضا</th>
+                <th className="hidden w-28 px-2 py-1.5 text-start font-medium lg:table-cell">دوره سمت</th>
+                {!readOnly ? <th className="w-[4.5rem] border-s border-border/50 px-2 py-1.5 text-center font-medium">عملیات</th> : null}
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {(officers.data ?? []).map((o) => {
+                const roleCode = o.role_code ?? "";
+                const roleLabel = roleCode === "OTHER" && (o.role_title || o.title) ? (o.role_title || o.title || "سایر") : LEGAL_OFFICER_LABELS[roleCode] ?? (roleCode || "—");
+                const shareLabel = o.is_shareholder ? o.ownership?.owner_display_name || "بله" : "—";
+                const from = o.mandate_from;
+                const to = o.mandate_to;
+                const period = from || to ? `${from ? formatJalaliDate(String(from)) : "…"} تا ${to ? formatJalaliDate(String(to)) : "…"}` : "—";
+                return (
+                  <tr key={o.officer_id} className="hover:bg-muted/20">
+                    <td className="px-2 py-1.5 text-start text-xs font-medium">{roleLabel}</td>
+                    <td className="px-2 py-1.5 text-start">
+                      <span className="font-medium">{o.full_name}</span>
+                      {o.national_id ? <span className="ms-1.5 font-mono text-[10px] text-muted-foreground" dir="ltr">({toFaDigits(o.national_id)})</span> : null}
+                    </td>
+                    <td className="hidden px-2 py-1.5 text-start text-xs text-muted-foreground md:table-cell">
+                      {shareLabel}
+                      {o.ownership?.ownership_percent != null ? <span className="ms-1 tabular-nums">({toFaDigits(String(o.ownership.ownership_percent))}٪)</span> : null}
+                    </td>
+                    <td className="px-1 py-1.5 text-center">{o.has_signing_authority ? <StatusChip label="دارد" tone="warning" /> : <span className="text-[11px] text-muted-foreground">—</span>}</td>
+                    <td className="hidden px-2 py-1.5 text-start text-[11px] text-muted-foreground lg:table-cell">{period}</td>
+                    {!readOnly ? (
+                      <td className="border-s border-border/50 px-2 py-1.5 text-center">
+                        <div className="inline-flex items-center justify-center gap-0.5">
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="ویرایش" onClick={() => { setEditingOfficer(o); setOfficerOpen(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" title="حذف" onClick={() => setPendingDeleteOfficer(o)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                      </td>
+                    ) : null}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </CollapsibleSection>
+
+      <CollapsibleSection id="cost-centers" title="مراکز هزینه" count={(costCenters.data ?? []).length}
+        action={readOnly ? <p className="text-xs text-amber-700 dark:text-amber-400">ثبت غیرفعال</p> : (
+          <Button size="sm" onClick={() => { setEditingCc(null); setCcOpen(true); }}><Plus className="h-4 w-4" /> مرکز</Button>
+        )}>
+        {costCenters.isLoading ? (
+          <div className="flex gap-2 py-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> بارگذاری…</div>
+        ) : (costCenters.data ?? []).length === 0 ? (
+          <div className="py-5 text-center text-xs text-muted-foreground">مرکز هزینه‌ای ثبت نشده است.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/40 text-[11px] text-muted-foreground">
+                <th className="px-2 py-1.5 text-start font-medium">نام</th>
+                <th className="w-28 px-2 py-1.5 text-start font-medium">کد</th>
+                {!readOnly ? <th className="w-[4.5rem] border-s border-border/50 px-2 py-1.5 text-center font-medium">عملیات</th> : null}
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {(costCenters.data ?? []).map((c) => (
+                <tr key={c.cost_center_id} className="hover:bg-muted/20">
+                  <td className="px-2 py-1.5 font-medium">{c.name}</td>
+                  <td className="px-2 py-1.5 text-start"><span className="inline-block font-mono text-xs tabular-nums" dir="ltr">{toFaDigits(c.code)}</span></td>
+                  {!readOnly ? (
+                    <td className="border-s border-border/50 px-2 py-1.5 text-center">
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="ویرایش" onClick={() => { setEditingCc(c); setCcOpen(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                    </td>
+                  ) : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </CollapsibleSection>
+
+      <Sheet open={bankOpen && !readOnly} onOpenChange={handleBankOpen}>
+        <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-y-auto p-0 sm:max-w-md" onInteractOutside={(e) => { if (bankDirty) e.preventDefault(); }} onPointerDownOutside={(e) => { if (bankDirty) e.preventDefault(); }}>
+          <SheetHeader className="space-y-1.5 border-b px-5 py-4">
+            <SheetTitle>{editingBank ? "ویرایش حساب بانکی" : "حساب بانکی جدید"}</SheetTitle>
+            <SheetDescription>شماره حساب و شبا مطابق استاندارد بانکی ایران</SheetDescription>
+          </SheetHeader>
+          <form className="flex flex-1 flex-col" onSubmit={bankForm.handleSubmit((v) => saveBank.mutate(v))}>
+            <div className="flex flex-1 flex-col gap-4 px-5 py-4">
+              {bankFieldError ? <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">{bankFieldError}</div> : null}
+              <div className="space-y-1.5">
+                <Label>بانک *</Label>
+                <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm" {...bankForm.register("bank_select", { required: true })}>
+                  <option value="">انتخاب بانک…</option>
+                  {IRAN_BANKS.map((b) => <option key={b} value={b}>{b}</option>)}
+                  <option value={OTHER_BANK}>سایر</option>
+                </select>
+              </div>
+              {watchedBankSelect === OTHER_BANK ? (
+                <div className="space-y-1.5"><Label>نام بانک *</Label><Input className="h-9" {...bankForm.register("bank_name_other", { required: true })} /></div>
+              ) : null}
+              <div className="space-y-1.5"><Label>عنوان حساب</Label><Input className="h-9" {...bankForm.register("label")} /></div>
+              <div className="space-y-1.5">
+                <Label>نوع حساب *</Label>
+                <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm" {...bankForm.register("account_type", { required: true })}>
+                  {ACCOUNT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>شماره حساب *</Label>
+                <Input className="h-9 font-mono tabular-nums" dir="rtl" inputMode="numeric" value={toFaDigits(bankForm.watch("account_number") || "")} onChange={(e) => { bankForm.setValue("account_number", toAsciiDigits(e.target.value).slice(0, 20), { shouldDirty: true }); }} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>شماره شبا (اختیاری)</Label>
+                <div className="flex items-center gap-1.5" dir="ltr">
+                  <span className="shrink-0 select-none rounded-md border bg-muted/50 px-2 py-1.5 font-mono text-sm text-muted-foreground">IR</span>
+                  <Input className="h-9 flex-1 font-mono tabular-nums tracking-wide" dir="ltr" inputMode="numeric" value={toFaDigits(formatIbanDigitsOnly(watchedIban))} onChange={(e) => { const digits = toAsciiDigits(e.target.value).slice(0, 24); bankForm.setValue("iban", digits ? `IR${digits}` : "", { shouldDirty: true }); }} />
+                </div>
+                <p className="text-[11px] text-muted-foreground">{toFaDigits(ibanHintLen)} از ۲۴</p>
+              </div>
+              <div className="flex h-9 items-center justify-between rounded-md border px-3">
+                <Label className="text-sm">حساب اصلی</Label>
+                <Switch checked={bankForm.watch("is_primary")} onCheckedChange={(v) => bankForm.setValue("is_primary", v, { shouldDirty: true })} />
+              </div>
+            </div>
+            <SheetFooter className="mt-auto gap-2 border-t px-5 py-4 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => handleBankOpen(false)}>انصراف</Button>
+              <Button type="submit" disabled={saveBank.isPending}>{saveBank.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}</Button>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={officerOpen && !readOnly} onOpenChange={handleOfficerOpen}>
+        <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-y-auto p-0 sm:max-w-md" onInteractOutside={(e) => { if (officerDirty) e.preventDefault(); }} onPointerDownOutside={(e) => { if (officerDirty) e.preventDefault(); }}>
+          <SheetHeader className="space-y-1.5 border-b px-5 py-4">
+            <SheetTitle>{editingOfficer ? "ویرایش مقام حقوقی" : "مقام حقوقی جدید"}</SheetTitle>
+            <SheetDescription>هیئت‌مدیره، مدیرعامل و بازرس مطابق قانون تجارت</SheetDescription>
+          </SheetHeader>
+          <form className="flex flex-1 flex-col" onSubmit={officerForm.handleSubmit((v) => saveOfficer.mutate(v))}>
+            <div className="flex flex-1 flex-col gap-4 px-5 py-4">
+              <div className="space-y-1.5">
+                <Label>نقش حقوقی *</Label>
+                <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm" {...officerForm.register("role_code", { required: true })}>
+                  {LEGAL_OFFICER_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+                <p className="text-[11px] text-muted-foreground">نقش‌های مدیرعامل، رئیس/نایب‌رئیس و بازرس فقط یک‌بار قابل ثبت هستند</p>
+              </div>
+              {watchedOfficerRole === "OTHER" ? (
+                <div className="space-y-1.5">
+                  <Label>عنوان نقش *</Label>
+                  <Input className="h-9" {...officerForm.register("role_title", { required: true })} placeholder="مثلاً: عضو علی‌البدل هیئت‌مدیره" />
+                </div>
+              ) : null}
+              <div className="space-y-1.5"><Label>نام و نام خانوادگی *</Label><Input className="h-9" {...officerForm.register("full_name", { required: true })} /></div>
+              <div className="space-y-1.5">
+                <Label>کد ملی</Label>
+                <Input className="h-9 font-mono tabular-nums" dir="rtl" inputMode="numeric" maxLength={10} value={toFaDigits(officerForm.watch("national_id") || "")} onChange={(e) => { officerForm.setValue("national_id", toAsciiDigits(e.target.value).slice(0, 10), { shouldDirty: true }); }} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>پیوند با سهامدار</Label>
+                <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm" {...officerForm.register("ownership_id")}>
+                  <option value="">خارج از سهامداران / بدون پیوند</option>
+                  {(ownerships.data ?? []).map((ow: OwnershipDto) => (
+                    <option key={ow.ownership_id} value={ow.ownership_id}>
+                      {ow.owner_display_name || (ow.owner_kind === "COMPANY" ? "شرکت گروه" : "سهامدار")}
+                      {ow.ownership_percent != null ? ` — ${toFaDigits(String(ow.ownership_percent))}٪` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>شروع دوره (شمسی)</Label>
+                  <ShamsiDateInput value={officerForm.watch("mandate_from") || ""} onChange={(iso) => officerForm.setValue("mandate_from", iso, { shouldDirty: true })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>پایان دوره (شمسی)</Label>
+                  <ShamsiDateInput value={officerForm.watch("mandate_to") || ""} onChange={(iso) => officerForm.setValue("mandate_to", iso, { shouldDirty: true })} />
+                </div>
+              </div>
+              <div className="flex h-9 items-center justify-between rounded-md border px-3">
+                <Label className="text-sm">حق امضا</Label>
+                <Switch checked={Boolean(officerForm.watch("has_signing_authority"))} onCheckedChange={(v) => officerForm.setValue("has_signing_authority", v, { shouldDirty: true })} />
+              </div>
+              <div className="space-y-1.5 rounded-md border px-3 py-2">
+                <div className="flex h-8 items-center justify-between">
+                  <Label className="text-sm">سمت فعال است</Label>
+                  <Switch checked={officerForm.watch("is_active") !== false} onCheckedChange={(v) => officerForm.setValue("is_active", v, { shouldDirty: true })} />
+                </div>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">غیرفعال یعنی حکم پایان یافته یا موقتاً متوقف است؛ رکورد در تاریخچه می‌ماند ولی به‌عنوان مقام جاری محسوب نمی‌شود.</p>
+              </div>
+              <div className="space-y-1.5"><Label>توضیحات حکم</Label><Input className="h-9" {...officerForm.register("mandate_notes")} /></div>
+            </div>
+            <SheetFooter className="mt-auto gap-2 border-t px-5 py-4 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => handleOfficerOpen(false)}>انصراف</Button>
+              <Button type="submit" disabled={saveOfficer.isPending}>{saveOfficer.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}</Button>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={ccOpen && !readOnly} onOpenChange={handleCcOpen}>
+        <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-y-auto p-0 sm:max-w-md" onInteractOutside={(e) => { if (ccDirty) e.preventDefault(); }} onPointerDownOutside={(e) => { if (ccDirty) e.preventDefault(); }}>
+          <SheetHeader className="space-y-1.5 border-b px-5 py-4">
+            <SheetTitle>{editingCc ? "ویرایش مرکز هزینه" : "مرکز هزینه جدید"}</SheetTitle>
+            <SheetDescription>کد و نام مرکز هزینه</SheetDescription>
+          </SheetHeader>
+          <form className="flex flex-1 flex-col" onSubmit={ccForm.handleSubmit((v) => saveCc.mutate({ code: v.code.trim(), name: v.name.trim() }))}>
+            <div className="flex flex-1 flex-col gap-4 px-5 py-4">
+              <div className="space-y-1.5"><Label>کد *</Label><Input className="h-9" dir="ltr" {...ccForm.register("code", { required: true })} /></div>
+              <div className="space-y-1.5"><Label>نام *</Label><Input className="h-9" {...ccForm.register("name", { required: true })} /></div>
+            </div>
+            <SheetFooter className="mt-auto gap-2 border-t px-5 py-4 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => handleCcOpen(false)}>انصراف</Button>
+              <Button type="submit" disabled={saveCc.isPending}>{saveCc.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}</Button>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      <Dialog open={!!pendingDeleteOfficer} onOpenChange={(o) => { if (!o && !deleteOfficerBusy) setPendingDeleteOfficer(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>حذف مقام حقوقی</DialogTitle>
+            <DialogDescription>
+              {pendingDeleteOfficer ? `«${pendingDeleteOfficer.full_name}» از فهرست مقامات حذف شود؟ این عملیات برگشت‌پذیر است (حذف نرم).` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={deleteOfficerBusy} onClick={() => setPendingDeleteOfficer(null)}>انصراف</Button>
+            <Button type="button" variant="destructive" disabled={deleteOfficerBusy} onClick={async () => {
+              if (!pendingDeleteOfficer) return;
+              setDeleteOfficerBusy(true);
+              try {
+                await deleteOfficer.mutateAsync(pendingDeleteOfficer.officer_id);
+                setPendingDeleteOfficer(null);
+              } finally {
+                setDeleteOfficerBusy(false);
+              }
+            }}>
+              {deleteOfficerBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "حذف"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
