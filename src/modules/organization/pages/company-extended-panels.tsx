@@ -1,1 +1,1 @@
-SEE_FILE:/tmp/cc_panels_content.txt
+PLACEHOLDER_WILL_FAIL
