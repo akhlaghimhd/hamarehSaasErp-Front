@@ -20,6 +20,7 @@ export const organizationPaths = {
     `${ORGANIZATION_BASE}/companies/${companyId}/officers`,
   companyCostCenters: (companyId: string) =>
     `${ORGANIZATION_BASE}/companies/${companyId}/cost-centers`,
+  costCenter: (id: string) => `${ORGANIZATION_BASE}/cost-centers/${id}`,
   companyOwnerships: (companyId: string) =>
     `${ORGANIZATION_BASE}/companies/${companyId}/ownerships`,
   companyFiscalAssignments: (companyId: string) =>
