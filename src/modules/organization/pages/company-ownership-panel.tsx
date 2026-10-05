@@ -25,7 +25,7 @@ import {
   DialogTitle,
 } from "@/shared/components/ui/dialog";
 import { ApiClientError, apiPut } from "@/api";
-import { toFaDigits, toAsciiDigits, cn } from "@/shared/lib/utils";
+import { toFaDigits, toAsciiDigits, cn, formatPercent } from "@/shared/lib/utils";
 import {
   ownershipService,
   type OwnershipDto,
@@ -56,23 +56,6 @@ const KIND_LABELS: Record<OwnerKind, string> = {
   EXTERNAL_PERSON: "شخص حقیقی",
   EXTERNAL_ORG: "شخص حقوقی",
 };
-
-/** درصد خوانا: اعشار فقط وقتی واقعاً وجود دارد. */
-function formatPercent(value: number | string | null | undefined): string {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return toFaDigits("0");
-  const rounded = Math.round(num * 10000) / 10000;
-  let asStr: string;
-  if (
-    Number.isInteger(rounded) ||
-    Math.abs(rounded - Math.round(rounded)) < 1e-9
-  ) {
-    asStr = String(Math.round(rounded));
-  } else {
-    asStr = rounded.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
-  }
-  return toFaDigits(asStr);
-}
 
 function ownerLabel(
   o: OwnershipDto,
