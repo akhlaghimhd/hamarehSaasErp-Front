@@ -2,16 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Globe,
-  Loader2,
-  Mail,
-  Pencil,
-  Phone,
-  Plus,
-  Smartphone,
-  Trash2,
-} from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Button } from "@/shared/components/ui/button";
@@ -54,25 +45,6 @@ const CONTACT_TYPE_LABELS: Record<string, string> = {
   FAX: "فکس",
   WEBSITE: "وب‌سایت",
 };
-
-function contactTypeIcon(type: string) {
-  const t = (type || "").toUpperCase();
-  if (t === "MOBILE") return Smartphone;
-  if (t === "PHONE" || t === "FAX") return Phone;
-  if (t === "EMAIL") return Mail;
-  if (t === "WEBSITE") return Globe;
-  return Phone;
-}
-
-function contactTypeTone(type: string): string {
-  const t = (type || "").toUpperCase();
-  if (t === "MOBILE") return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
-  if (t === "PHONE") return "bg-sky-500/10 text-sky-700 dark:text-sky-400";
-  if (t === "FAX") return "bg-violet-500/10 text-violet-700 dark:text-violet-400";
-  if (t === "EMAIL") return "bg-amber-500/10 text-amber-800 dark:text-amber-400";
-  if (t === "WEBSITE") return "bg-indigo-500/10 text-indigo-700 dark:text-indigo-400";
-  return "bg-muted text-muted-foreground";
-}
 
 type AddrForm = {
   address_text: string;
@@ -505,87 +477,94 @@ export function CompanyAddressContactPanel({
         ) : null}
 
         {(contacts.data ?? []).length > 0 ? (
-          <ul className="overflow-hidden rounded-xl border border-border/60 divide-y divide-border/50 bg-card">
-            {[...(contacts.data ?? [])]
-              .sort((a, b) => {
-                const pa = a.is_primary ? 0 : 1;
-                const pb = b.is_primary ? 0 : 1;
-                if (pa !== pb) return pa - pb;
-                return 0;
-              })
-              .map((c) => {
-              const Icon = contactTypeIcon(c.contact_type);
-              const tone = contactTypeTone(c.contact_type);
-              const typeLabel =
-                CONTACT_TYPE_LABELS[c.contact_type] ?? c.contact_type;
-              const value = contactValueDisplay(
-                c.contact_type,
-                c.contact_value
-              );
-              return (
-                <li
-                  key={c.contact_point_id}
-                  className="group flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40"
-                >
-                  <span
-                    className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${tone}`}
-                    title={typeLabel}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div
-                      dir="ltr"
-                      className="truncate text-sm font-semibold tabular-nums tracking-tight"
-                      title={value}
-                    >
-                      {value}
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-                      <span>{typeLabel}</span>
-                      {c.is_primary ? (
-                        <span className="rounded-full bg-amber-500/15 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:text-amber-400">
-                          اصلی
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
+          <div className="overflow-hidden rounded-lg border border-border/70">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/40 text-[11px] text-muted-foreground">
+                  <th className="px-3 py-1.5 text-start font-medium">نوع</th>
+                  <th className="px-2 py-1.5 text-start font-medium">مقدار</th>
+                  <th className="w-14 px-1 py-1.5 text-center font-medium">اصلی</th>
                   {!readOnly ? (
-                    <div className="flex shrink-0 gap-0.5 opacity-60 transition-opacity group-hover:opacity-100">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0"
-                        onClick={() => openEditContact(c)}
-                        aria-label="ویرایش"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 text-destructive"
-                        onClick={() =>
-                          setPendingDelete({
-                            kind: "contact",
-                            id: c.contact_point_id,
-                            label: `${typeLabel}: ${value}`,
-                          })
-                        }
-                        aria-label="حذف"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+                    <th className="w-16 px-1 py-1.5 text-end font-medium" />
                   ) : null}
-                </li>
-              );
-            })}
-          </ul>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {[...(contacts.data ?? [])]
+                  .sort((a, b) => {
+                    const pa = a.is_primary ? 0 : 1;
+                    const pb = b.is_primary ? 0 : 1;
+                    if (pa !== pb) return pa - pb;
+                    return 0;
+                  })
+                  .map((c) => {
+                    const typeLabel =
+                      CONTACT_TYPE_LABELS[c.contact_type] ?? c.contact_type;
+                    const value = contactValueDisplay(
+                      c.contact_type,
+                      c.contact_value
+                    );
+                    return (
+                      <tr key={c.contact_point_id} className="hover:bg-muted/20">
+                        <td className="px-3 py-1.5 text-[12px] text-muted-foreground">
+                          {typeLabel}
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <div
+                            dir="ltr"
+                            className="truncate text-[13px] font-medium tabular-nums"
+                            title={value}
+                          >
+                            {value}
+                          </div>
+                        </td>
+                        <td className="px-1 py-1.5 text-center">
+                          {c.is_primary ? (
+                            <StatusChip label="بله" tone="warning" />
+                          ) : (
+                            <span className="text-[11px] text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        {!readOnly ? (
+                          <td className="px-1 py-1.5 text-end">
+                            <div className="inline-flex">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() => openEditContact(c)}
+                                aria-label="ویرایش"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-destructive"
+                                onClick={() =>
+                                  setPendingDelete({
+                                    kind: "contact",
+                                    id: c.contact_point_id,
+                                    label: `${typeLabel}: ${value}`,
+                                  })
+                                }
+                                aria-label="حذف"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+                        ) : null}
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
         ) : !contacts.isLoading ? (
-          <div className="rounded-xl border border-dashed border-border/70 px-3 py-7 text-center text-xs text-muted-foreground">
+          <div className="px-3 py-6 text-center text-xs text-muted-foreground">
             راه ارتباطی ثبت نشده است.
           </div>
         ) : null}
