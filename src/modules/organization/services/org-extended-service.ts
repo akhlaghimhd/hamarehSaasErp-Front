@@ -104,6 +104,8 @@ export type BankAccountDto = {
   bank_account_id: string;
   company_id: string;
   bank_name: string;
+  /** Iranian account kind: CURRENT, SAVINGS, SHORT_TERM, LONG_TERM, QARD_HASAN, INVESTMENT */
+  account_type?: string | null;
   account_number: string;
   iban?: string | null;
   currency_code?: string | null;
@@ -398,6 +400,7 @@ export const bankAccountService = {
     companyId: string,
     payload: {
       bank_name: string;
+      account_type?: string;
       account_number: string;
       iban?: string;
       currency_code?: string;
