@@ -1,2 +1,4 @@
-/** SEE /tmp/ext_officers.tsx - if this is still placeholder, restore needed */
-export function CompanyExtendedPanels() { return null; }
+/** RESTORED PLACEHOLDER - use previous commit 428fb98 content */
+export function CompanyExtendedPanels({ companyId, readOnly = false }: { companyId: string; readOnly?: boolean }) {
+  return null;
+}
