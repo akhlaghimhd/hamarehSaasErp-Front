@@ -1,0 +1,233 @@
+/** Organization module DTOs — aligned with Backend Layer 5 (P0–P7) */
+
+export type OrganizationPermissionCode =
+  | "organization.company.view"
+  | "organization.company.create"
+  | "organization.company.update"
+  | "organization.company.delete"
+  | "organization.branch.view"
+  | "organization.branch.create"
+  | "organization.branch.update"
+  | "organization.branch.delete"
+  | "organization.department.view"
+  | "organization.department.create"
+  | "organization.department.update"
+  | "organization.department.delete"
+  | "organization.business_unit.view"
+  | "organization.business_unit.manage"
+  | "organization.hierarchy.view"
+  | "organization.hierarchy.manage";
+
+export const OrganizationPermissions = {
+  companyView: "organization.company.view",
+  companyCreate: "organization.company.create",
+  companyUpdate: "organization.company.update",
+  companyDelete: "organization.company.delete",
+  branchView: "organization.branch.view",
+  branchCreate: "organization.branch.create",
+  branchUpdate: "organization.branch.update",
+  branchDelete: "organization.branch.delete",
+  departmentView: "organization.department.view",
+  departmentCreate: "organization.department.create",
+  departmentUpdate: "organization.department.update",
+  departmentDelete: "organization.department.delete",
+  businessUnitView: "organization.business_unit.view",
+  businessUnitManage: "organization.business_unit.manage",
+  hierarchyView: "organization.hierarchy.view",
+  hierarchyManage: "organization.hierarchy.manage",
+} as const;
+
+export type EntityKind = "OPERATING" | "CONSOLIDATION" | "ELIMINATION";
+
+export type ConsolRateType = "CURRENT" | "AVERAGE" | "HISTORICAL";
+
+export type BranchKind =
+  | "OFFICE"
+  | "PLANT"
+  | "WAREHOUSE_SITE"
+  | "DISTRIBUTION"
+  | "MIXED";
+
+export type CompanyDto = {
+  company_id: string;
+  tenant_id: string;
+  code: string;
+  name: string;
+  legal_name?: string | null;
+  trade_name?: string | null;
+  company_type?: number | null;
+  registration_number?: string | null;
+  registration_date?: string | null;
+  registration_place?: string | null;
+  incorporation_country_id?: string | null;
+  economic_code?: string | null;
+  tax_identifier?: string | null;
+  national_id?: string | null;
+  vat_registration?: string | null;
+  is_active: boolean;
+  status?: number | null;
+  is_primary?: boolean;
+  parent_company_id?: string | null;
+  entity_kind?: EntityKind | string | null;
+  base_currency_id?: string | null;
+  chart_of_accounts_id?: string | null;
+  default_consol_rate_type?: ConsolRateType | string | null;
+  branches_count?: number;
+  departments_count?: number;
+  children_count?: number;
+  row_version?: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+  deleted_at?: string | null;
+};
+
+export type BranchDto = {
+  branch_id: string;
+  company_id: string;
+  code: string;
+  name: string;
+  address?: string | null;
+  is_active?: boolean;
+  branch_kind?: BranchKind | string | null;
+  parent_branch_id?: string | null;
+  default_warehouse_id?: string | null;
+  supports_shipping?: boolean;
+  supports_receiving?: boolean;
+  is_manufacturing_site?: boolean;
+  created_at?: string | null;
+  company?: { company_id?: string; name?: string; legal_name?: string | null } | null;
+};
+
+export type DepartmentDto = {
+  department_id: string;
+  company_id?: string | null;
+  branch_id: string;
+  code: string;
+  name: string;
+  parent_department_id?: string | null;
+  manager_user_id?: string | null;
+  is_active?: boolean;
+  created_at?: string | null;
+  branch?: { branch_id?: string; name?: string; code?: string } | null;
+  company?: { company_id?: string; name?: string; legal_name?: string | null } | null;
+};
+
+export type CreateCompanyPayload = {
+  code: string;
+  name: string;
+  legal_name?: string | null;
+  trade_name?: string | null;
+  registration_number?: string | null;
+  economic_code?: string | null;
+  tax_identifier?: string | null;
+  is_active?: boolean;
+  status?: number | null;
+  is_primary?: boolean;
+  parent_company_id?: string | null;
+  entity_kind?: EntityKind | string | null;
+};
+
+export type UpdateCompanyPayload = CreateCompanyPayload & {
+  row_version?: number;
+};
+
+export type CreateBranchPayload = {
+  company_id: string;
+  code: string;
+  name: string;
+  address?: string | null;
+  is_active?: boolean;
+  branch_kind?: BranchKind | string | null;
+  parent_branch_id?: string | null;
+  default_warehouse_id?: string | null;
+  supports_shipping?: boolean;
+  supports_receiving?: boolean;
+  is_manufacturing_site?: boolean;
+};
+
+export type UpdateBranchPayload = {
+  code: string;
+  name: string;
+  address?: string | null;
+  is_active?: boolean;
+  branch_kind?: BranchKind | string | null;
+  parent_branch_id?: string | null;
+  default_warehouse_id?: string | null;
+  supports_shipping?: boolean;
+  supports_receiving?: boolean;
+  is_manufacturing_site?: boolean;
+  company_id?: string | null;
+};
+
+export type CreateDepartmentPayload = {
+  branch_id: string;
+  code: string;
+  name: string;
+  parent_department_id?: string | null;
+  manager_user_id?: string | null;
+  is_active?: boolean;
+};
+
+export type UpdateDepartmentPayload = {
+  code: string;
+  name: string;
+  parent_department_id?: string | null;
+  manager_user_id?: string | null;
+  is_active?: boolean;
+  branch_id?: string | null;
+};
+
+/** نقش شرکت در گروه — برچسب‌های کاربرپسند (SME + هلدینگ) */
+export const ENTITY_KIND_LABELS: Record<string, string> = {
+  OPERATING: "شرکت عملیاتی",
+  CONSOLIDATION: "شرکت هلدینگ / سطح تلفیق",
+  ELIMINATION: "شرکت حذفی (فنی)",
+};
+
+export const ENTITY_KIND_TOOLTIPS: Record<string, string> = {
+  OPERATING:
+    "شرکت واقعی که فروش، خرید، انبار، بانک و کارهای روزمره دارد. انتخاب مناسب برای اکثر سازمان‌ها و تقریباً همه شرکت‌های گروه.",
+  CONSOLIDATION:
+    "شرکت یا سطح گزارش‌گیری که صورت‌های مالی شرکت‌های زیرمجموعه را جمع می‌کند. معمولاً تراکنش عملیاتی کم یا ندارد؛ بیشتر برای هلدینگ و گزارش تلفیقی.",
+  ELIMINATION:
+    "موجودیت مجازی فقط برای ثبت اسناد حذف معاملات درون‌گروهی در گزارش تلفیقی. معمولاً توسط تیم مالی مرکزی ساخته می‌شود و نباید تراکنش عملیاتی داشته باشد.",
+};
+
+export const ENTITY_KIND_FIELD_LABEL = "نقش شرکت در گروه";
+
+export const ENTITY_KIND_OPTIONS: Array<{
+  value: EntityKind;
+  label: string;
+  tooltip: string;
+}> = [
+  {
+    value: "OPERATING",
+    label: ENTITY_KIND_LABELS.OPERATING,
+    tooltip: ENTITY_KIND_TOOLTIPS.OPERATING,
+  },
+  {
+    value: "CONSOLIDATION",
+    label: ENTITY_KIND_LABELS.CONSOLIDATION,
+    tooltip: ENTITY_KIND_TOOLTIPS.CONSOLIDATION,
+  },
+  {
+    value: "ELIMINATION",
+    label: ENTITY_KIND_LABELS.ELIMINATION,
+    tooltip: ENTITY_KIND_TOOLTIPS.ELIMINATION,
+  },
+];
+
+export const BRANCH_KIND_LABELS: Record<string, string> = {
+  OFFICE: "دفتر",
+  PLANT: "کارخانه",
+  WAREHOUSE_SITE: "سایت انبار",
+  DISTRIBUTION: "توزیع",
+  MIXED: "ترکیبی",
+};
+
+export const STATUS_LABELS: Record<number, string> = {
+  1: "فعال",
+  2: "معلق",
+  3: "در حال انحلال",
+  4: "منحل‌شده",
+};
