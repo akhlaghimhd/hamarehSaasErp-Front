@@ -100,7 +100,7 @@ export function confirmActionLabel(kind: BulkKind): string {
 export const COLS: { id: ColumnId; label: string; hideable?: boolean; sort?: SortKey }[] = [
   { id: "name", label: "نام شرکت", hideable: false, sort: "name" },
   { id: "code", label: "کد", sort: "code" },
-  { id: "kind", label: "کاربرد", sort: "kind" },
+  { id: "kind", label: "نقش در گروه", sort: "kind" },
   { id: "reg", label: "شماره ثبت", sort: "reg" },
   { id: "parent", label: "شرکت والد", sort: "parent" },
   { id: "branches", label: "شعب", sort: "branches" },

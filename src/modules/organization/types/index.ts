@@ -176,22 +176,23 @@ export type UpdateDepartmentPayload = {
   branch_id?: string | null;
 };
 
+/** نقش شرکت در گروه — برچسب‌های کاربرپسند (SME + هلدینگ) */
 export const ENTITY_KIND_LABELS: Record<string, string> = {
   OPERATING: "شرکت عملیاتی",
-  CONSOLIDATION: "تجمیع گروه",
-  ELIMINATION: "حذف معاملات داخلی گروه",
+  CONSOLIDATION: "شرکت هلدینگ / سطح تلفیق",
+  ELIMINATION: "شرکت حذفی (فنی)",
 };
 
 export const ENTITY_KIND_TOOLTIPS: Record<string, string> = {
   OPERATING:
-    "روی این شرکت فروش، خرید و کارهای روزمره ثبت می‌شود. انتخاب مناسب برای اکثر سازمان‌ها.",
+    "شرکت واقعی که فروش، خرید، انبار، بانک و کارهای روزمره دارد. انتخاب مناسب برای اکثر سازمان‌ها و تقریباً همه شرکت‌های گروه.",
   CONSOLIDATION:
-    "برای جمع‌زدن گزارش چند شرکت زیر یک هلدینگ. معمولاً سند عملیاتی روی آن ثبت نمی‌شود.",
+    "شرکت یا سطح گزارش‌گیری که صورت‌های مالی شرکت‌های زیرمجموعه را جمع می‌کند. معمولاً تراکنش عملیاتی کم یا ندارد؛ بیشتر برای هلدینگ و گزارش تلفیقی.",
   ELIMINATION:
-    "برای خنثی‌کردن خرید و فروش بین شرکت‌های یک گروه در گزارش تلفیقی.",
+    "موجودیت مجازی فقط برای ثبت اسناد حذف معاملات درون‌گروهی در گزارش تلفیقی. معمولاً توسط تیم مالی مرکزی ساخته می‌شود و نباید تراکنش عملیاتی داشته باشد.",
 };
 
-export const ENTITY_KIND_FIELD_LABEL = "کاربرد این شرکت";
+export const ENTITY_KIND_FIELD_LABEL = "نقش شرکت در گروه";
 
 export const ENTITY_KIND_OPTIONS: Array<{
   value: EntityKind;
