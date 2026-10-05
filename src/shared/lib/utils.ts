@@ -186,3 +186,20 @@ export function currentJalaliYear(): number {
   const n = new Date();
   return toJalaliParts(n.getFullYear(), n.getMonth() + 1, n.getDate()).jy;
 }
+
+/** Format percent for tables: strip trailing zeros (25 not 25.00). */
+export function formatPercent(value: number | string | null | undefined): string {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return toFaDigits("0");
+  const rounded = Math.round(num * 10000) / 10000;
+  let asStr: string;
+  if (
+    Number.isInteger(rounded) ||
+    Math.abs(rounded - Math.round(rounded)) < 1e-9
+  ) {
+    asStr = String(Math.round(rounded));
+  } else {
+    asStr = rounded.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+  }
+  return toFaDigits(asStr);
+}
