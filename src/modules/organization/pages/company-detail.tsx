@@ -1,6 +1,6 @@
 /**
  * FE-ORG — جزئیات شرکت (URL ثابت /detail)
- * شعب / واحدها: فقط نمایش جذاب + لینک به صفحات تخصصی (بدون CRUD اینجا)
+ * شعب / واحدها: فقط نمایش + لینک به صفحات تخصصی (بدون CRUD اینجا)
  */
 
 "use client";
@@ -12,10 +12,7 @@ import {
   Building2,
   CircleHelp,
   ExternalLink,
-  GitBranch,
   Loader2,
-  MapPin,
-  Network,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -55,6 +52,7 @@ import {
 } from "../hooks/use-companies";
 import { useBranches } from "../hooks/use-branches";
 import { useDepartments } from "../hooks/use-departments";
+import { CollapsibleSection } from "./collapsible-section";
 import { CompanyAddressContactPanel } from "./company-address-contact-panel";
 import { CompanyOwnershipPanel } from "./company-ownership-panel";
 import { CompanyExtendedPanels } from "./company-extended-panels";
@@ -466,132 +464,121 @@ export function CompanyDetailPage() {
       </div>
 
       {canViewBranch ? (
-        <section id="branches" className="scroll-mt-20 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-base font-semibold">شعب</h2>
-              <p className="text-[11px] text-muted-foreground">
-                فقط نمایش — ایجاد، ویرایش و حذف در صفحه تخصصی شعب
-              </p>
-            </div>
+        <CollapsibleSection
+          id="branches"
+          title="شعب"
+          subtitle="فقط نمایش — مدیریت کامل در صفحه تخصصی شعب"
+          count={activeBranches.length}
+          action={
             <Button asChild size="sm" variant="outline">
               <Link href="/dashboard/organization/branches">
                 مدیریت شعب
                 <ExternalLink className="ms-1.5 h-3.5 w-3.5" />
               </Link>
             </Button>
-          </div>
+          }
+        >
           {branchesLoading ? (
-            <div className="flex gap-2 text-sm text-muted-foreground">
+            <div className="flex gap-2 py-3 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> بارگذاری…
             </div>
           ) : activeBranches.length === 0 ? (
-            <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+            <div className="py-5 text-center text-xs text-muted-foreground">
               شعبه‌ای برای این شرکت ثبت نشده است.
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {activeBranches.map((b) => (
-                <div
-                  key={b.branch_id}
-                  className="group relative overflow-hidden rounded-xl border border-border/80 bg-card p-4 transition-shadow hover:shadow-sm"
-                >
-                  <div className="mb-3 flex items-start gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <GitBranch className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{b.name}</div>
-                      <div className="font-mono text-xs text-muted-foreground">
-                        {toFaDigits(b.code)}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <StatusChip
-                      label={
-                        BRANCH_KIND_LABELS[b.branch_kind ?? "OFFICE"] ??
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/40 text-[11px] text-muted-foreground">
+                  <th className="px-2 py-1.5 text-start font-medium">نام</th>
+                  <th className="w-24 px-2 py-1.5 text-start font-medium">کد</th>
+                  <th className="w-28 px-2 py-1.5 text-start font-medium">نوع</th>
+                  <th className="w-20 px-2 py-1.5 text-center font-medium">وضعیت</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {activeBranches.map((b) => (
+                  <tr key={b.branch_id} className="hover:bg-muted/20">
+                    <td className="px-2 py-1.5 font-medium">{b.name}</td>
+                    <td className="px-2 py-1.5 font-mono text-xs text-muted-foreground">
+                      {toFaDigits(b.code)}
+                    </td>
+                    <td className="px-2 py-1.5 text-xs text-muted-foreground">
+                      {BRANCH_KIND_LABELS[b.branch_kind ?? "OFFICE"] ??
                         b.branch_kind ??
-                        "—"
-                      }
-                      tone="neutral"
-                    />
-                    {b.is_active === false ? (
-                      <StatusChip label="غیرفعال" tone="warning" />
-                    ) : (
-                      <StatusChip label="فعال" tone="success" />
-                    )}
-                  </div>
-                  {b.address ? (
-                    <div className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
-                      <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
-                      <span className="line-clamp-2">{toFaDigits(b.address)}</span>
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
+                        "—"}
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      {b.is_active === false ? (
+                        <StatusChip label="غیرفعال" tone="warning" />
+                      ) : (
+                        <StatusChip label="فعال" tone="success" />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
-        </section>
+        </CollapsibleSection>
       ) : null}
 
       {canViewDept ? (
-        <section id="departments" className="scroll-mt-20 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-base font-semibold">واحدهای سازمانی</h2>
-              <p className="text-[11px] text-muted-foreground">
-                فقط نمایش — ایجاد، ویرایش و حذف در صفحه تخصصی واحدها
-              </p>
-            </div>
+        <CollapsibleSection
+          id="departments"
+          title="واحدهای سازمانی"
+          subtitle="فقط نمایش — مدیریت کامل در صفحه تخصصی واحدها"
+          count={activeDepts.length}
+          action={
             <Button asChild size="sm" variant="outline">
               <Link href="/dashboard/organization/departments">
                 مدیریت واحدها
                 <ExternalLink className="ms-1.5 h-3.5 w-3.5" />
               </Link>
             </Button>
-          </div>
+          }
+        >
           {deptsLoading ? (
-            <div className="flex gap-2 text-sm text-muted-foreground">
+            <div className="flex gap-2 py-3 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> بارگذاری…
             </div>
           ) : activeDepts.length === 0 ? (
-            <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+            <div className="py-5 text-center text-xs text-muted-foreground">
               واحدی برای این شرکت ثبت نشده است.
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {activeDepts.map((d) => (
-                <div
-                  key={d.department_id}
-                  className="overflow-hidden rounded-xl border border-border/80 bg-card p-4 transition-shadow hover:shadow-sm"
-                >
-                  <div className="mb-3 flex items-start gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
-                      <Network className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{d.name}</div>
-                      <div className="font-mono text-xs text-muted-foreground">
-                        {toFaDigits(d.code)}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span>
-                      شعبه: {branchNameById.get(d.branch_id) ?? "—"}
-                    </span>
-                    {d.is_active === false ? (
-                      <StatusChip label="غیرفعال" tone="warning" />
-                    ) : (
-                      <StatusChip label="فعال" tone="success" />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/40 text-[11px] text-muted-foreground">
+                  <th className="px-2 py-1.5 text-start font-medium">نام</th>
+                  <th className="w-24 px-2 py-1.5 text-start font-medium">کد</th>
+                  <th className="px-2 py-1.5 text-start font-medium">شعبه</th>
+                  <th className="w-20 px-2 py-1.5 text-center font-medium">وضعیت</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {activeDepts.map((d) => (
+                  <tr key={d.department_id} className="hover:bg-muted/20">
+                    <td className="px-2 py-1.5 font-medium">{d.name}</td>
+                    <td className="px-2 py-1.5 font-mono text-xs text-muted-foreground">
+                      {toFaDigits(d.code)}
+                    </td>
+                    <td className="px-2 py-1.5 text-xs text-muted-foreground">
+                      {branchNameById.get(d.branch_id) ?? "—"}
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      {d.is_active === false ? (
+                        <StatusChip label="غیرفعال" tone="warning" />
+                      ) : (
+                        <StatusChip label="فعال" tone="success" />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
-        </section>
+        </CollapsibleSection>
       ) : null}
 
       <CompanyAddressContactPanel
@@ -610,81 +597,72 @@ export function CompanyDetailPage() {
       />
 
       <Sheet open={editOpen} onOpenChange={handleEditOpenChange}>
-        <SheetContent
-          side="right"
-          className="flex w-full flex-col gap-0 overflow-y-auto sm:max-w-md"
-          onInteractOutside={(e) => {
-            if (editDirty) e.preventDefault();
-          }}
-          onPointerDownOutside={(e) => {
-            if (editDirty) e.preventDefault();
-          }}
-        >
-          <SheetHeader className="space-y-1.5 pb-4">
+        <SheetContent className="w-full overflow-y-auto sm:max-w-lg" side="left">
+          <SheetHeader>
             <SheetTitle>ویرایش شرکت</SheetTitle>
             <SheetDescription>
-              هویت حقوقی و نقش شرکت در گروه
+              فیلدهای اصلی شرکت را به‌روز کنید.
             </SheetDescription>
           </SheetHeader>
-          <form onSubmit={onEditCompany} className="flex flex-1 flex-col gap-4">
-            <div className="space-y-1.5">
-              <Label>کد</Label>
-              <Input className="h-9" dir="ltr" {...editForm.register("code")} />
+          <form className="mt-4 space-y-4" onSubmit={onEditCompany}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="code">کد</Label>
+                <Input id="code" {...editForm.register("code")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="name">نام</Label>
+                <Input id="name" {...editForm.register("name")} />
+              </div>
             </div>
             <div className="space-y-1.5">
-              <Label>نام</Label>
-              <Input className="h-9" {...editForm.register("name")} />
+              <Label htmlFor="legal_name">نام حقوقی</Label>
+              <Input id="legal_name" {...editForm.register("legal_name")} />
             </div>
             <div className="space-y-1.5">
-              <Label>نام حقوقی</Label>
-              <Input className="h-9" {...editForm.register("legal_name")} />
+              <Label htmlFor="trade_name">نام تجاری</Label>
+              <Input id="trade_name" {...editForm.register("trade_name")} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="registration_number">شماره ثبت</Label>
+                <Input
+                  id="registration_number"
+                  {...editForm.register("registration_number")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="economic_code">کد اقتصادی</Label>
+                <Input
+                  id="economic_code"
+                  {...editForm.register("economic_code")}
+                />
+              </div>
             </div>
             <div className="space-y-1.5">
-              <Label>نام تجاری</Label>
-              <Input className="h-9" {...editForm.register("trade_name")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>شماره ثبت</Label>
+              <Label htmlFor="tax_identifier">شناسه مالیاتی</Label>
               <Input
-                className="h-9"
-                dir="ltr"
-                {...editForm.register("registration_number")}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>کد اقتصادی</Label>
-              <Input
-                className="h-9"
-                dir="ltr"
-                {...editForm.register("economic_code")}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>شناسه مالیاتی</Label>
-              <Input
-                className="h-9"
-                dir="ltr"
+                id="tax_identifier"
                 {...editForm.register("tax_identifier")}
               />
             </div>
             <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5">
-                <Label>{ENTITY_KIND_FIELD_LABEL}</Label>
+              <Label htmlFor="entity_kind" className="inline-flex items-center gap-1">
+                {ENTITY_KIND_FIELD_LABEL}
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button type="button" className="text-muted-foreground">
-                        <CircleHelp className="h-3.5 w-3.5" />
-                      </button>
+                      <CircleHelp className="h-3.5 w-3.5 text-muted-foreground" />
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs text-xs">
-                      نقش شرکت در ساختار گروه (عملیاتی، هلدینگ، حذفی).
+                      نقش شرکت در گروه (عملیاتی، تلفیقی، حذفی)
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-              </div>
+              </Label>
               <select
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                id="entity_kind"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
                 {...editForm.register("entity_kind")}
               >
                 {ENTITY_KIND_OPTIONS.map((o) => (
@@ -694,41 +672,52 @@ export function CompanyDetailPage() {
                 ))}
               </select>
             </div>
-            {!company.is_primary ? (
-              <div className="space-y-1.5">
-                <Label>شرکت والد</Label>
-                <select
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  {...editForm.register("parent_company_id")}
-                >
-                  <option value="">بدون والد</option>
-                  {(allCompanies ?? [])
-                    .filter((c) => c.company_id !== companyId)
-                    .map((c) => (
-                      <option key={c.company_id} value={c.company_id}>
-                        {c.legal_name || c.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-            ) : null}
-            <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">
-              <Label>فعال</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="parent_company_id">شرکت والد</Label>
+              <select
+                id="parent_company_id"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                {...editForm.register("parent_company_id")}
+              >
+                <option value="">— بدون والد —</option>
+                {(allCompanies ?? [])
+                  .filter((c) => c.company_id !== companyId)
+                  .map((c) => (
+                    <option key={c.company_id} value={c.company_id}>
+                      {c.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+              <Label htmlFor="is_primary">شرکت اصلی</Label>
               <Switch
+                id="is_primary"
+                checked={editForm.watch("is_primary")}
+                onCheckedChange={(v) => editForm.setValue("is_primary", v, { shouldDirty: true })}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+              <Label htmlFor="is_active">فعال</Label>
+              <Switch
+                id="is_active"
                 checked={editForm.watch("is_active")}
                 onCheckedChange={(v) => editForm.setValue("is_active", v, { shouldDirty: true })}
               />
             </div>
-            <SheetFooter className="mt-auto gap-2 border-t pt-4 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" onClick={closeEditForced}>
-                انصراف
-              </Button>
-              <Button type="submit" disabled={updateCompany.isPending}>
+            <SheetFooter className="gap-2 sm:justify-start">
+              <Button type="submit" disabled={!editDirty || updateCompany.isPending}>
                 {updateCompany.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  "ذخیره"
-                )}
+                ) : null}
+                ذخیره
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeEditForced}
+              >
+                انصراف
               </Button>
             </SheetFooter>
           </form>
