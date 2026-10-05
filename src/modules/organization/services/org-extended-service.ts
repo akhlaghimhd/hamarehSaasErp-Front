@@ -316,56 +316,60 @@ export const hierarchyService = {
   },
 };
 
-export const icPartnerService = {
-  async list(): Promise<IcPartnerDto[]> {
+export const intercompanyService = {
+  async listDocumentTypes(): Promise<IcDocumentTypeDto[]> {
+    const env = await apiGet(organizationPaths.icDocumentTypes);
+    return asArray(unwrapData(env));
+  },
+  async listPartners(): Promise<IcPartnerDto[]> {
     const env = await apiGet(organizationPaths.icPartners);
     return asArray(unwrapData(env));
   },
-  async create(payload: {
+  async createPartner(payload: {
     from_company_id: string;
     to_company_id: string;
-    code?: string;
+    partner_customer_id?: string;
+    partner_vendor_id?: string;
     notes?: string;
     is_active?: boolean;
   }) {
     const env = await apiPost(organizationPaths.icPartners, payload);
     return unwrapData<IcPartnerDto>(env);
   },
-  async update(
+  async updatePartner(
     id: string,
     payload: {
-      code?: string;
+      from_company_id?: string;
+      to_company_id?: string;
+      partner_customer_id?: string | null;
+      partner_vendor_id?: string | null;
       notes?: string | null;
       is_active?: boolean;
-      row_version?: number;
     }
   ) {
     const env = await apiPut(organizationPaths.icPartner(id), payload);
     return unwrapData<IcPartnerDto>(env);
   },
-  async softDelete(id: string) {
+  async deletePartner(id: string) {
     await apiDelete(organizationPaths.icPartner(id));
   },
-};
-
-export const icRuleService = {
-  async list(): Promise<IcRuleDto[]> {
+  async listRules(): Promise<IcRuleDto[]> {
     const env = await apiGet(organizationPaths.icRules);
     return asArray(unwrapData(env));
   },
-  async create(payload: {
+  async createRule(payload: {
     code: string;
     name: string;
     source_doc_type: string;
     target_doc_type: string;
     auto_create_mirror?: boolean;
-    notes?: string;
     is_active?: boolean;
+    notes?: string;
   }) {
     const env = await apiPost(organizationPaths.icRules, payload);
     return unwrapData<IcRuleDto>(env);
   },
-  async update(
+  async updateRule(
     id: string,
     payload: {
       code?: string;
@@ -373,23 +377,15 @@ export const icRuleService = {
       source_doc_type?: string;
       target_doc_type?: string;
       auto_create_mirror?: boolean;
-      notes?: string | null;
       is_active?: boolean;
-      row_version?: number;
+      notes?: string | null;
     }
   ) {
     const env = await apiPut(organizationPaths.icRule(id), payload);
     return unwrapData<IcRuleDto>(env);
   },
-  async softDelete(id: string) {
+  async deleteRule(id: string) {
     await apiDelete(organizationPaths.icRule(id));
-  },
-};
-
-export const icDocumentTypeService = {
-  async list(): Promise<IcDocumentTypeDto[]> {
-    const env = await apiGet(organizationPaths.icDocumentTypes);
-    return asArray(unwrapData(env));
   },
 };
 
