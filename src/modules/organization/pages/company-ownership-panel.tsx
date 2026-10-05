@@ -2,15 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Building2,
-  ChevronDown,
-  Loader2,
-  Pencil,
-  Plus,
-  Trash2,
-  User,
-} from "lucide-react";
+import { Building2, Loader2, Pencil, Plus, Trash2, User } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Button } from "@/shared/components/ui/button";
@@ -58,20 +50,22 @@ const REL_LABELS: Record<string, string> = {
   JOINT: "مشترک",
 };
 
-/** از دید کاربر: شرکت عضو همین گروه/هلدینگ (نه برچسب فنی «شرکت گروه»). */
 const KIND_LABELS: Record<OwnerKind, string> = {
   COMPANY: "شرکت عضو گروه",
   EXTERNAL_PERSON: "شخص حقیقی",
   EXTERNAL_ORG: "شخص حقوقی",
 };
 
-/** درصد را خوانا نشان بده: اعشار فقط وقتی واقعاً وجود دارد. */
+/** درصد خوانا: اعشار فقط وقتی واقعاً وجود دارد. */
 function formatPercent(value: number | string | null | undefined): string {
   const num = Number(value);
   if (!Number.isFinite(num)) return toFaDigits("0");
   const rounded = Math.round(num * 10000) / 10000;
   let asStr: string;
-  if (Number.isInteger(rounded) || Math.abs(rounded - Math.round(rounded)) < 1e-9) {
+  if (
+    Number.isInteger(rounded) ||
+    Math.abs(rounded - Math.round(rounded)) < 1e-9
+  ) {
     asStr = String(Math.round(rounded));
   } else {
     asStr = rounded.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
@@ -99,7 +93,6 @@ export function CompanyOwnershipPanel({
 }) {
   const qc = useQueryClient();
   const { data: companies } = useCompanies();
-  const [sectionOpen, setSectionOpen] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<OwnershipDto | null>(null);
   const [pendingDelete, setPendingDelete] = useState<OwnershipDto | null>(null);
@@ -253,150 +246,143 @@ export function CompanyOwnershipPanel({
         ? "text-emerald-700 dark:text-emerald-400"
         : "text-muted-foreground";
 
-  const count = (list.data ?? []).length;
-
   return (
-    <section id="ownerships" className="scroll-mt-20">
-      <div className="overflow-hidden rounded-xl border border-border/70 bg-card/40">
-        <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2.5">
-          <button
-            type="button"
-            className="flex min-w-0 flex-1 items-center gap-2 text-start"
-            onClick={() => setSectionOpen((v) => !v)}
-            aria-expanded={sectionOpen}
-          >
-            <ChevronDown
-              className={cn(
-                "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                !sectionOpen && "-rotate-90"
-              )}
-            />
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-sm font-semibold">سهامداران</h2>
-                {count > 0 ? (
-                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
-                    {toFaDigits(count)}
-                  </span>
-                ) : null}
-              </div>
-              <p className={cn("text-[11px] leading-5", totalTone)}>
-                جمع ثبت‌شده: {formatPercent(totalPercent)}٪
-                {totalPercent < 100
-                  ? ` · باقی‌مانده ${formatPercent(100 - totalPercent)}٪`
-                  : totalPercent > 100
-                    ? " · بیش از ۱۰۰٪ (اصلاح لازم)"
-                    : " · کامل"}
-              </p>
-            </div>
-          </button>
-          {readOnly ? (
-            <p className="shrink-0 text-xs text-amber-700 dark:text-amber-400">
-              ثبت غیرفعال
-            </p>
-          ) : (
-            <Button
-              size="sm"
-              className="shrink-0"
-              disabled={remainPercent <= 0 && !editing}
-              onClick={(e) => {
-                e.stopPropagation();
-                setEditing(null);
-                setOpen(true);
-              }}
-            >
-              <Plus className="h-4 w-4" /> سهامدار
-            </Button>
-          )}
+    <section id="ownerships" className="scroll-mt-20 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-base font-semibold">سهامداران</h2>
+          <p className={cn("text-[11px]", totalTone)}>
+            جمع ثبت‌شده: {formatPercent(totalPercent)}٪
+            {totalPercent < 100
+              ? ` · باقی‌مانده ${formatPercent(100 - totalPercent)}٪`
+              : totalPercent > 100
+                ? " · بیش از ۱۰۰٪ (اصلاح لازم)"
+                : " · کامل"}
+          </p>
         </div>
+        {readOnly ? (
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            ثبت غیرفعال
+          </p>
+        ) : (
+          <Button
+            size="sm"
+            disabled={remainPercent <= 0 && !editing}
+            onClick={() => {
+              setEditing(null);
+              setOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4" /> سهامدار
+          </Button>
+        )}
+      </div>
 
-        {sectionOpen ? (
-          <div className="p-0">
-            {list.isLoading ? (
-              <div className="flex gap-2 px-3 py-4 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" /> بارگذاری…
-              </div>
-            ) : null}
+      {list.isLoading ? (
+        <div className="flex gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> بارگذاری…
+        </div>
+      ) : null}
 
-            {(list.data ?? []).length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full table-fixed text-sm">
-                  <colgroup>
-                    <col className="w-[42%]" />
-                    <col className="hidden w-[16%] sm:table-column" />
-                    <col className="hidden w-[14%] md:table-column" />
-                    <col className="w-[16%]" />
-                    {!readOnly ? <col className="w-[12%]" /> : null}
-                  </colgroup>
-                  <thead>
-                    <tr className="border-b bg-muted/40 text-[11px] text-muted-foreground">
-                      <th className="px-3 py-2 text-start font-medium">سهامدار</th>
-                      <th className="hidden px-2 py-2 text-start font-medium sm:table-cell">نوع</th>
-                      <th className="hidden px-2 py-2 text-start font-medium md:table-cell">رابطه</th>
-                      <th className="px-2 py-2 text-end font-medium">درصد</th>
-                      {!readOnly ? <th className="px-1 py-2 text-end font-medium" /> : null}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {(list.data ?? []).map((o) => {
-                      const kind = (o.owner_kind || "COMPANY") as OwnerKind;
-                      const isExt = kind !== "COMPANY";
-                      return (
-                        <tr key={o.ownership_id} className="hover:bg-muted/20">
-                          <td className="px-3 py-2">
-                            <div className="flex min-w-0 items-center gap-2">
-                              {isExt ? (
-                                <User className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                              ) : (
-                                <Building2 className="h-3.5 w-3.5 shrink-0 text-primary" />
-                              )}
-                              <div className="min-w-0">
-                                <div className="truncate font-medium">{ownerLabel(o, nameOf)}</div>
-                                {o.owner_identifier ? (
-                                  <div dir="ltr" className="font-mono text-[10px] text-muted-foreground">
-                                    {toFaDigits(o.owner_identifier)}
-                                  </div>
-                                ) : null}
-                              </div>
+      <div className="overflow-hidden rounded-lg border border-border/70">
+        {(list.data ?? []).length > 0 ? (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/40 text-[11px] text-muted-foreground">
+                <th className="px-3 py-2 text-start font-medium">سهامدار</th>
+                <th className="hidden w-28 px-2 py-2 text-start font-medium sm:table-cell">
+                  نوع
+                </th>
+                <th className="hidden w-24 px-2 py-2 text-start font-medium md:table-cell">
+                  رابطه
+                </th>
+                <th className="w-20 px-2 py-2 text-end font-medium">درصد</th>
+                {!readOnly ? (
+                  <th className="w-16 px-1 py-2 text-end font-medium" />
+                ) : null}
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {(list.data ?? []).map((o) => {
+                const kind = (o.owner_kind || "COMPANY") as OwnerKind;
+                const isExt = kind !== "COMPANY";
+                return (
+                  <tr key={o.ownership_id} className="hover:bg-muted/20">
+                    <td className="px-3 py-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        {isExt ? (
+                          <User className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                        ) : (
+                          <Building2 className="h-3.5 w-3.5 shrink-0 text-primary" />
+                        )}
+                        <div className="min-w-0">
+                          <div className="truncate font-medium">
+                            {ownerLabel(o, nameOf)}
+                          </div>
+                          {o.owner_identifier ? (
+                            <div
+                              dir="ltr"
+                              className="font-mono text-[10px] text-muted-foreground"
+                            >
+                              {toFaDigits(o.owner_identifier)}
                             </div>
-                          </td>
-                          <td className="hidden px-2 py-2 text-[11px] text-muted-foreground sm:table-cell">
-                            {KIND_LABELS[kind] ?? kind}
-                          </td>
-                          <td className="hidden px-2 py-2 text-[11px] text-muted-foreground md:table-cell">
-                            {REL_LABELS[o.relation_type ?? "EQUITY"] ?? o.relation_type}
-                          </td>
-                          <td className="px-2 py-2 text-end tabular-nums font-medium">
-                            {formatPercent(o.ownership_percent)}٪
-                          </td>
-                          {!readOnly ? (
-                            <td className="px-1 py-2 text-end">
-                              <div className="inline-flex">
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setEditing(o); setOpen(true); }}>
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setPendingDelete(o)}>
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            </td>
                           ) : null}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : !list.isLoading ? (
-              <div className="px-3 py-6 text-center text-xs text-muted-foreground">
-                سهامداری ثبت نشده است.
-              </div>
-            ) : null}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="hidden px-2 py-2 text-[11px] text-muted-foreground sm:table-cell">
+                      {KIND_LABELS[kind] ?? kind}
+                    </td>
+                    <td className="hidden px-2 py-2 text-[11px] text-muted-foreground md:table-cell">
+                      {REL_LABELS[o.relation_type ?? "EQUITY"] ??
+                        o.relation_type}
+                    </td>
+                    <td className="px-2 py-2 text-end tabular-nums font-medium">
+                      {formatPercent(o.ownership_percent)}٪
+                    </td>
+                    {!readOnly ? (
+                      <td className="px-1 py-2 text-end">
+                        <div className="inline-flex">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={() => {
+                              setEditing(o);
+                              setOpen(true);
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-destructive"
+                            onClick={() => setPendingDelete(o)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    ) : null}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : !list.isLoading ? (
+          <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+            سهامداری ثبت نشده است.
           </div>
         ) : null}
       </div>
 
-      <Dialog open={!!pendingDelete} onOpenChange={(o) => { if (!o && !deleteBusy) setPendingDelete(null); }}>
+      <Dialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => {
+          if (!o && !deleteBusy) setPendingDelete(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>حذف سهامدار</DialogTitle>
@@ -407,9 +393,25 @@ export function CompanyOwnershipPanel({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="outline" disabled={deleteBusy} onClick={() => setPendingDelete(null)}>انصراف</Button>
-            <Button type="button" variant="destructive" disabled={deleteBusy} onClick={() => void runDelete()}>
-              {deleteBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "حذف"}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={deleteBusy}
+              onClick={() => setPendingDelete(null)}
+            >
+              انصراف
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleteBusy}
+              onClick={() => void runDelete()}
+            >
+              {deleteBusy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "حذف"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -419,14 +421,25 @@ export function CompanyOwnershipPanel({
         <SheetContent
           side="right"
           className="flex w-full flex-col gap-0 overflow-hidden sm:max-w-md"
-          onInteractOutside={(e) => { if (isDirty) e.preventDefault(); }}
-          onPointerDownOutside={(e) => { if (isDirty) e.preventDefault(); }}
+          onInteractOutside={(e) => {
+            if (isDirty) e.preventDefault();
+          }}
+          onPointerDownOutside={(e) => {
+            if (isDirty) e.preventDefault();
+          }}
         >
           <SheetHeader>
-            <SheetTitle>{editing ? "ویرایش سهامدار" : "سهامدار جدید"}</SheetTitle>
-            <SheetDescription>شرکت عضو همین گروه، یا شخص حقیقی/حقوقی خارج از سیستم</SheetDescription>
+            <SheetTitle>
+              {editing ? "ویرایش سهامدار" : "سهامدار جدید"}
+            </SheetTitle>
+            <SheetDescription>
+              شرکت عضو همین گروه، یا شخص حقیقی/حقوقی خارج از سیستم
+            </SheetDescription>
           </SheetHeader>
-          <form className="flex min-h-0 flex-1 flex-col" onSubmit={form.handleSubmit((v) => save.mutate(v))}>
+          <form
+            className="flex min-h-0 flex-1 flex-col"
+            onSubmit={form.handleSubmit((v) => save.mutate(v))}
+          >
             <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
               <div className="space-y-1.5">
                 <Label>نوع سهامدار *</Label>
@@ -434,7 +447,9 @@ export function CompanyOwnershipPanel({
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={watchedKind}
                   onChange={(e) => {
-                    form.setValue("owner_kind", e.target.value as OwnerKind, { shouldDirty: true });
+                    form.setValue("owner_kind", e.target.value as OwnerKind, {
+                      shouldDirty: true,
+                    });
                   }}
                 >
                   <option value="COMPANY">شرکت عضو گروه</option>
@@ -446,40 +461,77 @@ export function CompanyOwnershipPanel({
               {watchedKind === "COMPANY" ? (
                 <div className="space-y-1.5">
                   <Label>شرکت مالک *</Label>
-                  <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" {...form.register("owner_company_id")}>
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    {...form.register("owner_company_id")}
+                  >
                     <option value="">— انتخاب —</option>
-                    {(companies ?? []).filter((c) => c.company_id !== companyId).map((c) => (
-                      <option key={c.company_id} value={c.company_id}>{c.legal_name || c.name}</option>
-                    ))}
+                    {(companies ?? [])
+                      .filter((c) => c.company_id !== companyId)
+                      .map((c) => (
+                        <option key={c.company_id} value={c.company_id}>
+                          {c.legal_name || c.name}
+                        </option>
+                      ))}
                   </select>
                 </div>
               ) : (
                 <>
                   <div className="space-y-1.5">
-                    <Label>{watchedKind === "EXTERNAL_PERSON" ? "نام و نام خانوادگی *" : "نام شخص حقوقی *"}</Label>
-                    <Input className="h-9" {...form.register("owner_display_name")} />
+                    <Label>
+                      {watchedKind === "EXTERNAL_PERSON"
+                        ? "نام و نام خانوادگی *"
+                        : "نام شخص حقوقی *"}
+                    </Label>
+                    <Input
+                      className="h-9"
+                      {...form.register("owner_display_name")}
+                    />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>{watchedKind === "EXTERNAL_PERSON" ? "کد ملی (اختیاری)" : "شناسه ملی / شماره ثبت (اختیاری)"}</Label>
-                    <Input className="h-9 font-mono" dir="ltr" maxLength={20} {...form.register("owner_identifier")} />
+                    <Label>
+                      {watchedKind === "EXTERNAL_PERSON"
+                        ? "کد ملی (اختیاری)"
+                        : "شناسه ملی / شماره ثبت (اختیاری)"}
+                    </Label>
+                    <Input
+                      className="h-9 font-mono"
+                      dir="ltr"
+                      maxLength={20}
+                      {...form.register("owner_identifier")}
+                    />
                   </div>
                 </>
               )}
 
               <div className="space-y-1.5">
                 <Label>درصد مالکیت *</Label>
-                <Input type="number" step="0.01" min={0.01} max={remainPercent || 100} className="h-9" dir="ltr" {...form.register("ownership_percent", { required: true })} />
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0.01}
+                  max={remainPercent || 100}
+                  className="h-9"
+                  dir="ltr"
+                  {...form.register("ownership_percent", { required: true })}
+                />
                 <p className="text-[11px] text-muted-foreground">
                   حداکثر قابل ثبت الان: {formatPercent(remainPercent)}٪
-                  {watchedPercent && Number(watchedPercent) > remainPercent + 0.0001 ? (
-                    <span className="ms-1 text-destructive">(از سقف بیشتر است)</span>
+                  {watchedPercent &&
+                  Number(watchedPercent) > remainPercent + 0.0001 ? (
+                    <span className="ms-1 text-destructive">
+                      (از سقف بیشتر است)
+                    </span>
                   ) : null}
                 </p>
               </div>
 
               <div className="space-y-1.5">
                 <Label>نوع رابطه</Label>
-                <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" {...form.register("relation_type")}>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  {...form.register("relation_type")}
+                >
                   <option value="EQUITY">سهامی</option>
                   <option value="CONTROL">کنترلی</option>
                   <option value="JOINT">مشترک</option>
@@ -487,9 +539,19 @@ export function CompanyOwnershipPanel({
               </div>
             </div>
             <SheetFooter>
-              <Button type="button" variant="outline" onClick={() => handleOpen(false)}>انصراف</Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleOpen(false)}
+              >
+                انصراف
+              </Button>
               <Button type="submit" disabled={save.isPending}>
-                {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
+                {save.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "ذخیره"
+                )}
               </Button>
             </SheetFooter>
           </form>
