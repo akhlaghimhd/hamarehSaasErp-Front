@@ -51,7 +51,40 @@ type ContactForm = {
 
 function errMsg(e: unknown): string {
   if (e instanceof ApiClientError && e.message) return e.message;
+  if (e instanceof Error && e.message) return e.message;
   return MSG_ERR;
+}
+
+/** Normalize FA/AR digits → ASCII; strip non-digits; IR postal max 10. */
+function normalizePostalInput(raw: string): string {
+  const map: Record<string, string> = {
+    "۰": "0",
+    "۱": "1",
+    "۲": "2",
+    "۳": "3",
+    "۴": "4",
+    "۵": "5",
+    "۶": "6",
+    "۷": "7",
+    "۸": "8",
+    "۹": "9",
+    "٠": "0",
+    "١": "1",
+    "٢": "2",
+    "٣": "3",
+    "٤": "4",
+    "٥": "5",
+    "٦": "6",
+    "٧": "7",
+    "٨": "8",
+    "٩": "9",
+  };
+  let s = "";
+  for (const ch of raw) {
+    const d = map[ch] ?? ch;
+    if (d >= "0" && d <= "9") s += d;
+  }
+  return s.slice(0, 10);
 }
 
 /** Law 5.1 — addresses/contacts owned by MasterData, scoped to COMPANY. */
@@ -70,7 +103,9 @@ export function CompanyAddressContactPanel({
     null
   );
   const [deletingAddrId, setDeletingAddrId] = useState<string | null>(null);
-  const [deletingContactId, setDeletingContactId] = useState<string | null>(null);
+  const [deletingContactId, setDeletingContactId] = useState<string | null>(
+    null
+  );
 
   const addrForm = useForm<AddrForm>({
     defaultValues: { address_text: "", postal_code: "", is_primary: false },
@@ -101,7 +136,7 @@ export function CompanyAddressContactPanel({
     if (editingAddr) {
       addrForm.reset({
         address_text: editingAddr.address_text ?? "",
-        postal_code: editingAddr.postal_code ?? "",
+        postal_code: normalizePostalInput(editingAddr.postal_code ?? ""),
         is_primary: Boolean(editingAddr.is_primary),
       });
     } else {
@@ -128,17 +163,24 @@ export function CompanyAddressContactPanel({
 
   const saveAddr = useMutation({
     mutationFn: async (v: AddrForm) => {
+      const postal = normalizePostalInput(v.postal_code);
+      if (postal && !/^[0-9]{10}$/.test(postal)) {
+        throw new Error("کد پستی باید دقیقاً ۱۰ رقم باشد.");
+      }
       const payload = {
         address_text: v.address_text.trim(),
-        postal_code: v.postal_code.trim() || undefined,
+        postal_code: postal || undefined,
         is_primary: Boolean(v.is_primary),
       };
       if (editingAddr) {
-        await apiPut(`${MD}/entity-addresses/${editingAddr.entity_address_id}`, {
-          entity_type: "COMPANY",
-          entity_id: companyId,
-          ...payload,
-        });
+        await apiPut(
+          `${MD}/entity-addresses/${editingAddr.entity_address_id}`,
+          {
+            entity_type: "COMPANY",
+            entity_id: companyId,
+            ...payload,
+          }
+        );
         return;
       }
       await entityAddressService.createForCompany(companyId, payload);
@@ -254,12 +296,22 @@ export function CompanyAddressContactPanel({
   };
 
   const confirmDeleteAddr = (id: string) => {
-    if (!window.confirm("آدرس حذف شود؟ این عمل قابل بازگردانی از سطل حذف است.")) return;
+    if (
+      !window.confirm(
+        "آدرس حذف شود؟ این عمل قابل بازگردانی از سطل حذف است."
+      )
+    )
+      return;
     setDeletingAddrId(id);
     deleteAddr.mutate(id);
   };
   const confirmDeleteContact = (id: string) => {
-    if (!window.confirm("نقطه تماس حذف شود؟ این عمل قابل بازگردانی از سطل حذف است.")) return;
+    if (
+      !window.confirm(
+        "نقطه تماس حذف شود؟ این عمل قابل بازگردانی از سطل حذف است."
+      )
+    )
+      return;
     setDeletingContactId(id);
     deleteContact.mutate(id);
   };
@@ -444,14 +496,31 @@ export function CompanyAddressContactPanel({
                   className="h-9"
                   {...addrForm.register("address_text", { required: true })}
                 />
+                <p className="text-[11px] text-muted-foreground">
+                  خیابان، کوچه، پلاک، واحد — در یک متن پیوسته
+                </p>
               </div>
               <div className="space-y-1.5">
-                <Label>کد پستی</Label>
+                <Label>کد پستی (۱۰ رقم)</Label>
                 <Input
-                  className="h-9"
+                  className="h-9 font-mono"
                   dir="ltr"
-                  {...addrForm.register("postal_code")}
+                  inputMode="numeric"
+                  autoComplete="postal-code"
+                  maxLength={10}
+                  placeholder="مثلاً ۱۲۳۴۵۶۷۸۹۰"
+                  value={addrForm.watch("postal_code")}
+                  onChange={(e) =>
+                    addrForm.setValue(
+                      "postal_code",
+                      normalizePostalInput(e.target.value),
+                      { shouldDirty: true }
+                    )
+                  }
                 />
+                <p className="text-[11px] text-muted-foreground">
+                  استاندارد ایران: دقیقاً ۱۰ رقم
+                </p>
               </div>
               <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">
                 <Label>آدرس اصلی</Label>
