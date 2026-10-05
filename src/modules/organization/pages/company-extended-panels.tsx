@@ -1,3 +1,1 @@
-"use client";
-
-export { CompanyExtendedPanels } from "./company-extended-panels.impl";
+SEE_FILE:/tmp/cc_panels_content.txt
