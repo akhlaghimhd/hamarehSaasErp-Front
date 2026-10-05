@@ -7,6 +7,7 @@ import { cn, toFaDigits } from "@/shared/lib/utils";
 /**
  * Simple bordered collapsible box for company-detail sections.
  * Header stays visible; body toggles. Action slot (e.g. Add button) stays on the right.
+ * Body has horizontal padding so tables/lists sit inset from the outer border.
  */
 export function CollapsibleSection({
   id,
@@ -61,7 +62,9 @@ export function CollapsibleSection({
           </button>
           {action ? <div className="shrink-0">{action}</div> : null}
         </div>
-        {open ? <div className="p-0">{children}</div> : null}
+        {open ? (
+          <div className="px-3 py-2">{children}</div>
+        ) : null}
       </div>
     </section>
   );
