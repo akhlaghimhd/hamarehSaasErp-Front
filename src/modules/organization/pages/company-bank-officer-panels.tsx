@@ -1,1 +1,1 @@
-FILE_CONTENT_FROM_/tmp/bank_officer_panels.tsx
+LOAD_FROM_ARTIFACTS
