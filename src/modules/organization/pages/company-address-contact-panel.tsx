@@ -2,7 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  Globe,
+  Loader2,
+  Mail,
+  Pencil,
+  Phone,
+  Plus,
+  Smartphone,
+  Trash2,
+} from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Button } from "@/shared/components/ui/button";
@@ -45,6 +54,25 @@ const CONTACT_TYPE_LABELS: Record<string, string> = {
   FAX: "فکس",
   WEBSITE: "وب‌سایت",
 };
+
+function contactTypeIcon(type: string) {
+  const t = (type || "").toUpperCase();
+  if (t === "MOBILE") return Smartphone;
+  if (t === "PHONE" || t === "FAX") return Phone;
+  if (t === "EMAIL") return Mail;
+  if (t === "WEBSITE") return Globe;
+  return Phone;
+}
+
+function contactTypeTone(type: string): string {
+  const t = (type || "").toUpperCase();
+  if (t === "MOBILE") return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
+  if (t === "PHONE") return "bg-sky-500/10 text-sky-700 dark:text-sky-400";
+  if (t === "FAX") return "bg-violet-500/10 text-violet-700 dark:text-violet-400";
+  if (t === "EMAIL") return "bg-amber-500/10 text-amber-800 dark:text-amber-400";
+  if (t === "WEBSITE") return "bg-indigo-500/10 text-indigo-700 dark:text-indigo-400";
+  return "bg-muted text-muted-foreground";
+}
 
 type AddrForm = {
   address_text: string;
@@ -471,73 +499,75 @@ export function CompanyAddressContactPanel({
             <Loader2 className="h-4 w-4 animate-spin" /> بارگذاری…
           </div>
         ) : null}
-        <div className="overflow-hidden rounded-lg border border-border/70">
-          {(contacts.data ?? []).length > 0 ? (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/40 text-[11px] text-muted-foreground">
-                  <th className="w-24 px-3 py-2 text-start font-medium">نوع</th>
-                  <th className="px-2 py-2 text-start font-medium">مقدار</th>
-                  <th className="w-14 px-1 py-2 text-center font-medium">اصلی</th>
-                  {!readOnly ? (
-                    <th className="w-16 px-1 py-2 text-end font-medium" />
-                  ) : null}
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {(contacts.data ?? []).map((c) => (
-                  <tr key={c.contact_point_id} className="hover:bg-muted/20">
-                    <td className="px-3 py-2 text-[11px] text-muted-foreground">
-                      {CONTACT_TYPE_LABELS[c.contact_type] ?? c.contact_type}
-                    </td>
-                    <td className="px-2 py-2" dir="ltr">
-                      {contactValueDisplay(c.contact_type, c.contact_value)}
-                    </td>
-                    <td className="px-1 py-2 text-center">
+
+        {(contacts.data ?? []).length > 0 ? (
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {(contacts.data ?? []).map((c) => {
+              const Icon = contactTypeIcon(c.contact_type);
+              const tone = contactTypeTone(c.contact_type);
+              const typeLabel =
+                CONTACT_TYPE_LABELS[c.contact_type] ?? c.contact_type;
+              return (
+                <li
+                  key={c.contact_point_id}
+                  className="group flex items-center gap-3 rounded-xl border border-border/70 bg-card px-3 py-2.5 shadow-sm transition-colors hover:border-border hover:bg-muted/20"
+                >
+                  <div
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${tone}`}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-medium text-muted-foreground">
+                        {typeLabel}
+                      </span>
                       {c.is_primary ? (
-                        <StatusChip label="بله" tone="warning" />
-                      ) : (
-                        <span className="text-[11px] text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    {!readOnly ? (
-                      <td className="px-1 py-2 text-end">
-                        <div className="inline-flex">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={() => openEditContact(c)}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 text-destructive"
-                            onClick={() =>
-                              setPendingDelete({
-                                kind: "contact",
-                                id: c.contact_point_id,
-                                label: `${CONTACT_TYPE_LABELS[c.contact_type] ?? c.contact_type}: ${contactValueDisplay(c.contact_type, c.contact_value)}`,
-                              })
-                            }
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </td>
-                    ) : null}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : !contacts.isLoading ? (
-            <div className="px-3 py-6 text-center text-xs text-muted-foreground">
-              نقطه تماسی ثبت نشده است.
-            </div>
-          ) : null}
-        </div>
+                        <StatusChip label="اصلی" tone="warning" />
+                      ) : null}
+                    </div>
+                    <div
+                      dir="ltr"
+                      className="truncate text-sm font-medium tracking-tight"
+                    >
+                      {contactValueDisplay(c.contact_type, c.contact_value)}
+                    </div>
+                  </div>
+                  {!readOnly ? (
+                    <div className="flex shrink-0 opacity-70 transition-opacity group-hover:opacity-100">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => openEditContact(c)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-destructive"
+                        onClick={() =>
+                          setPendingDelete({
+                            kind: "contact",
+                            id: c.contact_point_id,
+                            label: `${typeLabel}: ${contactValueDisplay(c.contact_type, c.contact_value)}`,
+                          })
+                        }
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        ) : !contacts.isLoading ? (
+          <div className="rounded-xl border border-dashed px-3 py-8 text-center text-xs text-muted-foreground">
+            نقطه تماسی ثبت نشده است.
+          </div>
+        ) : null}
       </section>
 
       <Dialog
@@ -554,9 +584,7 @@ export function CompanyAddressContactPanel({
                 : "تأیید حذف نقطه تماس"}
             </DialogTitle>
             <DialogDescription>
-              {pendingDelete
-                ? `«${pendingDelete.label}» حذف شود؟`
-                : ""}
+              {pendingDelete ? `«${pendingDelete.label}» حذف شود؟` : ""}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -695,7 +723,12 @@ export function CompanyAddressContactPanel({
                 ) : (
                   <Input
                     className="h-9"
-                    dir={watchedContactType === "EMAIL" || watchedContactType === "WEBSITE" ? "ltr" : undefined}
+                    dir={
+                      watchedContactType === "EMAIL" ||
+                      watchedContactType === "WEBSITE"
+                        ? "ltr"
+                        : undefined
+                    }
                     {...contactForm.register("contact_value", { required: true })}
                   />
                 )}
@@ -714,7 +747,11 @@ export function CompanyAddressContactPanel({
               </div>
             </div>
             <SheetFooter>
-              <Button type="button" variant="outline" onClick={() => handleContactOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleContactOpen(false)}
+              >
                 انصراف
               </Button>
               <Button type="submit" disabled={saveContact.isPending}>
