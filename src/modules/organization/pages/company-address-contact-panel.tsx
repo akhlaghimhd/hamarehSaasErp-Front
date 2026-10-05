@@ -49,6 +49,11 @@ type ContactForm = {
   is_primary: boolean;
 };
 
+function errMsg(e: unknown): string {
+  if (e instanceof ApiClientError && e.message) return e.message;
+  return MSG_ERR;
+}
+
 /** Law 5.1 — addresses/contacts owned by MasterData, scoped to COMPANY. */
 export function CompanyAddressContactPanel({
   companyId,
@@ -64,6 +69,8 @@ export function CompanyAddressContactPanel({
   const [editingContact, setEditingContact] = useState<EntityContactDto | null>(
     null
   );
+  const [deletingAddrId, setDeletingAddrId] = useState<string | null>(null);
+  const [deletingContactId, setDeletingContactId] = useState<string | null>(null);
 
   const addrForm = useForm<AddrForm>({
     defaultValues: { address_text: "", postal_code: "", is_primary: false },
@@ -124,7 +131,7 @@ export function CompanyAddressContactPanel({
       const payload = {
         address_text: v.address_text.trim(),
         postal_code: v.postal_code.trim() || undefined,
-        is_primary: v.is_primary,
+        is_primary: Boolean(v.is_primary),
       };
       if (editingAddr) {
         await apiPut(`${MD}/entity-addresses/${editingAddr.entity_address_id}`, {
@@ -145,10 +152,7 @@ export function CompanyAddressContactPanel({
       setEditingAddr(null);
       addrForm.reset();
     },
-    onError: (e) =>
-      toast.error(
-        e instanceof ApiClientError && e.message ? e.message : MSG_ERR
-      ),
+    onError: (e) => toast.error(errMsg(e)),
   });
 
   const deleteAddr = useMutation({
@@ -158,11 +162,12 @@ export function CompanyAddressContactPanel({
         queryKey: ["md", "addresses", "COMPANY", companyId],
       });
       toast.success("آدرس حذف شد");
+      setDeletingAddrId(null);
     },
-    onError: (e) =>
-      toast.error(
-        e instanceof ApiClientError && e.message ? e.message : MSG_ERR
-      ),
+    onError: (e) => {
+      toast.error(errMsg(e));
+      setDeletingAddrId(null);
+    },
   });
 
   const saveContact = useMutation({
@@ -170,7 +175,7 @@ export function CompanyAddressContactPanel({
       const payload = {
         contact_type: v.contact_type,
         contact_value: v.contact_value.trim(),
-        is_primary: v.is_primary,
+        is_primary: Boolean(v.is_primary),
       };
       if (editingContact) {
         await apiPut(
@@ -198,10 +203,7 @@ export function CompanyAddressContactPanel({
         is_primary: false,
       });
     },
-    onError: (e) =>
-      toast.error(
-        e instanceof ApiClientError && e.message ? e.message : MSG_ERR
-      ),
+    onError: (e) => toast.error(errMsg(e)),
   });
 
   const deleteContact = useMutation({
@@ -211,11 +213,12 @@ export function CompanyAddressContactPanel({
         queryKey: ["md", "contacts", "COMPANY", companyId],
       });
       toast.success("تماس حذف شد");
+      setDeletingContactId(null);
     },
-    onError: (e) =>
-      toast.error(
-        e instanceof ApiClientError && e.message ? e.message : MSG_ERR
-      ),
+    onError: (e) => {
+      toast.error(errMsg(e));
+      setDeletingContactId(null);
+    },
   });
 
   const openNewAddr = () => {
@@ -248,6 +251,17 @@ export function CompanyAddressContactPanel({
       setEditingContact(null);
     }
     setContactOpen(next);
+  };
+
+  const confirmDeleteAddr = (id: string) => {
+    if (!window.confirm("آدرس حذف شود؟ این عمل قابل بازگردانی از سطل حذف است.")) return;
+    setDeletingAddrId(id);
+    deleteAddr.mutate(id);
+  };
+  const confirmDeleteContact = (id: string) => {
+    if (!window.confirm("نقطه تماس حذف شود؟ این عمل قابل بازگردانی از سطل حذف است.")) return;
+    setDeletingContactId(id);
+    deleteContact.mutate(id);
   };
 
   return (
@@ -307,12 +321,14 @@ export function CompanyAddressContactPanel({
                       variant="ghost"
                       size="sm"
                       className="h-8 text-destructive"
-                      onClick={() => {
-                        if (!window.confirm("آدرس حذف شود؟")) return;
-                        deleteAddr.mutate(a.entity_address_id);
-                      }}
+                      disabled={deletingAddrId === a.entity_address_id}
+                      onClick={() => confirmDeleteAddr(a.entity_address_id)}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      {deletingAddrId === a.entity_address_id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
                     </Button>
                   </>
                 ) : null}
@@ -380,12 +396,14 @@ export function CompanyAddressContactPanel({
                       variant="ghost"
                       size="sm"
                       className="h-8 text-destructive"
-                      onClick={() => {
-                        if (!window.confirm("تماس حذف شود؟")) return;
-                        deleteContact.mutate(c.contact_point_id);
-                      }}
+                      disabled={deletingContactId === c.contact_point_id}
+                      onClick={() => confirmDeleteContact(c.contact_point_id)}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      {deletingContactId === c.contact_point_id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
                     </Button>
                   </>
                 ) : null}
@@ -403,7 +421,7 @@ export function CompanyAddressContactPanel({
       <Sheet open={addrOpen && !readOnly} onOpenChange={handleAddrOpen}>
         <SheetContent
           side="right"
-          className="flex w-full flex-col gap-0 overflow-y-auto sm:max-w-md"
+          className="flex w-full flex-col gap-0 overflow-hidden sm:max-w-md"
           onInteractOutside={(e) => {
             if (addrDirty) e.preventDefault();
           }}
@@ -411,39 +429,41 @@ export function CompanyAddressContactPanel({
             if (addrDirty) e.preventDefault();
           }}
         >
-          <SheetHeader className="space-y-1.5 pb-4">
+          <SheetHeader>
             <SheetTitle>{editingAddr ? "ویرایش آدرس" : "آدرس جدید"}</SheetTitle>
             <SheetDescription>آدرس پستی شرکت</SheetDescription>
           </SheetHeader>
           <form
-            className="flex flex-1 flex-col gap-4"
+            className="flex min-h-0 flex-1 flex-col"
             onSubmit={addrForm.handleSubmit((v) => saveAddr.mutate(v))}
           >
-            <div className="space-y-1.5">
-              <Label>متن آدرس *</Label>
-              <Input
-                className="h-9"
-                {...addrForm.register("address_text", { required: true })}
-              />
+            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+              <div className="space-y-1.5">
+                <Label>متن آدرس *</Label>
+                <Input
+                  className="h-9"
+                  {...addrForm.register("address_text", { required: true })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>کد پستی</Label>
+                <Input
+                  className="h-9"
+                  dir="ltr"
+                  {...addrForm.register("postal_code")}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">
+                <Label>آدرس اصلی</Label>
+                <Switch
+                  checked={addrForm.watch("is_primary")}
+                  onCheckedChange={(v) =>
+                    addrForm.setValue("is_primary", v, { shouldDirty: true })
+                  }
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>کد پستی</Label>
-              <Input
-                className="h-9"
-                dir="ltr"
-                {...addrForm.register("postal_code")}
-              />
-            </div>
-            <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">
-              <Label>آدرس اصلی</Label>
-              <Switch
-                checked={addrForm.watch("is_primary")}
-                onCheckedChange={(v) =>
-                  addrForm.setValue("is_primary", v, { shouldDirty: true })
-                }
-              />
-            </div>
-            <SheetFooter className="mt-auto gap-2 border-t pt-4 sm:flex-row sm:justify-end">
+            <SheetFooter>
               <Button
                 type="button"
                 variant="outline"
@@ -466,7 +486,7 @@ export function CompanyAddressContactPanel({
       <Sheet open={contactOpen && !readOnly} onOpenChange={handleContactOpen}>
         <SheetContent
           side="right"
-          className="flex w-full flex-col gap-0 overflow-y-auto sm:max-w-md"
+          className="flex w-full flex-col gap-0 overflow-hidden sm:max-w-md"
           onInteractOutside={(e) => {
             if (contactDirty) e.preventDefault();
           }}
@@ -474,47 +494,49 @@ export function CompanyAddressContactPanel({
             if (contactDirty) e.preventDefault();
           }}
         >
-          <SheetHeader className="space-y-1.5 pb-4">
+          <SheetHeader>
             <SheetTitle>
               {editingContact ? "ویرایش نقطه تماس" : "نقطه تماس جدید"}
             </SheetTitle>
             <SheetDescription>تلفن، موبایل، ایمیل یا فکس</SheetDescription>
           </SheetHeader>
           <form
-            className="flex flex-1 flex-col gap-4"
+            className="flex min-h-0 flex-1 flex-col"
             onSubmit={contactForm.handleSubmit((v) => saveContact.mutate(v))}
           >
-            <div className="space-y-1.5">
-              <Label>نوع</Label>
-              <select
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                {...contactForm.register("contact_type")}
-              >
-                <option value="PHONE">تلفن</option>
-                <option value="MOBILE">موبایل</option>
-                <option value="EMAIL">ایمیل</option>
-                <option value="FAX">فکس</option>
-                <option value="WEBSITE">وب‌سایت</option>
-              </select>
+            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+              <div className="space-y-1.5">
+                <Label>نوع</Label>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  {...contactForm.register("contact_type")}
+                >
+                  <option value="PHONE">تلفن</option>
+                  <option value="MOBILE">موبایل</option>
+                  <option value="EMAIL">ایمیل</option>
+                  <option value="FAX">فکس</option>
+                  <option value="WEBSITE">وب‌سایت</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>مقدار *</Label>
+                <Input
+                  className="h-9"
+                  dir="ltr"
+                  {...contactForm.register("contact_value", { required: true })}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">
+                <Label>اصلی</Label>
+                <Switch
+                  checked={contactForm.watch("is_primary")}
+                  onCheckedChange={(v) =>
+                    contactForm.setValue("is_primary", v, { shouldDirty: true })
+                  }
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>مقدار *</Label>
-              <Input
-                className="h-9"
-                dir="ltr"
-                {...contactForm.register("contact_value", { required: true })}
-              />
-            </div>
-            <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">
-              <Label>اصلی</Label>
-              <Switch
-                checked={contactForm.watch("is_primary")}
-                onCheckedChange={(v) =>
-                  contactForm.setValue("is_primary", v, { shouldDirty: true })
-                }
-              />
-            </div>
-            <SheetFooter className="mt-auto gap-2 border-t pt-4 sm:flex-row sm:justify-end">
+            <SheetFooter>
               <Button
                 type="button"
                 variant="outline"
