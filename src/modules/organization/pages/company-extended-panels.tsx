@@ -35,6 +35,7 @@ import { ApiClientError, apiPut } from "@/api";
 import {
   toFaDigits,
   formatJalaliDate,
+  formatPercent,
 } from "@/shared/lib/utils";
 import { ShamsiDatePicker } from "@/shared/components/ui/shamsi-date-picker";
 import { CollapsibleSection } from "./collapsible-section";
@@ -537,7 +538,7 @@ export function CompanyExtendedPanels({
                     </td>
                     <td className="hidden px-2 py-1.5 text-start text-xs text-muted-foreground md:table-cell">
                       {shareLabel}
-                      {o.ownership?.ownership_percent != null ? <span className="ms-1 tabular-nums">({toFaDigits(String(o.ownership.ownership_percent))}٪)</span> : null}
+                      {o.ownership?.ownership_percent != null ? <span className="ms-1 tabular-nums">({formatPercent(o.ownership.ownership_percent)}٪)</span> : null}
                     </td>
                     <td className="px-1 py-1.5 text-center">{o.has_signing_authority ? <StatusChip label="دارد" tone="warning" /> : <span className="text-[11px] text-muted-foreground">—</span>}</td>
                     <td className="hidden px-2 py-1.5 text-start text-[11px] text-muted-foreground lg:table-cell">{period}</td>
@@ -676,7 +677,7 @@ export function CompanyExtendedPanels({
                   {(ownerships.data ?? []).map((ow: OwnershipDto) => (
                     <option key={ow.ownership_id} value={ow.ownership_id}>
                       {ow.owner_display_name || (ow.owner_kind === "COMPANY" ? "شرکت گروه" : "سهامدار")}
-                      {ow.ownership_percent != null ? ` — ${toFaDigits(String(ow.ownership_percent))}٪` : ""}
+                      {ow.ownership_percent != null ? ` — ${formatPercent(ow.ownership_percent)}٪` : ""}
                     </option>
                   ))}
                 </select>
