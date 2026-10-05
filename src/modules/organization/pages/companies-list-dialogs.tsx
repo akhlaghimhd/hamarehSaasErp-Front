@@ -28,6 +28,11 @@ import type { useCompaniesListPage } from "./use-companies-list-page";
 type Ctx = ReturnType<typeof useCompaniesListPage>;
 
 export function CompaniesListDialogs({ c }: { c: Ctx }) {
+  /** SME بدون multi_company: فقط عملیاتی. با multi_company: هر سه نقش (هلدینگ/حذفی هم). */
+  const kindOptions = c.hasMultiCompany
+    ? ENTITY_KIND_OPTIONS
+    : ENTITY_KIND_OPTIONS.filter((o) => o.value === "OPERATING");
+
   return (
     <>
       <Dialog open={!!c.confirm} onOpenChange={(o) => !o && !c.bulkBusy && c.setConfirm(null)}>
@@ -121,7 +126,7 @@ export function CompaniesListDialogs({ c }: { c: Ctx }) {
               <fieldset className="space-y-2">
                 <legend className="text-sm font-medium">{ENTITY_KIND_FIELD_LABEL}</legend>
                 <div className="space-y-1.5">
-                  {ENTITY_KIND_OPTIONS.map((opt) => (
+                  {kindOptions.map((opt) => (
                     <label
                       key={opt.value}
                       className="flex cursor-pointer items-start gap-2 rounded-lg border border-border/80 px-3 py-2 hover:bg-muted/40"
@@ -153,6 +158,18 @@ export function CompaniesListDialogs({ c }: { c: Ctx }) {
                     </label>
                   ))}
                 </div>
+                {c.selectedKind === "ELIMINATION" ? (
+                  <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:text-amber-200">
+                    این نوع فقط برای اسناد حذف معاملات درون‌گروهی است. تراکنش روزمره
+                    (فروش، خرید، انبار) روی آن ثبت نکنید؛ معمولاً تیم مالی مرکزی آن را می‌سازد.
+                  </p>
+                ) : null}
+                {c.selectedKind === "CONSOLIDATION" ? (
+                  <p className="rounded-md border border-border/80 bg-muted/40 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+                    مناسب هلدینگ یا سطح گزارش تلفیقی. اگر این شرکت فعالیت عملیاتی دارد،
+                    «شرکت عملیاتی» را انتخاب کنید.
+                  </p>
+                ) : null}
               </fieldset>
               <div className="flex items-center justify-between gap-2 rounded-lg border border-border/80 px-3 py-2">
                 <Label>فعال</Label>
