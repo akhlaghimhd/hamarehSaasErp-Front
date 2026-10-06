@@ -95,8 +95,8 @@ const cards: HubCard[] = [
   },
   {
     href: "/dashboard/identity/settings",
-    title: "تنظیمات هویت",
-    description: "تأیید دوگانه نقش و سیاست‌های امنیتی مستأجر",
+    title: "تنظیمات مستأجر (هویت)",
+    description: "تأیید دوگانه نقش و دسترسی اضطراری — سیاست امنیتی سطح مستأجر",
     icon: Settings2,
     open: true,
   },
@@ -138,7 +138,6 @@ function HubCardView({
   );
 
   if (interactive) {
-    // prefetch=false: hub must not download every heavy list module on open
     return (
       <Link href={card.href} className="block" prefetch={false}>
         {body}

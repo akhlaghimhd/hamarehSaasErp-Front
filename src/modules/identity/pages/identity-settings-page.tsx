@@ -1,4 +1,8 @@
-/** Tenant identity settings — separate dual-approval for roles vs privileged access */
+/**
+ * Tenant identity / security settings (SoT for dual-approval).
+ * Lives under Identity hub — NOT platform system_settings (those are SaaS Admin only).
+ * DEBT-SAAS-002 closed: this page is the formal tenant settings surface.
+ */
 
 "use client";
 
@@ -56,7 +60,7 @@ export function IdentitySettingsPage() {
     <div className="space-y-6 p-4">
       <PageHeader
         title="تنظیمات هویت و دسترسی"
-        description="سیاست‌های امنیتی در سطح مستأجر — موقت در این صفحه؛ بعداً به تنظیمات سیستم منتقل می‌شود"
+        description="سیاست‌های امنیتی سطح مستأجر (tenant_settings) — تأیید دوگانه نقش و دسترسی اضطراری"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "هویت و دسترسی", href: "/dashboard/identity" },
@@ -64,6 +68,11 @@ export function IdentitySettingsPage() {
         ]}
         icon={<Settings2 className="h-5 w-5" />}
       />
+
+      <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        این صفحه منبع حقیقت تنظیمات امنیتی مستأجر است. تنظیمات سراسری پلتفرم
+        (مثل retention) در پنل ادمین پلتفرم قرار دارد و با این صفحه ادغام نمی‌شود.
+      </div>
 
       {isLoading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -124,7 +133,7 @@ export function IdentitySettingsPage() {
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="dual-priv" className="text-base font-medium">
-                  تأیید دوگانه دسترسی اضطراری (موقت)
+                  تأیید دوگانه دسترسی اضطراری
                 </Label>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   درخواست‌های break-glass در صف دسترسی اضطراری می‌مانند تا تأیید
