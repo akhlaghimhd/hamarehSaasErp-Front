@@ -148,7 +148,12 @@ export function CompanyOfficerPanels({ companyId, readOnly = false }: { companyI
       </CollapsibleSection>
 
       <Sheet open={officerOpen} onOpenChange={(o) => { setOfficerOpen(o); if (!o) setEditOff(null); }}>
-        <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
+        <SheetContent
+          className="flex w-full flex-col gap-0 p-0 sm:max-w-md"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <SheetHeader className="border-b px-5 py-4">
             <SheetTitle>{editOff ? "ویرایش مقام" : "مقام حقوقی جدید"}</SheetTitle>
           </SheetHeader>
