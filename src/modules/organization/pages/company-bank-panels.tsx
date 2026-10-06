@@ -133,7 +133,12 @@ export function CompanyBankPanels({ companyId, readOnly = false }: { companyId: 
       </CollapsibleSection>
 
       <Sheet open={bankOpen} onOpenChange={(o) => { setBankOpen(o); if (!o) setEditBank(null); }}>
-        <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
+        <SheetContent
+          className="flex w-full flex-col gap-0 p-0 sm:max-w-md"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <SheetHeader className="border-b px-5 py-4">
             <SheetTitle>{editBank ? "ویرایش حساب بانکی" : "حساب بانکی جدید"}</SheetTitle>
             <SheetDescription>شماره حساب اجباری؛ شبا اختیاری (IR + ۲۴ رقم).</SheetDescription>
