@@ -230,7 +230,7 @@ export function CostCentersPanel({
                           {toFaDigits(c.code)}
                         </span>
                       </td>
-                      <td className="px-2 py-1.5 text-start">{c.name}</td>
+                      <td className="px-2 py-1.5 text-start">{toFaDigits(c.name)}</td>
                       <td className="px-2 py-1.5 text-start text-xs text-muted-foreground">
                         {typeLabel}
                       </td>
@@ -366,7 +366,7 @@ export function CostCentersPanel({
                   <option value="">— بدون والد —</option>
                   {parentOptions.map((p) => (
                     <option key={p.cost_center_id} value={p.cost_center_id}>
-                      {p.code} — {p.name}
+                      {toFaDigits(p.code)} — {toFaDigits(p.name)}
                     </option>
                   ))}
                 </select>
@@ -408,19 +408,11 @@ export function CostCentersPanel({
               </label>
             </div>
             <SheetFooter className="border-t px-5 py-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setCcOpen(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => setCcOpen(false)}>
                 انصراف
               </Button>
               <Button type="submit" disabled={saveCc.isPending}>
-                {saveCc.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  "ذخیره"
-                )}
+                {saveCc.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
               </Button>
             </SheetFooter>
           </form>
@@ -438,7 +430,7 @@ export function CostCentersPanel({
             <DialogTitle>حذف مرکز هزینه</DialogTitle>
             <DialogDescription>
               {pendingDeleteCc
-                ? `«${pendingDeleteCc.name}» (${pendingDeleteCc.code}) حذف نرم شود؟`
+                ? `«${toFaDigits(pendingDeleteCc.name)}» (${toFaDigits(pendingDeleteCc.code)}) حذف نرم شود؟`
                 : ""}
             </DialogDescription>
           </DialogHeader>
@@ -466,11 +458,7 @@ export function CostCentersPanel({
                 }
               }}
             >
-              {deleteCcBusy ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                "حذف"
-              )}
+              {deleteCcBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "حذف"}
             </Button>
           </DialogFooter>
         </DialogContent>
