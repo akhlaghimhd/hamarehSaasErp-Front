@@ -1,7 +1,7 @@
 /**
  * FE-ORG — Organization module hub
  * Feature packs (PLT-W1): multi_company / multi_branch / multi_business_unit /
- * custom_org_hierarchy / org.intercompany
+ * custom_org_hierarchy / org.intercompany / org.sales_structure / org.purch_structure
  */
 
 "use client";
@@ -139,6 +139,14 @@ export function OrganizationHomePage() {
     entitlements,
     FEATURE_PACK_CODES.orgIntercompany
   );
+  const hasSalesStructure = featureEntitlementsService.isEnabled(
+    entitlements,
+    FEATURE_PACK_CODES.orgSalesStructure
+  );
+  const hasPurchStructure = featureEntitlementsService.isEnabled(
+    entitlements,
+    FEATURE_PACK_CODES.orgPurchStructure
+  );
 
   const list = companies ?? [];
   const primary =
@@ -227,6 +235,13 @@ export function OrganizationHomePage() {
         "سازمان‌دهی مسیر فروش و خرید برای عملیات بازرگانی روزمره",
       icon: ShoppingCart,
       open: true,
+      packHint: !packsLoading && !(hasSalesStructure || hasPurchStructure)
+        ? "برای ایجاد ساختار فروش/خرید بسته org.sales_structure یا org.purch_structure لازم است"
+        : !packsLoading && !hasSalesStructure
+          ? "بسته org.sales_structure برای ایجاد سازمان فروش/کانال غیرفعال است"
+          : !packsLoading && !hasPurchStructure
+            ? "بسته org.purch_structure برای ایجاد سازمان خرید غیرفعال است"
+            : null,
     },
     {
       key: "featurePacks",
