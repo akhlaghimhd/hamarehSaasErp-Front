@@ -12,6 +12,8 @@ export const FEATURE_PACK_CODES = {
   multiBusinessUnit: "multi_business_unit",
   customOrgHierarchy: "custom_org_hierarchy",
   orgIntercompany: "org.intercompany",
+  orgSalesStructure: "org.sales_structure",
+  orgPurchStructure: "org.purch_structure",
 } as const;
 
 export type FeaturePackCode =
