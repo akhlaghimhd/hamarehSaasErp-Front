@@ -70,11 +70,13 @@ import {
   type IcRuleDto,
 } from "../services/org-extended-service";
 import { useCompanies } from "../hooks/use-companies";
+import { OrganizationPermissions } from "../types";
 import { IconAction } from "./companies-list-helpers";
 
 const MSG_NO_ACCESS = "برای مشاهده این بخش مجوز لازم را ندارید.";
 const MSG_ERR = "انجام این کار ممکن نشد. کمی بعد دوباره تلاش کنید.";
 
+/** Preferred IC codes; company.* used as soft fallback until PermissionSeeder ships IC codes. */
 const IC_VIEW = "organization.intercompany.view";
 const IC_MANAGE = "organization.intercompany.manage";
 
@@ -112,8 +114,12 @@ function companyLabel(
 
 export function IntercompanyPage() {
   const qc = useQueryClient();
-  const canView = usePermission(IC_VIEW) || usePermission(IC_MANAGE);
-  const canManage = usePermission(IC_MANAGE);
+  const hasIcView = usePermission(IC_VIEW);
+  const hasIcManage = usePermission(IC_MANAGE);
+  const hasCompanyView = usePermission(OrganizationPermissions.companyView);
+  const hasCompanyUpdate = usePermission(OrganizationPermissions.companyUpdate);
+  const canView = hasIcView || hasIcManage || hasCompanyView;
+  const canManage = hasIcManage || hasCompanyUpdate;
   const { data: companies } = useCompanies();
 
   const [partnerSearch, setPartnerSearch] = useState("");
