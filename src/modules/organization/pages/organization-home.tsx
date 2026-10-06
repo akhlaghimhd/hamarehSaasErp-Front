@@ -1,6 +1,7 @@
 /**
  * FE-ORG — Organization module hub
- * Feature packs (PLT-W1): multi_company / multi_branch / multi_business_unit / custom_org_hierarchy
+ * Feature packs (PLT-W1): multi_company / multi_branch / multi_business_unit /
+ * custom_org_hierarchy / org.intercompany
  */
 
 "use client";
@@ -134,6 +135,10 @@ export function OrganizationHomePage() {
     entitlements,
     FEATURE_PACK_CODES.customOrgHierarchy
   );
+  const hasIc = featureEntitlementsService.isEnabled(
+    entitlements,
+    FEATURE_PACK_CODES.orgIntercompany
+  );
 
   const list = companies ?? [];
   const primary =
@@ -210,6 +215,9 @@ export function OrganizationHomePage() {
         "تعریف شرکای گروه و قواعد ثبت معامله بین شرکت‌های یک سازمان",
       icon: ArrowLeftRight,
       open: true,
+      packHint: !packsLoading && !hasIc
+        ? "بسته org.intercompany لازم است؛ بدون آن عملیات IC محدود است"
+        : null,
     },
     {
       key: "salesPurch",
@@ -225,7 +233,7 @@ export function OrganizationHomePage() {
       href: "/dashboard/organization/feature-packs",
       title: "بسته‌های قابلیت",
       description:
-        "وضعیت entitlementهای خریداری‌شده (multi_company / multi_branch / BU / hierarchy)",
+        "وضعیت entitlementهای خریداری‌شده (multi_company / multi_branch / BU / hierarchy / IC)",
       icon: Package,
       open: true,
     },
