@@ -1,5 +1,5 @@
 /**
- * Tenant feature packs (PLT-W1) — read entitlements for UI gates.
+ * Tenant feature packs (PLT-W1 / SAASADM-P0) — read entitlements for UI gates.
  * Backend: GET /saas-platform/feature-entitlements
  */
 
@@ -11,6 +11,7 @@ export const FEATURE_PACK_CODES = {
   multiBranch: "multi_branch",
   multiBusinessUnit: "multi_business_unit",
   customOrgHierarchy: "custom_org_hierarchy",
+  orgIntercompany: "org.intercompany",
 } as const;
 
 export type FeaturePackCode =
