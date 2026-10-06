@@ -80,5 +80,10 @@ export function AdminLoginPage() {
           </Button>
         </form>
 
-        <p className="text-[11px] text-muted-foreground">
-          دمو:{
+        <p className="text-[11px] text-muted-foreground" dir="ltr">
+          demo: platform.admin / Admin123!
+        </p>
+      </div>
+    </div>
+  );
+}
