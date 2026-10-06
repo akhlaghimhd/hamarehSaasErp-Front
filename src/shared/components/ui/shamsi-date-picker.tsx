@@ -59,6 +59,7 @@ export type ShamsiDatePickerProps = {
 /**
  * Single trigger field + popup Jalali month calendar.
  * Stores ISO YYYY-MM-DD; displays Persian digits.
+ * Popup is fixed + clamped so it never overflows the viewport / sheet.
  */
 export function ShamsiDatePicker({
   value,
@@ -69,6 +70,7 @@ export function ShamsiDatePicker({
   disabled,
 }: ShamsiDatePickerProps) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const rootRef = useRef<HTMLDivElement>(null);
 
   const selected = isoToJalali(value);
@@ -88,6 +90,31 @@ export function ShamsiDatePicker({
       setViewJm(today.jm);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!open || !rootRef.current) return;
+    const place = () => {
+      const rect = rootRef.current!.getBoundingClientRect();
+      const width = 280;
+      const height = 320;
+      let left = rect.left;
+      let top = rect.bottom + 4;
+      if (left + width > window.innerWidth - 8) left = Math.max(8, window.innerWidth - width - 8);
+      if (left < 8) left = 8;
+      if (top + height > window.innerHeight - 8) {
+        top = rect.top - height - 4;
+      }
+      if (top < 8) top = 8;
+      setPos({ top, left });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -186,39 +213,38 @@ export function ShamsiDatePicker({
       {open ? (
         <div
           className={cn(
-            "absolute z-50 mt-1 w-[280px] rounded-lg border bg-popover p-3 text-popover-foreground shadow-md",
+            "fixed z-[100] w-[280px] rounded-lg border bg-popover p-3 text-popover-foreground shadow-md",
             "animate-in fade-in-0 zoom-in-95"
           )}
+          style={{ top: pos.top, left: pos.left }}
           role="dialog"
           aria-label="تقویم شمسی"
         >
-          {/* Header: month nav */}
           <div className="mb-2 flex items-center gap-1">
             <Button
               type="button"
               variant="ghost"
               size="sm"
               className="h-8 w-8 p-0"
-              onClick={() => goMonth(-1)}
-              aria-label="ماه قبل"
+              onClick={() => goMonth(1)}
+              aria-label="ماه بعد"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-
             <div className="flex flex-1 items-center justify-center gap-1">
               <select
-                className="h-8 rounded-md border-0 bg-transparent px-1 text-sm font-medium outline-none"
+                className="h-8 rounded-md border border-input bg-background px-1 text-sm"
                 value={viewJm}
                 onChange={(e) => setViewJm(Number(e.target.value))}
               >
-                {MONTHS.map((label, i) => (
-                  <option key={label} value={i + 1}>
-                    {label}
+                {MONTHS.map((m, i) => (
+                  <option key={m} value={i + 1}>
+                    {m}
                   </option>
                 ))}
               </select>
               <select
-                className="h-8 rounded-md border-0 bg-transparent px-1 text-sm font-medium outline-none tabular-nums"
+                className="h-8 rounded-md border border-input bg-background px-1 text-sm tabular-nums"
                 value={viewJy}
                 onChange={(e) => setViewJy(Number(e.target.value))}
               >
@@ -229,20 +255,18 @@ export function ShamsiDatePicker({
                 ))}
               </select>
             </div>
-
             <Button
               type="button"
               variant="ghost"
               size="sm"
               className="h-8 w-8 p-0"
-              onClick={() => goMonth(1)}
-              aria-label="ماه بعد"
+              onClick={() => goMonth(-1)}
+              aria-label="ماه قبل"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
           </div>
 
-          {/* Weekday headers */}
           <div className="mb-1 grid grid-cols-7 gap-0.5 text-center text-[11px] text-muted-foreground">
             {WEEKDAYS.map((w) => (
               <div key={w} className="py-1 font-medium">
@@ -251,7 +275,6 @@ export function ShamsiDatePicker({
             ))}
           </div>
 
-          {/* Day grid */}
           <div className="grid grid-cols-7 gap-0.5">
             {cells.map((cell, idx) => {
               if (!cell) {
