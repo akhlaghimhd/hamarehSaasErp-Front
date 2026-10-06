@@ -3,7 +3,7 @@
  */
 "use client";
 
-import { Package, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Package, Loader2 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { StatusChip } from "@/shared/components/data-display/status-chip";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
@@ -46,6 +46,11 @@ const PACK_CATALOG: Array<{
     code: FEATURE_PACK_CODES.customOrgHierarchy,
     title: "سلسله‌مراتب سفارشی (custom_org_hierarchy)",
     description: "ایجاد درخت CUSTOM علاوه بر درخت‌های سیستمی",
+  },
+  {
+    code: FEATURE_PACK_CODES.orgIntercompany,
+    title: "بین‌شرکتی (org.intercompany)",
+    description: "شرکای گروه و قواعد معامله بین‌شرکتی",
   },
 ];
 
