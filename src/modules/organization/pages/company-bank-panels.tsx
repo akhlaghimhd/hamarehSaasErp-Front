@@ -97,7 +97,7 @@ export function CompanyBankPanels({ companyId, readOnly = false }: { companyId: 
   return (
     <>
       <CollapsibleSection id="bank-accounts" title="حساب‌های بانکی" subtitle="شماره حساب و شبا — استاندارد ایران" count={sortedBanks.length}
-        actions={!readOnly ? <Button type="button" size="sm" className="h-8 gap-1" onClick={() => { setEditBank(null); setBankOpen(true); }}><Plus className="h-4 w-4" /> حساب</Button> : null}>
+        action={!readOnly ? <Button type="button" size="sm" className="h-8 gap-1" onClick={() => { setEditBank(null); setBankOpen(true); }}><Plus className="h-4 w-4" /> حساب</Button> : null}>
         {banksQ.isLoading ? <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           : sortedBanks.length === 0 ? <div className="py-5 text-center text-xs text-muted-foreground">حساب بانکی ثبت نشده است.</div>
           : (
@@ -118,7 +118,7 @@ export function CompanyBankPanels({ companyId, readOnly = false }: { companyId: 
                         <td className="px-2 py-1.5 text-start"><div className="font-medium">{label || b.bank_name}</div>{label ? <div className="text-[11px] text-muted-foreground">{b.bank_name}</div> : null}</td>
                         <td className="px-2 py-1.5 text-start"><span className="font-mono text-xs tabular-nums" dir="ltr">{toFaDigits(b.account_number)}</span></td>
                         <td className="hidden px-2 py-1.5 text-start md:table-cell">{b.iban ? <span className="font-mono text-[11px] tabular-nums" dir="ltr">{ibanFa(b.iban)}</span> : "—"}</td>
-                        <td className="px-2 py-1.5 text-start">{b.is_primary ? <StatusChip status="active" label="اصلی" /> : "—"}</td>
+                        <td className="px-2 py-1.5 text-start">{b.is_primary ? <StatusChip label="اصلی" tone="success" /> : "—"}</td>
                         {!readOnly ? <td className="border-s px-2 py-1.5"><div className="flex gap-0.5">
                           <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditBank(b); setBankOpen(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
                           <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDelBank(b)}><Trash2 className="h-3.5 w-3.5" /></Button>
