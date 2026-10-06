@@ -82,7 +82,6 @@ export function CostCentersPanel({
       is_active: true,
     },
   });
-  const { isDirty: ccDirty } = ccForm.formState;
 
   useEffect(() => {
     if (!ccOpen) return;
@@ -236,7 +235,10 @@ export function CostCentersPanel({
                         {typeLabel}
                       </td>
                       <td className="px-2 py-1.5 text-start">
-                        <StatusChip label={c.is_active === false ? "غیرفعال" : "فعال"} tone={c.is_active === false ? "warning" : "success"} />
+                        <StatusChip
+                          label={c.is_active === false ? "غیرفعال" : "فعال"}
+                          tone={c.is_active === false ? "warning" : "success"}
+                        />
                       </td>
                       {!readOnly ? (
                         <td className="border-s px-2 py-1.5">
@@ -277,14 +279,16 @@ export function CostCentersPanel({
       <Sheet
         open={ccOpen}
         onOpenChange={(o) => {
-          if (!o && ccDirty) {
-            if (!window.confirm("تغییرات ذخیره نشده. خارج می‌شوید؟")) return;
-          }
           setCcOpen(o);
           if (!o) setEditingCc(null);
         }}
       >
-        <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
+        <SheetContent
+          className="flex w-full flex-col gap-0 p-0 sm:max-w-md"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <SheetHeader className="border-b px-5 py-4">
             <SheetTitle>
               {editingCc ? "ویرایش مرکز هزینه" : "مرکز هزینه جدید"}
@@ -302,9 +306,22 @@ export function CostCentersPanel({
                 <div className="space-y-1.5">
                   <Label>کد *</Label>
                   <Input
-                    className="h-9 font-mono"
-                    dir="ltr"
-                    {...ccForm.register("code", { required: true })}
+                    className="h-9 font-mono tabular-nums"
+                    dir="rtl"
+                    inputMode="text"
+                    value={toFaDigits(ccForm.watch("code") || "")}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const map: Record<string, string> = {
+                        "۰": "0", "۱": "1", "۲": "2", "۳": "3", "۴": "4",
+                        "۵": "5", "۶": "6", "۷": "7", "۸": "8", "۹": "9",
+                        "٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4",
+                        "٥": "5", "٦": "6", "٧": "7", "٨": "8", "٩": "9",
+                      };
+                      let out = "";
+                      for (const ch of raw) out += map[ch] ?? ch;
+                      ccForm.setValue("code", out, { shouldDirty: true, shouldValidate: true });
+                    }}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -323,7 +340,22 @@ export function CostCentersPanel({
               </div>
               <div className="space-y-1.5">
                 <Label>نام *</Label>
-                <Input className="h-9" {...ccForm.register("name", { required: true })} />
+                <Input
+                  className="h-9"
+                  value={toFaDigits(ccForm.watch("name") || "")}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const map: Record<string, string> = {
+                      "۰": "0", "۱": "1", "۲": "2", "۳": "3", "۴": "4",
+                      "۵": "5", "۶": "6", "۷": "7", "۸": "8", "۹": "9",
+                      "٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4",
+                      "٥": "5", "٦": "6", "٧": "7", "٨": "8", "٩": "9",
+                    };
+                    let out = "";
+                    for (const ch of raw) out += map[ch] ?? ch;
+                    ccForm.setValue("name", out, { shouldDirty: true, shouldValidate: true });
+                  }}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>مرکز والد</Label>
