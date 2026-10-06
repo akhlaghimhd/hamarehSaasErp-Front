@@ -176,7 +176,7 @@ export function CostCentersPanel({
         title="مراکز هزینه"
         subtitle="بعد گزارشگری هزینه — مصرف در حسابداری/خرید/حقوق"
         count={rows.length}
-        actions={
+        action={
           !readOnly ? (
             <Button
               type="button"
@@ -236,10 +236,7 @@ export function CostCentersPanel({
                         {typeLabel}
                       </td>
                       <td className="px-2 py-1.5 text-start">
-                        <StatusChip
-                          status={c.is_active === false ? "inactive" : "active"}
-                          label={c.is_active === false ? "غیرفعال" : "فعال"}
-                        />
+                        <StatusChip label={c.is_active === false ? "غیرفعال" : "فعال"} tone={c.is_active === false ? "warning" : "success"} />
                       </td>
                       {!readOnly ? (
                         <td className="border-s px-2 py-1.5">
