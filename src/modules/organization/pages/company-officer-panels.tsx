@@ -105,7 +105,7 @@ export function CompanyOfficerPanels({ companyId, readOnly = false }: { companyI
   return (
     <>
       <CollapsibleSection id="officers" title="مقامات حقوقی شرکت" subtitle="هیئت‌مدیره، مدیرعامل و بازرسان" count={(offsQ.data ?? []).length}
-        actions={!readOnly ? <Button type="button" size="sm" className="h-8 gap-1" onClick={() => { setEditOff(null); setOfficerOpen(true); }}><Plus className="h-4 w-4" /> مقام</Button> : null}>
+        action={!readOnly ? <Button type="button" size="sm" className="h-8 gap-1" onClick={() => { setEditOff(null); setOfficerOpen(true); }}><Plus className="h-4 w-4" /> مقام</Button> : null}>
         {offsQ.isLoading ? <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           : (offsQ.data ?? []).length === 0 ? <div className="py-5 text-center text-xs text-muted-foreground">مقام حقوقی ثبت نشده است.</div>
           : (
@@ -132,7 +132,7 @@ export function CompanyOfficerPanels({ companyId, readOnly = false }: { companyI
                         <td className="px-2 py-1.5 text-start text-xs">{role}</td>
                         <td className="px-2 py-1.5 text-start"><span className="font-medium">{o.full_name}</span>{o.national_id ? <span className="ms-1 font-mono text-[10px] text-muted-foreground" dir="ltr">({toFaDigits(o.national_id)})</span> : null}</td>
                         <td className="px-2 py-1.5 text-start text-xs text-muted-foreground">{ownL}</td>
-                        <td className="px-2 py-1.5 text-start">{o.has_signing_authority ? <StatusChip status="active" label="دارد" /> : "—"}</td>
+                        <td className="px-2 py-1.5 text-start">{o.has_signing_authority ? <StatusChip label="دارد" tone="success" /> : "—"}</td>
                         <td className="px-2 py-1.5 text-start text-xs tabular-nums">{period}</td>
                         {!readOnly ? <td className="border-s px-2 py-1.5"><div className="flex gap-0.5">
                           <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditOff(o); setOfficerOpen(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
