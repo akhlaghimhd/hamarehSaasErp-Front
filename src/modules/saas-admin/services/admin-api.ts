@@ -118,3 +118,83 @@ export const adminFeatureService = {
     return unwrapData(res.data);
   },
 };
+
+export type AdminTenantRow = {
+  tenant_id: string;
+  tenant_code?: string;
+  tenant_name?: string;
+  legal_name?: string | null;
+  slug?: string;
+  status?: number;
+  created_at?: string;
+};
+
+export type AdminTenantsListResult = {
+  data: AdminTenantRow[];
+  meta: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  };
+};
+
+export type AdminTenantDetail = {
+  tenant: AdminTenantRow;
+  enabled_codes: string[];
+  entitlements: unknown;
+  member_count: number;
+};
+
+export const adminTenantService = {
+  async list(params?: {
+    search?: string;
+    status?: number;
+    per_page?: number;
+  }): Promise<AdminTenantsListResult> {
+    const res = await adminApiClient.get("/tenants", { params });
+    const body = res.data as {
+      data?: AdminTenantRow[];
+      meta?: AdminTenantsListResult["meta"];
+    };
+    return {
+      data: Array.isArray(body?.data) ? body.data : [],
+      meta: body?.meta ?? {
+        current_page: 1,
+        last_page: 1,
+        per_page: 20,
+        total: 0,
+      },
+    };
+  },
+
+  async show(tenantId: string): Promise<AdminTenantDetail> {
+    const res = await adminApiClient.get(`/tenants/${tenantId}`);
+    return unwrapData<AdminTenantDetail>(res.data);
+  },
+};
+
+export type SystemSettingRow = {
+  system_setting_id: string;
+  setting_key: string;
+  setting_value?: string | null;
+  description?: string | null;
+  row_version?: number;
+};
+
+export const adminSystemSettingService = {
+  async list(): Promise<SystemSettingRow[]> {
+    const res = await adminApiClient.get("/system-settings");
+    const data = unwrapData<SystemSettingRow[]>(res.data);
+    return Array.isArray(data) ? data : [];
+  },
+
+  async upsert(payload: {
+    setting_key: string;
+    setting_value?: string | null;
+    description?: string | null;
+  }): Promise<SystemSettingRow> {
+    const res = await adminApiClient.post("/system-settings", payload);
+    return unwrapData<SystemSettingRow>(res.data);
+  },
+};

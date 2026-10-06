@@ -21,7 +21,7 @@ export function AdminLoginPage() {
     setLoading(true);
     try {
       await adminAuthService.login(username.trim(), password);
-      router.replace("/admin/feature-packs");
+      router.replace("/admin/tenants");
     } catch (err) {
       setError(err instanceof Error ? err.message : "ورود ناموفق بود");
     } finally {
@@ -81,7 +81,7 @@ export function AdminLoginPage() {
         </form>
 
         <p className="text-[11px] text-muted-foreground" dir="ltr">
-          demo: platform.admin / Admin123!
+          local default: platform.admin / LocalAdmin1!
         </p>
       </div>
     </div>

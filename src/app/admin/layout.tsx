@@ -2,14 +2,18 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Package, LogOut, Shield } from "lucide-react";
+import { Package, LogOut, Shield, Building2, Settings } from "lucide-react";
 import { AdminGuard } from "@/modules/saas-admin/components/admin-guard";
 import { adminAuthService } from "@/modules/saas-admin/services/admin-api";
 import { adminTokenStorage } from "@/modules/saas-admin/lib/admin-token-storage";
 import { Button } from "@/shared/components/ui/button";
 import { cn } from "@/shared/lib/utils";
 
-const nav = [{ href: "/admin/feature-packs", label: "بسته‌های قابلیت", icon: Package }];
+const nav = [
+  { href: "/admin/tenants", label: "مستأجرها", icon: Building2 },
+  { href: "/admin/feature-packs", label: "بسته‌های قابلیت", icon: Package },
+  { href: "/admin/system-settings", label: "تنظیمات سیستم", icon: Settings },
+];
 
 export default function AdminLayout({
   children,

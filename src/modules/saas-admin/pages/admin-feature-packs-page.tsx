@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Package, Loader2, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { Button } from "@/shared/components/ui/button";
@@ -25,13 +26,19 @@ const DEMO_TENANT_HINT =
   "3ab77cac-1343-4b13-8e14-0d887aad132a";
 
 export function AdminFeaturePacksPage() {
-  const [tenantId, setTenantId] = useState(DEMO_TENANT_HINT);
+  const searchParams = useSearchParams();
+  const fromQuery = searchParams.get("tenantId");
+  const [tenantId, setTenantId] = useState(fromQuery || DEMO_TENANT_HINT);
   const [catalog, setCatalog] = useState<FeatureCatalogItem[]>([]);
   const [enabled, setEnabled] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyCode, setBusyCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (fromQuery) setTenantId(fromQuery);
+  }, [fromQuery]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,7 +60,7 @@ export function AdminFeaturePacksPage() {
 
   useEffect(() => {
     void load();
-  }, []); // initial only — explicit refresh for tenant change
+  }, [load]);
 
   async function toggle(code: string, next: boolean) {
     setBusyCode(code);
