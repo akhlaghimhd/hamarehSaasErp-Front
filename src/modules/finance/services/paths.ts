@@ -34,4 +34,11 @@ export const financePaths = {
   complianceAlerts: `${FINANCE_BASE}/compliance-alerts`,
   complianceScan: `${FINANCE_BASE}/compliance-alerts/scan`,
   complianceResolve: (id: string) => `${FINANCE_BASE}/compliance-alerts/${id}/resolve`,
+  suggestedJournals: `${FINANCE_BASE}/suggested-journals`,
+  suggestedJournal: (id: string) => `${FINANCE_BASE}/suggested-journals/${id}`,
+  suggestedJournalAccept: (id: string) =>
+    `${FINANCE_BASE}/suggested-journals/${id}/accept`,
+  suggestedJournalReject: (id: string) =>
+    `${FINANCE_BASE}/suggested-journals/${id}/reject`,
+  accountDeterminationRules: `${FINANCE_BASE}/account-determination-rules`,
 } as const;

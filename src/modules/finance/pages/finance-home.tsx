@@ -12,6 +12,7 @@ import {
   Percent,
   Send,
   AlertTriangle,
+  Inbox,
 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { usePermission } from "@/auth";
@@ -88,6 +89,7 @@ export function FinanceHomePage() {
   const canTax = usePermission(FinancePermissions.taxView);
   const canMoodian = usePermission(FinancePermissions.moodianView);
   const canCompliance = usePermission(FinancePermissions.complianceView);
+  const canSuggest = usePermission(FinancePermissions.suggestView);
 
   const cards: HubCard[] = [
     {
@@ -104,6 +106,14 @@ export function FinanceHomePage() {
       title: "اسناد حسابداری",
       description: "پیش‌نویس، ثبت قطعی و برگشت",
       icon: FileText,
+      open: true,
+    },
+    {
+      key: "suggested",
+      href: "/dashboard/finance/suggested-journals",
+      title: "صندوق پیشنهادها",
+      description: "K1 — قبول/رد پیش‌نویس از رویداد عملیاتی",
+      icon: Inbox,
       open: true,
     },
     {
@@ -167,6 +177,7 @@ export function FinanceHomePage() {
   const allowedMap: Record<string, boolean> = {
     accounts: canCoa,
     journals: canJournal,
+    suggested: canSuggest,
     reports: canReport,
     treasury: canTreasury,
     cheques: canTreasury,
@@ -180,7 +191,7 @@ export function FinanceHomePage() {
     <div className="space-y-6">
       <PageHeader
         title="حسابداری مالی"
-        description="دفتر کل، خزانه، مالیات و مودیان (P0–P2)"
+        description="دفتر کل، خزانه، مالیات، مودیان و پیشنهاد هوشمند (P0–P3)"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "حسابداری" },

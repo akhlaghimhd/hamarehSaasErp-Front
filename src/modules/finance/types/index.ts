@@ -1,4 +1,4 @@
-/** FIN-P0/P1/P2 FE types — aligned with FinancialAccounting API */
+/** FIN-P0/P1/P2/P3 FE types — aligned with FinancialAccounting API */
 
 export const FinancePermissions = {
   coaView: "finance.coa.view",
@@ -28,6 +28,9 @@ export const FinancePermissions = {
   moodianSubmit: "finance.moodian.submit",
   complianceView: "finance.compliance.view",
   complianceManage: "finance.compliance.manage",
+  suggestView: "finance.suggest.view",
+  suggestManage: "finance.suggest.manage",
+  suggestDecide: "finance.suggest.decide",
 } as const;
 
 export type FinancePermissionCode =
@@ -219,6 +222,30 @@ export interface ComplianceAlertDto {
   title: string;
   message: string;
   is_resolved: boolean;
+}
+
+export interface SuggestedJournalLineDto {
+  suggested_line_id: string;
+  account_id: string;
+  debit_amount?: number | string;
+  credit_amount?: number | string;
+  line_role?: string;
+  suggestion_reason?: string;
+  sort_order?: number;
+}
+
+export interface SuggestedJournalDto {
+  suggested_journal_id: string;
+  company_id: string;
+  ledger_id: string;
+  period_id: string;
+  source_event_type: string;
+  source_document_id: string;
+  status: "PENDING" | "ACCEPTED" | "REJECTED" | string;
+  description?: string | null;
+  journal_entry_id?: string | null;
+  decision_note?: string | null;
+  lines?: SuggestedJournalLineDto[];
 }
 
 export const DEMO_PERIOD_ID = "a1000000-0000-4000-8000-000000000001";
