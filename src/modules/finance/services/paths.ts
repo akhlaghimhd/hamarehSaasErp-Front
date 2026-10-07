@@ -19,6 +19,7 @@ export const financePaths = {
   trialBalance: `${FINANCE_BASE}/reports/trial-balance`,
   profitAndLoss: `${FINANCE_BASE}/reports/profit-and-loss`,
   balanceSheet: `${FINANCE_BASE}/reports/balance-sheet`,
+  consolidatedTrialBalance: `${FINANCE_BASE}/reports/consolidated-trial-balance`,
   cashAccounts: `${FINANCE_BASE}/cash-accounts`,
   treasuryDocuments: `${FINANCE_BASE}/treasury-documents`,
   treasuryPost: (id: string) => `${FINANCE_BASE}/treasury-documents/${id}/post`,
@@ -46,4 +47,7 @@ export const financePaths = {
   accountDeterminationRules: `${FINANCE_BASE}/account-determination-rules`,
   fixedAssets: `${FINANCE_BASE}/fixed-assets`,
   fixedAssetsRunDepreciation: `${FINANCE_BASE}/fixed-assets/run-depreciation`,
+  icAccountMaps: `${FINANCE_BASE}/intercompany/account-maps`,
+  icPairs: `${FINANCE_BASE}/intercompany/pairs`,
+  icEliminations: `${FINANCE_BASE}/intercompany/eliminations`,
 } as const;
