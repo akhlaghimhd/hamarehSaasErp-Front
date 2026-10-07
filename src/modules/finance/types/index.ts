@@ -1,4 +1,4 @@
-/** FIN-P0..P4 FE types — aligned with FinancialAccounting API */
+/** FIN-P0..P5 FE types — aligned with FinancialAccounting API */
 
 export const FinancePermissions = {
   coaView: "finance.coa.view",
@@ -34,6 +34,8 @@ export const FinancePermissions = {
   faView: "finance.fa.view",
   faManage: "finance.fa.manage",
   faDepreciate: "finance.fa.depreciate",
+  icView: "finance.ic.view",
+  icManage: "finance.ic.manage",
 } as const;
 
 export type FinancePermissionCode =
