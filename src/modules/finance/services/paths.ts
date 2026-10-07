@@ -13,6 +13,9 @@ export const financePaths = {
   periodSoftClose: `${FINANCE_BASE}/period-controls/soft-close`,
   periodHardClose: `${FINANCE_BASE}/period-controls/hard-close`,
   periodReopen: `${FINANCE_BASE}/period-controls/reopen`,
+  periodCloseEvaluate: `${FINANCE_BASE}/period-close/evaluate`,
+  periodCloseSoft: `${FINANCE_BASE}/period-close/soft-close`,
+  periodCloseHard: `${FINANCE_BASE}/period-close/hard-close`,
   trialBalance: `${FINANCE_BASE}/reports/trial-balance`,
   profitAndLoss: `${FINANCE_BASE}/reports/profit-and-loss`,
   balanceSheet: `${FINANCE_BASE}/reports/balance-sheet`,
@@ -41,4 +44,6 @@ export const financePaths = {
   suggestedJournalReject: (id: string) =>
     `${FINANCE_BASE}/suggested-journals/${id}/reject`,
   accountDeterminationRules: `${FINANCE_BASE}/account-determination-rules`,
+  fixedAssets: `${FINANCE_BASE}/fixed-assets`,
+  fixedAssetsRunDepreciation: `${FINANCE_BASE}/fixed-assets/run-depreciation`,
 } as const;
