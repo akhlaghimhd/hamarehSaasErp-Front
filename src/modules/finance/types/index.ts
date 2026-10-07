@@ -1,4 +1,4 @@
-/** FIN-P0/P1 FE types — aligned with FinancialAccounting API */
+/** FIN-P0/P1/P2 FE types — aligned with FinancialAccounting API */
 
 export const FinancePermissions = {
   coaView: "finance.coa.view",
@@ -22,6 +22,12 @@ export const FinancePermissions = {
   arManage: "finance.ar.manage",
   apView: "finance.ap.view",
   apManage: "finance.ap.manage",
+  taxView: "finance.tax.view",
+  taxManage: "finance.tax.manage",
+  moodianView: "finance.moodian.view",
+  moodianSubmit: "finance.moodian.submit",
+  complianceView: "finance.compliance.view",
+  complianceManage: "finance.compliance.manage",
 } as const;
 
 export type FinancePermissionCode =
@@ -172,7 +178,49 @@ export interface AgingBucketDto {
   amount: string;
 }
 
-/** Demo period from DemoFinanceCoaSeeder */
+export interface TaxRateConfigDto {
+  tax_rate_config_id: string;
+  tax_code: string;
+  name: string;
+  rate_percent: number | string;
+  valid_from: string;
+  valid_to?: string | null;
+  is_default?: boolean;
+}
+
+export interface TaxTransactionDto {
+  tax_transaction_id: string;
+  company_id: string;
+  tax_code: string;
+  taxable_amount: number | string;
+  tax_rate: number | string;
+  tax_amount: number | string;
+  transaction_date: string;
+  direction: string;
+  source_document_type: string;
+}
+
+export interface MoodianSubmissionDto {
+  moodian_submission_id: string;
+  company_id: string;
+  source_document_type: string;
+  source_document_id: string;
+  external_ref?: string | null;
+  status: string;
+  error_message?: string | null;
+  submitted_at?: string | null;
+}
+
+export interface ComplianceAlertDto {
+  compliance_alert_id: string;
+  company_id?: string | null;
+  alert_code: string;
+  severity: string;
+  title: string;
+  message: string;
+  is_resolved: boolean;
+}
+
 export const DEMO_PERIOD_ID = "a1000000-0000-4000-8000-000000000001";
 
 export const ACCOUNT_TYPE_LABELS: Record<number, string> = {
@@ -189,4 +237,13 @@ export const AGING_BUCKET_LABELS: Record<string, string> = {
   "31_60": "۳۱–۶۰ روز",
   "61_90": "۶۱–۹۰ روز",
   "90_plus": "بیش از ۹۰ روز",
+};
+
+export const MOODIAN_STATUS_LABELS: Record<string, string> = {
+  PENDING: "در انتظار",
+  SUBMITTED: "ارسال‌شده",
+  ACCEPTED: "پذیرفته",
+  REJECTED: "ردشده",
+  FAILED: "خطا",
+  CANCELLED: "لغو",
 };

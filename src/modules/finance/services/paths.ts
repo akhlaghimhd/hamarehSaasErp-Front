@@ -25,4 +25,13 @@ export const financePaths = {
   openItemsAging: `${FINANCE_BASE}/open-items/aging`,
   openItemAllocate: (id: string) => `${FINANCE_BASE}/open-items/${id}/allocate`,
   bankStatements: `${FINANCE_BASE}/bank-statements`,
+  taxRates: `${FINANCE_BASE}/tax/rates`,
+  taxSplit: `${FINANCE_BASE}/tax/split`,
+  taxTransactions: `${FINANCE_BASE}/tax/transactions`,
+  moodianSubmissions: `${FINANCE_BASE}/moodian/submissions`,
+  moodianSubmit: `${FINANCE_BASE}/moodian/submit`,
+  moodianPoll: (id: string) => `${FINANCE_BASE}/moodian/submissions/${id}/poll`,
+  complianceAlerts: `${FINANCE_BASE}/compliance-alerts`,
+  complianceScan: `${FINANCE_BASE}/compliance-alerts/scan`,
+  complianceResolve: (id: string) => `${FINANCE_BASE}/compliance-alerts/${id}/resolve`,
 } as const;
