@@ -17,6 +17,7 @@ import {
   ChevronsRight,
   X,
   Shield,
+  Calculator,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { useSidebar } from "@/shared/components/layout/sidebar-context";
@@ -26,6 +27,7 @@ const navItems = [
   { href: "/dashboard", label: "داشبورد", icon: LayoutDashboard },
   { href: "/dashboard/identity", label: "هویت و دسترسی", icon: Shield },
   { href: "/dashboard/organization", label: "سازمان", icon: Building2 },
+  { href: "/dashboard/finance", label: "حسابداری", icon: Calculator },
   { href: "/dashboard/ui-guide", label: "راهنمای UI", icon: BookOpen },
   { href: "/dashboard/showcase", label: "نمایشگاه UI", icon: Component },
   { href: "/themes", label: "پالت رنگ", icon: Palette },
