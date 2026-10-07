@@ -17,6 +17,7 @@ import {
   CalendarCheck,
   GitBranch,
   Layers,
+  Sparkles,
 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { usePermission } from "@/auth";
@@ -97,6 +98,7 @@ export function FinanceHomePage() {
   const canFa = usePermission(FinancePermissions.faView);
   const canPeriod = usePermission(FinancePermissions.periodView);
   const canIc = usePermission(FinancePermissions.icView);
+  const canSmart = usePermission(FinancePermissions.smartView);
 
   const cards: HubCard[] = [
     {
@@ -121,6 +123,14 @@ export function FinanceHomePage() {
       title: "صندوق پیشنهادها",
       description: "K1 — قبول/رد پیش‌نویس از رویداد عملیاتی",
       icon: Inbox,
+      open: true,
+    },
+    {
+      key: "smart",
+      href: "/dashboard/finance/smart-assist",
+      title: "دستیار هوشمند",
+      description: "K2/K5/K6 — پیشنهاد، بینش، NL→Draft",
+      icon: Sparkles,
       open: true,
     },
     {
@@ -217,6 +227,7 @@ export function FinanceHomePage() {
     accounts: canCoa,
     journals: canJournal,
     suggested: canSuggest,
+    smart: canSmart,
     reports: canReport,
     treasury: canTreasury,
     cheques: canTreasury,
@@ -234,7 +245,7 @@ export function FinanceHomePage() {
     <div className="space-y-6">
       <PageHeader
         title="حسابداری مالی"
-        description="دفتر کل تا گروه و بین شرکتی (P0–P5)"
+        description="دفتر کل تا گروه و دستیار هوشمند (P0–P6)"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "حسابداری" },
