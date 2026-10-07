@@ -1,4 +1,4 @@
-/** FIN-P0 FE types — aligned with FinancialAccounting API */
+/** FIN-P0/P1 FE types — aligned with FinancialAccounting API */
 
 export const FinancePermissions = {
   coaView: "finance.coa.view",
@@ -15,6 +15,13 @@ export const FinancePermissions = {
   periodClose: "finance.period.close",
   periodReopen: "finance.period.reopen",
   reportView: "finance.report.view",
+  treasuryView: "finance.treasury.view",
+  treasuryManage: "finance.treasury.manage",
+  treasuryPost: "finance.treasury.post",
+  arView: "finance.ar.view",
+  arManage: "finance.ar.manage",
+  apView: "finance.ap.view",
+  apManage: "finance.ap.manage",
 } as const;
 
 export type FinancePermissionCode =
@@ -118,6 +125,53 @@ export interface BalanceSheetDto {
   total_liabilities_equity: string;
 }
 
+export interface TreasuryDocumentDto {
+  treasury_document_id: string;
+  company_id: string;
+  period_id: string;
+  cash_account_id: string;
+  document_type: "RECEIPT" | "PAYMENT" | string;
+  document_number?: string | null;
+  document_date: string;
+  status: string;
+  amount: number | string;
+  counterparty_name?: string | null;
+  description?: string | null;
+  journal_entry_id?: string | null;
+}
+
+export interface ChequeDto {
+  cheque_id: string;
+  company_id: string;
+  direction: string;
+  cheque_number: string;
+  bank_name?: string | null;
+  due_date: string;
+  amount: number | string;
+  status: string;
+  payee_name?: string | null;
+  drawer_name?: string | null;
+}
+
+export interface OpenItemDto {
+  open_item_id: string;
+  company_id: string;
+  side: "AR" | "AP" | string;
+  document_number?: string | null;
+  document_date: string;
+  due_date?: string | null;
+  counterparty_name: string;
+  original_amount: number | string;
+  open_amount: number | string;
+  status: string;
+}
+
+export interface AgingBucketDto {
+  bucket: string;
+  count: number;
+  amount: string;
+}
+
 /** Demo period from DemoFinanceCoaSeeder */
 export const DEMO_PERIOD_ID = "a1000000-0000-4000-8000-000000000001";
 
@@ -127,4 +181,12 @@ export const ACCOUNT_TYPE_LABELS: Record<number, string> = {
   3: "حقوق صاحبان سهام",
   4: "درآمد",
   5: "هزینه",
+};
+
+export const AGING_BUCKET_LABELS: Record<string, string> = {
+  current: "جاری",
+  "1_30": "۱–۳۰ روز",
+  "31_60": "۳۱–۶۰ روز",
+  "61_90": "۶۱–۹۰ روز",
+  "90_plus": "بیش از ۹۰ روز",
 };
