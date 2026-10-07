@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, FileText, BarChart3, TreePine } from "lucide-react";
+import {
+  FileText,
+  BarChart3,
+  TreePine,
+  Wallet,
+  ScrollText,
+  BookMarked,
+} from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { usePermission } from "@/auth";
 import { FinancePermissions } from "../types";
@@ -12,9 +19,8 @@ type HubCard = {
   href: string;
   title: string;
   description: string;
-  icon: typeof BookOpen;
+  icon: typeof TreePine;
   open: boolean;
-  permission: string;
 };
 
 function HubCardView({
@@ -74,25 +80,25 @@ export function FinanceHomePage() {
   const canCoa = usePermission(FinancePermissions.coaView);
   const canJournal = usePermission(FinancePermissions.journalView);
   const canReport = usePermission(FinancePermissions.reportView);
+  const canTreasury = usePermission(FinancePermissions.treasuryView);
+  const canAr = usePermission(FinancePermissions.arView);
 
   const cards: HubCard[] = [
     {
       key: "accounts",
       href: "/dashboard/finance/accounts",
       title: "کدینگ حساب‌ها",
-      description: "درخت حساب‌های کل و معین؛ ایجاد و حذف نرم",
+      description: "درخت حساب‌های کل و معین",
       icon: TreePine,
       open: true,
-      permission: FinancePermissions.coaView,
     },
     {
       key: "journals",
       href: "/dashboard/finance/journals",
       title: "اسناد حسابداری",
-      description: "پیش‌نویس، ثبت قطعی و برگشت سند",
+      description: "پیش‌نویس، ثبت قطعی و برگشت",
       icon: FileText,
       open: true,
-      permission: FinancePermissions.journalView,
     },
     {
       key: "reports",
@@ -101,7 +107,30 @@ export function FinanceHomePage() {
       description: "تراز آزمایشی، سود و زیان، ترازنامه",
       icon: BarChart3,
       open: true,
-      permission: FinancePermissions.reportView,
+    },
+    {
+      key: "treasury",
+      href: "/dashboard/finance/treasury",
+      title: "خزانه",
+      description: "اسناد دریافت و پرداخت",
+      icon: Wallet,
+      open: true,
+    },
+    {
+      key: "cheques",
+      href: "/dashboard/finance/cheques",
+      title: "چک",
+      description: "ثبت و چرخه وضعیت چک",
+      icon: ScrollText,
+      open: true,
+    },
+    {
+      key: "openItems",
+      href: "/dashboard/finance/open-items",
+      title: "حساب‌های باز",
+      description: "AR/AP و عمر بدهی",
+      icon: BookMarked,
+      open: true,
     },
   ];
 
@@ -109,13 +138,16 @@ export function FinanceHomePage() {
     accounts: canCoa,
     journals: canJournal,
     reports: canReport,
+    treasury: canTreasury,
+    cheques: canTreasury,
+    openItems: canAr,
   };
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="حسابداری مالی"
-        description="دفتر کل، کدینگ، اسناد و گزارش‌های پایه (موج P0)"
+        description="دفتر کل، خزانه، چک و حساب‌های باز (P0 + P1)"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "حسابداری" },
