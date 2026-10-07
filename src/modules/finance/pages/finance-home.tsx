@@ -15,6 +15,8 @@ import {
   Inbox,
   Building2,
   CalendarCheck,
+  GitBranch,
+  Layers,
 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { usePermission } from "@/auth";
@@ -94,6 +96,7 @@ export function FinanceHomePage() {
   const canSuggest = usePermission(FinancePermissions.suggestView);
   const canFa = usePermission(FinancePermissions.faView);
   const canPeriod = usePermission(FinancePermissions.periodView);
+  const canIc = usePermission(FinancePermissions.icView);
 
   const cards: HubCard[] = [
     {
@@ -192,6 +195,22 @@ export function FinanceHomePage() {
       icon: CalendarCheck,
       open: true,
     },
+    {
+      key: "intercompany",
+      href: "/dashboard/finance/intercompany",
+      title: "بین شرکتی",
+      description: "H — نقشه / جفت پیش‌نویس / حذف",
+      icon: GitBranch,
+      open: true,
+    },
+    {
+      key: "consolTb",
+      href: "/dashboard/finance/consolidated-tb",
+      title: "تراز تلفیقی",
+      description: "جمع OPERATING زیر ریشه گروه",
+      icon: Layers,
+      open: true,
+    },
   ];
 
   const allowedMap: Record<string, boolean> = {
@@ -207,13 +226,15 @@ export function FinanceHomePage() {
     alerts: canCompliance,
     fixedAssets: canFa,
     periodClose: canPeriod,
+    intercompany: canIc,
+    consolTb: canIc,
   };
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="حسابداری مالی"
-        description="دفتر کل، خزانه، مالیات، دارایی ثابت و بستن دوره (P0–P4)"
+        description="دفتر کل تا گروه و بین شرکتی (P0–P5)"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "حسابداری" },
