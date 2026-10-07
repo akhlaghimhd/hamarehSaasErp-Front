@@ -9,6 +9,9 @@ import {
   Wallet,
   ScrollText,
   BookMarked,
+  Percent,
+  Send,
+  AlertTriangle,
 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { usePermission } from "@/auth";
@@ -82,6 +85,9 @@ export function FinanceHomePage() {
   const canReport = usePermission(FinancePermissions.reportView);
   const canTreasury = usePermission(FinancePermissions.treasuryView);
   const canAr = usePermission(FinancePermissions.arView);
+  const canTax = usePermission(FinancePermissions.taxView);
+  const canMoodian = usePermission(FinancePermissions.moodianView);
+  const canCompliance = usePermission(FinancePermissions.complianceView);
 
   const cards: HubCard[] = [
     {
@@ -132,6 +138,30 @@ export function FinanceHomePage() {
       icon: BookMarked,
       open: true,
     },
+    {
+      key: "tax",
+      href: "/dashboard/finance/tax",
+      title: "نرخ مالیات",
+      description: "پیکربندی VAT دوره‌ای",
+      icon: Percent,
+      open: true,
+    },
+    {
+      key: "moodian",
+      href: "/dashboard/finance/moodian",
+      title: "مودیان",
+      description: "پیگیری ارسال صورتحساب",
+      icon: Send,
+      open: true,
+    },
+    {
+      key: "alerts",
+      href: "/dashboard/finance/compliance-alerts",
+      title: "هشدار انطباق",
+      description: "K3 — شکاف مودیان و کیفیت",
+      icon: AlertTriangle,
+      open: true,
+    },
   ];
 
   const allowedMap: Record<string, boolean> = {
@@ -141,13 +171,16 @@ export function FinanceHomePage() {
     treasury: canTreasury,
     cheques: canTreasury,
     openItems: canAr,
+    tax: canTax,
+    moodian: canMoodian,
+    alerts: canCompliance,
   };
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="حسابداری مالی"
-        description="دفتر کل، خزانه، چک و حساب‌های باز (P0 + P1)"
+        description="دفتر کل، خزانه، مالیات و مودیان (P0–P2)"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "حسابداری" },
