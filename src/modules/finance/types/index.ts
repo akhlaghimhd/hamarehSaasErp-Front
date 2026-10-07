@@ -1,4 +1,4 @@
-/** FIN-P0/P1/P2/P3 FE types — aligned with FinancialAccounting API */
+/** FIN-P0..P4 FE types — aligned with FinancialAccounting API */
 
 export const FinancePermissions = {
   coaView: "finance.coa.view",
@@ -31,6 +31,9 @@ export const FinancePermissions = {
   suggestView: "finance.suggest.view",
   suggestManage: "finance.suggest.manage",
   suggestDecide: "finance.suggest.decide",
+  faView: "finance.fa.view",
+  faManage: "finance.fa.manage",
+  faDepreciate: "finance.fa.depreciate",
 } as const;
 
 export type FinancePermissionCode =
@@ -49,6 +52,8 @@ export interface AccountDto {
   normal_balance?: number;
   is_control_account?: boolean;
   is_postable?: boolean;
+  requires_cost_center?: boolean;
+  requires_business_unit?: boolean;
   status?: number;
   children?: AccountTreeNode[];
 }
@@ -246,6 +251,37 @@ export interface SuggestedJournalDto {
   journal_entry_id?: string | null;
   decision_note?: string | null;
   lines?: SuggestedJournalLineDto[];
+}
+
+export interface FixedAssetDto {
+  fixed_asset_id: string;
+  company_id: string;
+  asset_code: string;
+  name: string;
+  acquisition_cost: number | string;
+  book_value: number | string;
+  accumulated_depreciation?: number | string;
+  status: string;
+  useful_life_months?: number;
+  acquisition_date?: string;
+}
+
+export interface PeriodCloseItemDto {
+  code: string;
+  severity: string;
+  title: string;
+  message: string;
+  blocking?: boolean;
+}
+
+export interface PeriodCloseChecklistDto {
+  checklist?: {
+    checklist_id?: string;
+    has_blocking?: boolean;
+    items_json?: PeriodCloseItemDto[];
+  };
+  items?: PeriodCloseItemDto[];
+  has_blocking?: boolean;
 }
 
 export const DEMO_PERIOD_ID = "a1000000-0000-4000-8000-000000000001";

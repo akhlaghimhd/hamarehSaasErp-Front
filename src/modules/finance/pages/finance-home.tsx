@@ -13,6 +13,8 @@ import {
   Send,
   AlertTriangle,
   Inbox,
+  Building2,
+  CalendarCheck,
 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { usePermission } from "@/auth";
@@ -90,6 +92,8 @@ export function FinanceHomePage() {
   const canMoodian = usePermission(FinancePermissions.moodianView);
   const canCompliance = usePermission(FinancePermissions.complianceView);
   const canSuggest = usePermission(FinancePermissions.suggestView);
+  const canFa = usePermission(FinancePermissions.faView);
+  const canPeriod = usePermission(FinancePermissions.periodView);
 
   const cards: HubCard[] = [
     {
@@ -172,6 +176,22 @@ export function FinanceHomePage() {
       icon: AlertTriangle,
       open: true,
     },
+    {
+      key: "fixedAssets",
+      href: "/dashboard/finance/fixed-assets",
+      title: "دارایی ثابت",
+      description: "F — دارایی و استهلاک → پیش‌نویس",
+      icon: Building2,
+      open: true,
+    },
+    {
+      key: "periodClose",
+      href: "/dashboard/finance/period-close",
+      title: "بستن دوره",
+      description: "K4 — چک‌لیست هدایت‌شده",
+      icon: CalendarCheck,
+      open: true,
+    },
   ];
 
   const allowedMap: Record<string, boolean> = {
@@ -185,13 +205,15 @@ export function FinanceHomePage() {
     tax: canTax,
     moodian: canMoodian,
     alerts: canCompliance,
+    fixedAssets: canFa,
+    periodClose: canPeriod,
   };
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="حسابداری مالی"
-        description="دفتر کل، خزانه، مالیات، مودیان و پیشنهاد هوشمند (P0–P3)"
+        description="دفتر کل، خزانه، مالیات، دارایی ثابت و بستن دوره (P0–P4)"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "حسابداری" },
