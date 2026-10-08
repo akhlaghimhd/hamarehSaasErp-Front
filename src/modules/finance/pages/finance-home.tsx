@@ -40,15 +40,14 @@ type HubGroup = {
   title: string;
 };
 
+/** ترتیب بر اساس فرکانس استفاده: روزانه → جاری → ماهانه → بستن → پایه → گروه */
 const HUB_GROUPS: HubGroup[] = [
-  { id: "gl_core", title: "دفتر کل و پایه" },
-  { id: "treasury", title: "خزانه و نقدینگی" },
-  { id: "ar_ap", title: "مشتریان و تأمین‌کنندگان" },
-  { id: "tax_compliance", title: "مالیات و انطباق" },
-  { id: "fixed_assets", title: "دارایی ثابت" },
-  { id: "group_ic", title: "چندشرکتی و بین‌شرکتی" },
+  { id: "daily_ops", title: "عملیات روزانه" },
+  { id: "ongoing_control", title: "کنترل جاری" },
+  { id: "tax_periodic", title: "مالیات و انطباق دوره‌ای" },
   { id: "reports_close", title: "گزارش‌ها و بستن دوره" },
-  { id: "smart", title: "کنترل و هوشمند" },
+  { id: "setup_structure", title: "پایه و ساختار" },
+  { id: "assets_group", title: "دارایی و گروه" },
 ];
 
 function HubCardView({
@@ -120,15 +119,7 @@ export function FinanceHomePage() {
   const canSmart = usePermission(FinancePermissions.smartView);
 
   const cards: HubCard[] = [
-    {
-      key: "accounts",
-      href: "/dashboard/finance/accounts",
-      title: "کدینگ حساب‌ها",
-      description: "درخت حساب‌های کل و معین",
-      icon: ListTree,
-      open: true,
-      group: "gl_core",
-    },
+    // —— عملیات روزانه
     {
       key: "journals",
       href: "/dashboard/finance/journals",
@@ -136,7 +127,7 @@ export function FinanceHomePage() {
       description: "پیش‌نویس، ثبت قطعی و برگشت",
       icon: NotebookPen,
       open: true,
-      group: "gl_core",
+      group: "daily_ops",
     },
     {
       key: "suggested",
@@ -145,7 +136,7 @@ export function FinanceHomePage() {
       description: "K1 — قبول/رد پیش‌نویس از رویداد عملیاتی",
       icon: Inbox,
       open: true,
-      group: "gl_core",
+      group: "daily_ops",
     },
     {
       key: "treasury",
@@ -154,16 +145,7 @@ export function FinanceHomePage() {
       description: "اسناد دریافت و پرداخت",
       icon: Wallet,
       open: true,
-      group: "treasury",
-    },
-    {
-      key: "bankRecon",
-      href: "/dashboard/finance/bank-recon",
-      title: "تطبیق بانکی",
-      description: "صورت‌حساب بانک و match سطر",
-      icon: Scale,
-      open: true,
-      group: "treasury",
+      group: "daily_ops",
     },
     {
       key: "cheques",
@@ -172,7 +154,7 @@ export function FinanceHomePage() {
       description: "ثبت و چرخه وضعیت چک",
       icon: FileCheck2,
       open: true,
-      group: "treasury",
+      group: "daily_ops",
     },
     {
       key: "openItems",
@@ -181,34 +163,17 @@ export function FinanceHomePage() {
       description: "AR/AP و عمر بدهی",
       icon: HandCoins,
       open: true,
-      group: "ar_ap",
+      group: "daily_ops",
     },
+    // —— کنترل جاری
     {
-      key: "tax",
-      href: "/dashboard/finance/tax",
-      title: "نرخ مالیات",
-      description: "پیکربندی VAT دوره‌ای",
-      icon: BadgePercent,
+      key: "bankRecon",
+      href: "/dashboard/finance/bank-recon",
+      title: "تطبیق بانکی",
+      description: "صورت‌حساب بانک و match سطر",
+      icon: Scale,
       open: true,
-      group: "tax_compliance",
-    },
-    {
-      key: "taxReports",
-      href: "/dashboard/finance/tax-reports",
-      title: "گزارش VAT / مودیان",
-      description: "خلاصه دوره + شکاف ارسال",
-      icon: FileSpreadsheet,
-      open: true,
-      group: "tax_compliance",
-    },
-    {
-      key: "moodian",
-      href: "/dashboard/finance/moodian",
-      title: "مودیان",
-      description: "پیگیری ارسال صورتحساب",
-      icon: Send,
-      open: true,
-      group: "tax_compliance",
+      group: "ongoing_control",
     },
     {
       key: "alerts",
@@ -217,35 +182,46 @@ export function FinanceHomePage() {
       description: "K3 — شکاف مودیان و کیفیت",
       icon: BellRing,
       open: true,
-      group: "tax_compliance",
+      group: "ongoing_control",
     },
     {
-      key: "fixedAssets",
-      href: "/dashboard/finance/fixed-assets",
-      title: "دارایی ثابت",
-      description: "F — دارایی و استهلاک → پیش‌نویس",
-      icon: Building2,
+      key: "smart",
+      href: "/dashboard/finance/smart-assist",
+      title: "دستیار هوشمند",
+      description: "K2/K5/K6 — پیشنهاد، بینش، NL→Draft",
+      icon: Sparkles,
       open: true,
-      group: "fixed_assets",
+      group: "ongoing_control",
+    },
+    // —— مالیات و انطباق دوره‌ای
+    {
+      key: "tax",
+      href: "/dashboard/finance/tax",
+      title: "نرخ مالیات",
+      description: "پیکربندی VAT دوره‌ای",
+      icon: BadgePercent,
+      open: true,
+      group: "tax_periodic",
     },
     {
-      key: "intercompany",
-      href: "/dashboard/finance/intercompany",
-      title: "بین شرکتی",
-      description: "H — نقشه / جفت پیش‌نویس / حذف",
-      icon: Share2,
+      key: "taxReports",
+      href: "/dashboard/finance/tax-reports",
+      title: "گزارش VAT / مودیان",
+      description: "خلاصه دوره + شکاف ارسال",
+      icon: FileSpreadsheet,
       open: true,
-      group: "group_ic",
+      group: "tax_periodic",
     },
     {
-      key: "consolTb",
-      href: "/dashboard/finance/consolidated-tb",
-      title: "تراز تلفیقی",
-      description: "جمع OPERATING زیر ریشه گروه",
-      icon: Boxes,
+      key: "moodian",
+      href: "/dashboard/finance/moodian",
+      title: "مودیان",
+      description: "پیگیری ارسال صورتحساب",
+      icon: Send,
       open: true,
-      group: "group_ic",
+      group: "tax_periodic",
     },
+    // —— گزارش‌ها و بستن دوره
     {
       key: "reports",
       href: "/dashboard/finance/reports",
@@ -264,14 +240,43 @@ export function FinanceHomePage() {
       open: true,
       group: "reports_close",
     },
+    // —— پایه و ساختار
     {
-      key: "smart",
-      href: "/dashboard/finance/smart-assist",
-      title: "دستیار هوشمند",
-      description: "K2/K5/K6 — پیشنهاد، بینش، NL→Draft",
-      icon: Sparkles,
+      key: "accounts",
+      href: "/dashboard/finance/accounts",
+      title: "کدینگ حساب‌ها",
+      description: "درخت حساب‌های کل و معین",
+      icon: ListTree,
       open: true,
-      group: "smart",
+      group: "setup_structure",
+    },
+    // —— دارایی و گروه
+    {
+      key: "fixedAssets",
+      href: "/dashboard/finance/fixed-assets",
+      title: "دارایی ثابت",
+      description: "F — دارایی و استهلاک → پیش‌نویس",
+      icon: Building2,
+      open: true,
+      group: "assets_group",
+    },
+    {
+      key: "intercompany",
+      href: "/dashboard/finance/intercompany",
+      title: "بین شرکتی",
+      description: "H — نقشه / جفت پیش‌نویس / حذف",
+      icon: Share2,
+      open: true,
+      group: "assets_group",
+    },
+    {
+      key: "consolTb",
+      href: "/dashboard/finance/consolidated-tb",
+      title: "تراز تلفیقی",
+      description: "جمع OPERATING زیر ریشه گروه",
+      icon: Boxes,
+      open: true,
+      group: "assets_group",
     },
   ];
 
@@ -299,7 +304,7 @@ export function FinanceHomePage() {
     <div className="space-y-8">
       <PageHeader
         title="حسابداری مالی"
-        description="دفتر کل تا گروه و دستیار هوشمند (P0–P6 + residual)"
+        description="چیدمان بر اساس کاربرد روزانه تا دوره‌ای"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "حسابداری" },
