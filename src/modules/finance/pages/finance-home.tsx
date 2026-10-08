@@ -18,6 +18,8 @@ import {
   GitBranch,
   Layers,
   Sparkles,
+  Landmark,
+  FileSpreadsheet,
 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { usePermission } from "@/auth";
@@ -150,6 +152,14 @@ export function FinanceHomePage() {
       open: true,
     },
     {
+      key: "bankRecon",
+      href: "/dashboard/finance/bank-recon",
+      title: "تطبیق بانکی",
+      description: "صورت‌حساب بانک و match سطر",
+      icon: Landmark,
+      open: true,
+    },
+    {
       key: "cheques",
       href: "/dashboard/finance/cheques",
       title: "چک",
@@ -171,6 +181,14 @@ export function FinanceHomePage() {
       title: "نرخ مالیات",
       description: "پیکربندی VAT دوره‌ای",
       icon: Percent,
+      open: true,
+    },
+    {
+      key: "taxReports",
+      href: "/dashboard/finance/tax-reports",
+      title: "گزارش VAT / مودیان",
+      description: "خلاصه دوره + شکاف ارسال",
+      icon: FileSpreadsheet,
       open: true,
     },
     {
@@ -201,7 +219,7 @@ export function FinanceHomePage() {
       key: "periodClose",
       href: "/dashboard/finance/period-close",
       title: "بستن دوره",
-      description: "K4 — چک‌لیست هدایت‌شده",
+      description: "K4 — وضعیت دوره + چک‌لیست",
       icon: CalendarCheck,
       open: true,
     },
@@ -230,9 +248,11 @@ export function FinanceHomePage() {
     smart: canSmart,
     reports: canReport,
     treasury: canTreasury,
+    bankRecon: canTreasury,
     cheques: canTreasury,
     openItems: canAr,
     tax: canTax,
+    taxReports: canTax,
     moodian: canMoodian,
     alerts: canCompliance,
     fixedAssets: canFa,
@@ -245,7 +265,7 @@ export function FinanceHomePage() {
     <div className="space-y-6">
       <PageHeader
         title="حسابداری مالی"
-        description="دفتر کل تا گروه و دستیار هوشمند (P0–P6)"
+        description="دفتر کل تا گروه و دستیار هوشمند (P0–P6 + residual)"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "حسابداری" },
