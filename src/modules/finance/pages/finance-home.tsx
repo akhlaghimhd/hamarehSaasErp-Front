@@ -3,23 +3,23 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  FileText,
-  BarChart3,
-  TreePine,
-  Wallet,
-  ScrollText,
-  BookMarked,
-  Percent,
-  Send,
-  AlertTriangle,
+  ListTree,
+  NotebookPen,
   Inbox,
-  Building2,
-  CalendarCheck,
-  GitBranch,
-  Layers,
   Sparkles,
-  Landmark,
+  BarChart3,
+  Wallet,
+  Scale,
+  FileCheck2,
+  HandCoins,
+  BadgePercent,
   FileSpreadsheet,
+  Send,
+  BellRing,
+  Building2,
+  ClipboardCheck,
+  Share2,
+  Boxes,
 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { usePermission } from "@/auth";
@@ -30,9 +30,26 @@ type HubCard = {
   href: string;
   title: string;
   description: string;
-  icon: typeof TreePine;
+  icon: typeof ListTree;
   open: boolean;
+  group: string;
 };
+
+type HubGroup = {
+  id: string;
+  title: string;
+};
+
+const HUB_GROUPS: HubGroup[] = [
+  { id: "gl_core", title: "دفتر کل و پایه" },
+  { id: "treasury", title: "خزانه و نقدینگی" },
+  { id: "ar_ap", title: "مشتریان و تأمین‌کنندگان" },
+  { id: "tax_compliance", title: "مالیات و انطباق" },
+  { id: "fixed_assets", title: "دارایی ثابت" },
+  { id: "group_ic", title: "چندشرکتی و بین‌شرکتی" },
+  { id: "reports_close", title: "گزارش‌ها و بستن دوره" },
+  { id: "smart", title: "کنترل و هوشمند" },
+];
 
 function HubCardView({
   card,
@@ -108,16 +125,18 @@ export function FinanceHomePage() {
       href: "/dashboard/finance/accounts",
       title: "کدینگ حساب‌ها",
       description: "درخت حساب‌های کل و معین",
-      icon: TreePine,
+      icon: ListTree,
       open: true,
+      group: "gl_core",
     },
     {
       key: "journals",
       href: "/dashboard/finance/journals",
       title: "اسناد حسابداری",
       description: "پیش‌نویس، ثبت قطعی و برگشت",
-      icon: FileText,
+      icon: NotebookPen,
       open: true,
+      group: "gl_core",
     },
     {
       key: "suggested",
@@ -126,22 +145,7 @@ export function FinanceHomePage() {
       description: "K1 — قبول/رد پیش‌نویس از رویداد عملیاتی",
       icon: Inbox,
       open: true,
-    },
-    {
-      key: "smart",
-      href: "/dashboard/finance/smart-assist",
-      title: "دستیار هوشمند",
-      description: "K2/K5/K6 — پیشنهاد، بینش، NL→Draft",
-      icon: Sparkles,
-      open: true,
-    },
-    {
-      key: "reports",
-      href: "/dashboard/finance/reports",
-      title: "گزارش‌های مالی",
-      description: "تراز آزمایشی، سود و زیان، ترازنامه",
-      icon: BarChart3,
-      open: true,
+      group: "gl_core",
     },
     {
       key: "treasury",
@@ -150,38 +154,43 @@ export function FinanceHomePage() {
       description: "اسناد دریافت و پرداخت",
       icon: Wallet,
       open: true,
+      group: "treasury",
     },
     {
       key: "bankRecon",
       href: "/dashboard/finance/bank-recon",
       title: "تطبیق بانکی",
       description: "صورت‌حساب بانک و match سطر",
-      icon: Landmark,
+      icon: Scale,
       open: true,
+      group: "treasury",
     },
     {
       key: "cheques",
       href: "/dashboard/finance/cheques",
       title: "چک",
       description: "ثبت و چرخه وضعیت چک",
-      icon: ScrollText,
+      icon: FileCheck2,
       open: true,
+      group: "treasury",
     },
     {
       key: "openItems",
       href: "/dashboard/finance/open-items",
       title: "حساب‌های باز",
       description: "AR/AP و عمر بدهی",
-      icon: BookMarked,
+      icon: HandCoins,
       open: true,
+      group: "ar_ap",
     },
     {
       key: "tax",
       href: "/dashboard/finance/tax",
       title: "نرخ مالیات",
       description: "پیکربندی VAT دوره‌ای",
-      icon: Percent,
+      icon: BadgePercent,
       open: true,
+      group: "tax_compliance",
     },
     {
       key: "taxReports",
@@ -190,6 +199,7 @@ export function FinanceHomePage() {
       description: "خلاصه دوره + شکاف ارسال",
       icon: FileSpreadsheet,
       open: true,
+      group: "tax_compliance",
     },
     {
       key: "moodian",
@@ -198,14 +208,16 @@ export function FinanceHomePage() {
       description: "پیگیری ارسال صورتحساب",
       icon: Send,
       open: true,
+      group: "tax_compliance",
     },
     {
       key: "alerts",
       href: "/dashboard/finance/compliance-alerts",
       title: "هشدار انطباق",
       description: "K3 — شکاف مودیان و کیفیت",
-      icon: AlertTriangle,
+      icon: BellRing,
       open: true,
+      group: "tax_compliance",
     },
     {
       key: "fixedAssets",
@@ -214,30 +226,52 @@ export function FinanceHomePage() {
       description: "F — دارایی و استهلاک → پیش‌نویس",
       icon: Building2,
       open: true,
-    },
-    {
-      key: "periodClose",
-      href: "/dashboard/finance/period-close",
-      title: "بستن دوره",
-      description: "K4 — وضعیت دوره + چک‌لیست",
-      icon: CalendarCheck,
-      open: true,
+      group: "fixed_assets",
     },
     {
       key: "intercompany",
       href: "/dashboard/finance/intercompany",
       title: "بین شرکتی",
       description: "H — نقشه / جفت پیش‌نویس / حذف",
-      icon: GitBranch,
+      icon: Share2,
       open: true,
+      group: "group_ic",
     },
     {
       key: "consolTb",
       href: "/dashboard/finance/consolidated-tb",
       title: "تراز تلفیقی",
       description: "جمع OPERATING زیر ریشه گروه",
-      icon: Layers,
+      icon: Boxes,
       open: true,
+      group: "group_ic",
+    },
+    {
+      key: "reports",
+      href: "/dashboard/finance/reports",
+      title: "گزارش‌های مالی",
+      description: "تراز آزمایشی، سود و زیان، ترازنامه",
+      icon: BarChart3,
+      open: true,
+      group: "reports_close",
+    },
+    {
+      key: "periodClose",
+      href: "/dashboard/finance/period-close",
+      title: "بستن دوره",
+      description: "K4 — وضعیت دوره + چک‌لیست",
+      icon: ClipboardCheck,
+      open: true,
+      group: "reports_close",
+    },
+    {
+      key: "smart",
+      href: "/dashboard/finance/smart-assist",
+      title: "دستیار هوشمند",
+      description: "K2/K5/K6 — پیشنهاد، بینش، NL→Draft",
+      icon: Sparkles,
+      open: true,
+      group: "smart",
     },
   ];
 
@@ -262,7 +296,7 @@ export function FinanceHomePage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title="حسابداری مالی"
         description="دفتر کل تا گروه و دستیار هوشمند (P0–P6 + residual)"
@@ -272,20 +306,32 @@ export function FinanceHomePage() {
         ]}
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {cards.map((card) => {
-          const active =
-            pathname === card.href || pathname.startsWith(card.href + "/");
-          return (
-            <HubCardView
-              key={card.key}
-              card={card}
-              active={active}
-              allowed={allowedMap[card.key] ?? false}
-            />
-          );
-        })}
-      </div>
+      {HUB_GROUPS.map((group) => {
+        const groupCards = cards.filter((c) => c.group === group.id);
+        if (groupCards.length === 0) return null;
+        return (
+          <section key={group.id} className="space-y-3">
+            <h2 className="text-sm font-semibold text-muted-foreground">
+              {group.title}
+            </h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {groupCards.map((card) => {
+                const active =
+                  pathname === card.href ||
+                  pathname.startsWith(card.href + "/");
+                return (
+                  <HubCardView
+                    key={card.key}
+                    card={card}
+                    active={active}
+                    allowed={allowedMap[card.key] ?? false}
+                  />
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }
