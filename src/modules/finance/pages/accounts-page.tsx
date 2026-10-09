@@ -18,6 +18,7 @@ import {
   useAccountTree,
   useCreateAccount,
   useDeleteAccount,
+  financeAccountKeys,
 } from "../hooks/use-accounts";
 import { accountService } from "../services/account-service";
 import {
@@ -28,9 +29,17 @@ import {
 import { ApiClientError } from "@/api";
 import { cn, toFaDigits } from "@/shared/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { financeAccountKeys } from "../hooks/use-accounts";
 
 const TYPE_ORDER = [1, 2, 3, 4, 5] as const;
+
+/** پایه کد برای هر نوع حساب (حساب ریشه) */
+const TYPE_CODE_BASE: Record<number, number> = {
+  1: 1000,
+  2: 2000,
+  3: 3000,
+  4: 4000,
+  5: 5000,
+};
 
 function groupByType(roots: AccountTreeNode[]): Record<number, AccountTreeNode[]> {
   const map: Record<number, AccountTreeNode[]> = { 1: [], 2: [], 3: [], 4: [], 5: [] };
@@ -39,6 +48,75 @@ function groupByType(roots: AccountTreeNode[]): Record<number, AccountTreeNode[]
     if (map[t]) map[t].push(n);
   }
   return map;
+}
+
+function collectCodes(nodes: AccountTreeNode[], set: Set<string>) {
+  for (const n of nodes) {
+    set.add(String(n.account_code).trim());
+    if (n.children?.length) collectCodes(n.children, set);
+  }
+}
+
+function parseCodeNum(code: string): number | null {
+  const n = Number(String(code).trim());
+  return Number.isFinite(n) ? n : null;
+}
+
+/** پیشنهاد کد حساب ریشه بر اساس نوع */
+function suggestRootCode(type: number, roots: AccountTreeNode[]): string {
+  const used = new Set<string>();
+  collectCodes(roots, used);
+
+  const sameType = roots.filter((r) => Number(r.account_type) === type);
+  let max = (TYPE_CODE_BASE[type] ?? 1000) - 100;
+
+  for (const r of sameType) {
+    const n = parseCodeNum(r.account_code);
+    if (n !== null && n > max) max = n;
+  }
+
+  // گام ۱۰۰ برای ریشه تا جا برای زیرحساب بماند
+  let candidate = max < (TYPE_CODE_BASE[type] ?? 1000) ? (TYPE_CODE_BASE[type] ?? 1000) : max + 100;
+  while (used.has(String(candidate))) candidate += 100;
+  return String(candidate);
+}
+
+/** پیشنهاد کد زیرحساب بر اساس والد و خواهر/برادرها */
+function suggestChildCode(parent: AccountTreeNode, allRoots: AccountTreeNode[]): string {
+  const used = new Set<string>();
+  collectCodes(allRoots, used);
+
+  const siblings = parent.children ?? [];
+  const parentNum = parseCodeNum(parent.account_code);
+  const parentCode = String(parent.account_code).trim();
+
+  if (siblings.length === 0) {
+    // اولین فرزند: parent + 01 یا parentNum+1
+    if (parentNum !== null) {
+      let c = parentNum + 1;
+      // اگر parent مثل 1100 باشد، 1101 منطقی‌تر است
+      if (parentCode.endsWith("00") || parentCode.endsWith("0")) {
+        c = parentNum + 1;
+      }
+      while (used.has(String(c))) c += 1;
+      return String(c);
+    }
+    const fallback = `${parentCode}01`;
+    if (!used.has(fallback)) return fallback;
+    let i = 2;
+    while (used.has(`${parentCode}${String(i).padStart(2, "0")}`)) i += 1;
+    return `${parentCode}${String(i).padStart(2, "0")}`;
+  }
+
+  // بیشینه عددی بین خواهر/برادرها
+  let max = parentNum ?? 0;
+  for (const s of siblings) {
+    const n = parseCodeNum(s.account_code);
+    if (n !== null && n > max) max = n;
+  }
+  let candidate = max + 1;
+  while (used.has(String(candidate))) candidate += 1;
+  return String(candidate);
 }
 
 type FormMode =
@@ -193,23 +271,28 @@ export function AccountsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [openTypes, setOpenTypes] = useState<Set<number>>(() => new Set([1]));
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
+  /** آیا کاربر کد را دستی عوض کرده تا با تغییر نوع دوباره بازنویسی نشود */
+  const [codeTouched, setCodeTouched] = useState(false);
 
-  const grouped = useMemo(() => groupByType(data ?? []), [data]);
+  const roots = data ?? [];
+  const grouped = useMemo(() => groupByType(roots), [roots]);
 
   function resetForm() {
     setMode({ kind: "create-root" });
-    setCode("");
     setName("");
     setType(1);
     setFormError(null);
+    setCodeTouched(false);
+    setCode(suggestRootCode(1, roots));
   }
 
   function startAddChild(parent: AccountTreeNode) {
     setMode({ kind: "create-child", parent });
-    setCode("");
     setName("");
     setType(Number(parent.account_type));
     setFormError(null);
+    setCodeTouched(false);
+    setCode(suggestChildCode(parent, roots));
     setOpenTypes((prev) => new Set(prev).add(Number(parent.account_type)));
     setOpenIds((prev) => new Set(prev).add(parent.account_id));
   }
@@ -220,6 +303,14 @@ export function AccountsPage() {
     setName(account.name);
     setType(Number(account.account_type));
     setFormError(null);
+    setCodeTouched(true);
+  }
+
+  function onTypeChange(next: number) {
+    setType(next);
+    if (mode.kind === "create-root" && !codeTouched) {
+      setCode(suggestRootCode(next, roots));
+    }
   }
 
   function toggleType(t: number) {
@@ -243,29 +334,37 @@ export function AccountsPage() {
   async function handleSubmit() {
     setFormError(null);
     try {
+      let finalCode = code.trim();
+      if (mode.kind !== "edit" && !finalCode) {
+        finalCode =
+          mode.kind === "create-child"
+            ? suggestChildCode(mode.parent, roots)
+            : suggestRootCode(type, roots);
+      }
+      if (!finalCode) {
+        setFormError("کد حساب الزامی است.");
+        return;
+      }
+
       if (mode.kind === "edit") {
         await updateMut.mutateAsync({
           id: mode.account.account_id,
-          payload: { account_code: code.trim(), name: name.trim() },
+          payload: { account_code: finalCode, name: name.trim() },
         });
       } else if (mode.kind === "create-child") {
+        const t = Number(mode.parent.account_type);
         await createMut.mutateAsync({
-          account_code: code.trim(),
+          account_code: finalCode,
           name: name.trim(),
-          account_type: Number(mode.parent.account_type),
+          account_type: t,
           parent_account_id: mode.parent.account_id,
           is_postable: true,
-          normal_balance:
-            Number(mode.parent.account_type) === 4 ||
-            Number(mode.parent.account_type) === 2 ||
-            Number(mode.parent.account_type) === 3
-              ? 2
-              : 1,
+          normal_balance: t === 4 || t === 2 || t === 3 ? 2 : 1,
         });
         setOpenIds((prev) => new Set(prev).add(mode.parent.account_id));
       } else {
         await createMut.mutateAsync({
-          account_code: code.trim(),
+          account_code: finalCode,
           name: name.trim(),
           account_type: type,
           parent_account_id: null,
@@ -310,6 +409,14 @@ export function AccountsPage() {
         ? `زیرحساب برای «${mode.parent.name}»`
         : "حساب جدید";
 
+  // پر کردن اولیه کد ریشه وقتی داده لود شد و فرم خالی است
+  const suggestedPreview =
+    mode.kind === "create-root"
+      ? suggestRootCode(type, roots)
+      : mode.kind === "create-child"
+        ? suggestChildCode(mode.parent, roots)
+        : "";
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -342,9 +449,13 @@ export function AccountsPage() {
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">کد</label>
               <Input
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className="w-28"
+                value={code || (mode.kind !== "edit" ? suggestedPreview : "")}
+                onChange={(e) => {
+                  setCodeTouched(true);
+                  setCode(e.target.value);
+                }}
+                className="w-28 font-mono"
+                placeholder={mode.kind !== "edit" ? toFaDigits(suggestedPreview) : ""}
               />
             </div>
             <div className="min-w-[160px] flex-1 space-y-1">
@@ -357,7 +468,7 @@ export function AccountsPage() {
                 <select
                   className="h-9 rounded-md border bg-background px-2 text-sm"
                   value={type}
-                  onChange={(e) => setType(Number(e.target.value))}
+                  onChange={(e) => onTypeChange(Number(e.target.value))}
                 >
                   {Object.entries(ACCOUNT_TYPE_LABELS).map(([k, v]) => (
                     <option key={k} value={k}>
@@ -369,7 +480,7 @@ export function AccountsPage() {
             ) : null}
             <Button
               size="sm"
-              disabled={!code.trim() || !name.trim() || busy}
+              disabled={!name.trim() || busy}
               onClick={() => void handleSubmit()}
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -402,8 +513,8 @@ export function AccountsPage() {
       ) : (
         <div className="space-y-2">
           {TYPE_ORDER.map((t) => {
-            const roots = grouped[t] ?? [];
-            if (roots.length === 0) return null;
+            const list = grouped[t] ?? [];
+            if (list.length === 0) return null;
             const open = openTypes.has(t);
             return (
               <div key={t} className="overflow-hidden rounded-xl border bg-card">
@@ -422,7 +533,7 @@ export function AccountsPage() {
                 </button>
                 {open ? (
                   <div className="border-t border-border/50">
-                    {roots.map((n) => (
+                    {list.map((n) => (
                       <TreeRow
                         key={n.account_id}
                         node={n}
