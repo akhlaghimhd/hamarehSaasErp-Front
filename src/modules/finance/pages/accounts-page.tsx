@@ -4,15 +4,29 @@ import { useMemo, useState, type ReactNode } from "react";
 import {
   ChevronDown,
   ChevronLeft,
+  CreditCard,
+  Landmark,
   Loader2,
   Pencil,
+  PieChart,
   Plus,
   Trash2,
+  TrendingDown,
+  TrendingUp,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog";
 import { usePermission } from "@/auth";
 import {
   useAccountTree,
@@ -27,7 +41,7 @@ import {
   type AccountTreeNode,
 } from "../types";
 import { ApiClientError } from "@/api";
-import { toFaDigits } from "@/shared/lib/utils";
+import { cn, toFaDigits } from "@/shared/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 const TYPE_ORDER = [1, 2, 3, 4, 5] as const;
@@ -47,6 +61,43 @@ const TYPE_CODE_BASE: Record<number, string> = {
   3: "3",
   4: "4",
   5: "5",
+};
+
+/** آیکن و رنگ ظریف هر نوع حساب (فقط روی کل) */
+const TYPE_VISUAL: Record<
+  number,
+  { icon: LucideIcon; frame: string; iconClass: string; label: string }
+> = {
+  1: {
+    icon: Landmark,
+    frame: "border-s-2 border-s-sky-500/70",
+    iconClass: "text-sky-600 dark:text-sky-400",
+    label: "دارایی",
+  },
+  2: {
+    icon: CreditCard,
+    frame: "border-s-2 border-s-amber-500/70",
+    iconClass: "text-amber-600 dark:text-amber-400",
+    label: "بدهی",
+  },
+  3: {
+    icon: PieChart,
+    frame: "border-s-2 border-s-violet-500/70",
+    iconClass: "text-violet-600 dark:text-violet-400",
+    label: "حقوق صاحبان سهام",
+  },
+  4: {
+    icon: TrendingUp,
+    frame: "border-s-2 border-s-emerald-500/70",
+    iconClass: "text-emerald-600 dark:text-emerald-400",
+    label: "درآمد",
+  },
+  5: {
+    icon: TrendingDown,
+    frame: "border-s-2 border-s-rose-500/70",
+    iconClass: "text-rose-600 dark:text-rose-400",
+    label: "هزینه",
+  },
 };
 
 function collectCodes(nodes: AccountTreeNode[], set: Set<string>) {
@@ -73,7 +124,6 @@ function nodeDepth(node: AccountTreeNode, roots: AccountTreeNode[]): number {
   return find(roots, 1) ?? 1;
 }
 
-/** مرتب‌سازی ریشه‌ها: نوع ۱…۵ سپس کد */
 function sortRoots(roots: AccountTreeNode[]): AccountTreeNode[] {
   return [...roots].sort((a, b) => {
     const ta = Number(a.account_type);
@@ -88,11 +138,9 @@ function sortRoots(roots: AccountTreeNode[]): AccountTreeNode[] {
 function suggestRootCode(type: number, roots: AccountTreeNode[]): string {
   const used = new Set<string>();
   collectCodes(roots, used);
-  const base = TYPE_CODE_BASE[type] ?? String(type);
-  return base;
+  return TYPE_CODE_BASE[type] ?? String(type);
 }
 
-/** کد فرزند = کد والد + ۱،۲،۳… */
 function suggestChildCode(parent: AccountTreeNode, allRoots: AccountTreeNode[]): string {
   const used = new Set<string>();
   collectCodes(allRoots, used);
@@ -195,7 +243,7 @@ function TreeRow({
   form: FormMode | null;
   onAddChild: (node: AccountTreeNode) => void;
   onEdit: (node: AccountTreeNode) => void;
-  onDelete: (id: string) => void;
+  onDelete: (node: AccountTreeNode) => void;
   formSlot: ReactNode;
 }) {
   const hasKids = Boolean(node.children?.length);
@@ -203,16 +251,22 @@ function TreeRow({
   const level = nodeDepth(node, roots);
   const isKol = level === 1;
   const canAddChild = canCreate && level < MAX_DEPTH;
-  // کل قابل حذف نیست
   const showDelete = canDelete && !isKol && !hasKids;
   const showFormHere =
     (form?.kind === "create-child" && form.parent.account_id === node.account_id) ||
     (form?.kind === "edit" && form.account.account_id === node.account_id);
 
+  const typeVisual = TYPE_VISUAL[Number(node.account_type)];
+  const TypeIcon = typeVisual?.icon;
+
   return (
-    <div>
+    <div className={cn(isKol && "mt-2 first:mt-0")}>
       <div
-        className="group flex items-center gap-2 border-b border-border/40 py-2 pe-2 text-sm"
+        className={cn(
+          "group flex items-center gap-2 border-b border-border/40 py-2 pe-2 text-sm",
+          isKol && typeVisual?.frame,
+          isKol && "bg-muted/20"
+        )}
         style={{ paddingInlineStart: 12 + depth * 16 }}
       >
         {hasKids ? (
@@ -227,11 +281,20 @@ function TreeRow({
           <span className="inline-block h-5 w-5 shrink-0" />
         )}
 
+        {isKol && TypeIcon ? (
+          <TypeIcon
+            className={cn("h-3.5 w-3.5 shrink-0", typeVisual.iconClass)}
+            aria-label={typeVisual.label}
+          />
+        ) : null}
+
         <span className="w-14 shrink-0 font-mono text-xs text-muted-foreground">
           {toFaDigits(node.account_code)}
         </span>
 
-        <span className="min-w-0 flex-1 truncate">{node.name}</span>
+        <span className={cn("min-w-0 flex-1 truncate", isKol && "font-medium")}>
+          {node.name}
+        </span>
 
         <span className="hidden text-[10px] text-muted-foreground sm:inline">
           {LEVEL_LABEL[level] ?? ""}
@@ -266,7 +329,7 @@ function TreeRow({
               size="icon"
               className="h-7 w-7 text-destructive"
               title="حذف"
-              onClick={() => onDelete(node.account_id)}
+              onClick={() => onDelete(node)}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
@@ -329,6 +392,8 @@ export function AccountsPage() {
   const [name, setName] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
+  const [deleteTarget, setDeleteTarget] = useState<AccountTreeNode | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const roots = useMemo(() => sortRoots(data ?? []), [data]);
 
@@ -369,6 +434,11 @@ export function AccountsPage() {
     setCode(account.account_code);
     setName(account.name);
     setFormError(null);
+  }
+
+  function requestDelete(node: AccountTreeNode) {
+    setDeleteError(null);
+    setDeleteTarget(node);
   }
 
   function toggleNode(id: string) {
@@ -440,13 +510,23 @@ export function AccountsPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("این حساب حذف شود؟")) return;
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleteError(null);
     try {
-      await deleteMut.mutateAsync(id);
-      if (form?.kind === "edit" && form.account.account_id === id) closeForm();
+      await deleteMut.mutateAsync(deleteTarget.account_id);
+      if (form?.kind === "edit" && form.account.account_id === deleteTarget.account_id) {
+        closeForm();
+      }
+      setDeleteTarget(null);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "حذف ممکن نیست (احتمالاً گردش دارد یا زیرمجموعه دارد).");
+      const msg =
+        e instanceof ApiClientError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : "حذف ممکن نیست (احتمالاً گردش دارد یا زیرمجموعه دارد).";
+      setDeleteError(msg);
     }
   }
 
@@ -511,18 +591,24 @@ export function AccountsPage() {
           {canCreate && missingTypes.length > 0 ? (
             <div className="flex flex-wrap items-center gap-2 border-b border-border/40 px-3 py-2">
               <span className="text-xs text-muted-foreground">افزودن حساب کل:</span>
-              {missingTypes.map((t) => (
-                <Button
-                  key={t}
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => startAddRoot(t)}
-                >
-                  <Plus className="me-1 h-3 w-3" />
-                  {ACCOUNT_TYPE_LABELS[t] ?? t}
-                </Button>
-              ))}
+              {missingTypes.map((t) => {
+                const vis = TYPE_VISUAL[t];
+                const Icon = vis?.icon;
+                return (
+                  <Button
+                    key={t}
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => startAddRoot(t)}
+                  >
+                    {Icon ? <Icon className={cn("me-1 h-3 w-3", vis.iconClass)} /> : (
+                      <Plus className="me-1 h-3 w-3" />
+                    )}
+                    {ACCOUNT_TYPE_LABELS[t] ?? t}
+                  </Button>
+                );
+              })}
             </div>
           ) : null}
 
@@ -547,13 +633,63 @@ export function AccountsPage() {
                 form={form}
                 onAddChild={startAddChild}
                 onEdit={startEdit}
-                onDelete={(id) => void handleDelete(id)}
+                onDelete={requestDelete}
                 formSlot={inlineForm}
               />
             ))
           )}
         </div>
       )}
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>حذف حساب</DialogTitle>
+            <DialogDescription>
+              {deleteTarget ? (
+                <>
+                  حساب «{deleteTarget.name}» با کد{" "}
+                  <span className="font-mono">{toFaDigits(deleteTarget.account_code)}</span>{" "}
+                  حذف شود؟ این عمل قابل بازگشت از سطل حذف‌شده است.
+                </>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError ? (
+            <p className="text-sm text-destructive">{deleteError}</p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={deleteMut.isPending}
+              onClick={() => {
+                setDeleteTarget(null);
+                setDeleteError(null);
+              }}
+            >
+              انصراف
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteMut.isPending}
+              onClick={() => void confirmDelete()}
+            >
+              {deleteMut.isPending ? (
+                <Loader2 className="me-1 h-4 w-4 animate-spin" />
+              ) : null}
+              حذف
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
