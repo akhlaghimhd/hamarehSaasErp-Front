@@ -27,12 +27,12 @@ import {
   type AccountTreeNode,
 } from "../types";
 import { ApiClientError } from "@/api";
-import { cn, toFaDigits } from "@/shared/lib/utils";
+import { toFaDigits } from "@/shared/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 const TYPE_ORDER = [1, 2, 3, 4, 5] as const;
 
-/** حداکثر عمق: ۱ کل · ۲ معین · ۳ تفصیلی */
+/** ۱ کل · ۲ معین · ۳ تفصیلی */
 const MAX_DEPTH = 3;
 
 const LEVEL_LABEL: Record<number, string> = {
@@ -48,15 +48,6 @@ const TYPE_CODE_BASE: Record<number, string> = {
   4: "4",
   5: "5",
 };
-
-function groupByType(roots: AccountTreeNode[]): Record<number, AccountTreeNode[]> {
-  const map: Record<number, AccountTreeNode[]> = { 1: [], 2: [], 3: [], 4: [], 5: [] };
-  for (const n of roots) {
-    const t = Number(n.account_type);
-    if (map[t]) map[t].push(n);
-  }
-  return map;
-}
 
 function collectCodes(nodes: AccountTreeNode[], set: Set<string>) {
   for (const n of nodes) {
@@ -82,25 +73,26 @@ function nodeDepth(node: AccountTreeNode, roots: AccountTreeNode[]): number {
   return find(roots, 1) ?? 1;
 }
 
-function findTypeRoot(type: number, roots: AccountTreeNode[]): AccountTreeNode | null {
-  const same = roots.filter((r) => Number(r.account_type) === type);
-  if (same.length === 0) return null;
-  const base = TYPE_CODE_BASE[type] ?? String(type);
-  return same.find((r) => String(r.account_code).trim() === base) ?? same[0];
+/** مرتب‌سازی ریشه‌ها: نوع ۱…۵ سپس کد */
+function sortRoots(roots: AccountTreeNode[]): AccountTreeNode[] {
+  return [...roots].sort((a, b) => {
+    const ta = Number(a.account_type);
+    const tb = Number(b.account_type);
+    if (ta !== tb) return ta - tb;
+    return String(a.account_code).localeCompare(String(b.account_code), undefined, {
+      numeric: true,
+    });
+  });
 }
 
-/** حساب کل: رقم نوع (۱…۵) */
 function suggestRootCode(type: number, roots: AccountTreeNode[]): string {
   const used = new Set<string>();
   collectCodes(roots, used);
   const base = TYPE_CODE_BASE[type] ?? String(type);
-  return used.has(base) ? base : base;
+  return base;
 }
 
-/**
- * کد فرزند = کد والد + ۱،۲،۳…
- * والد ۱ → ۱۱،۱۲،۱۳ | والد ۱۱ → ۱۱۱،۱۱۲ | والد ۱۲ → ۱۲۱،۱۲۲
- */
+/** کد فرزند = کد والد + ۱،۲،۳… */
 function suggestChildCode(parent: AccountTreeNode, allRoots: AccountTreeNode[]): string {
   const used = new Set<string>();
   collectCodes(allRoots, used);
@@ -209,7 +201,10 @@ function TreeRow({
   const hasKids = Boolean(node.children?.length);
   const open = openIds.has(node.account_id);
   const level = nodeDepth(node, roots);
+  const isKol = level === 1;
   const canAddChild = canCreate && level < MAX_DEPTH;
+  // کل قابل حذف نیست
+  const showDelete = canDelete && !isKol && !hasKids;
   const showFormHere =
     (form?.kind === "create-child" && form.parent.account_id === node.account_id) ||
     (form?.kind === "edit" && form.account.account_id === node.account_id);
@@ -238,6 +233,10 @@ function TreeRow({
 
         <span className="min-w-0 flex-1 truncate">{node.name}</span>
 
+        <span className="hidden text-[10px] text-muted-foreground sm:inline">
+          {LEVEL_LABEL[level] ?? ""}
+        </span>
+
         <div className="flex shrink-0 items-center gap-0.5">
           {canAddChild ? (
             <Button
@@ -255,13 +254,13 @@ function TreeRow({
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              title="ویرایش"
+              title="ویرایش عنوان"
               onClick={() => onEdit(node)}
             >
               <Pencil className="h-3.5 w-3.5" />
             </Button>
           ) : null}
-          {canDelete && !hasKids ? (
+          {showDelete ? (
             <Button
               variant="ghost"
               size="icon"
@@ -329,11 +328,14 @@ export function AccountsPage() {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
-  const [openTypes, setOpenTypes] = useState<Set<number>>(() => new Set(TYPE_ORDER));
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
 
-  const roots = data ?? [];
-  const grouped = useMemo(() => groupByType(roots), [roots]);
+  const roots = useMemo(() => sortRoots(data ?? []), [data]);
+
+  const missingTypes = useMemo(() => {
+    const present = new Set(roots.map((r) => Number(r.account_type)));
+    return TYPE_ORDER.filter((t) => !present.has(t));
+  }, [roots]);
 
   function closeForm() {
     setForm(null);
@@ -342,21 +344,11 @@ export function AccountsPage() {
     setFormError(null);
   }
 
-  /** + گروه نوع: فقط اگر کل نباشد → ساخت کل */
   function startAddRoot(type: number) {
-    if (findTypeRoot(type, roots)) {
-      // کل از قبل هست؛ معین را از + روی ردیف کل بسازید
-      const root = findTypeRoot(type, roots)!;
-      setOpenTypes((prev) => new Set(prev).add(type));
-      setOpenIds((prev) => new Set(prev).add(root.account_id));
-      startAddChild(root);
-      return;
-    }
     setForm({ kind: "create-root", type });
     setCode(suggestRootCode(type, roots));
     setName("");
     setFormError(null);
-    setOpenTypes((prev) => new Set(prev).add(type));
   }
 
   function startAddChild(parent: AccountTreeNode) {
@@ -369,7 +361,6 @@ export function AccountsPage() {
     setCode(suggestChildCode(parent, roots));
     setName("");
     setFormError(null);
-    setOpenTypes((prev) => new Set(prev).add(Number(parent.account_type)));
     setOpenIds((prev) => new Set(prev).add(parent.account_id));
   }
 
@@ -378,15 +369,6 @@ export function AccountsPage() {
     setCode(account.account_code);
     setName(account.name);
     setFormError(null);
-  }
-
-  function toggleType(t: number) {
-    setOpenTypes((prev) => {
-      const next = new Set(prev);
-      if (next.has(t)) next.delete(t);
-      else next.add(t);
-      return next;
-    });
   }
 
   function toggleNode(id: string) {
@@ -478,7 +460,7 @@ export function AccountsPage() {
 
   function formTitle(): string {
     if (!form) return "";
-    if (form.kind === "edit") return "ویرایش حساب";
+    if (form.kind === "edit") return "ویرایش عنوان حساب";
     if (form.kind === "create-child") {
       const pl = nodeDepth(form.parent, roots);
       const next = LEVEL_LABEL[pl + 1] ?? "زیرحساب";
@@ -525,76 +507,51 @@ export function AccountsPage() {
           </button>
         </div>
       ) : (
-        <div className="space-y-2">
-          {TYPE_ORDER.map((t) => {
-            const list = grouped[t] ?? [];
-            const open = openTypes.has(t);
-            const typeRoot = findTypeRoot(t, roots);
-            // فرم ساخت کل فقط بالای گروه؛ فرم معین/تفصیلی فقط زیر ردیف والد
-            const showRootForm = form?.kind === "create-root" && form.type === t;
+        <div className="overflow-hidden rounded-xl border bg-card">
+          {canCreate && missingTypes.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 border-b border-border/40 px-3 py-2">
+              <span className="text-xs text-muted-foreground">افزودن حساب کل:</span>
+              {missingTypes.map((t) => (
+                <Button
+                  key={t}
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => startAddRoot(t)}
+                >
+                  <Plus className="me-1 h-3 w-3" />
+                  {ACCOUNT_TYPE_LABELS[t] ?? t}
+                </Button>
+              ))}
+            </div>
+          ) : null}
 
-            return (
-              <div key={t} className="overflow-hidden rounded-xl border bg-card">
-                <div className="flex items-center gap-1 border-b border-border/40 px-2 py-1.5">
-                  <button
-                    type="button"
-                    className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-md px-1 py-1 text-sm font-medium hover:bg-muted/40"
-                    onClick={() => toggleType(t)}
-                  >
-                    <span>{ACCOUNT_TYPE_LABELS[t] ?? t}</span>
-                    <ChevronDown
-                      className={cn(
-                        "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                        open && "rotate-180"
-                      )}
-                    />
-                  </button>
-                  {canCreate && !typeRoot ? (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0"
-                      title="افزودن حساب کل"
-                      onClick={() => startAddRoot(t)}
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </Button>
-                  ) : null}
-                </div>
+          {form?.kind === "create-root" ? inlineForm : null}
 
-                {open ? (
-                  <div>
-                    {showRootForm ? inlineForm : null}
-
-                    {list.length === 0 && !showRootForm ? (
-                      <p className="px-3 py-3 text-xs text-muted-foreground">
-                        هنوز حساب کل این گروه نیست. با + بسازید.
-                      </p>
-                    ) : (
-                      list.map((n) => (
-                        <TreeRow
-                          key={n.account_id}
-                          node={n}
-                          depth={0}
-                          roots={roots}
-                          canCreate={canCreate}
-                          canDelete={canDelete}
-                          canEdit={canEdit}
-                          openIds={openIds}
-                          toggle={toggleNode}
-                          form={form}
-                          onAddChild={startAddChild}
-                          onEdit={startEdit}
-                          onDelete={(id) => void handleDelete(id)}
-                          formSlot={inlineForm}
-                        />
-                      ))
-                    )}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
+          {roots.length === 0 && form?.kind !== "create-root" ? (
+            <p className="px-3 py-4 text-sm text-muted-foreground">
+              هنوز حساب کلی تعریف نشده است.
+            </p>
+          ) : (
+            roots.map((n) => (
+              <TreeRow
+                key={n.account_id}
+                node={n}
+                depth={0}
+                roots={roots}
+                canCreate={canCreate}
+                canDelete={canDelete}
+                canEdit={canEdit}
+                openIds={openIds}
+                toggle={toggleNode}
+                form={form}
+                onAddChild={startAddChild}
+                onEdit={startEdit}
+                onDelete={(id) => void handleDelete(id)}
+                formSlot={inlineForm}
+              />
+            ))
+          )}
         </div>
       )}
     </div>
