@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   ChevronDown,
   ChevronLeft,
@@ -60,7 +60,6 @@ function collectCodes(nodes: AccountTreeNode[], set: Set<string>) {
 }
 
 function nodeDepth(node: AccountTreeNode, roots: AccountTreeNode[]): number {
-  // depth 1 = root under type
   const level = Number(node.account_level);
   if (level >= 1) return level;
 
@@ -77,7 +76,6 @@ function nodeDepth(node: AccountTreeNode, roots: AccountTreeNode[]): number {
   return find(roots, 1) ?? 1;
 }
 
-/** کد ریشه بعدی برای یک نوع (۱، ۱۱، ۱۲ یا ۱۱۰۱ سبک سیدر) */
 function suggestRootCode(type: number, roots: AccountTreeNode[]): string {
   const used = new Set<string>();
   collectCodes(roots, used);
@@ -88,11 +86,7 @@ function suggestRootCode(type: number, roots: AccountTreeNode[]): string {
     return used.has(base) ? `${base}1` : base;
   }
 
-  // اگر ریشه تک‌رقمی نوع است، فرزندهای سطح۱ مثل ۱۱، ۱۲
   const base = TYPE_CODE_BASE[type] ?? String(type);
-  let i = 1;
-  while (used.has(`${base}${i}`)) i += 1;
-  // اگر الگوی ۴رقمی (۱۰۰۰) در داده هست، همان را ادامه بده
   const nums = sameType
     .map((r) => Number(r.account_code))
     .filter((n) => Number.isFinite(n));
@@ -102,10 +96,11 @@ function suggestRootCode(type: number, roots: AccountTreeNode[]): string {
     while (used.has(String(c))) c += 100;
     return String(c);
   }
+  let i = 1;
+  while (used.has(`${base}${i}`)) i += 1;
   return `${base}${i}`;
 }
 
-/** کد فرزند سلسله‌مراتبی زیر والد */
 function suggestChildCode(parent: AccountTreeNode, allRoots: AccountTreeNode[]): string {
   const used = new Set<string>();
   collectCodes(allRoots, used);
@@ -126,9 +121,7 @@ function suggestChildCode(parent: AccountTreeNode, allRoots: AccountTreeNode[]):
     return `${parentCode}${i}`;
   }
 
-  // اولین فرزند
   if (/^\d+$/.test(parentCode)) {
-    // ۱ → ۱۱ ، ۱۱ → ۱۱۰۱ ، ۱۱۰۱ → ۱۱۰۲
     if (parentCode.length === 1) {
       const cand = `${parentCode}1`;
       if (!used.has(cand)) return cand;
@@ -140,9 +133,7 @@ function suggestChildCode(parent: AccountTreeNode, allRoots: AccountTreeNode[]):
     const asNum = Number(parentCode);
     if (Number.isFinite(asNum)) {
       let c = asNum + 1;
-      // ترجیح: اگر والد به ۰۰ ختم شود، +1
       while (used.has(String(c))) c += 1;
-      // اگر c با parent هم‌پیشوند نیست، parent+01
       if (!String(c).startsWith(parentCode) && parentCode.length <= 4) {
         let i = 1;
         const pad = parentCode.length <= 2 ? 2 : 1;
@@ -171,7 +162,6 @@ function InlineForm({
   title,
   code,
   name,
-  onCode,
   onName,
   onSubmit,
   onCancel,
@@ -182,7 +172,6 @@ function InlineForm({
   title: string;
   code: string;
   name: string;
-  onCode: (v: string) => void;
   onName: (v: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
@@ -205,12 +194,10 @@ function InlineForm({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Input
-          value={code}
-          onChange={(e) => onCode(e.target.value)}
-          className="h-8 w-24 font-mono text-sm"
-          placeholder="کد"
+          value={toFaDigits(code)}
           readOnly
-          title="کد به‌صورت خودکار بر اساس ساختار درخت پیشنهاد شده"
+          className="h-8 w-24 font-mono text-sm"
+          title="کد خودکار بر اساس محل درج در درخت"
         />
         <Input
           value={name}
@@ -260,7 +247,7 @@ function TreeRow({
   onAddChild: (node: AccountTreeNode) => void;
   onEdit: (node: AccountTreeNode) => void;
   onDelete: (id: string) => void;
-  formSlot: React.ReactNode;
+  formSlot: ReactNode;
 }) {
   const hasKids = Boolean(node.children?.length);
   const open = openIds.has(node.account_id);
@@ -274,7 +261,7 @@ function TreeRow({
     <div>
       <div
         className="group flex items-center gap-2 border-b border-border/40 py-2 pe-2 text-sm"
-        style={{ paddingInlineStart: 12 + (depth) * 16 }}
+        style={{ paddingInlineStart: 12 + depth * 16 }}
       >
         {hasKids ? (
           <button
@@ -524,7 +511,7 @@ export function AccountsPage() {
 
   const busy = createMut.isPending || updateMut.isPending;
 
-  const formSlot = form ? (
+  const inlineForm = form ? (
     <InlineForm
       title={
         form.kind === "edit"
@@ -533,9 +520,8 @@ export function AccountsPage() {
             ? `زیرحساب «${form.parent.name}»`
             : `حساب جدید — ${ACCOUNT_TYPE_LABELS[form.type] ?? form.type}`
       }
-      code={toFaDigits(code)}
+      code={code}
       name={name}
-      onCode={(v) => setCode(v)}
       onName={setName}
       onSubmit={() => void handleSubmit()}
       onCancel={closeForm}
@@ -544,10 +530,6 @@ export function AccountsPage() {
       submitLabel={form.kind === "edit" ? "ذخیره" : "افزودن"}
     />
   ) : null;
-
-  // کد واقعی (ارقام لاتین) برای submit — اگر UI فارسی نشان می‌دهد
-  // در InlineForm value را toFaDigits کردیم؛ onChange ممکن است فارسی بگیرد
-  // برای سادگی کد state را لاتین نگه می‌داریم و فقط نمایش را FA می‌کنیم
 
   return (
     <div className="space-y-4">
@@ -584,7 +566,7 @@ export function AccountsPage() {
                 <div className="flex items-center gap-1 border-b border-border/40 px-2 py-1.5">
                   <button
                     type="button"
-                    className="flex min-w-0 flex-1 items-center justify-between gap-2 px-1 py-1 text-sm font-medium hover:bg-muted/40 rounded-md"
+                    className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-md px-1 py-1 text-sm font-medium hover:bg-muted/40"
                     onClick={() => toggleType(t)}
                   >
                     <span>{ACCOUNT_TYPE_LABELS[t] ?? t}</span>
@@ -610,20 +592,7 @@ export function AccountsPage() {
 
                 {open ? (
                   <div>
-                    {showRootForm ? (
-                      <InlineForm
-                        title={`حساب جدید — ${ACCOUNT_TYPE_LABELS[t] ?? t}`}
-                        code={code}
-                        name={name}
-                        onCode={setCode}
-                        onName={setName}
-                        onSubmit={() => void handleSubmit()}
-                        onCancel={closeForm}
-                        busy={busy}
-                        error={formError}
-                        submitLabel="افزودن"
-                      />
-                    ) : null}
+                    {showRootForm ? inlineForm : null}
 
                     {list.length === 0 && !showRootForm ? (
                       <p className="px-3 py-3 text-xs text-muted-foreground">
@@ -645,28 +614,7 @@ export function AccountsPage() {
                           onAddChild={startAddChild}
                           onEdit={startEdit}
                           onDelete={(id) => void handleDelete(id)}
-                          formSlot={
-                            form ? (
-                              <InlineForm
-                                title={
-                                  form.kind === "edit"
-                                    ? "ویرایش حساب"
-                                    : form.kind === "create-child"
-                                      ? `زیرحساب «${form.parent.name}»`
-                                      : "حساب جدید"
-                                }
-                                code={code}
-                                name={name}
-                                onCode={setCode}
-                                onName={setName}
-                                onSubmit={() => void handleSubmit()}
-                                onCancel={closeForm}
-                                busy={busy}
-                                error={formError}
-                                submitLabel={form.kind === "edit" ? "ذخیره" : "افزودن"}
-                              />
-                            ) : null
-                          }
+                          formSlot={inlineForm}
                         />
                       ))
                     )}
