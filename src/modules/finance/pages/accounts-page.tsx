@@ -111,7 +111,7 @@ function sortRoots(roots: AccountTreeNode[]): AccountTreeNode[] {
   });
 }
 
-function suggestRootCode(type: number, roots: AccountTreeNode[]): string {
+function suggestRootCode(type: number, _roots: AccountTreeNode[]): string {
   return TYPE_CODE_BASE[type] ?? String(type);
 }
 
@@ -198,6 +198,7 @@ function TreeRow({
   const isKol = level === 1;
   const canAddChild = canCreate && level < MAX_DEPTH;
   const showDelete = canDelete && !isKol && !hasKids;
+  const showEdit = canEdit && !isKol;
   const showFormHere =
     (form?.kind === "create-child" && form.parent.account_id === node.account_id) ||
     (form?.kind === "edit" && form.account.account_id === node.account_id);
@@ -243,7 +244,7 @@ function TreeRow({
               <Plus className="h-3.5 w-3.5" />
             </Button>
           ) : null}
-          {canEdit ? (
+          {showEdit ? (
             <Button variant="ghost" size="icon" className="h-7 w-7" title="ویرایش کد و نام" onClick={() => onEdit(node)}>
               <Pencil className="h-3.5 w-3.5" />
             </Button>
@@ -320,6 +321,7 @@ export function AccountsPage() {
     setOpenIds((prev) => new Set(prev).add(parent.account_id));
   }
   function startEdit(account: AccountTreeNode) {
+    if (nodeDepth(account, roots) <= 1) return;
     setForm({ kind: "edit", account });
     setCode(account.account_code);
     setName(account.name);
