@@ -63,39 +63,50 @@ const TYPE_CODE_BASE: Record<number, string> = {
   5: "5",
 };
 
-/** آیکن و رنگ ظریف هر نوع حساب (فقط روی کل) */
+/** آیکن و رنگ ظریف هر نوع — نوار کامل روی کل، نازک‌تر روی فرزندان باز */
 const TYPE_VISUAL: Record<
   number,
-  { icon: LucideIcon; frame: string; iconClass: string; label: string }
+  {
+    icon: LucideIcon;
+    frame: string;
+    rail: string;
+    iconClass: string;
+    label: string;
+  }
 > = {
   1: {
     icon: Landmark,
-    frame: "border-s-2 border-s-sky-500/70",
-    iconClass: "text-sky-600 dark:text-sky-400",
+    frame: "border-s-2 border-s-sky-500/55",
+    rail: "border-s border-s-sky-500/30",
+    iconClass: "text-sky-600/90 dark:text-sky-400/90",
     label: "دارایی",
   },
   2: {
     icon: CreditCard,
-    frame: "border-s-2 border-s-amber-500/70",
-    iconClass: "text-amber-600 dark:text-amber-400",
+    frame: "border-s-2 border-s-amber-500/55",
+    rail: "border-s border-s-amber-500/30",
+    iconClass: "text-amber-600/90 dark:text-amber-400/90",
     label: "بدهی",
   },
   3: {
     icon: PieChart,
-    frame: "border-s-2 border-s-violet-500/70",
-    iconClass: "text-violet-600 dark:text-violet-400",
+    frame: "border-s-2 border-s-violet-500/55",
+    rail: "border-s border-s-violet-500/30",
+    iconClass: "text-violet-600/90 dark:text-violet-400/90",
     label: "حقوق صاحبان سهام",
   },
   4: {
     icon: TrendingUp,
-    frame: "border-s-2 border-s-emerald-500/70",
-    iconClass: "text-emerald-600 dark:text-emerald-400",
+    frame: "border-s-2 border-s-emerald-500/55",
+    rail: "border-s border-s-emerald-500/30",
+    iconClass: "text-emerald-600/90 dark:text-emerald-400/90",
     label: "درآمد",
   },
   5: {
     icon: TrendingDown,
-    frame: "border-s-2 border-s-rose-500/70",
-    iconClass: "text-rose-600 dark:text-rose-400",
+    frame: "border-s-2 border-s-rose-500/55",
+    rail: "border-s border-s-rose-500/30",
+    iconClass: "text-rose-600/90 dark:text-rose-400/90",
     label: "هزینه",
   },
 };
@@ -263,9 +274,11 @@ function TreeRow({
     <div className={cn(isKol && "mt-2 first:mt-0")}>
       <div
         className={cn(
-          "group flex items-center gap-2 border-b border-border/40 py-2 pe-2 text-sm",
+          "group flex items-center gap-2 border-b border-border/40 py-2 pe-2 text-sm transition-colors",
+          "hover:bg-muted/40",
           isKol && typeVisual?.frame,
-          isKol && "bg-muted/20"
+          isKol && "bg-muted/15",
+          !isKol && typeVisual?.rail
         )}
         style={{ paddingInlineStart: 12 + depth * 16 }}
       >
@@ -288,7 +301,14 @@ function TreeRow({
           />
         ) : null}
 
-        <span className="w-14 shrink-0 font-mono text-xs text-muted-foreground">
+        <span
+          className={cn(
+            "w-14 shrink-0 font-mono text-xs tabular-nums",
+            isKol
+              ? "font-semibold text-foreground"
+              : "font-medium text-foreground/80"
+          )}
+        >
           {toFaDigits(node.account_code)}
         </span>
 
@@ -300,7 +320,7 @@ function TreeRow({
           {LEVEL_LABEL[level] ?? ""}
         </span>
 
-        <div className="flex shrink-0 items-center gap-0.5">
+        <div className="flex shrink-0 items-center gap-0.5 opacity-70 transition-opacity group-hover:opacity-100">
           {canAddChild ? (
             <Button
               variant="ghost"
