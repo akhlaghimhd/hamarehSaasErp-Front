@@ -221,13 +221,13 @@ function InlineForm({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Input
-          value={code}
+          value={toFaDigits(code)}
           readOnly={!codeEditable}
           onChange={(e) => onCode(normalizeAccountCode(e.target.value))}
           className="h-8 w-28 font-mono text-sm"
           title={codeEditable ? "کد حساب (قابل ویرایش)" : "کد حساب"}
           placeholder="کد"
-          dir="ltr"
+          inputMode="numeric"
         />
         <Input
           value={name}
@@ -337,7 +337,21 @@ function TreeRow({
           {toFaDigits(node.account_code)}
         </span>
 
-        <span className={cn("min-w-0 flex-1 truncate", isKol && "font-medium")}>{node.name}</span>
+        {hasKids ? (
+          <button
+            type="button"
+            className={cn(
+              "min-w-0 flex-1 truncate text-start hover:text-foreground",
+              isKol && "font-medium"
+            )}
+            onClick={() => toggle(node.account_id)}
+            title={open ? "بستن" : "باز کردن"}
+          >
+            {node.name}
+          </button>
+        ) : (
+          <span className={cn("min-w-0 flex-1 truncate", isKol && "font-medium")}>{node.name}</span>
+        )}
 
         <span className="hidden text-[10px] text-muted-foreground sm:inline">
           {LEVEL_LABEL[level] ?? ""}
