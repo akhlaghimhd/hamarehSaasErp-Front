@@ -82,7 +82,6 @@ function nodeDepth(node: AccountTreeNode, roots: AccountTreeNode[]): number {
   return find(roots, 1) ?? 1;
 }
 
-/** ریشهٔ اصلی هر نوع: ترجیح کد پایهٔ نوع (۱…۵) */
 function findTypeRoot(type: number, roots: AccountTreeNode[]): AccountTreeNode | null {
   const same = roots.filter((r) => Number(r.account_type) === type);
   if (same.length === 0) return null;
@@ -90,20 +89,17 @@ function findTypeRoot(type: number, roots: AccountTreeNode[]): AccountTreeNode |
   return same.find((r) => String(r.account_code).trim() === base) ?? same[0];
 }
 
-/** حساب کل هر نوع: همان رقم نوع (۱…۵) */
+/** حساب کل: رقم نوع (۱…۵) */
 function suggestRootCode(type: number, roots: AccountTreeNode[]): string {
-  const usedGlobal = new Set<string>();
-  collectCodes(roots, usedGlobal);
+  const used = new Set<string>();
+  collectCodes(roots, used);
   const base = TYPE_CODE_BASE[type] ?? String(type);
-  if (!usedGlobal.has(base)) return base;
-  let i = 1;
-  while (usedGlobal.has(`${base}${i}`)) i += 1;
-  return `${base}${i}`;
+  return used.has(base) ? base : base;
 }
 
 /**
- * قانون کد فرزند: کد والد + شماره ترتیبی (۱، ۲، ۳…)
- * مثال: والد ۱ → ۱۱، ۱۲ ؛ والد ۱۱ → ۱۱۱، ۱۱۲
+ * کد فرزند = کد والد + ۱،۲،۳…
+ * والد ۱ → ۱۱،۱۲،۱۳ | والد ۱۱ → ۱۱۱،۱۱۲ | والد ۱۲ → ۱۲۱،۱۲۲
  */
 function suggestChildCode(parent: AccountTreeNode, allRoots: AccountTreeNode[]): string {
   const used = new Set<string>();
@@ -158,7 +154,7 @@ function InlineForm({
           value={toFaDigits(code)}
           readOnly
           className="h-8 w-24 font-mono text-sm"
-          title="کد به‌صورت خودکار"
+          title="کد خودکار"
         />
         <Input
           value={name}
@@ -248,13 +244,7 @@ function TreeRow({
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              title={
-                level === 1
-                  ? "افزودن معین"
-                  : level === 2
-                    ? "افزودن تفصیلی"
-                    : "افزودن زیرحساب"
-              }
+              title={level === 1 ? "افزودن معین" : "افزودن تفصیلی"}
               onClick={() => onAddChild(node)}
             >
               <Plus className="h-3.5 w-3.5" />
@@ -352,28 +342,21 @@ export function AccountsPage() {
     setFormError(null);
   }
 
-  /**
-   * + روی گروه نوع (مثلاً دارایی):
-   * - اگر هنوز حساب کل آن نوع نیست → ساخت کل با کد ۱…۵
-   * - اگر کل هست → افزودن معین زیر همان کل (نه برادرِ کل)
-   */
-  function startAddUnderType(type: number) {
-    const typeRoot = findTypeRoot(type, roots);
-    setOpenTypes((prev) => new Set(prev).add(type));
-
-    if (typeRoot) {
-      setForm({ kind: "create-child", parent: typeRoot });
-      setCode(suggestChildCode(typeRoot, roots));
-      setName("");
-      setFormError(null);
-      setOpenIds((prev) => new Set(prev).add(typeRoot.account_id));
+  /** + گروه نوع: فقط اگر کل نباشد → ساخت کل */
+  function startAddRoot(type: number) {
+    if (findTypeRoot(type, roots)) {
+      // کل از قبل هست؛ معین را از + روی ردیف کل بسازید
+      const root = findTypeRoot(type, roots)!;
+      setOpenTypes((prev) => new Set(prev).add(type));
+      setOpenIds((prev) => new Set(prev).add(root.account_id));
+      startAddChild(root);
       return;
     }
-
     setForm({ kind: "create-root", type });
     setCode(suggestRootCode(type, roots));
     setName("");
     setFormError(null);
+    setOpenTypes((prev) => new Set(prev).add(type));
   }
 
   function startAddChild(parent: AccountTreeNode) {
@@ -547,11 +530,8 @@ export function AccountsPage() {
             const list = grouped[t] ?? [];
             const open = openTypes.has(t);
             const typeRoot = findTypeRoot(t, roots);
-            const showTypeForm =
-              (form?.kind === "create-root" && form.type === t) ||
-              (form?.kind === "create-child" &&
-                typeRoot &&
-                form.parent.account_id === typeRoot.account_id);
+            // فرم ساخت کل فقط بالای گروه؛ فرم معین/تفصیلی فقط زیر ردیف والد
+            const showRootForm = form?.kind === "create-root" && form.type === t;
 
             return (
               <div key={t} className="overflow-hidden rounded-xl border bg-card">
@@ -569,13 +549,13 @@ export function AccountsPage() {
                       )}
                     />
                   </button>
-                  {canCreate ? (
+                  {canCreate && !typeRoot ? (
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 shrink-0"
-                      title={typeRoot ? "افزودن معین زیر حساب کل" : "افزودن حساب کل"}
-                      onClick={() => startAddUnderType(t)}
+                      title="افزودن حساب کل"
+                      onClick={() => startAddRoot(t)}
                     >
                       <Plus className="h-3.5 w-3.5" />
                     </Button>
@@ -584,11 +564,11 @@ export function AccountsPage() {
 
                 {open ? (
                   <div>
-                    {showTypeForm ? inlineForm : null}
+                    {showRootForm ? inlineForm : null}
 
-                    {list.length === 0 && !showTypeForm ? (
+                    {list.length === 0 && !showRootForm ? (
                       <p className="px-3 py-3 text-xs text-muted-foreground">
-                        هنوز حسابی نیست. با + حساب کل این گروه را بسازید.
+                        هنوز حساب کل این گروه نیست. با + بسازید.
                       </p>
                     ) : (
                       list.map((n) => (
