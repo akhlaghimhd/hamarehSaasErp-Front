@@ -82,92 +82,34 @@ function nodeDepth(node: AccountTreeNode, roots: AccountTreeNode[]): number {
   return find(roots, 1) ?? 1;
 }
 
+/** حساب کل هر نوع: همان رقم نوع (۱…۵) اگر آزاد باشد */
 function suggestRootCode(type: number, roots: AccountTreeNode[]): string {
-  // یکتایی سراسری
   const usedGlobal = new Set<string>();
   collectCodes(roots, usedGlobal);
 
-  // فقط برادرهای هم‌سطح (حساب‌های کل همین نوع) — نه کدهای زیرمجموعه
-  const sameTypeRoots = roots.filter((r) => Number(r.account_type) === type);
+  const base = TYPE_CODE_BASE[type] ?? String(type);
+  if (!usedGlobal.has(base)) return base;
 
-  if (sameTypeRoots.length === 0) {
-    const base = TYPE_CODE_BASE[type] ?? String(type);
-    if (!usedGlobal.has(base)) return base;
-    const n = Number(base);
-    if (Number.isFinite(n)) {
-      let c = n + 1;
-      while (usedGlobal.has(String(c))) c += 1;
-      return String(c);
-    }
-    let i = 1;
-    while (usedGlobal.has(`${base}${i}`)) i += 1;
-    return `${base}${i}`;
-  }
-
-  const nums = sameTypeRoots
-    .map((r) => Number(String(r.account_code).trim()))
-    .filter((n) => Number.isFinite(n));
-
-  if (nums.length === 0) {
-    let c = 1;
-    while (usedGlobal.has(String(c))) c += 1;
-    return String(c);
-  }
-
-  let c = Math.max(...nums) + 1;
-  while (usedGlobal.has(String(c))) c += 1;
-  return String(c);
+  // اگر ریشهٔ نوع از قبل هست، ریشهٔ اضافه توصیه نمی‌شود؛
+  // فقط کد آزاد بعدی با همان رقم نوع (نادر)
+  let i = 1;
+  while (usedGlobal.has(`${base}${i}`)) i += 1;
+  return `${base}${i}`;
 }
 
+/**
+ * قانون کد فرزند: کد والد + شماره ترتیبی (۱، ۲، ۳…)
+ * مثال: والد ۱ → ۱۱، ۱۲ ؛ والد ۱۱ → ۱۱۱، ۱۱۲ ؛ والد ۴ → ۴۱
+ */
 function suggestChildCode(parent: AccountTreeNode, allRoots: AccountTreeNode[]): string {
   const used = new Set<string>();
   collectCodes(allRoots, used);
   const parentCode = String(parent.account_code).trim();
-  const siblings = parent.children ?? [];
-
-  if (siblings.length > 0) {
-    const nums = siblings
-      .map((s) => Number(String(s.account_code).trim()))
-      .filter((n) => Number.isFinite(n));
-    if (nums.length > 0) {
-      let c = Math.max(...nums) + 1;
-      while (used.has(String(c))) c += 1;
-      return String(c);
-    }
-    let i = siblings.length + 1;
-    while (used.has(`${parentCode}${i}`)) i += 1;
-    return `${parentCode}${i}`;
-  }
-
-  if (/^\d+$/.test(parentCode)) {
-    if (parentCode.length === 1) {
-      const cand = `${parentCode}1`;
-      if (!used.has(cand)) return cand;
-    }
-    if (parentCode.length === 2) {
-      const cand = `${parentCode}01`;
-      if (!used.has(cand)) return cand;
-    }
-    const asNum = Number(parentCode);
-    if (Number.isFinite(asNum)) {
-      let c = asNum + 1;
-      while (used.has(String(c))) c += 1;
-      if (!String(c).startsWith(parentCode) && parentCode.length <= 4) {
-        let i = 1;
-        const pad = parentCode.length <= 2 ? 2 : 1;
-        let cand = parentCode + String(i).padStart(pad, "0");
-        while (used.has(cand)) {
-          i += 1;
-          cand = parentCode + String(i).padStart(pad, "0");
-        }
-        return cand;
-      }
-      return String(c);
-    }
-  }
 
   let i = 1;
-  while (used.has(`${parentCode}${i}`)) i += 1;
+  while (used.has(`${parentCode}${i}`)) {
+    i += 1;
+  }
   return `${parentCode}${i}`;
 }
 
