@@ -30,6 +30,26 @@ function groupByType(roots: AccountTreeNode[]): Record<number, AccountTreeNode[]
   return map;
 }
 
+/** لیست تخت برای انتخاب والد (با تورفتگی متنی) */
+function flattenForParent(
+  nodes: AccountTreeNode[],
+  depth = 0
+): Array<{ id: string; label: string; type: number }> {
+  const out: Array<{ id: string; label: string; type: number }> = [];
+  for (const n of nodes) {
+    const pad = depth > 0 ? `${"— ".repeat(depth)}` : "";
+    out.push({
+      id: n.account_id,
+      label: `${pad}${toFaDigits(n.account_code)} — ${n.name}`,
+      type: Number(n.account_type),
+    });
+    if (n.children?.length) {
+      out.push(...flattenForParent(n.children, depth + 1));
+    }
+  }
+  return out;
+}
+
 function TreeRow({
   node,
   depth,
@@ -120,11 +140,13 @@ export function AccountsPage() {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [type, setType] = useState(1);
+  const [parentId, setParentId] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [openTypes, setOpenTypes] = useState<Set<number>>(() => new Set([1]));
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
 
   const grouped = useMemo(() => groupByType(data ?? []), [data]);
+  const parentOptions = useMemo(() => flattenForParent(data ?? []), [data]);
 
   function toggleType(t: number) {
     setOpenTypes((prev) => {
@@ -144,6 +166,13 @@ export function AccountsPage() {
     });
   }
 
+  function onParentChange(value: string) {
+    setParentId(value);
+    if (!value) return;
+    const parent = parentOptions.find((p) => p.id === value);
+    if (parent) setType(parent.type);
+  }
+
   async function handleCreate() {
     setFormError(null);
     try {
@@ -151,12 +180,17 @@ export function AccountsPage() {
         account_code: code.trim(),
         name: name.trim(),
         account_type: type,
+        parent_account_id: parentId || null,
         is_postable: true,
         normal_balance: type === 4 || type === 2 || type === 3 ? 2 : 1,
       });
       setCode("");
       setName("");
+      setParentId("");
       setOpenTypes((prev) => new Set(prev).add(type));
+      if (parentId) {
+        setOpenIds((prev) => new Set(prev).add(parentId));
+      }
     } catch (e) {
       const msg =
         e instanceof ApiClientError
@@ -206,11 +240,27 @@ export function AccountsPage() {
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">حساب والد</label>
+            <select
+              className="h-9 min-w-[180px] max-w-[260px] rounded-md border bg-background px-2 text-sm"
+              value={parentId}
+              onChange={(e) => onParentChange(e.target.value)}
+            >
+              <option value="">بدون والد (حساب اصلی)</option>
+              {parentOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
             <label className="text-xs text-muted-foreground">نوع</label>
             <select
               className="h-9 rounded-md border bg-background px-2 text-sm"
               value={type}
               onChange={(e) => setType(Number(e.target.value))}
+              disabled={Boolean(parentId)}
             >
               {Object.entries(ACCOUNT_TYPE_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>
