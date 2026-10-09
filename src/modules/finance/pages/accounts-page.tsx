@@ -32,8 +32,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 const TYPE_ORDER = [1, 2, 3, 4, 5] as const;
 
-/** حداکثر عمق درخت: ۱=کل ، ۲=معین ، ۳=تفصیلی */
+/** حداکثر عمق: ۱ کل · ۲ معین · ۳ تفصیلی */
 const MAX_DEPTH = 3;
+
+const LEVEL_LABEL: Record<number, string> = {
+  1: "کل",
+  2: "معین",
+  3: "تفصیلی",
+};
 
 const TYPE_CODE_BASE: Record<number, string> = {
   1: "1",
@@ -197,7 +203,7 @@ function InlineForm({
           value={toFaDigits(code)}
           readOnly
           className="h-8 w-24 font-mono text-sm"
-          title="کد خودکار بر اساس محل درج در درخت"
+          title="کد به‌صورت خودکار"
         />
         <Input
           value={name}
@@ -281,21 +287,19 @@ function TreeRow({
 
         <span className="min-w-0 flex-1 truncate">{node.name}</span>
 
-        {node.is_postable ? (
-          <span className="hidden text-[10px] text-emerald-700 dark:text-emerald-400 sm:inline">
-            قابل ثبت
-          </span>
-        ) : (
-          <span className="hidden text-[10px] text-muted-foreground sm:inline">کنترل</span>
-        )}
-
         <div className="flex shrink-0 items-center gap-0.5">
           {canAddChild ? (
             <Button
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              title="افزودن زیرحساب"
+              title={
+                level === 1
+                  ? "افزودن معین"
+                  : level === 2
+                    ? "افزودن تفصیلی"
+                    : "افزودن زیرحساب"
+              }
               onClick={() => onAddChild(node)}
             >
               <Plus className="h-3.5 w-3.5" />
@@ -312,7 +316,7 @@ function TreeRow({
               <Pencil className="h-3.5 w-3.5" />
             </Button>
           ) : null}
-          {canDelete && node.is_postable ? (
+          {canDelete && !hasKids ? (
             <Button
               variant="ghost"
               size="icon"
@@ -404,7 +408,7 @@ export function AccountsPage() {
   function startAddChild(parent: AccountTreeNode) {
     const level = nodeDepth(parent, roots);
     if (level >= MAX_DEPTH) {
-      alert(`حداکثر عمق درخت ${toFaDigits(MAX_DEPTH)} سطح است.`);
+      alert("بیش از سه سطح (کل / معین / تفصیلی) تعریف نمی‌شود.");
       return;
     }
     setForm({ kind: "create-child", parent });
@@ -461,23 +465,32 @@ export function AccountsPage() {
         });
       } else if (form.kind === "create-child") {
         const t = Number(form.parent.account_type);
+        const parentLevel = nodeDepth(form.parent, roots);
+        const nextLevel = parentLevel + 1;
+        // سطح آخر (تفصیلی) سندپذیر؛ سطوح بالاتر گروه
+        const postable = nextLevel >= MAX_DEPTH;
         await createMut.mutateAsync({
           account_code: finalCode,
           name: name.trim(),
           account_type: t,
           parent_account_id: form.parent.account_id,
-          is_postable: true,
+          is_postable: postable,
+          is_control_account: !postable,
+          account_level: nextLevel,
           normal_balance: t === 4 || t === 2 || t === 3 ? 2 : 1,
         });
         setOpenIds((prev) => new Set(prev).add(form.parent.account_id));
       } else {
         const t = form.type;
+        // حساب کل تازه: گروه است تا زیرش معین بگذارند
         await createMut.mutateAsync({
           account_code: finalCode,
           name: name.trim(),
           account_type: t,
           parent_account_id: null,
-          is_postable: true,
+          is_postable: false,
+          is_control_account: true,
+          account_level: 1,
           normal_balance: t === 4 || t === 2 || t === 3 ? 2 : 1,
         });
       }
@@ -494,12 +507,12 @@ export function AccountsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("حذف این حساب؟")) return;
+    if (!confirm("این حساب حذف شود؟")) return;
     try {
       await deleteMut.mutateAsync(id);
       if (form?.kind === "edit" && form.account.account_id === id) closeForm();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "حذف ممکن نیست");
+      alert(e instanceof Error ? e.message : "حذف ممکن نیست (احتمالاً گردش دارد یا زیرمجموعه دارد).");
     }
   }
 
@@ -511,15 +524,20 @@ export function AccountsPage() {
 
   const busy = createMut.isPending || updateMut.isPending;
 
+  function formTitle(): string {
+    if (!form) return "";
+    if (form.kind === "edit") return "ویرایش حساب";
+    if (form.kind === "create-child") {
+      const pl = nodeDepth(form.parent, roots);
+      const next = LEVEL_LABEL[pl + 1] ?? "زیرحساب";
+      return `${next} زیر «${form.parent.name}»`;
+    }
+    return `حساب کل — ${ACCOUNT_TYPE_LABELS[form.type] ?? form.type}`;
+  }
+
   const inlineForm = form ? (
     <InlineForm
-      title={
-        form.kind === "edit"
-          ? "ویرایش حساب"
-          : form.kind === "create-child"
-            ? `زیرحساب «${form.parent.name}»`
-            : `حساب جدید — ${ACCOUNT_TYPE_LABELS[form.type] ?? form.type}`
-      }
+      title={formTitle()}
       code={code}
       name={name}
       onName={setName}
@@ -535,7 +553,7 @@ export function AccountsPage() {
     <div className="space-y-4">
       <PageHeader
         title="کدینگ حساب‌ها"
-        description={`درخت حساب‌های دفتر کل — حداکثر ${toFaDigits(MAX_DEPTH)} سطح`}
+        description="کل · معین · تفصیلی"
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "حسابداری", href: "/dashboard/finance" },
@@ -582,7 +600,7 @@ export function AccountsPage() {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 shrink-0"
-                      title="افزودن حساب در این گروه"
+                      title="افزودن حساب کل"
                       onClick={() => startAddRoot(t)}
                     >
                       <Plus className="h-3.5 w-3.5" />
@@ -596,7 +614,7 @@ export function AccountsPage() {
 
                     {list.length === 0 && !showRootForm ? (
                       <p className="px-3 py-3 text-xs text-muted-foreground">
-                        حسابی در این گروه نیست. با + اضافه کنید.
+                        هنوز حسابی نیست. با + حساب کل اضافه کنید.
                       </p>
                     ) : (
                       list.map((n) => (
