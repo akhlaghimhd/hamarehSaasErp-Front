@@ -1,7 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronLeft, Loader2, Plus, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
@@ -11,6 +19,7 @@ import {
   useCreateAccount,
   useDeleteAccount,
 } from "../hooks/use-accounts";
+import { accountService } from "../services/account-service";
 import {
   ACCOUNT_TYPE_LABELS,
   FinancePermissions,
@@ -18,6 +27,8 @@ import {
 } from "../types";
 import { ApiClientError } from "@/api";
 import { cn, toFaDigits } from "@/shared/lib/utils";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { financeAccountKeys } from "../hooks/use-accounts";
 
 const TYPE_ORDER = [1, 2, 3, 4, 5] as const;
 
@@ -30,40 +41,33 @@ function groupByType(roots: AccountTreeNode[]): Record<number, AccountTreeNode[]
   return map;
 }
 
-/** لیست تخت برای انتخاب والد (با تورفتگی متنی) */
-function flattenForParent(
-  nodes: AccountTreeNode[],
-  depth = 0
-): Array<{ id: string; label: string; type: number }> {
-  const out: Array<{ id: string; label: string; type: number }> = [];
-  for (const n of nodes) {
-    const pad = depth > 0 ? `${"— ".repeat(depth)}` : "";
-    out.push({
-      id: n.account_id,
-      label: `${pad}${toFaDigits(n.account_code)} — ${n.name}`,
-      type: Number(n.account_type),
-    });
-    if (n.children?.length) {
-      out.push(...flattenForParent(n.children, depth + 1));
-    }
-  }
-  return out;
-}
+type FormMode =
+  | { kind: "create-root" }
+  | { kind: "create-child"; parent: AccountTreeNode }
+  | { kind: "edit"; account: AccountTreeNode };
 
 function TreeRow({
   node,
   depth,
+  canCreate,
   canDelete,
-  onDelete,
+  canEdit,
   openIds,
   toggle,
+  onAddChild,
+  onEdit,
+  onDelete,
 }: {
   node: AccountTreeNode;
   depth: number;
+  canCreate: boolean;
   canDelete: boolean;
-  onDelete: (id: string) => void;
+  canEdit: boolean;
   openIds: Set<string>;
   toggle: (id: string) => void;
+  onAddChild: (node: AccountTreeNode) => void;
+  onEdit: (node: AccountTreeNode) => void;
+  onDelete: (id: string) => void;
 }) {
   const hasKids = Boolean(node.children?.length);
   const open = openIds.has(node.account_id);
@@ -71,7 +75,7 @@ function TreeRow({
   return (
     <div>
       <div
-        className="flex items-center gap-2 border-b border-border/40 py-2 pe-3 text-sm"
+        className="group flex items-center gap-2 border-b border-border/40 py-2 pe-2 text-sm"
         style={{ paddingInlineStart: 12 + depth * 16 }}
       >
         {hasKids ? (
@@ -93,22 +97,48 @@ function TreeRow({
         <span className="min-w-0 flex-1 truncate">{node.name}</span>
 
         {node.is_postable ? (
-          <span className="text-[10px] text-emerald-700 dark:text-emerald-400">قابل ثبت</span>
+          <span className="hidden text-[10px] text-emerald-700 dark:text-emerald-400 sm:inline">
+            قابل ثبت
+          </span>
         ) : (
-          <span className="text-[10px] text-muted-foreground">کنترل</span>
+          <span className="hidden text-[10px] text-muted-foreground sm:inline">کنترل</span>
         )}
 
-        {canDelete && node.is_postable ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-destructive"
-            title="حذف نرم"
-            onClick={() => onDelete(node.account_id)}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+          {canCreate ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              title="افزودن زیرحساب"
+              onClick={() => onAddChild(node)}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          ) : null}
+          {canEdit ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              title="ویرایش"
+              onClick={() => onEdit(node)}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          ) : null}
+          {canDelete && node.is_postable ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-destructive"
+              title="حذف"
+              onClick={() => onDelete(node.account_id)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {hasKids && open
@@ -117,10 +147,14 @@ function TreeRow({
               key={c.account_id}
               node={c}
               depth={depth + 1}
+              canCreate={canCreate}
               canDelete={canDelete}
-              onDelete={onDelete}
+              canEdit={canEdit}
               openIds={openIds}
               toggle={toggle}
+              onAddChild={onAddChild}
+              onEdit={onEdit}
+              onDelete={onDelete}
             />
           ))
         : null}
@@ -132,21 +166,61 @@ export function AccountsPage() {
   const canView = usePermission(FinancePermissions.coaView);
   const canCreate = usePermission(FinancePermissions.coaCreate);
   const canDelete = usePermission(FinancePermissions.coaDelete);
+  const canEdit = usePermission(FinancePermissions.coaUpdate);
 
   const { data, isLoading, error, refetch } = useAccountTree();
   const createMut = useCreateAccount();
   const deleteMut = useDeleteAccount();
+  const qc = useQueryClient();
 
+  const updateMut = useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: { account_code: string; name: string };
+    }) => accountService.update(id, payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: financeAccountKeys.all });
+    },
+  });
+
+  const [mode, setMode] = useState<FormMode>({ kind: "create-root" });
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [type, setType] = useState(1);
-  const [parentId, setParentId] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [openTypes, setOpenTypes] = useState<Set<number>>(() => new Set([1]));
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
 
   const grouped = useMemo(() => groupByType(data ?? []), [data]);
-  const parentOptions = useMemo(() => flattenForParent(data ?? []), [data]);
+
+  function resetForm() {
+    setMode({ kind: "create-root" });
+    setCode("");
+    setName("");
+    setType(1);
+    setFormError(null);
+  }
+
+  function startAddChild(parent: AccountTreeNode) {
+    setMode({ kind: "create-child", parent });
+    setCode("");
+    setName("");
+    setType(Number(parent.account_type));
+    setFormError(null);
+    setOpenTypes((prev) => new Set(prev).add(Number(parent.account_type)));
+    setOpenIds((prev) => new Set(prev).add(parent.account_id));
+  }
+
+  function startEdit(account: AccountTreeNode) {
+    setMode({ kind: "edit", account });
+    setCode(account.account_code);
+    setName(account.name);
+    setType(Number(account.account_type));
+    setFormError(null);
+  }
 
   function toggleType(t: number) {
     setOpenTypes((prev) => {
@@ -166,46 +240,57 @@ export function AccountsPage() {
     });
   }
 
-  function onParentChange(value: string) {
-    setParentId(value);
-    if (!value) return;
-    const parent = parentOptions.find((p) => p.id === value);
-    if (parent) setType(parent.type);
-  }
-
-  async function handleCreate() {
+  async function handleSubmit() {
     setFormError(null);
     try {
-      await createMut.mutateAsync({
-        account_code: code.trim(),
-        name: name.trim(),
-        account_type: type,
-        parent_account_id: parentId || null,
-        is_postable: true,
-        normal_balance: type === 4 || type === 2 || type === 3 ? 2 : 1,
-      });
-      setCode("");
-      setName("");
-      setParentId("");
-      setOpenTypes((prev) => new Set(prev).add(type));
-      if (parentId) {
-        setOpenIds((prev) => new Set(prev).add(parentId));
+      if (mode.kind === "edit") {
+        await updateMut.mutateAsync({
+          id: mode.account.account_id,
+          payload: { account_code: code.trim(), name: name.trim() },
+        });
+      } else if (mode.kind === "create-child") {
+        await createMut.mutateAsync({
+          account_code: code.trim(),
+          name: name.trim(),
+          account_type: Number(mode.parent.account_type),
+          parent_account_id: mode.parent.account_id,
+          is_postable: true,
+          normal_balance:
+            Number(mode.parent.account_type) === 4 ||
+            Number(mode.parent.account_type) === 2 ||
+            Number(mode.parent.account_type) === 3
+              ? 2
+              : 1,
+        });
+        setOpenIds((prev) => new Set(prev).add(mode.parent.account_id));
+      } else {
+        await createMut.mutateAsync({
+          account_code: code.trim(),
+          name: name.trim(),
+          account_type: type,
+          parent_account_id: null,
+          is_postable: true,
+          normal_balance: type === 4 || type === 2 || type === 3 ? 2 : 1,
+        });
+        setOpenTypes((prev) => new Set(prev).add(type));
       }
+      resetForm();
     } catch (e) {
       const msg =
         e instanceof ApiClientError
           ? e.message
           : e instanceof Error
             ? e.message
-            : "خطا در ایجاد حساب";
+            : "خطا در ذخیره";
       setFormError(msg);
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("حذف نرم این حساب؟")) return;
+    if (!confirm("حذف این حساب؟")) return;
     try {
       await deleteMut.mutateAsync(id);
+      if (mode.kind === "edit" && mode.account.account_id === id) resetForm();
     } catch (e) {
       alert(e instanceof Error ? e.message : "حذف ممکن نیست");
     }
@@ -216,6 +301,14 @@ export function AccountsPage() {
       <div className="p-6 text-sm text-amber-700">مجوز مشاهده کدینگ را ندارید.</div>
     );
   }
+
+  const busy = createMut.isPending || updateMut.isPending;
+  const formTitle =
+    mode.kind === "edit"
+      ? "ویرایش حساب"
+      : mode.kind === "create-child"
+        ? `زیرحساب برای «${mode.parent.name}»`
+        : "حساب جدید";
 
   return (
     <div className="space-y-4">
@@ -229,57 +322,67 @@ export function AccountsPage() {
         ]}
       />
 
-      {canCreate ? (
-        <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">کد</label>
-            <Input value={code} onChange={(e) => setCode(e.target.value)} className="w-28" />
+      {(canCreate || canEdit) && (
+        <div className="rounded-xl border bg-card p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-sm font-medium">{formTitle}</span>
+            {mode.kind !== "create-root" ? (
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                onClick={resetForm}
+              >
+                <X className="h-3.5 w-3.5" />
+                انصراف
+              </button>
+            ) : null}
           </div>
-          <div className="min-w-[140px] flex-1 space-y-1">
-            <label className="text-xs text-muted-foreground">نام</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">حساب والد</label>
-            <select
-              className="h-9 min-w-[180px] max-w-[260px] rounded-md border bg-background px-2 text-sm"
-              value={parentId}
-              onChange={(e) => onParentChange(e.target.value)}
+
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">کد</label>
+              <Input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="w-28"
+              />
+            </div>
+            <div className="min-w-[160px] flex-1 space-y-1">
+              <label className="text-xs text-muted-foreground">نام</label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            {mode.kind === "create-root" ? (
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">نوع</label>
+                <select
+                  className="h-9 rounded-md border bg-background px-2 text-sm"
+                  value={type}
+                  onChange={(e) => setType(Number(e.target.value))}
+                >
+                  {Object.entries(ACCOUNT_TYPE_LABELS).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+            <Button
+              size="sm"
+              disabled={!code.trim() || !name.trim() || busy}
+              onClick={() => void handleSubmit()}
             >
-              <option value="">بدون والد (حساب اصلی)</option>
-              {parentOptions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              <span className={busy ? "ms-1" : ""}>
+                {mode.kind === "edit" ? "ذخیره" : "افزودن"}
+              </span>
+            </Button>
           </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">نوع</label>
-            <select
-              className="h-9 rounded-md border bg-background px-2 text-sm"
-              value={type}
-              onChange={(e) => setType(Number(e.target.value))}
-              disabled={Boolean(parentId)}
-            >
-              {Object.entries(ACCOUNT_TYPE_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </div>
-          <Button
-            size="sm"
-            disabled={!code.trim() || !name.trim() || createMut.isPending}
-            onClick={() => void handleCreate()}
-          >
-            {createMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            <span className="ms-1">افزودن</span>
-          </Button>
-          {formError ? <p className="w-full text-xs text-destructive">{formError}</p> : null}
+          {formError ? (
+            <p className="mt-2 text-xs text-destructive">{formError}</p>
+          ) : null}
         </div>
-      ) : null}
+      )}
 
       {isLoading ? (
         <div className="flex items-center gap-2 rounded-xl border bg-card p-4 text-sm text-muted-foreground">
@@ -310,7 +413,12 @@ export function AccountsPage() {
                   onClick={() => toggleType(t)}
                 >
                   <span>{ACCOUNT_TYPE_LABELS[t] ?? t}</span>
-                  <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-180")} />
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 text-muted-foreground transition-transform",
+                      open && "rotate-180"
+                    )}
+                  />
                 </button>
                 {open ? (
                   <div className="border-t border-border/50">
@@ -319,10 +427,14 @@ export function AccountsPage() {
                         key={n.account_id}
                         node={n}
                         depth={0}
+                        canCreate={canCreate}
                         canDelete={canDelete}
-                        onDelete={(id) => void handleDelete(id)}
+                        canEdit={canEdit}
                         openIds={openIds}
                         toggle={toggleNode}
+                        onAddChild={startAddChild}
+                        onEdit={startEdit}
+                        onDelete={(id) => void handleDelete(id)}
                       />
                     ))}
                   </div>
