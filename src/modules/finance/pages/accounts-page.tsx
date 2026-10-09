@@ -658,7 +658,7 @@ export function AccountsPage() {
                 <>
                   حساب «{deleteTarget.name}» با کد{" "}
                   <span className="font-mono">{toFaDigits(deleteTarget.account_code)}</span>{" "}
-                  حذف شود؟ این عمل قابل بازگشت از سطل حذف‌شده است.
+                  حذف شود؟ حساب‌هایی که زیرمجموعه یا گردش سند دارند قابل حذف نیستند.
                 </>
               ) : null}
             </DialogDescription>
