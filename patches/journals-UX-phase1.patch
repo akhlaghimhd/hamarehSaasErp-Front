@@ -1,0 +1,142 @@
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -13,6 +13,7 @@
+   FileText,
+   Search,
+   Link2,
++  Keyboard,
+ } from "lucide-react";
+ import { PageHeader } from "@/shared/components/layout/page-header";
+ import { Button } from "@/shared/components/ui/button";
+@@ -200,20 +201,29 @@
+   const [entryNumber, setEntryNumber] = useState<string | null>(null);
+   const [periodId, setPeriodId] = useState(DEMO_PERIOD_ID);
+   const [accountQuery, setAccountQuery] = useState("");
++  const [recentAccountIds, setRecentAccountIds] = useState<string[]>([]);
++  const [dirty, setDirty] = useState(false);
+ 
+   const filteredAccounts = useMemo(() => {
+     const q = accountQuery.trim();
+-    if (!q) return postableAccounts;
+     const ascii = toAsciiDigits(q);
+-    return postableAccounts.filter(
+-      (a) =>
+-        a.name.includes(q) ||
+-        String(a.account_code).includes(ascii) ||
+-        toFaDigits(a.account_code).includes(q)
+-    );
+-  }, [postableAccounts, accountQuery]);
+-
+-  const [dirty, setDirty] = useState(false);
++    const base = !q
++      ? postableAccounts
++      : postableAccounts.filter(
++          (a) =>
++            a.name.includes(q) ||
++            String(a.account_code).includes(ascii) ||
++            toFaDigits(a.account_code).includes(q)
++        );
++    if (!recentAccountIds.length) return base;
++    const recentSet = new Set(recentAccountIds);
++    const recent = recentAccountIds
++      .map((id) => base.find((a) => a.account_id === id))
++      .filter(Boolean) as typeof postableAccounts;
++    const rest = base.filter((a) => !recentSet.has(a.account_id));
++    return [...recent, ...rest];
++  }, [postableAccounts, accountQuery, recentAccountIds]);
++
+   const [meta, setMeta] = useState<{
+     reverses_entry_id?: string | null;
+     reversed_by_entry_id?: string | null;
+@@ -277,6 +287,11 @@
+   function markDirty() {
+     setDirty(true);
+   }
++
++  function rememberAccount(id: string) {
++    if (!id) return;
++    setRecentAccountIds((prev) => [id, ...prev.filter((x) => x !== id)].slice(0, 8));
++  }
+ 
+   function closeForm() {
+     if (dirty && !viewOnly) {
+@@ -494,6 +509,28 @@
+     }
+   }
+ 
++  useEffect(() => {
++    if (formMode === null || viewOnly) return;
++    function onKey(e: KeyboardEvent) {
++      const mod = e.ctrlKey || e.metaKey;
++      if (mod && e.key.toLowerCase() === "s") {
++        e.preventDefault();
++        if (!saving) void doSave(false);
++      } else if (mod && e.key === "Enter") {
++        e.preventDefault();
++        if (!saving && isBalanced && canPost) void doSave(true);
++      } else if (mod && e.key.toLowerCase() === "b") {
++        e.preventDefault();
++        fillBalanceOnLast();
++      } else if (e.altKey && e.key.toLowerCase() === "n") {
++        e.preventDefault();
++        addLine();
++      }
++    }
++    window.addEventListener("keydown", onKey);
++    return () => window.removeEventListener("keydown", onKey);
++  });
++
+   if (!canView) {
+     return (
+       <div className="p-6 text-sm text-amber-700">مجوز مشاهده اسناد را ندارید.</div>
+@@ -589,6 +626,10 @@
+             <span className="text-xs text-muted-foreground">
+               {toFaDigits(filteredAccounts.length)} حساب قابل ثبت
+             </span>
++            <span className="text-[11px] text-muted-foreground flex items-center gap-1">
++              <Keyboard className="h-3.5 w-3.5" />
++              Ctrl+S پیش‌نویس · Ctrl+Enter قطعی · Ctrl+B تراز · Alt+N سطر
++            </span>
+           </div>
+         ) : null}
+ 
+@@ -623,7 +664,10 @@
+                       <select
+                         className="h-9 w-full rounded-md border bg-background px-2 text-xs"
+                         value={l.account_id}
+-                        onChange={(e) => updateLine(l.key, { account_id: e.target.value })}
++                        onChange={(e) => {
++                          updateLine(l.key, { account_id: e.target.value });
++                          rememberAccount(e.target.value);
++                        }}
+                       >
+                         <option value="">انتخاب حساب…</option>
+                         {filteredAccounts.map((a) => (
+@@ -738,9 +782,11 @@
+               <Button type="button" size="sm" variant="outline" onClick={addLine}>
+                 <Plus className="h-3.5 w-3.5 ml-1" />
+                 افزودن سطر
++                <span className="mr-1 text-[10px] text-muted-foreground">Alt+N</span>
+               </Button>
+               <Button type="button" size="sm" variant="secondary" onClick={fillBalanceOnLast}>
+                 تراز آخرین سطر
++                <span className="mr-1 text-[10px] text-muted-foreground">Ctrl+B</span>
+               </Button>
+             </div>
+           ) : null}
+@@ -782,6 +828,7 @@
+                     variant="outline"
+                     disabled={saving}
+                     onClick={() => void doSave(false)}
++                    title="Ctrl+S"
+                   >
+                     ذخیره پیش‌نویس
+                   </Button>
+@@ -790,6 +837,7 @@
+                       type="button"
+                       disabled={saving || !isBalanced}
+                       onClick={() => void doSave(true)}
++                      title="Ctrl+Enter"
+                     >
+                       {saving ? (
+                         <Loader2 className="h-4 w-4 animate-spin ml-1" />
