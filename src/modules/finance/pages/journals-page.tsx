@@ -186,18 +186,6 @@ export function JournalsPage() {
     [postableAccounts]
   );
 
-  const filteredAccounts = useMemo(() => {
-    const q = accountQuery.trim();
-    if (!q) return postableAccounts;
-    const ascii = toAsciiDigits(q);
-    return postableAccounts.filter(
-      (a) =>
-        a.name.includes(q) ||
-        String(a.account_code).includes(ascii) ||
-        toFaDigits(a.account_code).includes(q)
-    );
-  }, [postableAccounts, accountQuery]);
-
   const postMut = usePostJournal();
   const reverseMut = useReverseJournal();
   const deleteMut = useDeleteJournal();
@@ -212,6 +200,19 @@ export function JournalsPage() {
   const [entryNumber, setEntryNumber] = useState<string | null>(null);
   const [periodId, setPeriodId] = useState(DEMO_PERIOD_ID);
   const [accountQuery, setAccountQuery] = useState("");
+
+  const filteredAccounts = useMemo(() => {
+    const q = accountQuery.trim();
+    if (!q) return postableAccounts;
+    const ascii = toAsciiDigits(q);
+    return postableAccounts.filter(
+      (a) =>
+        a.name.includes(q) ||
+        String(a.account_code).includes(ascii) ||
+        toFaDigits(a.account_code).includes(q)
+    );
+  }, [postableAccounts, accountQuery]);
+
   const [dirty, setDirty] = useState(false);
   const [meta, setMeta] = useState<{
     reverses_entry_id?: string | null;
