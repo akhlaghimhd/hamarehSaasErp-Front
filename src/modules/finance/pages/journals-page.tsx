@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState, useCallback, useEffect } from "react";
 import {
@@ -59,9 +59,9 @@ import {
 } from "@/shared/lib/utils";
 
 const statusLabel: Record<string, string> = {
-  DRAFT: "┘╛█î╪┤ظî┘┘ê█î╪│",
-  POSTED: "╪س╪ذ╪زظî╪┤╪»┘ç",
-  REVERSED: "╪ذ╪▒┌»╪┤╪زظî╪«┘ê╪▒╪»┘ç",
+  DRAFT: "پیش‌نویس",
+  POSTED: "ثبت‌شده",
+  REVERSED: "برگشت‌خورده",
 };
 
 const statusChip: Record<string, string> = {
@@ -93,8 +93,8 @@ function emptyLine(desc = ""): LineForm {
 }
 
 function periodLabel(id?: string | null): string {
-  if (!id) return "ظ¤";
-  if (id === DEMO_PERIOD_ID) return "╪»┘ê╪▒┘ç ╪ش╪د╪▒█î (╪»┘à┘ê)";
+  if (!id) return "—";
+  if (id === DEMO_PERIOD_ID) return "دوره جاری (دمو)";
   return toFaDigits(id.slice(0, 8));
 }
 
@@ -180,8 +180,8 @@ export function JournalsPage() {
   const accountLabel = useCallback(
     (id: string) => {
       const a = postableAccounts.find((x) => x.account_id === id);
-      if (!a) return id ? id.slice(0, 8) : "ظ¤";
-      return `${toFaDigits(a.account_code)} ظ¤ ${a.name}`;
+      if (!a) return id ? id.slice(0, 8) : "—";
+      return `${toFaDigits(a.account_code)} — ${a.name}`;
     },
     [postableAccounts]
   );
@@ -281,7 +281,7 @@ export function JournalsPage() {
 
   function closeForm() {
     if (dirty && !viewOnly) {
-      if (!window.confirm("╪ز╪║█î█î╪▒╪د╪ز ╪░╪«█î╪▒┘çظî┘╪┤╪»┘ç ╪»╪د╪▒█î╪». ╪«╪د╪▒╪ش ╪┤┘ê█î╪»╪ا")) return;
+      if (!window.confirm("تغییرات ذخیره‌نشده دارید. خارج شوید؟")) return;
     }
     setFormMode(null);
     setDirty(false);
@@ -322,7 +322,7 @@ export function JournalsPage() {
         );
       }
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : "╪«╪╖╪د ╪»╪▒ ╪ذ╪د╪▒┌»╪░╪د╪▒█î ╪│┘╪»");
+      setMsg(e instanceof Error ? e.message : "خطا در بارگذاری سند");
       setFormMode(null);
     }
   }
@@ -334,7 +334,7 @@ export function JournalsPage() {
         setFormMode("new");
         setViewOnly(false);
         setDocumentDate(todayIso());
-        setDescription(full.description ? `┌ر┘╛█î: ${full.description}` : "┌ر┘╛█î ╪│┘╪»");
+        setDescription(full.description ? `کپی: ${full.description}` : "کپی سند");
         setEntryNumber(null);
         const items = full.items ?? [];
         setPeriodId(full.period_id || DEMO_PERIOD_ID);
@@ -359,7 +359,7 @@ export function JournalsPage() {
         );
         setFormError(null);
       } catch (e) {
-        setMsg(e instanceof Error ? e.message : "┌ر┘╛█î ┘à┘à┌ر┘ ┘╪┤╪»");
+        setMsg(e instanceof Error ? e.message : "کپی ممکن نشد");
       }
     })();
   }
@@ -414,15 +414,15 @@ export function JournalsPage() {
   async function doSave(andPost: boolean) {
     setFormError(null);
     if (!primaryCompanyId) {
-      setFormError("╪┤╪▒┌ر╪ز ╪د╪╡┘█î █î╪د┘╪ز ┘╪┤╪».");
+      setFormError("شرکت اصلی یافت نشد.");
       return;
     }
     if (!documentDate) {
-      setFormError("╪ز╪د╪▒█î╪« ╪│┘╪» ╪د┘╪▓╪د┘à█î ╪د╪│╪ز.");
+      setFormError("تاریخ سند الزامی است.");
       return;
     }
     if (!periodId) {
-      setFormError("╪»┘ê╪▒┘ç ┘à╪د┘█î ╪د┘╪▓╪د┘à█î ╪د╪│╪ز.");
+      setFormError("دوره مالی الزامی است.");
       return;
     }
     const built = lines
@@ -437,14 +437,14 @@ export function JournalsPage() {
       .filter((l) => l.account_id && (l.debit_amount || l.credit_amount));
 
     if (built.length < 2) {
-      setFormError("╪ص╪»╪د┘é┘ ╪»┘ê ╪ت╪▒╪ز█î┌ر┘ ╪ذ╪د ╪ص╪│╪د╪ذ ┘ê ┘à╪ذ┘╪║ ┘╪د╪▓┘à ╪د╪│╪ز.");
+      setFormError("حداقل دو آرتیکل با حساب و مبلغ لازم است.");
       return;
     }
     if (andPost) {
       const d = built.reduce((s, x) => s + (x.debit_amount || 0), 0);
       const c = built.reduce((s, x) => s + (x.credit_amount || 0), 0);
       if (Math.round((d - c) * 100) / 100 !== 0 || d <= 0) {
-        setFormError("╪ذ╪▒╪د█î ╪س╪ذ╪ز ┘é╪╖╪╣█î╪î ╪│┘╪» ╪ذ╪د█î╪» ╪ز╪▒╪د╪▓ ┘ê ┘à╪ذ┘╪║ظî╪»╪د╪▒ ╪ذ╪د╪┤╪».");
+        setFormError("برای ثبت قطعی، سند باید تراز و مبلغ‌دار باشد.");
         return;
       }
     }
@@ -460,9 +460,9 @@ export function JournalsPage() {
         } as Parameters<typeof journalService.createDraft>[0]);
         if (andPost) {
           await journalService.post(created.journal_entry_id);
-          setMsg("╪│┘╪» ╪░╪«█î╪▒┘ç ┘ê ╪س╪ذ╪ز ┘é╪╖╪╣█î ╪┤╪».");
+          setMsg("سند ذخیره و ثبت قطعی شد.");
         } else {
-          setMsg("┘╛█î╪┤ظî┘┘ê█î╪│ ╪░╪«█î╪▒┘ç ╪┤╪».");
+          setMsg("پیش‌نویس ذخیره شد.");
         }
       } else if (typeof formMode === "string") {
         await journalService.updateDraft(formMode, {
@@ -473,9 +473,9 @@ export function JournalsPage() {
         });
         if (andPost) {
           await journalService.post(formMode);
-          setMsg("╪│┘╪» ╪ذ┘çظî╪▒┘ê╪▓ ┘ê ╪س╪ذ╪ز ┘é╪╖╪╣█î ╪┤╪».");
+          setMsg("سند به‌روز و ثبت قطعی شد.");
         } else {
-          setMsg("┘╛█î╪┤ظî┘┘ê█î╪│ ╪ذ┘çظî╪▒┘ê╪▓ ╪┤╪».");
+          setMsg("پیش‌نویس به‌روز شد.");
         }
       }
       setDirty(false);
@@ -487,7 +487,7 @@ export function JournalsPage() {
           ? e.message
           : e instanceof Error
             ? e.message
-            : "╪░╪«█î╪▒┘ç ┘╪د┘à┘ê┘┘é ╪ذ┘ê╪»"
+            : "ذخیره ناموفق بود"
       );
     } finally {
       setSaving(false);
@@ -496,34 +496,34 @@ export function JournalsPage() {
 
   if (!canView) {
     return (
-      <div className="p-6 text-sm text-amber-700">┘à╪ش┘ê╪▓ ┘à╪┤╪د┘ç╪»┘ç ╪د╪│┘╪د╪» ╪▒╪د ┘╪»╪د╪▒█î╪».</div>
+      <div className="p-6 text-sm text-amber-700">مجوز مشاهده اسناد را ندارید.</div>
     );
   }
 
   if (formMode !== null) {
     const title =
       formMode === "new"
-        ? "╪│┘╪» ╪ص╪│╪د╪ذ╪»╪د╪▒█î ╪ش╪»█î╪»"
+        ? "سند حسابداری جدید"
         : viewOnly
-          ? "┘à╪┤╪د┘ç╪»┘ç ╪│┘╪»"
-          : "┘ê█î╪▒╪د█î╪┤ ┘╛█î╪┤ظî┘┘ê█î╪│";
+          ? "مشاهده سند"
+          : "ویرایش پیش‌نویس";
 
     return (
       <div className="space-y-4 pb-24">
         <PageHeader
           title={title}
-          description="╪ت╪▒╪ز█î┌ر┘ظî┘ç╪د ╪ذ╪د█î╪» ╪ز╪▒╪د╪▓ ╪ذ╪د╪┤┘╪»╪ؤ ╪┤┘à╪د╪▒┘ç ╪│┘╪» ┘ç┘┌»╪د┘à ╪س╪ذ╪ز ┘é╪╖╪╣█î ╪د╪«╪ز╪╡╪د╪╡ ┘à█îظî█î╪د╪ذ╪»"
+          description="آرتیکل‌ها باید تراز باشند؛ شماره سند هنگام ثبت قطعی اختصاص می‌یابد"
           breadcrumbs={[
-            { label: "╪»╪د╪┤╪ذ┘ê╪▒╪»", href: "/dashboard" },
-            { label: "╪ص╪│╪د╪ذ╪»╪د╪▒█î", href: "/dashboard/finance" },
-            { label: "╪د╪│┘╪د╪»", href: "/dashboard/finance/journals" },
-            { label: formMode === "new" ? "╪ش╪»█î╪»" : "╪ش╪▓╪خ█î╪د╪ز" },
+            { label: "داشبورد", href: "/dashboard" },
+            { label: "حسابداری", href: "/dashboard/finance" },
+            { label: "اسناد", href: "/dashboard/finance/journals" },
+            { label: formMode === "new" ? "جدید" : "جزئیات" },
           ]}
         />
 
         <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-3">
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">╪ز╪د╪▒█î╪« ╪│┘╪»</label>
+            <label className="text-xs text-muted-foreground">تاریخ سند</label>
             <ShamsiDatePicker
               value={documentDate}
               onChange={(v) => {
@@ -532,11 +532,11 @@ export function JournalsPage() {
               }}
               disabled={viewOnly}
               className="h-9 w-44"
-              placeholder="╪د┘╪ز╪«╪د╪ذ ╪ز╪د╪▒█î╪«"
+              placeholder="انتخاب تاریخ"
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">╪»┘ê╪▒┘ç ┘à╪د┘█î</label>
+            <label className="text-xs text-muted-foreground">دوره مالی</label>
             <select
               className="h-9 rounded-md border bg-background px-2 text-sm min-w-[160px]"
               value={periodId}
@@ -546,23 +546,23 @@ export function JournalsPage() {
                 setPeriodId(e.target.value);
               }}
             >
-              <option value={DEMO_PERIOD_ID}>╪»┘ê╪▒┘ç ╪ش╪د╪▒█î (╪»┘à┘ê)</option>
+              <option value={DEMO_PERIOD_ID}>دوره جاری (دمو)</option>
             </select>
           </div>
           <div className="space-y-1 flex-1 min-w-[200px]">
-            <label className="text-xs text-muted-foreground">╪┤╪▒╪ص ╪│┘╪»</label>
+            <label className="text-xs text-muted-foreground">شرح سند</label>
             <Input
               className="h-9"
-              placeholder="╪┤╪▒╪ص ┌ر┘█î ╪│┘╪»"
+              placeholder="شرح کلی سند"
               value={description}
               disabled={viewOnly}
               onChange={(e) => { markDirty(); setDescription(e.target.value); }}
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">╪┤┘à╪د╪▒┘ç</label>
+            <label className="text-xs text-muted-foreground">شماره</label>
             <div className="h-9 px-3 flex items-center rounded-md border bg-muted/40 text-xs text-muted-foreground font-mono">
-              {entryNumber ? toFaDigits(entryNumber) : "┘╛╪│ ╪د╪▓ ╪س╪ذ╪ز ┘é╪╖╪╣█î"}
+              {entryNumber ? toFaDigits(entryNumber) : "پس از ثبت قطعی"}
             </div>
           </div>
         </div>
@@ -570,8 +570,8 @@ export function JournalsPage() {
         {(meta.reverses_entry_id || meta.reversed_by_entry_id) && (
           <div className="rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground flex flex-wrap gap-3 items-center">
             <Link2 className="h-3.5 w-3.5" />
-            {meta.reverses_entry_id ? <span>╪د█î┘ ╪│┘╪» ╪ذ╪▒┌»╪┤╪ز ╪د╪│╪ز (╪د╪▓ ╪│┘╪» ┘à╪ذ╪»╪ث)</span> : null}
-            {meta.reversed_by_entry_id ? <span>╪د█î┘ ╪│┘╪» ╪ذ╪▒┌»╪┤╪ز ╪«┘ê╪▒╪»┘ç ╪د╪│╪ز</span> : null}
+            {meta.reverses_entry_id ? <span>این سند برگشت است (از سند مبدأ)</span> : null}
+            {meta.reversed_by_entry_id ? <span>این سند برگشت خورده است</span> : null}
           </div>
         )}
 
@@ -581,13 +581,13 @@ export function JournalsPage() {
               <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input
                 className="h-9 pr-8 text-xs"
-                placeholder="╪ش╪│╪ز╪ش┘ê█î ╪ص╪│╪د╪ذ (┌ر╪» █î╪د ┘╪د┘à)ظخ"
+                placeholder="جستجوی حساب (کد یا نام)…"
                 value={accountQuery}
                 onChange={(e) => setAccountQuery(e.target.value)}
               />
             </div>
             <span className="text-xs text-muted-foreground">
-              {toFaDigits(filteredAccounts.length)} ╪ص╪│╪د╪ذ ┘é╪د╪ذ┘ ╪س╪ذ╪ز
+              {toFaDigits(filteredAccounts.length)} حساب قابل ثبت
             </span>
           </div>
         ) : null}
@@ -597,15 +597,15 @@ export function JournalsPage() {
             <thead>
               <tr className="border-b text-right text-xs text-muted-foreground bg-muted/30">
                 <th className="px-2 py-2 w-10">#</th>
-                <th className="px-2 py-2 min-w-[200px]">╪ص╪│╪د╪ذ (╪ز┘╪╡█î┘█î)</th>
-                <th className="px-2 py-2 min-w-[120px]">╪┤╪▒╪ص ╪│╪╖╪▒</th>
-                <th className="px-2 py-2 w-28">╪ذ╪»┘ç┌ر╪د╪▒</th>
-                <th className="px-2 py-2 w-28">╪ذ╪│╪ز╪د┘┌ر╪د╪▒</th>
+                <th className="px-2 py-2 min-w-[200px]">حساب (تفصیلی)</th>
+                <th className="px-2 py-2 min-w-[120px]">شرح سطر</th>
+                <th className="px-2 py-2 w-28">بدهکار</th>
+                <th className="px-2 py-2 w-28">بستانکار</th>
                 {costCenters.length > 0 ? (
-                  <th className="px-2 py-2 min-w-[120px]">┘à╪▒┌ر╪▓ ┘ç╪▓█î┘┘ç</th>
+                  <th className="px-2 py-2 min-w-[120px]">مرکز هزینه</th>
                 ) : null}
                 {businessUnits.length > 0 ? (
-                  <th className="px-2 py-2 min-w-[120px]">┘ê╪د╪ص╪» ┌ر╪│╪ذظî┘ê┌ر╪د╪▒</th>
+                  <th className="px-2 py-2 min-w-[120px]">واحد کسب‌وکار</th>
                 ) : null}
                 {!viewOnly ? <th className="px-2 py-2 w-10" /> : null}
               </tr>
@@ -625,10 +625,10 @@ export function JournalsPage() {
                         value={l.account_id}
                         onChange={(e) => updateLine(l.key, { account_id: e.target.value })}
                       >
-                        <option value="">╪د┘╪ز╪«╪د╪ذ ╪ص╪│╪د╪ذظخ</option>
+                        <option value="">انتخاب حساب…</option>
                         {filteredAccounts.map((a) => (
                           <option key={a.account_id} value={a.account_id}>
-                            {toFaDigits(a.account_code)} ظ¤ {a.name}
+                            {toFaDigits(a.account_code)} — {a.name}
                           </option>
                         ))}
                       </select>
@@ -639,7 +639,7 @@ export function JournalsPage() {
                       className="h-9 text-xs"
                       value={l.description}
                       disabled={viewOnly}
-                      placeholder={description || "╪┤╪▒╪ص"}
+                      placeholder={description || "شرح"}
                       onChange={(e) => updateLine(l.key, { description: e.target.value })}
                     />
                   </td>
@@ -675,7 +675,7 @@ export function JournalsPage() {
                     <td className="px-2 py-1.5">
                       {viewOnly ? (
                         <span className="text-xs">
-                          {costCenters.find((c) => c.cost_center_id === l.cost_center_id)?.name ?? "ظ¤"}
+                          {costCenters.find((c) => c.cost_center_id === l.cost_center_id)?.name ?? "—"}
                         </span>
                       ) : (
                         <select
@@ -683,10 +683,10 @@ export function JournalsPage() {
                           value={l.cost_center_id}
                           onChange={(e) => updateLine(l.key, { cost_center_id: e.target.value })}
                         >
-                          <option value="">ظ¤</option>
+                          <option value="">—</option>
                           {costCenters.map((c) => (
                             <option key={c.cost_center_id} value={c.cost_center_id}>
-                              {toFaDigits(c.code)} ظ¤ {c.name}
+                              {toFaDigits(c.code)} — {c.name}
                             </option>
                           ))}
                         </select>
@@ -697,7 +697,7 @@ export function JournalsPage() {
                     <td className="px-2 py-1.5">
                       {viewOnly ? (
                         <span className="text-xs">
-                          {businessUnits.find((b) => b.business_unit_id === l.business_unit_id)?.name ?? "ظ¤"}
+                          {businessUnits.find((b) => b.business_unit_id === l.business_unit_id)?.name ?? "—"}
                         </span>
                       ) : (
                         <select
@@ -705,10 +705,10 @@ export function JournalsPage() {
                           value={l.business_unit_id}
                           onChange={(e) => updateLine(l.key, { business_unit_id: e.target.value })}
                         >
-                          <option value="">ظ¤</option>
+                          <option value="">—</option>
                           {businessUnits.map((b) => (
                             <option key={b.business_unit_id} value={b.business_unit_id}>
-                              {toFaDigits(b.code)} ظ¤ {b.name}
+                              {toFaDigits(b.code)} — {b.name}
                             </option>
                           ))}
                         </select>
@@ -737,10 +737,10 @@ export function JournalsPage() {
             <div className="flex flex-wrap gap-2 p-2 border-t">
               <Button type="button" size="sm" variant="outline" onClick={addLine}>
                 <Plus className="h-3.5 w-3.5 ml-1" />
-                ╪د┘╪▓┘ê╪»┘ ╪│╪╖╪▒
+                افزودن سطر
               </Button>
               <Button type="button" size="sm" variant="secondary" onClick={fillBalanceOnLast}>
-                ╪ز╪▒╪د╪▓ ╪ت╪«╪▒█î┘ ╪│╪╖╪▒
+                تراز آخرین سطر
               </Button>
             </div>
           ) : null}
@@ -752,11 +752,11 @@ export function JournalsPage() {
           <div className="mx-auto max-w-6xl flex flex-wrap items-center justify-between gap-3 px-4 py-3">
             <div className="flex flex-wrap gap-4 text-sm">
               <span>
-                ╪ذ╪»┘ç┌ر╪د╪▒:{" "}
+                بدهکار:{" "}
                 <strong className="font-mono">{formatMoney(lineTotals.debit)}</strong>
               </span>
               <span>
-                ╪ذ╪│╪ز╪د┘┌ر╪د╪▒:{" "}
+                بستانکار:{" "}
                 <strong className="font-mono">{formatMoney(lineTotals.credit)}</strong>
               </span>
               <span
@@ -766,14 +766,14 @@ export function JournalsPage() {
                 )}
               >
                 {isBalanced
-                  ? "╪ز╪▒╪د╪▓ ظ£ô"
-                  : `┘à╪د┘╪»┘ç: ${formatMoney(Math.abs(lineTotals.diff))}`}
+                  ? "تراز ✓"
+                  : `مانده: ${formatMoney(Math.abs(lineTotals.diff))}`}
               </span>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="ghost" onClick={closeForm}>
                 <X className="h-4 w-4 ml-1" />
-                ╪ذ╪│╪ز┘
+                بستن
               </Button>
               {!viewOnly ? (
                 <>
@@ -783,7 +783,7 @@ export function JournalsPage() {
                     disabled={saving}
                     onClick={() => void doSave(false)}
                   >
-                    ╪░╪«█î╪▒┘ç ┘╛█î╪┤ظî┘┘ê█î╪│
+                    ذخیره پیش‌نویس
                   </Button>
                   {canPost ? (
                     <Button
@@ -796,7 +796,7 @@ export function JournalsPage() {
                       ) : (
                         <CheckCircle2 className="h-4 w-4 ml-1" />
                       )}
-                      ╪░╪«█î╪▒┘ç ┘ê ╪س╪ذ╪ز ┘é╪╖╪╣█î
+                      ذخیره و ثبت قطعی
                     </Button>
                   ) : null}
                 </>
@@ -811,18 +811,18 @@ export function JournalsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="╪د╪│┘╪د╪» ╪ص╪│╪د╪ذ╪»╪د╪▒█î"
-        description="┘╛█î╪┤ظî┘┘ê█î╪│╪î ╪س╪ذ╪ز ┘é╪╖╪╣█î ┘ê ╪ذ╪▒┌»╪┤╪ز ظ¤ ╪ذ╪د ┌ر┘╪ز╪▒┘ ╪ز╪▒╪د╪▓"
+        title="اسناد حسابداری"
+        description="پیش‌نویس، ثبت قطعی و برگشت — با کنترل تراز"
         breadcrumbs={[
-          { label: "╪»╪د╪┤╪ذ┘ê╪▒╪»", href: "/dashboard" },
-          { label: "╪ص╪│╪د╪ذ╪»╪د╪▒█î", href: "/dashboard/finance" },
-          { label: "╪د╪│┘╪د╪»" },
+          { label: "داشبورد", href: "/dashboard" },
+          { label: "حسابداری", href: "/dashboard/finance" },
+          { label: "اسناد" },
         ]}
         actions={
           canCreate ? (
             <Button size="sm" onClick={openNew}>
               <Plus className="h-4 w-4 ml-1" />
-              ╪│┘╪» ╪ش╪»█î╪»
+              سند جدید
             </Button>
           ) : undefined
         }
@@ -836,44 +836,44 @@ export function JournalsPage() {
 
       <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">┘ê╪╢╪╣█î╪ز</label>
+          <label className="text-xs text-muted-foreground">وضعیت</label>
           <select
             className="h-9 rounded-md border bg-background px-2 text-sm"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
-            <option value="">┘ç┘à┘ç ({toFaDigits(statusCounts.all)})</option>
-            <option value="DRAFT">┘╛█î╪┤ظî┘┘ê█î╪│ ({toFaDigits(statusCounts.DRAFT)})</option>
-            <option value="POSTED">╪س╪ذ╪زظî╪┤╪»┘ç ({toFaDigits(statusCounts.POSTED)})</option>
+            <option value="">همه ({toFaDigits(statusCounts.all)})</option>
+            <option value="DRAFT">پیش‌نویس ({toFaDigits(statusCounts.DRAFT)})</option>
+            <option value="POSTED">ثبت‌شده ({toFaDigits(statusCounts.POSTED)})</option>
             <option value="REVERSED">
-              ╪ذ╪▒┌»╪┤╪زظî╪«┘ê╪▒╪»┘ç ({toFaDigits(statusCounts.REVERSED)})
+              برگشت‌خورده ({toFaDigits(statusCounts.REVERSED)})
             </option>
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">╪»┘ê╪▒┘ç</label>
+          <label className="text-xs text-muted-foreground">دوره</label>
           <select
             className="h-9 rounded-md border bg-background px-2 text-sm"
             value={periodFilter}
             onChange={(e) => setPeriodFilter(e.target.value)}
           >
-            <option value="">┘ç┘à┘ç ╪»┘ê╪▒┘çظî┘ç╪د</option>
-            <option value={DEMO_PERIOD_ID}>╪»┘ê╪▒┘ç ╪ش╪د╪▒█î (╪»┘à┘ê)</option>
+            <option value="">همه دوره‌ها</option>
+            <option value={DEMO_PERIOD_ID}>دوره جاری (دمو)</option>
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">╪د╪▓ ╪ز╪د╪▒█î╪«</label>
-          <ShamsiDatePicker value={dateFrom} onChange={setDateFrom} className="h-9 w-40" placeholder="╪د╪▓" />
+          <label className="text-xs text-muted-foreground">از تاریخ</label>
+          <ShamsiDatePicker value={dateFrom} onChange={setDateFrom} className="h-9 w-40" placeholder="از" />
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">╪ز╪د ╪ز╪د╪▒█î╪«</label>
-          <ShamsiDatePicker value={dateTo} onChange={setDateTo} className="h-9 w-40" placeholder="╪ز╪د" />
+          <label className="text-xs text-muted-foreground">تا تاریخ</label>
+          <ShamsiDatePicker value={dateTo} onChange={setDateTo} className="h-9 w-40" placeholder="تا" />
         </div>
         <div className="space-y-1 flex-1 min-w-[160px]">
-          <label className="text-xs text-muted-foreground">╪ش╪│╪ز╪ش┘ê</label>
+          <label className="text-xs text-muted-foreground">جستجو</label>
           <Input
             className="h-9"
-            placeholder="╪┤┘à╪د╪▒┘ç █î╪د ╪┤╪▒╪صظخ"
+            placeholder="شماره یا شرح…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -883,23 +883,23 @@ export function JournalsPage() {
       <div className="rounded-xl border bg-card overflow-x-auto">
         {isLoading ? (
           <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> ╪ذ╪د╪▒┌»╪░╪د╪▒█îظخ
+            <Loader2 className="h-4 w-4 animate-spin" /> بارگذاری…
           </div>
         ) : error ? (
           <div className="p-4 text-sm text-destructive">
-            ╪«╪╖╪د.{" "}
+            خطا.{" "}
             <button type="button" className="underline" onClick={() => void refetch()}>
-              ╪ز┘╪د╪┤ ┘à╪ش╪»╪»
+              تلاش مجدد
             </button>
           </div>
         ) : !filtered.length ? (
           <div className="p-6 text-center space-y-3">
             <FileText className="h-8 w-8 mx-auto text-muted-foreground/50" />
-            <p className="text-sm text-muted-foreground">╪│┘╪»█î ╪س╪ذ╪ز ┘╪┤╪»┘ç ╪د╪│╪ز.</p>
+            <p className="text-sm text-muted-foreground">سندی ثبت نشده است.</p>
             {canCreate ? (
               <Button size="sm" onClick={openNew}>
                 <Plus className="h-4 w-4 ml-1" />
-                ╪س╪ذ╪ز ╪د┘ê┘█î┘ ╪│┘╪»
+                ثبت اولین سند
               </Button>
             ) : null}
           </div>
@@ -907,14 +907,14 @@ export function JournalsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-right text-xs text-muted-foreground">
-                <th className="px-3 py-2 font-medium">╪┤┘à╪د╪▒┘ç</th>
-                <th className="px-3 py-2 font-medium">╪ز╪د╪▒█î╪«</th>
-                <th className="px-3 py-2 font-medium">╪»┘ê╪▒┘ç</th>
-                <th className="px-3 py-2 font-medium">┘ê╪╢╪╣█î╪ز</th>
-                <th className="px-3 py-2 font-medium">╪┤╪▒╪ص</th>
-                <th className="px-3 py-2 font-medium">╪ذ╪»┘ç┌ر╪د╪▒</th>
-                <th className="px-3 py-2 font-medium">╪ذ╪│╪ز╪د┘┌ر╪د╪▒</th>
-                <th className="px-3 py-2 font-medium">╪╣┘à┘█î╪د╪ز</th>
+                <th className="px-3 py-2 font-medium">شماره</th>
+                <th className="px-3 py-2 font-medium">تاریخ</th>
+                <th className="px-3 py-2 font-medium">دوره</th>
+                <th className="px-3 py-2 font-medium">وضعیت</th>
+                <th className="px-3 py-2 font-medium">شرح</th>
+                <th className="px-3 py-2 font-medium">بدهکار</th>
+                <th className="px-3 py-2 font-medium">بستانکار</th>
+                <th className="px-3 py-2 font-medium">عملیات</th>
               </tr>
             </thead>
             <tbody>
@@ -926,7 +926,7 @@ export function JournalsPage() {
                     className="border-b border-border/50 hover:bg-muted/40"
                   >
                     <td className="px-3 py-2 font-mono text-xs font-medium">
-                      {j.entry_number ? toFaDigits(j.entry_number) : "ظ¤"}
+                      {j.entry_number ? toFaDigits(j.entry_number) : "—"}
                     </td>
                     <td className="px-3 py-2 text-xs">
                       {formatJalaliDate(j.document_date)}
@@ -943,13 +943,13 @@ export function JournalsPage() {
                       </span>
                     </td>
                     <td className="px-3 py-2 max-w-[180px] truncate text-xs">
-                      {j.description ?? "ظ¤"}
+                      {j.description ?? "—"}
                     </td>
                     <td className="px-3 py-2 font-mono text-xs">
-                      {t.debit ? formatMoney(t.debit) : "ظ¤"}
+                      {t.debit ? formatMoney(t.debit) : "—"}
                     </td>
                     <td className="px-3 py-2 font-mono text-xs">
-                      {t.credit ? formatMoney(t.credit) : "ظ¤"}
+                      {t.credit ? formatMoney(t.credit) : "—"}
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex flex-wrap gap-1">
@@ -962,7 +962,7 @@ export function JournalsPage() {
                           {j.status === "DRAFT" && canUpdate ? (
                             <Pencil className="h-3.5 w-3.5" />
                           ) : (
-                            "┘à╪┤╪د┘ç╪»┘ç"
+                            "مشاهده"
                           )}
                         </Button>
                         {canCreate ? (
@@ -970,7 +970,7 @@ export function JournalsPage() {
                             size="sm"
                             variant="ghost"
                             className="h-8 px-2"
-                            title="┌ر┘╛█î"
+                            title="کپی"
                             onClick={() => openCopy(j)}
                           >
                             <Copy className="h-3.5 w-3.5" />
@@ -985,11 +985,11 @@ export function JournalsPage() {
                             onClick={() =>
                               void postMut
                                 .mutateAsync(j.journal_entry_id)
-                                .then(() => setMsg("╪│┘╪» ╪س╪ذ╪ز ┘é╪╖╪╣█î ╪┤╪»."))
+                                .then(() => setMsg("سند ثبت قطعی شد."))
                                 .catch((e: Error) => setMsg(e.message))
                             }
                           >
-                            ╪س╪ذ╪ز ┘é╪╖╪╣█î
+                            ثبت قطعی
                           </Button>
                         ) : null}
                         {j.status === "POSTED" && canReverse ? (
@@ -1000,7 +1000,7 @@ export function JournalsPage() {
                             onClick={() => setReverseTarget(j)}
                           >
                             <Undo2 className="h-3.5 w-3.5 ml-1" />
-                            ╪ذ╪▒┌»╪┤╪ز
+                            برگشت
                           </Button>
                         ) : null}
                         {j.status === "DRAFT" && canDelete ? (
@@ -1026,17 +1026,17 @@ export function JournalsPage() {
       <Dialog open={!!reverseTarget} onOpenChange={(o) => !o && setReverseTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>╪ذ╪▒┌»╪┤╪ز ╪│┘╪»</DialogTitle>
+            <DialogTitle>برگشت سند</DialogTitle>
             <DialogDescription>
-              ╪│┘╪» ┘à╪╣┌ر┘ê╪│ ╪╡╪د╪»╪▒ ┘à█îظî╪┤┘ê╪» ┘ê ╪│┘╪» ╪د╪╡┘█î ╪ذ╪▒┌»╪┤╪زظî╪«┘ê╪▒╪»┘ç ╪╣┘╪د┘à╪ز ┘à█îظî╪«┘ê╪▒╪».
+              سند معکوس صادر می‌شود و سند اصلی برگشت‌خورده علامت می‌خورد.
               {reverseTarget?.entry_number
-                ? ` ╪┤┘à╪د╪▒┘ç: ${toFaDigits(reverseTarget.entry_number)}`
+                ? ` شماره: ${toFaDigits(reverseTarget.entry_number)}`
                 : ""}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setReverseTarget(null)}>
-              ╪د┘╪╡╪▒╪د┘
+              انصراف
             </Button>
             <Button
               disabled={reverseMut.isPending}
@@ -1045,13 +1045,13 @@ export function JournalsPage() {
                 void reverseMut
                   .mutateAsync(reverseTarget.journal_entry_id)
                   .then(() => {
-                    setMsg("╪│┘╪» ╪ذ╪▒┌»╪┤╪ز ╪╡╪د╪»╪▒ ╪┤╪».");
+                    setMsg("سند برگشت صادر شد.");
                     setReverseTarget(null);
                   })
                   .catch((e: Error) => setMsg(e.message));
               }}
             >
-              ╪ز╪ث█î█î╪» ╪ذ╪▒┌»╪┤╪ز
+              تأیید برگشت
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1060,12 +1060,12 @@ export function JournalsPage() {
       <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>╪ص╪░┘ ┘╛█î╪┤ظî┘┘ê█î╪│</DialogTitle>
-            <DialogDescription>┘┘é╪╖ ┘╛█î╪┤ظî┘┘ê█î╪│ ╪ذ╪»┘ê┘ ╪س╪ذ╪ز ┘é╪╖╪╣█î ╪ص╪░┘ ┘à█îظî╪┤┘ê╪».</DialogDescription>
+            <DialogTitle>حذف پیش‌نویس</DialogTitle>
+            <DialogDescription>فقط پیش‌نویس بدون ثبت قطعی حذف می‌شود.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>
-              ╪د┘╪╡╪▒╪د┘
+              انصراف
             </Button>
             <Button
               variant="destructive"
@@ -1075,13 +1075,13 @@ export function JournalsPage() {
                 void deleteMut
                   .mutateAsync(deleteTarget.journal_entry_id)
                   .then(() => {
-                    setMsg("┘╛█î╪┤ظî┘┘ê█î╪│ ╪ص╪░┘ ╪┤╪».");
+                    setMsg("پیش‌نویس حذف شد.");
                     setDeleteTarget(null);
                   })
                   .catch((e: Error) => setMsg(e.message));
               }}
             >
-              ╪ص╪░┘
+              حذف
             </Button>
           </DialogFooter>
         </DialogContent>
