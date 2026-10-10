@@ -21,6 +21,15 @@ export type CashAccountDto = {
   is_active?: boolean;
 };
 
+export type CreateCashAccountPayload = {
+  company_id: string;
+  gl_account_id: string;
+  code: string;
+  name: string;
+  cash_kind?: "BANK" | "PETTY_CASH";
+  bank_account_id?: string;
+};
+
 export type CreateTreasuryDocumentPayload = {
   company_id: string;
   period_id: string;
@@ -45,6 +54,13 @@ export const treasuryService = {
     );
     const data = unwrapData<CashAccountDto[] | unknown>(envelope);
     return Array.isArray(data) ? data : [];
+  },
+
+  async createCashAccount(
+    payload: CreateCashAccountPayload
+  ): Promise<CashAccountDto> {
+    const envelope = await apiPost(financePaths.cashAccounts, payload);
+    return unwrapData<CashAccountDto>(envelope);
   },
 
   async listDocuments(params?: {
