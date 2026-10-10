@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import {
   Loader2,
   Plus,
@@ -11,6 +11,8 @@ import {
   Pencil,
   X,
   FileText,
+  Search,
+  Link2,
 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { Button } from "@/shared/components/ui/button";
@@ -26,6 +28,12 @@ import {
 } from "@/shared/components/ui/dialog";
 import { usePermission } from "@/auth";
 import { useCompanies } from "@/modules/organization/hooks/use-companies";
+import {
+  costCenterService,
+  businessUnitService,
+  type CostCenterDto,
+  type BusinessUnitDto,
+} from "@/modules/organization/services/org-extended-service";
 import {
   useJournals,
   usePostJournal,
@@ -68,6 +76,8 @@ type LineForm = {
   debit: string;
   credit: string;
   description: string;
+  cost_center_id: string;
+  business_unit_id: string;
 };
 
 function emptyLine(desc = ""): LineForm {
@@ -77,7 +87,15 @@ function emptyLine(desc = ""): LineForm {
     debit: "",
     credit: "",
     description: desc,
+    cost_center_id: "",
+    business_unit_id: "",
   };
+}
+
+function periodLabel(id?: string | null): string {
+  if (!id) return "—";
+  if (id === DEMO_PERIOD_ID) return "دوره جاری (دمو)";
+  return toFaDigits(id.slice(0, 8));
 }
 
 function parseAmount(raw: string): number {
@@ -146,6 +164,14 @@ export function JournalsPage() {
   const { data, isLoading, error, refetch } = useJournals(filters);
   const { data: accountsFlat } = useAccountFlat();
 
+  const [costCenters, setCostCenters] = useState<CostCenterDto[]>([]);
+  const [businessUnits, setBusinessUnits] = useState<BusinessUnitDto[]>([]);
+  useEffect(() => {
+    if (!primaryCompanyId) return;
+    void costCenterService.list(primaryCompanyId).then(setCostCenters).catch(() => setCostCenters([]));
+    void businessUnitService.list().then(setBusinessUnits).catch(() => setBusinessUnits([]));
+  }, [primaryCompanyId]);
+
   const postableAccounts = useMemo(
     () => (accountsFlat ?? []).filter((a) => a.is_postable !== false),
     [accountsFlat]
@@ -160,6 +186,18 @@ export function JournalsPage() {
     [postableAccounts]
   );
 
+  const filteredAccounts = useMemo(() => {
+    const q = accountQuery.trim();
+    if (!q) return postableAccounts;
+    const ascii = toAsciiDigits(q);
+    return postableAccounts.filter(
+      (a) =>
+        a.name.includes(q) ||
+        String(a.account_code).includes(ascii) ||
+        toFaDigits(a.account_code).includes(q)
+    );
+  }, [postableAccounts, accountQuery]);
+
   const postMut = usePostJournal();
   const reverseMut = useReverseJournal();
   const deleteMut = useDeleteJournal();
@@ -172,6 +210,13 @@ export function JournalsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [entryNumber, setEntryNumber] = useState<string | null>(null);
+  const [periodId, setPeriodId] = useState(DEMO_PERIOD_ID);
+  const [accountQuery, setAccountQuery] = useState("");
+  const [dirty, setDirty] = useState(false);
+  const [meta, setMeta] = useState<{
+    reverses_entry_id?: string | null;
+    reversed_by_entry_id?: string | null;
+  }>({});
 
   const [reverseTarget, setReverseTarget] = useState<JournalEntryDto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<JournalEntryDto | null>(null);
@@ -218,11 +263,27 @@ export function JournalsPage() {
     setFormMode("new");
     setViewOnly(false);
     setDocumentDate(todayIso());
+    setPeriodId(DEMO_PERIOD_ID);
     setDescription("");
     setLines([emptyLine(), emptyLine()]);
     setFormError(null);
     setMsg(null);
     setEntryNumber(null);
+    setAccountQuery("");
+    setDirty(false);
+    setMeta({});
+  }
+
+  function markDirty() {
+    setDirty(true);
+  }
+
+  function closeForm() {
+    if (dirty && !viewOnly) {
+      if (!window.confirm("تغییرات ذخیره‌نشده دارید. خارج شوید؟")) return;
+    }
+    setFormMode(null);
+    setDirty(false);
   }
 
   async function openEdit(j: JournalEntryDto, readonly: boolean) {
@@ -234,8 +295,14 @@ export function JournalsPage() {
     try {
       const full = await journalService.getById(j.journal_entry_id);
       setDocumentDate(full.document_date?.slice(0, 10) || todayIso());
+      setPeriodId(full.period_id || DEMO_PERIOD_ID);
       setDescription(full.description ?? "");
       setEntryNumber(full.entry_number ?? null);
+      setDirty(false);
+      setMeta({
+        reverses_entry_id: full.reverses_entry_id,
+        reversed_by_entry_id: full.reversed_by_entry_id,
+      });
       const items = full.items ?? [];
       if (items.length === 0) {
         setLines([emptyLine(), emptyLine()]);
@@ -248,6 +315,8 @@ export function JournalsPage() {
             credit:
               Number(it.credit_amount || 0) > 0 ? String(Number(it.credit_amount)) : "",
             description: it.description ?? "",
+            cost_center_id: it.cost_center_id ?? "",
+            business_unit_id: it.business_unit_id ?? "",
           }))
         );
       }
@@ -267,6 +336,9 @@ export function JournalsPage() {
         setDescription(full.description ? `کپی: ${full.description}` : "کپی سند");
         setEntryNumber(null);
         const items = full.items ?? [];
+        setPeriodId(full.period_id || DEMO_PERIOD_ID);
+        setDirty(true);
+        setMeta({});
         setLines(
           items.length
             ? items.map((it) => ({
@@ -279,6 +351,8 @@ export function JournalsPage() {
                     ? String(Number(it.credit_amount))
                     : "",
                 description: it.description ?? "",
+                cost_center_id: it.cost_center_id ?? "",
+                business_unit_id: it.business_unit_id ?? "",
               }))
             : [emptyLine(), emptyLine()]
         );
@@ -290,6 +364,7 @@ export function JournalsPage() {
   }
 
   function updateLine(key: string, patch: Partial<LineForm>) {
+    markDirty();
     setLines((prev) =>
       prev.map((l) => {
         if (l.key !== key) return l;
@@ -302,10 +377,12 @@ export function JournalsPage() {
   }
 
   function addLine() {
+    markDirty();
     setLines((prev) => [...prev, emptyLine(description)]);
   }
 
   function removeLine(key: string) {
+    markDirty();
     setLines((prev) => (prev.length <= 2 ? prev : prev.filter((l) => l.key !== key)));
   }
 
@@ -320,6 +397,7 @@ export function JournalsPage() {
     }
     const diff = Math.round((d - c) * 100) / 100;
     if (diff === 0) return;
+    markDirty();
     setLines((prev) => {
       const copy = [...prev];
       const i = copy.length - 1;
@@ -342,12 +420,18 @@ export function JournalsPage() {
       setFormError("تاریخ سند الزامی است.");
       return;
     }
+    if (!periodId) {
+      setFormError("دوره مالی الزامی است.");
+      return;
+    }
     const built = lines
       .map((l) => ({
         account_id: l.account_id,
         debit_amount: parseAmount(l.debit) || undefined,
         credit_amount: parseAmount(l.credit) || undefined,
         description: l.description.trim() || description.trim() || undefined,
+        cost_center_id: l.cost_center_id || undefined,
+        business_unit_id: l.business_unit_id || undefined,
       }))
       .filter((l) => l.account_id && (l.debit_amount || l.credit_amount));
 
@@ -368,7 +452,7 @@ export function JournalsPage() {
       if (formMode === "new") {
         const created = await journalService.createDraft({
           company_id: primaryCompanyId,
-          period_id: DEMO_PERIOD_ID,
+          period_id: periodId,
           document_date: documentDate,
           description: description.trim() || undefined,
           lines: built,
@@ -382,6 +466,7 @@ export function JournalsPage() {
       } else if (typeof formMode === "string") {
         await journalService.updateDraft(formMode, {
           document_date: documentDate,
+          period_id: periodId,
           description: description.trim() || undefined,
           lines: built,
         });
@@ -392,6 +477,7 @@ export function JournalsPage() {
           setMsg("پیش‌نویس به‌روز شد.");
         }
       }
+      setDirty(false);
       setFormMode(null);
       await refetch();
     } catch (e) {
@@ -439,11 +525,28 @@ export function JournalsPage() {
             <label className="text-xs text-muted-foreground">تاریخ سند</label>
             <ShamsiDatePicker
               value={documentDate}
-              onChange={setDocumentDate}
+              onChange={(v) => {
+                markDirty();
+                setDocumentDate(v);
+              }}
               disabled={viewOnly}
               className="h-9 w-44"
               placeholder="انتخاب تاریخ"
             />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">دوره مالی</label>
+            <select
+              className="h-9 rounded-md border bg-background px-2 text-sm min-w-[160px]"
+              value={periodId}
+              disabled={viewOnly}
+              onChange={(e) => {
+                markDirty();
+                setPeriodId(e.target.value);
+              }}
+            >
+              <option value={DEMO_PERIOD_ID}>دوره جاری (دمو)</option>
+            </select>
           </div>
           <div className="space-y-1 flex-1 min-w-[200px]">
             <label className="text-xs text-muted-foreground">شرح سند</label>
@@ -452,7 +555,7 @@ export function JournalsPage() {
               placeholder="شرح کلی سند"
               value={description}
               disabled={viewOnly}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => { markDirty(); setDescription(e.target.value); }}
             />
           </div>
           <div className="space-y-1">
@@ -463,15 +566,46 @@ export function JournalsPage() {
           </div>
         </div>
 
+        {(meta.reverses_entry_id || meta.reversed_by_entry_id) && (
+          <div className="rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground flex flex-wrap gap-3 items-center">
+            <Link2 className="h-3.5 w-3.5" />
+            {meta.reverses_entry_id ? <span>این سند برگشت است (از سند مبدأ)</span> : null}
+            {meta.reversed_by_entry_id ? <span>این سند برگشت خورده است</span> : null}
+          </div>
+        )}
+
+        {!viewOnly ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                className="h-9 pr-8 text-xs"
+                placeholder="جستجوی حساب (کد یا نام)…"
+                value={accountQuery}
+                onChange={(e) => setAccountQuery(e.target.value)}
+              />
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {toFaDigits(filteredAccounts.length)} حساب قابل ثبت
+            </span>
+          </div>
+        ) : null}
+
         <div className="rounded-xl border bg-card overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-right text-xs text-muted-foreground bg-muted/30">
                 <th className="px-2 py-2 w-10">#</th>
-                <th className="px-2 py-2 min-w-[220px]">حساب (تفصیلی)</th>
-                <th className="px-2 py-2 min-w-[140px]">شرح سطر</th>
-                <th className="px-2 py-2 w-32">بدهکار</th>
-                <th className="px-2 py-2 w-32">بستانکار</th>
+                <th className="px-2 py-2 min-w-[200px]">حساب (تفصیلی)</th>
+                <th className="px-2 py-2 min-w-[120px]">شرح سطر</th>
+                <th className="px-2 py-2 w-28">بدهکار</th>
+                <th className="px-2 py-2 w-28">بستانکار</th>
+                {costCenters.length > 0 ? (
+                  <th className="px-2 py-2 min-w-[120px]">مرکز هزینه</th>
+                ) : null}
+                {businessUnits.length > 0 ? (
+                  <th className="px-2 py-2 min-w-[120px]">واحد کسب‌وکار</th>
+                ) : null}
                 {!viewOnly ? <th className="px-2 py-2 w-10" /> : null}
               </tr>
             </thead>
@@ -491,7 +625,7 @@ export function JournalsPage() {
                         onChange={(e) => updateLine(l.key, { account_id: e.target.value })}
                       >
                         <option value="">انتخاب حساب…</option>
-                        {postableAccounts.map((a) => (
+                        {filteredAccounts.map((a) => (
                           <option key={a.account_id} value={a.account_id}>
                             {toFaDigits(a.account_code)} — {a.name}
                           </option>
@@ -536,6 +670,50 @@ export function JournalsPage() {
                       }
                     />
                   </td>
+                  {costCenters.length > 0 ? (
+                    <td className="px-2 py-1.5">
+                      {viewOnly ? (
+                        <span className="text-xs">
+                          {costCenters.find((c) => c.cost_center_id === l.cost_center_id)?.name ?? "—"}
+                        </span>
+                      ) : (
+                        <select
+                          className="h-9 w-full rounded-md border bg-background px-2 text-xs"
+                          value={l.cost_center_id}
+                          onChange={(e) => updateLine(l.key, { cost_center_id: e.target.value })}
+                        >
+                          <option value="">—</option>
+                          {costCenters.map((c) => (
+                            <option key={c.cost_center_id} value={c.cost_center_id}>
+                              {toFaDigits(c.code)} — {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
+                  ) : null}
+                  {businessUnits.length > 0 ? (
+                    <td className="px-2 py-1.5">
+                      {viewOnly ? (
+                        <span className="text-xs">
+                          {businessUnits.find((b) => b.business_unit_id === l.business_unit_id)?.name ?? "—"}
+                        </span>
+                      ) : (
+                        <select
+                          className="h-9 w-full rounded-md border bg-background px-2 text-xs"
+                          value={l.business_unit_id}
+                          onChange={(e) => updateLine(l.key, { business_unit_id: e.target.value })}
+                        >
+                          <option value="">—</option>
+                          {businessUnits.map((b) => (
+                            <option key={b.business_unit_id} value={b.business_unit_id}>
+                              {toFaDigits(b.code)} — {b.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
+                  ) : null}
                   {!viewOnly ? (
                     <td className="px-1 py-1.5">
                       <Button
@@ -592,7 +770,7 @@ export function JournalsPage() {
               </span>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="ghost" onClick={() => setFormMode(null)}>
+              <Button type="button" variant="ghost" onClick={closeForm}>
                 <X className="h-4 w-4 ml-1" />
                 بستن
               </Button>
@@ -730,6 +908,7 @@ export function JournalsPage() {
               <tr className="border-b text-right text-xs text-muted-foreground">
                 <th className="px-3 py-2 font-medium">شماره</th>
                 <th className="px-3 py-2 font-medium">تاریخ</th>
+                <th className="px-3 py-2 font-medium">دوره</th>
                 <th className="px-3 py-2 font-medium">وضعیت</th>
                 <th className="px-3 py-2 font-medium">شرح</th>
                 <th className="px-3 py-2 font-medium">بدهکار</th>
@@ -751,6 +930,7 @@ export function JournalsPage() {
                     <td className="px-3 py-2 text-xs">
                       {formatJalaliDate(j.document_date)}
                     </td>
+                    <td className="px-3 py-2 text-xs">{periodLabel(j.period_id)}</td>
                     <td className="px-3 py-2">
                       <span
                         className={cn(
