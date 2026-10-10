@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, X, CheckCircle2, Wallet } from "lucide-react";
+import { Loader2, Plus, X, CheckCircle2, Wallet, Landmark } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
@@ -54,9 +54,18 @@ const statusChip: Record<string, string> = {
   VOID: "bg-slate-100 text-slate-600 border-slate-200",
 };
 
+const kindLabel: Record<string, string> = {
+  BANK: "بانک",
+  PETTY_CASH: "تنخواه",
+};
+
 function todayIso(): string {
   const n = new Date();
-  const { jy, jm, jd } = toJalaliParts(n.getFullYear(), n.getMonth() + 1, n.getDate());
+  const { jy, jm, jd } = toJalaliParts(
+    n.getFullYear(),
+    n.getMonth() + 1,
+    n.getDate()
+  );
   return jalaliToIso(jy, jm, jd);
 }
 
@@ -102,7 +111,11 @@ export function TreasuryPage() {
     enabled: canView && !!primaryCompanyId,
   });
 
-  const { data: cashAccounts } = useQuery({
+  const {
+    data: cashAccounts,
+    isLoading: cashLoading,
+    refetch: refetchCash,
+  } = useQuery({
     queryKey: ["finance", "cash-accounts", primaryCompanyId],
     queryFn: () => treasuryService.listCashAccounts(primaryCompanyId),
     enabled: canView && !!primaryCompanyId,
@@ -160,6 +173,13 @@ export function TreasuryPage() {
   const [postTarget, setPostTarget] = useState<TreasuryDocumentDto | null>(null);
   const [postOffset, setPostOffset] = useState("");
 
+  const [cashDialogOpen, setCashDialogOpen] = useState(false);
+  const [cashCode, setCashCode] = useState("");
+  const [cashName, setCashName] = useState("");
+  const [cashKind, setCashKind] = useState<"BANK" | "PETTY_CASH">("BANK");
+  const [cashGlId, setCashGlId] = useState("");
+  const [cashError, setCashError] = useState<string | null>(null);
+
   const createMut = useMutation({
     mutationFn: (payload: CreateTreasuryDocumentPayload) =>
       treasuryService.createDocument(payload),
@@ -180,6 +200,60 @@ export function TreasuryPage() {
       void qc.invalidateQueries({ queryKey: ["finance", "treasury-docs"] });
     },
   });
+
+  const createCashMut = useMutation({
+    mutationFn: () =>
+      treasuryService.createCashAccount({
+        company_id: primaryCompanyId,
+        gl_account_id: cashGlId,
+        code: cashCode.trim(),
+        name: cashName.trim(),
+        cash_kind: cashKind,
+      }),
+    onSuccess: async (row) => {
+      await qc.invalidateQueries({ queryKey: ["finance", "cash-accounts"] });
+      await refetchCash();
+      setCashAccountId(row.cash_account_id);
+      setCashDialogOpen(false);
+      setMsg("حساب نقدی/بانکی ثبت شد.");
+    },
+  });
+
+  function openCashDialog() {
+    setCashCode("");
+    setCashName("");
+    setCashKind("BANK");
+    setCashGlId("");
+    setCashError(null);
+    setCashDialogOpen(true);
+  }
+
+  async function saveCashAccount() {
+    setCashError(null);
+    if (!primaryCompanyId) {
+      setCashError("شرکت اصلی یافت نشد.");
+      return;
+    }
+    if (!cashCode.trim() || !cashName.trim()) {
+      setCashError("کد و نام الزامی است.");
+      return;
+    }
+    if (!cashGlId) {
+      setCashError("حساب دفتر کل (تفصیلی) را انتخاب کنید.");
+      return;
+    }
+    try {
+      await createCashMut.mutateAsync();
+    } catch (e) {
+      setCashError(
+        e instanceof ApiClientError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : "ثبت ناموفق بود"
+      );
+    }
+  }
 
   function openNew() {
     setFormOpen(true);
@@ -202,7 +276,7 @@ export function TreasuryPage() {
       return;
     }
     if (!cashAccountId) {
-      setFormError("حساب نقدی/بانکی الزامی است.");
+      setFormError("حساب نقدی/بانکی الزامی است. ابتدا یکی تعریف کنید.");
       return;
     }
     if (!documentDate) {
@@ -231,7 +305,11 @@ export function TreasuryPage() {
         offset_account_id: autoPost ? offsetAccountId : undefined,
         auto_post: autoPost || undefined,
       });
-      setMsg(autoPost ? "سند خزانه ایجاد و در دفتر ثبت شد." : "پیش‌نویس خزانه ذخیره شد.");
+      setMsg(
+        autoPost
+          ? "سند خزانه ایجاد و در دفتر ثبت شد."
+          : "پیش‌نویس خزانه ذخیره شد."
+      );
       setFormOpen(false);
     } catch (e) {
       setFormError(
@@ -246,7 +324,9 @@ export function TreasuryPage() {
 
   if (!canView) {
     return (
-      <div className="p-6 text-sm text-amber-700">مجوز مشاهده خزانه را ندارید.</div>
+      <div className="p-6 text-sm text-amber-700">
+        مجوز مشاهده خزانه را ندارید.
+      </div>
     );
   }
 
@@ -307,7 +387,20 @@ export function TreasuryPage() {
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <label className="text-xs text-muted-foreground">حساب نقدی / بانکی</label>
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs text-muted-foreground">
+                حساب نقدی / بانکی
+              </label>
+              {canManage ? (
+                <button
+                  type="button"
+                  className="text-[11px] text-primary hover:underline"
+                  onClick={openCashDialog}
+                >
+                  + تعریف حساب جدید
+                </button>
+              ) : null}
+            </div>
             <select
               className="h-9 w-full rounded-md border bg-background px-2 text-sm"
               value={cashAccountId}
@@ -323,7 +416,7 @@ export function TreasuryPage() {
             </select>
             {(cashAccounts ?? []).length === 0 ? (
               <p className="text-[11px] text-amber-700">
-                حساب نقدی تعریف نشده. ابتدا از API یا سیدر حساب نقدی بسازید.
+                هنوز حساب نقدی ندارید. با «تعریف حساب جدید» یکی بسازید.
               </p>
             ) : null}
           </div>
@@ -378,10 +471,16 @@ export function TreasuryPage() {
           ) : null}
         </div>
 
-        {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+        {formError ? (
+          <p className="text-sm text-destructive">{formError}</p>
+        ) : null}
 
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="ghost" onClick={() => setFormOpen(false)}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setFormOpen(false)}
+          >
             <X className="h-4 w-4 ml-1" />
             انصراف
           </Button>
@@ -396,6 +495,23 @@ export function TreasuryPage() {
             {autoPost ? "ذخیره و ثبت در دفتر" : "ذخیره پیش‌نویس"}
           </Button>
         </div>
+
+        <CashAccountDialog
+          open={cashDialogOpen}
+          onOpenChange={setCashDialogOpen}
+          cashCode={cashCode}
+          setCashCode={setCashCode}
+          cashName={cashName}
+          setCashName={setCashName}
+          cashKind={cashKind}
+          setCashKind={setCashKind}
+          cashGlId={cashGlId}
+          setCashGlId={setCashGlId}
+          cashError={cashError}
+          postableAccounts={postableAccounts}
+          pending={createCashMut.isPending}
+          onSave={() => void saveCashAccount()}
+        />
       </div>
     );
   }
@@ -412,10 +528,16 @@ export function TreasuryPage() {
         ]}
         actions={
           canManage ? (
-            <Button size="sm" onClick={openNew}>
-              <Plus className="h-4 w-4 ml-1" />
-              سند جدید
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={openCashDialog}>
+                <Landmark className="h-4 w-4 ml-1" />
+                حساب نقدی
+              </Button>
+              <Button size="sm" onClick={openNew}>
+                <Plus className="h-4 w-4 ml-1" />
+                سند جدید
+              </Button>
+            </div>
           ) : undefined
         }
       />
@@ -426,6 +548,58 @@ export function TreasuryPage() {
         </div>
       ) : null}
 
+      <div className="rounded-xl border bg-card p-3 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-xs font-medium text-muted-foreground">
+            حساب‌های نقدی / بانکی این شرکت
+          </div>
+          {canManage ? (
+            <button
+              type="button"
+              className="text-[11px] text-primary hover:underline"
+              onClick={openCashDialog}
+            >
+              + افزودن
+            </button>
+          ) : null}
+        </div>
+        {cashLoading ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> بارگذاری…
+          </div>
+        ) : !(cashAccounts ?? []).length ? (
+          <div className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-2 py-1.5">
+            هنوز حسابی تعریف نشده. قبل از ثبت سند دریافت/پرداخت، یک حساب نقدی
+            یا بانکی بسازید.
+            {canManage ? (
+              <button
+                type="button"
+                className="mr-2 underline font-medium"
+                onClick={openCashDialog}
+              >
+                تعریف حساب
+              </button>
+            ) : null}
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {(cashAccounts ?? []).map((c) => (
+              <span
+                key={c.cash_account_id}
+                className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2.5 py-0.5 text-[11px]"
+              >
+                <span className="font-mono">{toFaDigits(c.code)}</span>
+                <span className="text-muted-foreground">·</span>
+                <span>{c.name}</span>
+                <span className="text-muted-foreground">
+                  ({kindLabel[c.cash_kind ?? "BANK"] ?? c.cash_kind})
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">وضعیت</label>
@@ -435,8 +609,12 @@ export function TreasuryPage() {
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="">همه ({toFaDigits(statusCounts.all)})</option>
-            <option value="DRAFT">پیش‌نویس ({toFaDigits(statusCounts.DRAFT)})</option>
-            <option value="POSTED">ثبت‌شده ({toFaDigits(statusCounts.POSTED)})</option>
+            <option value="DRAFT">
+              پیش‌نویس ({toFaDigits(statusCounts.DRAFT)})
+            </option>
+            <option value="POSTED">
+              ثبت‌شده ({toFaDigits(statusCounts.POSTED)})
+            </option>
           </select>
         </div>
         <div className="space-y-1">
@@ -470,14 +648,20 @@ export function TreasuryPage() {
         ) : error ? (
           <div className="p-4 text-sm text-destructive">
             خطا.{" "}
-            <button type="button" className="underline" onClick={() => void refetch()}>
+            <button
+              type="button"
+              className="underline"
+              onClick={() => void refetch()}
+            >
               تلاش مجدد
             </button>
           </div>
         ) : !filtered.length ? (
           <div className="p-6 text-center space-y-3">
             <Wallet className="h-8 w-8 mx-auto text-muted-foreground/50" />
-            <p className="text-sm text-muted-foreground">سند خزانه‌ای ثبت نشده است.</p>
+            <p className="text-sm text-muted-foreground">
+              سند خزانه‌ای ثبت نشده است.
+            </p>
             {canManage ? (
               <Button size="sm" onClick={openNew}>
                 <Plus className="h-4 w-4 ml-1" />
@@ -509,7 +693,9 @@ export function TreasuryPage() {
                   <td className="px-3 py-2 font-mono text-xs">
                     {d.document_number ? toFaDigits(d.document_number) : "—"}
                   </td>
-                  <td className="px-3 py-2 text-xs">{formatJalaliDate(d.document_date)}</td>
+                  <td className="px-3 py-2 text-xs">
+                    {formatJalaliDate(d.document_date)}
+                  </td>
                   <td className="px-3 py-2 text-xs">
                     {typeLabel[d.document_type] ?? d.document_type}
                   </td>
@@ -558,7 +744,10 @@ export function TreasuryPage() {
         )}
       </div>
 
-      <Dialog open={!!postTarget} onOpenChange={(o) => !o && setPostTarget(null)}>
+      <Dialog
+        open={!!postTarget}
+        onOpenChange={(o) => !o && setPostTarget(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>ثبت در دفتر کل</DialogTitle>
@@ -609,6 +798,141 @@ export function TreasuryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CashAccountDialog
+        open={cashDialogOpen}
+        onOpenChange={setCashDialogOpen}
+        cashCode={cashCode}
+        setCashCode={setCashCode}
+        cashName={cashName}
+        setCashName={setCashName}
+        cashKind={cashKind}
+        setCashKind={setCashKind}
+        cashGlId={cashGlId}
+        setCashGlId={setCashGlId}
+        cashError={cashError}
+        postableAccounts={postableAccounts}
+        pending={createCashMut.isPending}
+        onSave={() => void saveCashAccount()}
+      />
     </div>
+  );
+}
+
+type AccountOpt = {
+  account_id: string;
+  account_code: string;
+  name: string;
+};
+
+function CashAccountDialog({
+  open,
+  onOpenChange,
+  cashCode,
+  setCashCode,
+  cashName,
+  setCashName,
+  cashKind,
+  setCashKind,
+  cashGlId,
+  setCashGlId,
+  cashError,
+  postableAccounts,
+  pending,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  cashCode: string;
+  setCashCode: (v: string) => void;
+  cashName: string;
+  setCashName: (v: string) => void;
+  cashKind: "BANK" | "PETTY_CASH";
+  setCashKind: (v: "BANK" | "PETTY_CASH") => void;
+  cashGlId: string;
+  setCashGlId: (v: string) => void;
+  cashError: string | null;
+  postableAccounts: AccountOpt[];
+  pending: boolean;
+  onSave: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>تعریف حساب نقدی / بانکی</DialogTitle>
+          <DialogDescription>
+            این حساب را به یک سرفصل تفصیلی دفتر کل وصل می‌کنید تا دریافت و پرداخت
+            روی همان حساب ثبت شود.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3 py-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">کد</label>
+              <Input
+                className="h-9 font-mono"
+                value={cashCode}
+                onChange={(e) => setCashCode(e.target.value)}
+                placeholder="مثلاً BANK01"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">نوع</label>
+              <select
+                className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                value={cashKind}
+                onChange={(e) =>
+                  setCashKind(e.target.value as "BANK" | "PETTY_CASH")
+                }
+              >
+                <option value="BANK">بانک</option>
+                <option value="PETTY_CASH">تنخواه</option>
+              </select>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">نام</label>
+            <Input
+              className="h-9"
+              value={cashName}
+              onChange={(e) => setCashName(e.target.value)}
+              placeholder="مثلاً حساب جاری بانک ملی"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">
+              حساب دفتر کل (تفصیلی)
+            </label>
+            <select
+              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              value={cashGlId}
+              onChange={(e) => setCashGlId(e.target.value)}
+            >
+              <option value="">انتخاب از کدینگ…</option>
+              {postableAccounts.map((a) => (
+                <option key={a.account_id} value={a.account_id}>
+                  {toFaDigits(a.account_code)} — {a.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          {cashError ? (
+            <p className="text-sm text-destructive">{cashError}</p>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            انصراف
+          </Button>
+          <Button disabled={pending} onClick={onSave}>
+            {pending ? (
+              <Loader2 className="h-4 w-4 animate-spin ml-1" />
+            ) : null}
+            ثبت حساب
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
