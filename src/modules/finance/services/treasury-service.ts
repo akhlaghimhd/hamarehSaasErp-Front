@@ -10,8 +10,47 @@ function unwrapData<T>(envelope: unknown): T {
   return envelope as T;
 }
 
+export type CashAccountDto = {
+  cash_account_id: string;
+  company_id: string;
+  gl_account_id: string;
+  code: string;
+  name: string;
+  cash_kind?: string | null;
+  bank_account_id?: string | null;
+  is_active?: boolean;
+};
+
+export type CreateTreasuryDocumentPayload = {
+  company_id: string;
+  period_id: string;
+  cash_account_id: string;
+  document_type: "RECEIPT" | "PAYMENT";
+  document_date: string;
+  amount: number;
+  counterparty_name?: string;
+  description?: string;
+  offset_account_id?: string;
+  ledger_id?: string;
+  auto_post?: boolean;
+};
+
 export const treasuryService = {
-  async listDocuments(params?: { company_id?: string; status?: string }) {
+  async listCashAccounts(companyId?: string): Promise<CashAccountDto[]> {
+    const q = new URLSearchParams();
+    if (companyId) q.set("company_id", companyId);
+    const qs = q.toString();
+    const envelope = await apiGet(
+      qs ? `${financePaths.cashAccounts}?${qs}` : financePaths.cashAccounts
+    );
+    const data = unwrapData<CashAccountDto[] | unknown>(envelope);
+    return Array.isArray(data) ? data : [];
+  },
+
+  async listDocuments(params?: {
+    company_id?: string;
+    status?: string;
+  }): Promise<TreasuryDocumentDto[]> {
     const q = new URLSearchParams();
     if (params?.company_id) q.set("company_id", params.company_id);
     if (params?.status) q.set("status", params.status);
@@ -23,15 +62,20 @@ export const treasuryService = {
     return Array.isArray(data) ? data : [];
   },
 
-  async createDocument(payload: Record<string, unknown>) {
+  async createDocument(
+    payload: CreateTreasuryDocumentPayload
+  ): Promise<TreasuryDocumentDto> {
     const envelope = await apiPost(financePaths.treasuryDocuments, payload);
     return unwrapData<TreasuryDocumentDto>(envelope);
   },
 
-  async postDocument(id: string, ledgerId: string, offsetAccountId: string) {
+  async postDocument(
+    id: string,
+    opts: { offset_account_id: string; ledger_id?: string }
+  ): Promise<TreasuryDocumentDto> {
     const envelope = await apiPost(financePaths.treasuryPost(id), {
-      ledger_id: ledgerId,
-      offset_account_id: offsetAccountId,
+      offset_account_id: opts.offset_account_id,
+      ledger_id: opts.ledger_id ?? null,
     });
     return unwrapData<TreasuryDocumentDto>(envelope);
   },
