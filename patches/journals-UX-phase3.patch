@@ -1,0 +1,163 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -203,6 +203,7 @@
+   const [accountQuery, setAccountQuery] = useState("");
+   const [recentAccountIds, setRecentAccountIds] = useState<string[]>([]);
+   const [dirty, setDirty] = useState(false);
++  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+ 
+   const filteredAccounts = useMemo(() => {
+     const q = accountQuery.trim();
+@@ -296,10 +297,17 @@
+ 
+   function closeForm() {
+     if (dirty && !viewOnly) {
+-      if (!window.confirm("تغییرات ذخیره‌نشده دارید. خارج شوید؟")) return;
++      setLeaveConfirmOpen(true);
++      return;
+     }
+     setFormMode(null);
+     setDirty(false);
++  }
++
++  function confirmLeaveForm() {
++    setLeaveConfirmOpen(false);
++    setDirty(false);
++    setFormMode(null);
+   }
+ 
+   async function openEdit(j: JournalEntryDto, readonly: boolean) {
+@@ -678,23 +686,32 @@
+           <table className="w-full text-sm">
+             <thead>
+               <tr className="border-b text-right text-xs text-muted-foreground bg-muted/30">
+-                <th className="px-2 py-2 w-10">#</th>
+-                <th className="px-2 py-2 min-w-[200px]">حساب (تفصیلی)</th>
+-                <th className="px-2 py-2 min-w-[120px]">شرح سطر</th>
+-                <th className="px-2 py-2 w-28">بدهکار</th>
+-                <th className="px-2 py-2 w-28">بستانکار</th>
++                <th className="px-2 py-1 w-10">#</th>
++                <th className="px-2 py-1 min-w-[200px]">حساب (تفصیلی)</th>
++                <th className="px-2 py-1 min-w-[120px]">شرح سطر</th>
++                <th className="px-2 py-1 w-28">بدهکار</th>
++                <th className="px-2 py-1 w-28">بستانکار</th>
+                 {costCenters.length > 0 ? (
+-                  <th className="px-2 py-2 min-w-[120px]">مرکز هزینه</th>
++                  <th className="px-2 py-1 min-w-[120px]">مرکز هزینه</th>
+                 ) : null}
+                 {businessUnits.length > 0 ? (
+-                  <th className="px-2 py-2 min-w-[120px]">واحد کسب‌وکار</th>
++                  <th className="px-2 py-1 min-w-[120px]">واحد کسب‌وکار</th>
+                 ) : null}
+-                {!viewOnly ? <th className="px-2 py-2 w-10" /> : null}
++                {!viewOnly ? <th className="px-2 py-1 w-10" /> : null}
+               </tr>
+             </thead>
+             <tbody>
+-              {lines.map((l, idx) => (
+-                <tr key={l.key} className="border-b border-border/50 align-middle">
++              {lines.map((l, idx) => {
++                const lineComplete =
++                  !!l.account_id && (parseAmount(l.debit) > 0 || parseAmount(l.credit) > 0);
++                return (
++                <tr
++                  key={l.key}
++                  className={cn(
++                    "border-b border-border/50 align-middle",
++                    lineComplete && "bg-emerald-50/60"
++                  )}
++                >
+                   <td className="px-2 py-1.5 text-xs text-muted-foreground tabular-nums">
+                     {toFaDigits(idx + 1)}
+                   </td>
+@@ -702,7 +719,7 @@
+                     ) : (
+                       <select
+                         data-line-key={l.key}
+-                        className="h-9 w-full rounded-md border bg-background px-2 text-xs"
++                        className="h-8 w-full rounded-md border bg-background px-2 text-xs"
+                         value={l.account_id}
+                         onChange={(e) => {
+                           updateLine(l.key, { account_id: e.target.value });
+@@ -722,7 +739,7 @@
+                   </td>
+                   <td className="px-2 py-1.5">
+                     <Input
+-                      className="h-9 text-xs"
++                      className="h-8 text-xs"
+                       value={l.description}
+                       disabled={viewOnly}
+                       placeholder={description || "شرح"}
+@@ -731,7 +748,7 @@
+                   </td>
+                   <td className="px-2 py-1.5">
+                     <Input
+-                      className="h-9 text-xs font-mono text-left"
++                      className="h-8 text-xs font-mono text-left"
+                       dir="ltr"
+                       inputMode="decimal"
+                       value={l.debit ? toFaDigits(l.debit) : ""}
+@@ -745,7 +762,7 @@
+                   </td>
+                   <td className="px-2 py-1.5">
+                     <Input
+-                      className="h-9 text-xs font-mono text-left"
++                      className="h-8 text-xs font-mono text-left"
+                       dir="ltr"
+                       inputMode="decimal"
+                       value={l.credit ? toFaDigits(l.credit) : ""}
+@@ -765,7 +782,7 @@
+                         </span>
+                       ) : (
+                         <select
+-                          className="h-9 w-full rounded-md border bg-background px-2 text-xs"
++                          className="h-8 w-full rounded-md border bg-background px-2 text-xs"
+                           value={l.cost_center_id}
+                           onChange={(e) => updateLine(l.key, { cost_center_id: e.target.value })}
+                         >
+@@ -787,7 +804,7 @@
+                         </span>
+                       ) : (
+                         <select
+-                          className="h-9 w-full rounded-md border bg-background px-2 text-xs"
++                          className="h-8 w-full rounded-md border bg-background px-2 text-xs"
+                           value={l.business_unit_id}
+                           onChange={(e) => updateLine(l.key, { business_unit_id: e.target.value })}
+                         >
+@@ -816,7 +833,8 @@
+                     </td>
+                   ) : null}
+                 </tr>
+-              ))}
++                );
++              })}
+             </tbody>
+           </table>
+           {!viewOnly ? (
+@@ -901,6 +919,25 @@
+             </div>
+           </div>
+         </div>
++
++        <Dialog open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
++          <DialogContent>
++            <DialogHeader>
++              <DialogTitle>خروج از فرم</DialogTitle>
++              <DialogDescription>
++                تغییرات ذخیره‌نشده دارید. اگر خارج شوید این تغییرات از بین می‌رود.
++              </DialogDescription>
++            </DialogHeader>
++            <DialogFooter>
++              <Button variant="outline" onClick={() => setLeaveConfirmOpen(false)}>
++                ماندن
++              </Button>
++              <Button variant="destructive" onClick={confirmLeaveForm}>
++                خروج بدون ذخیره
++              </Button>
++            </DialogFooter>
++          </DialogContent>
++        </Dialog>
+       </div>
+     );
+   }
