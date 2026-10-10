@@ -178,15 +178,22 @@ export interface ChequeDto {
 export interface OpenItemDto {
   open_item_id: string;
   company_id: string;
-  party_type: string;
-  party_id: string;
+  /** AR | AP — بک‌اند */
+  side?: string;
+  /** سازگاری قدیمی */
+  party_type?: string;
+  party_id?: string;
   party_name?: string | null;
-  document_type: string;
-  document_id: string;
+  counterparty_name?: string | null;
+  document_type?: string;
+  document_id?: string;
+  document_number?: string | null;
   document_date: string;
+  due_date?: string | null;
   original_amount: number | string;
   open_amount: number | string;
   currency_code?: string;
+  description?: string | null;
   status: string;
 }
 
