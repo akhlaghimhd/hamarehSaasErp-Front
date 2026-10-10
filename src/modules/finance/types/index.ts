@@ -105,7 +105,8 @@ export interface JournalEntryDto {
 }
 
 export interface CreateJournalPayload {
-  ledger_id: string;
+  /** Optional: backend resolves leading ledger for company when omitted */
+  ledger_id?: string;
   company_id: string;
   period_id: string;
   document_date: string;
