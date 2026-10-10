@@ -10,8 +10,25 @@ function unwrapData<T>(envelope: unknown): T {
   return envelope as T;
 }
 
+export type CreateChequePayload = {
+  company_id: string;
+  direction: "IN" | "OUT";
+  cheque_number: string;
+  due_date: string;
+  amount: number;
+  bank_name?: string;
+  issue_date?: string;
+  payee_name?: string;
+  drawer_name?: string;
+  cash_account_id?: string;
+  description?: string;
+};
+
 export const chequeService = {
-  async list(params?: { company_id?: string; status?: string }) {
+  async list(params?: {
+    company_id?: string;
+    status?: string;
+  }): Promise<ChequeDto[]> {
     const q = new URLSearchParams();
     if (params?.company_id) q.set("company_id", params.company_id);
     if (params?.status) q.set("status", params.status);
@@ -23,13 +40,15 @@ export const chequeService = {
     return Array.isArray(data) ? data : [];
   },
 
-  async create(payload: Record<string, unknown>) {
+  async create(payload: CreateChequePayload): Promise<ChequeDto> {
     const envelope = await apiPost(financePaths.cheques, payload);
     return unwrapData<ChequeDto>(envelope);
   },
 
-  async transition(id: string, status: string) {
-    const envelope = await apiPost(financePaths.chequeTransition(id), { status });
+  async transition(id: string, status: string): Promise<ChequeDto> {
+    const envelope = await apiPost(financePaths.chequeTransition(id), {
+      status,
+    });
     return unwrapData<ChequeDto>(envelope);
   },
 };
