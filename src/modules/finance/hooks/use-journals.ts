@@ -49,3 +49,29 @@ export function useCreateJournal() {
     },
   });
 }
+
+export function useUpdateJournal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: Partial<CreateJournalPayload>;
+    }) => journalService.updateDraft(id, payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: financeJournalKeys.all });
+    },
+  });
+}
+
+export function useDeleteJournal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => journalService.deleteDraft(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: financeJournalKeys.all });
+    },
+  });
+}
