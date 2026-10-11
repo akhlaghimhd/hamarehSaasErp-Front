@@ -1,0 +1,98 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -756,90 +698,6 @@
+   function exportJournalPdf() {
+-    const meta = journalMetaRows();
+-    const companyName = meta.find((r) => r[0] === "شرکت")?.[1] ?? "—";
+-    const userLabel = meta.find((r) => r[0] === "کاربر")?.[1] ?? "—";
+-    const now = meta.find((r) => r[0] === "زمان خروجی")?.[1] ?? "—";
+-    const orgName = meta.find((r) => r[0] === "سازمان")?.[1] ?? "—";
+-
+-    const rowsHtml = lines
+-      .map((l, idx) => {
+-        const bg = l.is_system_balance ? "#fffbeb" : idx % 2 === 1 ? "#f8fafc" : "#fff";
+-        const cc = costCenters.find((c) => c.cost_center_id === l.cost_center_id);
+-        const bu = businessUnits.find((b) => b.business_unit_id === l.business_unit_id);
+-        return `<tr style="background:${bg}">
+-          <td class="c">${toFaDigits(idx + 1)}</td>
+-          <td>${accountLabel(l.account_id)}</td>
+-          <td>${l.description || "—"}</td>
+-          <td class="n">${parseAmount(l.debit) ? formatMoney(parseAmount(l.debit)) : "—"}</td>
+-          <td class="n">${parseAmount(l.credit) ? formatMoney(parseAmount(l.credit)) : "—"}</td>
+-          <td>${cc ? `${toFaDigits(cc.code)} — ${cc.name}` : "—"}</td>
+-          <td>${bu ? `${toFaDigits(bu.code)} — ${bu.name}` : "—"}</td>
+-          <td class="c">${l.is_system_balance ? "تراز" : "—"}</td>
+-        </tr>`;
+-      })
+-      .join("");
+-
+-    const html = `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/>
+-      <title>سند حسابداری ${entryNumber ? toFaDigits(entryNumber) : "پیش‌نویس"}</title>
+-      <style>
+-        *{box-sizing:border-box}
+-        body{font-family:Tahoma,Arial,sans-serif;padding:16px 20px;color:#111;font-size:11px}
+-        h1{font-size:15px;margin:0 0 10px;text-align:center}
+-        .meta{width:100%;border-collapse:collapse;margin-bottom:12px}
+-        .meta td{border:1px solid #cbd5e1;padding:4px 8px;vertical-align:top}
+-        .meta td.k{width:18%;background:#f1f5f9;font-weight:600;white-space:nowrap}
+-        .meta td.v{width:32%}
+-        table.lines{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:4px}
+-        table.lines th,table.lines td{border:1px solid #94a3b8;padding:4px 6px;text-align:right}
+-        table.lines th{background:#e2e8f0;font-weight:600}
+-        td.n,th.n{text-align:left;font-variant-numeric:tabular-nums;direction:ltr}
+-        td.c,th.c{text-align:center}
+-        .totals{margin-top:10px;width:100%;border-collapse:collapse}
+-        .totals td{border:1px solid #94a3b8;padding:5px 8px}
+-        .totals td.k{background:#f1f5f9;font-weight:600;width:30%}
+-        @media print{body{padding:8px} a{display:none}}
+-      </style></head><body>
+-      <h1>سند حسابداری</h1>
+-      <table class="meta">
+-        <tr>
+-          <td class="k">شرکت</td><td class="v">${companyName}</td>
+-          <td class="k">سازمان</td><td class="v">${orgName}</td>
+-        </tr>
+-        <tr>
+-          <td class="k">شماره سند</td><td class="v">${entryNumber ? toFaDigits(entryNumber) : "پیش‌نویس"}</td>
+-          <td class="k">تاریخ سند</td><td class="v">${documentDate ? toFaDigits(documentDate) : "—"}</td>
+-        </tr>
+-        <tr>
+-          <td class="k">دوره مالی</td><td class="v">${periodLabel(periodId)}</td>
+-          <td class="k">کاربر</td><td class="v">${userLabel}</td>
+-        </tr>
+-        <tr>
+-          <td class="k">زمان خروجی</td><td class="v">${now}</td>
+-          <td class="k">وضعیت تراز</td><td class="v">${isBalanced ? "تراز ✓" : "نامتراز"}</td>
+-        </tr>
+-        <tr>
+-          <td class="k">شرح سند</td><td class="v" colspan="3">${description || "—"}</td>
+-        </tr>
+-      </table>
+-      <table class="lines">
+-        <thead>
+-          <tr>
+-            <th class="c">#</th>
+-            <th>حساب</th>
+-            <th>شرح سطر</th>
+-            <th class="n">بدهکار</th>
+-            <th class="n">بستانکار</th>
+-            <th>مرکز هزینه</th>
+-            <th>واحد کسب‌وکار</th>
+-            <th class="c">نوع</th>
+-          </tr>
+-        </thead>
+-        <tbody>${rowsHtml}</tbody>
+-      </table>
+-      <table class="totals">
+-        <tr><td class="k">جمع بدهکار</td><td class="n">${formatMoney(lineTotals.debit)}</td></tr>
+-        <tr><td class="k">جمع بستانکار</td><td class="n">${formatMoney(lineTotals.credit)}</td></tr>
+-        <tr><td class="k">اختلاف</td><td class="n">${formatMoney(lineTotals.diff)}</td></tr>
+-      </table>
+-      <script>window.onload=function(){window.print();}</script>
+-      </body></html>`;
++    const html = buildJournalReportHtml(buildReportMeta(), buildReportLines()).replace(
++      "</body>",
++      "<script>window.onload=function(){window.print();}</script></body>"
++    );
+     const w = window.open("", "_blank");
