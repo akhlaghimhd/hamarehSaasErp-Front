@@ -43,6 +43,7 @@ import {
 } from "../hooks/use-journals";
 import { useAccountFlat } from "../hooks/use-accounts";
 import { journalService } from "../services/journal-service";
+import { AccountTypeahead } from "./journals-account-typeahead";
 import {
   FinancePermissions,
   DEMO_PERIOD_ID,
@@ -113,6 +114,24 @@ function formatMoney(n: number): string {
   );
 }
 
+/** نمایش مبلغ در ورودی با جداکننده هزارگان (ارقام فارسی) */
+function formatAmountDisplay(raw: string): string {
+  const ascii = toAsciiDigits(raw).replace(/,/g, "").trim();
+  if (!ascii) return "";
+  const neg = ascii.startsWith("-");
+  const body = neg ? ascii.slice(1) : ascii;
+  if (!/^\d*\.?\d*$/.test(body) || body === "" || body === ".") {
+    return toFaDigits(ascii);
+  }
+  const [intPart, decPart] = body.split(".");
+  const grouped = (intPart || "0").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const out = decPart !== undefined ? `${grouped}.${decPart}` : grouped;
+  return toFaDigits(neg ? `-${out}` : out);
+}
+
+const AMOUNT_INPUT_CLASS =
+  "h-8 text-xs font-mono tabular-nums text-left tracking-tight";
+
 function sumLines(
   items: Array<{ debit_amount?: number | string; credit_amount?: number | string }> | undefined
 ) {
@@ -130,6 +149,7 @@ function todayIso(): string {
   const { jy, jm, jd } = toJalaliParts(n.getFullYear(), n.getMonth() + 1, n.getDate());
   return jalaliToIso(jy, jm, jd);
 }
+
 
 export function JournalsPage() {
   const canView = usePermission(FinancePermissions.journalView);
@@ -204,6 +224,10 @@ export function JournalsPage() {
   const [recentAccountIds, setRecentAccountIds] = useState<string[]>([]);
   const [dirty, setDirty] = useState(false);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  /** typeahead حساب روی هر سطر */
+  const [accountFocusKey, setAccountFocusKey] = useState<string | null>(null);
+  const [accountTypeQuery, setAccountTypeQuery] = useState("");
+  const [accountHighlightIdx, setAccountHighlightIdx] = useState(0);
 
   const filteredAccounts = useMemo(() => {
     const q = accountQuery.trim();
@@ -284,6 +308,8 @@ export function JournalsPage() {
     setAccountQuery("");
     setDirty(false);
     setMeta({});
+    setAccountFocusKey(null);
+    setAccountTypeQuery("");
   }
 
   function markDirty() {
@@ -415,10 +441,13 @@ export function JournalsPage() {
         business_unit_id: "",
       },
     ]);
+    setAccountFocusKey(key);
+    setAccountTypeQuery("");
+    setAccountHighlightIdx(0);
     requestAnimationFrame(() => {
       const el = document.querySelector(
-        `select[data-line-key="${key}"]`
-      ) as HTMLSelectElement | null;
+        `input[data-line-key="${key}"]`
+      ) as HTMLInputElement | null;
       el?.focus();
     });
   }
@@ -486,7 +515,7 @@ export function JournalsPage() {
       .filter((l) => l.account_id && (l.debit_amount || l.credit_amount));
 
     if (built.length < 2) {
-      setFormError("حداقل دو آرتیکل با حساب و مبلغ لازم است.");
+      setFormError("حداقل دو سطر با حساب و مبلغ لازم است.");
       return;
     }
     if (andPost) {
@@ -546,17 +575,19 @@ export function JournalsPage() {
   useEffect(() => {
     if (formMode === null || viewOnly) return;
     function onKey(e: KeyboardEvent) {
-      const mod = e.ctrlKey || e.metaKey;
-      if (mod && e.key.toLowerCase() === "s") {
+      // فقط Alt — Ctrl/Meta با میانبرهای مرورگر تداخل دارند
+      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+      const k = e.key.toLowerCase();
+      if (k === "s") {
         e.preventDefault();
         if (!saving) void doSave(false);
-      } else if (mod && e.key === "Enter") {
+      } else if (k === "enter") {
         e.preventDefault();
         if (!saving && isBalanced && canPost) void doSave(true);
-      } else if (mod && e.key.toLowerCase() === "b") {
+      } else if (k === "b") {
         e.preventDefault();
         fillBalanceOnLast();
-      } else if (e.altKey && e.key.toLowerCase() === "n") {
+      } else if (k === "n") {
         e.preventDefault();
         addLine();
       }
@@ -580,10 +611,11 @@ export function JournalsPage() {
           : "ویرایش پیش‌نویس";
 
     return (
-      <div className="space-y-4 pb-24">
+      <div className="flex flex-col min-h-0 h-[calc(100dvh-3.5rem)]">
+        <div className="shrink-0 px-1 pt-1">
         <PageHeader
           title={title}
-          description="آرتیکل‌ها باید تراز باشند؛ شماره سند هنگام ثبت قطعی اختصاص می‌یابد"
+          description="سطرهای سند باید تراز باشند؛ شماره سند هنگام ثبت قطعی اختصاص می‌یابد"
           breadcrumbs={[
             { label: "داشبورد", href: "/dashboard" },
             { label: "حسابداری", href: "/dashboard/finance" },
@@ -591,7 +623,9 @@ export function JournalsPage() {
             { label: formMode === "new" ? "جدید" : "جزئیات" },
           ]}
         />
+        </div>
 
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 px-1 py-2">
         <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-3">
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">تاریخ سند</label>
@@ -677,7 +711,7 @@ export function JournalsPage() {
             </span>
             <span className="text-[11px] text-muted-foreground flex items-center gap-1">
               <Keyboard className="h-3.5 w-3.5" />
-              Ctrl+S پیش‌نویس · Ctrl+Enter قطعی · Ctrl+B تراز · Alt+N سطر
+              Alt+S پیش‌نویس · Alt+Enter قطعی · Alt+B تراز · Alt+N سطر
             </span>
           </div>
         ) : null}
@@ -715,26 +749,41 @@ export function JournalsPage() {
                   <td className="px-2 py-1.5 text-xs text-muted-foreground font-mono">
                     {toFaDigits(idx + 1)}
                   </td>
-                  <td className="px-2 py-1.5">
+                  <td className="px-2 py-1.5 relative">
                     {viewOnly ? (
-                      <span className="text-xs">{accountLabel(l.account_id)}</span>
+                      <span className="text-xs font-mono tabular-nums">{accountLabel(l.account_id)}</span>
                     ) : (
-                      <select
-                        data-line-key={l.key}
-                        className="h-8 w-full rounded-md border bg-background px-2 text-xs"
-                        value={l.account_id}
-                        onChange={(e) => {
-                          updateLine(l.key, { account_id: e.target.value });
-                          rememberAccount(e.target.value);
+                      <AccountTypeahead
+                        lineKey={l.key}
+                        valueId={l.account_id}
+                        label={l.account_id ? accountLabel(l.account_id) : ""}
+                        options={postableAccounts}
+                        recentIds={recentAccountIds}
+                        focused={accountFocusKey === l.key}
+                        query={accountFocusKey === l.key ? accountTypeQuery : ""}
+                        highlightIdx={accountHighlightIdx}
+                        onFocus={() => {
+                          setAccountFocusKey(l.key);
+                          setAccountTypeQuery("");
+                          setAccountHighlightIdx(0);
                         }}
-                      >
-                        <option value="">انتخاب حساب…</option>
-                        {filteredAccounts.map((a) => (
-                          <option key={a.account_id} value={a.account_id}>
-                            {toFaDigits(a.account_code)} — {a.name}
-                          </option>
-                        ))}
-                      </select>
+                        onQueryChange={(q) => {
+                          setAccountFocusKey(l.key);
+                          setAccountTypeQuery(q);
+                          setAccountHighlightIdx(0);
+                        }}
+                        onHighlightChange={setAccountHighlightIdx}
+                        onSelect={(id) => {
+                          updateLine(l.key, { account_id: id });
+                          rememberAccount(id);
+                          setAccountFocusKey(null);
+                          setAccountTypeQuery("");
+                        }}
+                        onBlurClose={() => {
+                          setAccountFocusKey(null);
+                          setAccountTypeQuery("");
+                        }}
+                      />
                     )}
                   </td>
                   <td className="px-2 py-1.5">
@@ -748,30 +797,28 @@ export function JournalsPage() {
                   </td>
                   <td className="px-2 py-1.5">
                     <Input
-                      className="h-8 text-xs font-mono text-left"
+                      className={AMOUNT_INPUT_CLASS}
                       dir="ltr"
                       inputMode="decimal"
-                      value={l.debit ? toFaDigits(l.debit) : ""}
+                      value={l.debit ? formatAmountDisplay(l.debit) : ""}
                       disabled={viewOnly}
-                      onChange={(e) =>
-                        updateLine(l.key, {
-                          debit: toAsciiDigits(e.target.value).replace(/[^\d.]/g, ""),
-                        })
-                      }
+                      onChange={(e) => {
+                        const raw = toAsciiDigits(e.target.value).replace(/,/g, "").replace(/[^0-9.]/g, "");
+                        updateLine(l.key, { debit: raw });
+                      }}
                     />
                   </td>
                   <td className="px-2 py-1.5">
                     <Input
-                      className="h-8 text-xs font-mono text-left"
+                      className={AMOUNT_INPUT_CLASS}
                       dir="ltr"
                       inputMode="decimal"
-                      value={l.credit ? toFaDigits(l.credit) : ""}
+                      value={l.credit ? formatAmountDisplay(l.credit) : ""}
                       disabled={viewOnly}
-                      onChange={(e) =>
-                        updateLine(l.key, {
-                          credit: toAsciiDigits(e.target.value).replace(/[^\d.]/g, ""),
-                        })
-                      }
+                      onChange={(e) => {
+                        const raw = toAsciiDigits(e.target.value).replace(/,/g, "").replace(/[^0-9.]/g, "");
+                        updateLine(l.key, { credit: raw });
+                      }}
                     />
                   </td>
                   {costCenters.length > 0 ? (
@@ -846,7 +893,7 @@ export function JournalsPage() {
               </Button>
               <Button type="button" size="sm" variant="secondary" onClick={fillBalanceOnLast}>
                 تراز آخرین سطر
-                <span className="mr-1 text-[10px] text-muted-foreground">Ctrl+B</span>
+                <span className="mr-1 text-[10px] text-muted-foreground">Alt+B</span>
               </Button>
             </div>
           ) : null}
@@ -854,16 +901,18 @@ export function JournalsPage() {
 
         {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
 
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/95 backdrop-blur">
-          <div className="mx-auto max-w-6xl flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+        </div>
+
+        <div className="shrink-0 border-t bg-background z-10">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
             <div className="flex flex-wrap gap-4 text-sm">
               <span>
                 بدهکار:{" "}
-                <strong className="font-mono">{formatMoney(lineTotals.debit)}</strong>
+                <strong className="font-mono tabular-nums">{formatMoney(lineTotals.debit)}</strong>
               </span>
               <span>
                 بستانکار:{" "}
-                <strong className="font-mono">{formatMoney(lineTotals.credit)}</strong>
+                <strong className="font-mono tabular-nums">{formatMoney(lineTotals.credit)}</strong>
               </span>
               <span
                 className={cn(
@@ -895,7 +944,7 @@ export function JournalsPage() {
                     variant="outline"
                     disabled={saving}
                     onClick={() => void doSave(false)}
-                    title="Ctrl+S"
+                    title="Alt+S"
                   >
                     ذخیره پیش‌نویس
                   </Button>
@@ -904,7 +953,7 @@ export function JournalsPage() {
                       type="button"
                       disabled={saving || !isBalanced}
                       onClick={() => void doSave(true)}
-                      title="Ctrl+Enter"
+                      title="Alt+Enter"
                     >
                       {saving ? (
                         <Loader2 className="h-4 w-4 animate-spin ml-1" />
@@ -1079,10 +1128,10 @@ export function JournalsPage() {
                     <td className="px-3 py-2 max-w-[180px] truncate text-xs">
                       {j.description ?? "—"}
                     </td>
-                    <td className="px-3 py-2 font-mono text-xs">
+                    <td className="px-3 py-2 font-mono tabular-nums text-xs">
                       {t.debit ? formatMoney(t.debit) : "—"}
                     </td>
-                    <td className="px-3 py-2 font-mono text-xs">
+                    <td className="px-3 py-2 font-mono tabular-nums text-xs">
                       {t.credit ? formatMoney(t.credit) : "—"}
                     </td>
                     <td className="px-3 py-2">
