@@ -1,28 +1,171 @@
 "use client";
 
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toFaDigits, toAsciiDigits } from "@/shared/lib/utils";
 
-type AccountOpt = { account_id: string; account_code: string | number; name: string };
+export type TypeaheadOption = {
+  id: string;
+  label: string;
+  searchText?: string;
+};
 
-export function AccountTypeahead({
-  lineKey,
+type Props = {
+  valueId: string;
+  displayLabel: string;
+  options: TypeaheadOption[];
+  placeholder?: string;
+  disabled?: boolean;
+  className?: string;
+  dataLineKey?: string;
+  onSelect: (id: string) => void;
+};
+
+const VAZIR = { fontFamily: "var(--font-vazirmatn), Tahoma, Arial, sans-serif" } as const;
+
+export function OptionTypeahead({
   valueId,
-  label,
+  displayLabel,
   options,
-  recentIds,
-  focused,
-  query,
-  highlightIdx,
-  onFocus,
-  onQueryChange,
-  onHighlightChange,
+  placeholder = "جستجو…",
+  disabled,
+  className,
+  dataLineKey,
   onSelect,
-  onBlurClose,
-}: {
+}: Props) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [highlight, setHighlight] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [panel, setPanel] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  const filtered = (() => {
+    const q = query.trim();
+    if (!q) return options;
+    const ascii = toAsciiDigits(q).toLowerCase();
+    const ql = q.toLowerCase();
+    return options.filter((o) => {
+      const hay = (o.searchText ?? o.label).toLowerCase();
+      return hay.includes(ql) || hay.includes(ascii) || toFaDigits(hay).includes(q);
+    });
+  })();
+
+  function placePanel() {
+    const el = inputRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setPanel({ top: r.bottom + 2, left: r.left, width: Math.max(r.width, 200) });
+  }
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    placePanel();
+    const onScroll = () => placePanel();
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [open, query]);
+
+  useEffect(() => {
+    if (open) setHighlight(0);
+  }, [query, open]);
+
+  function pick(idx: number) {
+    const o = filtered[idx];
+    if (!o) return;
+    onSelect(o.id);
+    setOpen(false);
+    setQuery("");
+  }
+
+  return (
+    <div className="relative">
+      <input
+        ref={inputRef}
+        data-line-key={dataLineKey}
+        disabled={disabled}
+        className={className ?? "h-8 w-full rounded-md border bg-background px-2 text-xs tabular-nums"}
+        style={VAZIR}
+        placeholder={placeholder}
+        value={open ? query : displayLabel}
+        onFocus={(e) => {
+          setOpen(true);
+          setQuery("");
+          e.target.select();
+          requestAnimationFrame(placePanel);
+        }}
+        onChange={(e) => {
+          setOpen(true);
+          setQuery(e.target.value);
+        }}
+        onBlur={() => {
+          window.setTimeout(() => {
+            setOpen(false);
+            setQuery("");
+          }, 150);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setOpen(true);
+            setHighlight((h) => Math.min(h + 1, Math.max(filtered.length - 1, 0)));
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setHighlight((h) => Math.max(h - 1, 0));
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            if (filtered.length === 1) pick(0);
+            else if (filtered[highlight]) pick(highlight);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            setOpen(false);
+            setQuery("");
+            inputRef.current?.blur();
+          }
+        }}
+        autoComplete="off"
+      />
+      {open && panel ? (
+        <div
+          className="z-[80] max-h-52 overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md"
+          style={{ position: "fixed", top: panel.top, left: panel.left, width: panel.width, ...VAZIR }}
+        >
+          {filtered.length === 0 ? (
+            <div className="px-2 py-1.5 text-xs text-muted-foreground">موردی نیست</div>
+          ) : (
+            filtered.slice(0, 80).map((o, i) => (
+              <button
+                key={o.id || "__empty"}
+                type="button"
+                className={
+                  "flex w-full items-center px-2 py-1.5 text-right text-xs hover:bg-accent " +
+                  (i === highlight ? "bg-accent" : "")
+                }
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onSelect(o.id);
+                  setOpen(false);
+                  setQuery("");
+                }}
+                onMouseEnter={() => setHighlight(i)}
+              >
+                <span className="truncate">{o.label}</span>
+              </button>
+            ))
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function AccountTypeahead(props: {
   lineKey: string;
   valueId: string;
   label: string;
-  options: AccountOpt[];
+  options: { account_id: string; account_code: string | number; name: string }[];
   recentIds: string[];
   focused: boolean;
   query: string;
@@ -33,102 +176,29 @@ export function AccountTypeahead({
   onSelect: (id: string) => void;
   onBlurClose: () => void;
 }) {
-  const filtered = (() => {
-    const q = query.trim();
-    const ascii = toAsciiDigits(q);
-    let base = options;
-    if (q) {
-      base = options.filter(
-        (a) =>
-          a.name.includes(q) ||
-          String(a.account_code).includes(ascii) ||
-          toFaDigits(a.account_code).includes(q)
-      );
-    }
-    if (!recentIds.length || q) return base;
-    const set = new Set(recentIds);
-    const recent = recentIds
-      .map((id) => base.find((a) => a.account_id === id))
-      .filter(Boolean) as AccountOpt[];
-    const rest = base.filter((a) => !set.has(a.account_id));
-    return [...recent, ...rest];
-  })();
-
-  const showList = focused;
-  const displayValue = focused ? query : label;
-
-  function pick(idx: number) {
-    const a = filtered[idx];
-    if (a) onSelect(a.account_id);
-  }
+  const opts: TypeaheadOption[] = props.options.map((a) => ({
+    id: a.account_id,
+    label: `${toFaDigits(a.account_code)} — ${a.name}`,
+    searchText: `${a.account_code} ${a.name}`,
+  }));
+  const ordered =
+    props.recentIds.length && !props.query.trim()
+      ? [
+          ...(props.recentIds
+            .map((id) => opts.find((o) => o.id === id))
+            .filter(Boolean) as TypeaheadOption[]),
+          ...opts.filter((o) => !props.recentIds.includes(o.id)),
+        ]
+      : opts;
 
   return (
-    <div className="relative">
-      <input
-        data-line-key={lineKey}
-        className="h-8 w-full rounded-md border bg-background px-2 text-xs font-mono tabular-nums"
-        placeholder="کد یا نام حساب…"
-        value={displayValue}
-        onFocus={(e) => {
-          onFocus();
-          e.target.select();
-        }}
-        onChange={(e) => onQueryChange(e.target.value)}
-        onBlur={() => {
-          // تأخیر کوتاه تا کلیک روی آیتم لیست ثبت شود
-          window.setTimeout(() => onBlurClose(), 150);
-        }}
-        onKeyDown={(e) => {
-          if (!showList && (e.key === "ArrowDown" || e.key === "Enter")) {
-            onFocus();
-            return;
-          }
-          if (e.key === "ArrowDown") {
-            e.preventDefault();
-            onHighlightChange(Math.min(highlightIdx + 1, Math.max(filtered.length - 1, 0)));
-          } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            onHighlightChange(Math.max(highlightIdx - 1, 0));
-          } else if (e.key === "Enter") {
-            e.preventDefault();
-            if (filtered.length === 1) pick(0);
-            else if (filtered[highlightIdx]) pick(highlightIdx);
-          } else if (e.key === "Escape") {
-            e.preventDefault();
-            onBlurClose();
-            (e.target as HTMLInputElement).blur();
-          }
-        }}
-        autoComplete="off"
-      />
-      {showList ? (
-        <div className="absolute z-50 mt-0.5 max-h-52 w-full min-w-[220px] overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md">
-          {filtered.length === 0 ? (
-            <div className="px-2 py-1.5 text-xs text-muted-foreground">موردی نیست</div>
-          ) : (
-            filtered.slice(0, 50).map((a, i) => (
-              <button
-                key={a.account_id}
-                type="button"
-                className={
-                  "flex w-full items-center gap-2 px-2 py-1.5 text-right text-xs hover:bg-accent " +
-                  (i === highlightIdx ? "bg-accent" : "")
-                }
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  onSelect(a.account_id);
-                }}
-                onMouseEnter={() => onHighlightChange(i)}
-              >
-                <span className="font-mono tabular-nums text-muted-foreground shrink-0">
-                  {toFaDigits(a.account_code)}
-                </span>
-                <span className="truncate">{a.name}</span>
-              </button>
-            ))
-          )}
-        </div>
-      ) : null}
-    </div>
+    <OptionTypeahead
+      valueId={props.valueId}
+      displayLabel={props.label}
+      options={ordered}
+      placeholder="کد یا نام حساب…"
+      dataLineKey={props.lineKey}
+      onSelect={props.onSelect}
+    />
   );
 }
