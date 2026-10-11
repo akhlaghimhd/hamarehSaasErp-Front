@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   Loader2,
   Plus,
@@ -202,13 +203,6 @@ export function JournalsPage() {
     return { number: true, date: true, period: true, status: true, desc: true, debit: true, credit: true, actions: true };
   });
 
-  const [msg, setMsg] = useState<string | null>(null);
-  useEffect(() => {
-    if (!msg) return;
-    const isErr = msg.includes("خطا") || msg.includes("ممکن نشد") || msg.includes("مسدود");
-    const t = window.setTimeout(() => setMsg(null), isErr ? 8000 : 3500);
-    return () => window.clearTimeout(t);
-  }, [msg]);
 
   const filters = useMemo(
     () => ({
@@ -316,7 +310,6 @@ export function JournalsPage() {
   useEffect(() => {
     setListPage(1);
     setSelectedIds([]);
-    setMsg(null);
   }, [statusFilter, periodFilter, dateFrom, dateTo, search]);
 
   useEffect(() => {
@@ -368,7 +361,6 @@ export function JournalsPage() {
   function openNew() {
     setViewOnly(false);
     setFormError(null);
-    setMsg(null);
     setAccountQuery("");
     setMeta({});
     setAccountFocusKey(null);
@@ -530,7 +522,6 @@ export function JournalsPage() {
   }
 
   async function openEdit(j: JournalEntryDto, readonly: boolean) {
-    setMsg(null);
     setFormError(null);
     setViewOnly(readonly || j.status !== "DRAFT");
     setFormMode(j.journal_entry_id);
@@ -568,7 +559,7 @@ export function JournalsPage() {
         );
       }
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : "خطا در بارگذاری سند");
+      toast.error(e instanceof Error ? e.message : "خطا در بارگذاری سند");
       setFormMode(null);
     }
   }
@@ -605,7 +596,7 @@ export function JournalsPage() {
         );
         setFormError(null);
       } catch (e) {
-        setMsg(e instanceof Error ? e.message : "کپی ممکن نشد");
+        toast.error(e instanceof Error ? e.message : "کپی ممکن نشد");
       }
     })();
   }
@@ -683,7 +674,7 @@ export function JournalsPage() {
       // اگر تراز است، سطر تراز سیستم را حذف کن
       markDirty();
       setLines((prev) => prev.filter((l) => !l.is_system_balance));
-      setMsg("سند تراز است؛ سطر تراز سیستم حذف شد.");
+      toast.message("سند تراز است؛ سطر تراز سیستم حذف شد.");
       return;
     }
     markDirty();
@@ -779,7 +770,7 @@ export function JournalsPage() {
     );
     const w = window.open("", "_blank");
     if (!w) {
-      setMsg("مرورگر پنجره چاپ را مسدود کرد.");
+      toast.error("مرورگر پنجره چاپ را مسدود کرد.");
       return;
     }
     w.document.write(html);
@@ -877,9 +868,9 @@ export function JournalsPage() {
         } as Parameters<typeof journalService.createDraft>[0]);
         if (andPost) {
           await journalService.post(created.journal_entry_id);
-          setMsg("سند ذخیره و ثبت قطعی شد.");
+          toast.success("سند ذخیره و ثبت قطعی شد.");
         } else {
-          setMsg("پیش‌نویس ذخیره شد.");
+          toast.success("پیش‌نویس ذخیره شد.");
         }
       } else if (typeof formMode === "string") {
         await journalService.updateDraft(formMode, {
@@ -890,9 +881,9 @@ export function JournalsPage() {
         });
         if (andPost) {
           await journalService.post(formMode);
-          setMsg("سند به‌روز و ثبت قطعی شد.");
+          toast.success("سند به‌روز و ثبت قطعی شد.");
         } else {
-          setMsg("پیش‌نویس به‌روز شد.");
+          toast.success("پیش‌نویس به‌روز شد.");
         }
       }
       setDirty(false);
@@ -1033,7 +1024,7 @@ export function JournalsPage() {
       </body></html>`;
     const w = window.open("", "_blank");
     if (!w) {
-      setMsg("مرورگر پنجره چاپ را مسدود کرد. اجازه پاپ‌آپ را فعال کنید.");
+      toast.error("مرورگر پنجره چاپ را مسدود کرد. اجازه پاپ‌آپ را فعال کنید.");
       return;
     }
     w.document.write(html);
@@ -1045,7 +1036,7 @@ export function JournalsPage() {
   async function bulkPostSelected() {
     const drafts = (data ?? []).filter((j) => selectedIds.includes(j.journal_entry_id) && j.status === "DRAFT");
     if (!drafts.length) {
-      setMsg("پیش‌نویسی در انتخاب‌ها نیست.");
+      toast.error("پیش‌نویسی در انتخاب‌ها نیست.");
       return;
     }
     let ok = 0;
@@ -1058,14 +1049,14 @@ export function JournalsPage() {
       }
     }
     setSelectedIds([]);
-    setMsg(`${toFaDigits(ok)} سند ثبت قطعی شد.`);
+    toast.success(`${toFaDigits(ok)} سند ثبت قطعی شد.`);
     void refetch();
   }
 
   function requestBulkDelete() {
     const drafts = (data ?? []).filter((j) => selectedIds.includes(j.journal_entry_id) && j.status === "DRAFT");
     if (!drafts.length) {
-      setMsg("فقط پیش‌نویس قابل حذف گروهی است.");
+      toast.error("فقط پیش‌نویس قابل حذف گروهی است.");
       return;
     }
     setBulkDeleteConfirmOpen(true);
@@ -1085,7 +1076,7 @@ export function JournalsPage() {
       }
     }
     setSelectedIds([]);
-    setMsg(`${toFaDigits(ok)} پیش‌نویس حذف شد.`);
+    toast.success(`${toFaDigits(ok)} پیش‌نویس حذف شد.`);
     void refetch();
   }
 
@@ -1604,25 +1595,6 @@ export function JournalsPage() {
         }
       />
 
-      {msg ? (
-        <div
-          className={
-            msg.includes("خطا") || msg.includes("ممکن نشد") || msg.includes("مسدود")
-              ? "rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 flex items-start gap-2"
-              : "rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 flex items-start gap-2"
-          }
-        >
-          <span className="flex-1">{msg}</span>
-          <button
-            type="button"
-            className="shrink-0 h-6 w-6 inline-flex items-center justify-center rounded hover:bg-black/5"
-            title="بستن"
-            onClick={() => setMsg(null)}
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      ) : null}
 
       {selectedIds.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50/60 px-2 py-1.5 text-xs">
@@ -1849,8 +1821,8 @@ export function JournalsPage() {
                             onClick={() =>
                               void postMut
                                 .mutateAsync(j.journal_entry_id)
-                                .then(() => setMsg("سند ثبت قطعی شد."))
-                                .catch((e: Error) => setMsg(e.message))
+                                .then(() => toast.success("سند ثبت قطعی شد."))
+                                .catch((e: Error) => toast.error(e.message))
                             }
                           >
                             ثبت قطعی
@@ -1966,10 +1938,10 @@ export function JournalsPage() {
                 void reverseMut
                   .mutateAsync(reverseTarget.journal_entry_id)
                   .then(() => {
-                    setMsg("سند برگشت صادر شد.");
+                    toast.success("سند برگشت صادر شد.");
                     setReverseTarget(null);
                   })
-                  .catch((e: Error) => setMsg(e.message));
+                  .catch((e: Error) => toast.error(e.message));
               }}
             >
               تأیید برگشت
@@ -1996,10 +1968,10 @@ export function JournalsPage() {
                 void deleteMut
                   .mutateAsync(deleteTarget.journal_entry_id)
                   .then(() => {
-                    setMsg("پیش‌نویس حذف شد.");
+                    toast.success("پیش‌نویس حذف شد.");
                     setDeleteTarget(null);
                   })
-                  .catch((e: Error) => setMsg(e.message));
+                  .catch((e: Error) => toast.error(e.message));
               }}
             >
               حذف
