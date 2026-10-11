@@ -1,0 +1,88 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -695,72 +695,14 @@
+   function exportJournalExcel() {
+-    const meta = journalMetaRows();
+-    const wb = XLSX.utils.book_new();
+-
+-    // شیت ۱: مشخصات
+-    const metaAoa: (string | number)[][] = [
+-      ["مشخصات سند حسابداری"],
+-      [],
+-      ...meta.filter((r) => r.length > 0),
+-      [],
+-      ["جمع بدهکار", lineTotals.debit],
+-      ["جمع بستانکار", lineTotals.credit],
+-      ["اختلاف", lineTotals.diff],
+-      ["وضعیت", isBalanced ? "تراز" : "نامتراز"],
+-    ];
+-    const wsMeta = XLSX.utils.aoa_to_sheet(metaAoa);
+-    wsMeta["!cols"] = [{ wch: 18 }, { wch: 40 }];
+-    XLSX.utils.book_append_sheet(wb, wsMeta, "مشخصات");
+-
+-    // شیت ۲: سطرها
+-    const header = [
+-      "ردیف",
+-      "حساب",
+-      "شرح سطر",
+-      "بدهکار",
+-      "بستانکار",
+-      "مرکز هزینه",
+-      "واحد کسب‌وکار",
+-      "نوع سطر",
+-    ];
+-    const body = lines.map((l, idx) => [
+-      idx + 1,
+-      accountLabel(l.account_id),
+-      l.description || "",
+-      parseAmount(l.debit) || "",
+-      parseAmount(l.credit) || "",
+-      costCenters.find((c) => c.cost_center_id === l.cost_center_id)
+-        ? `${costCenters.find((c) => c.cost_center_id === l.cost_center_id)!.code} — ${costCenters.find((c) => c.cost_center_id === l.cost_center_id)!.name}`
+-        : "",
+-      businessUnits.find((b) => b.business_unit_id === l.business_unit_id)
+-        ? `${businessUnits.find((b) => b.business_unit_id === l.business_unit_id)!.code} — ${businessUnits.find((b) => b.business_unit_id === l.business_unit_id)!.name}`
+-        : "",
+-      l.is_system_balance ? "تراز سیستم" : "عادی",
+-    ]);
+-    const totalRow = [
+-      "",
+-      "",
+-      "جمع",
+-      lineTotals.debit,
+-      lineTotals.credit,
+-      "",
+-      "",
+-      "",
+-    ];
+-    const wsLines = XLSX.utils.aoa_to_sheet([header, ...body, [], totalRow]);
+-    wsLines["!cols"] = [
+-      { wch: 6 },
+-      { wch: 36 },
+-      { wch: 28 },
+-      { wch: 14 },
+-      { wch: 14 },
+-      { wch: 22 },
+-      { wch: 22 },
+-      { wch: 12 },
+-    ];
+-    // محدوده جدول برای خوانایی در اکسل
+-    if (wsLines["!ref"]) {
+-      wsLines["!autofilter"] = { ref: `A1:H${body.length + 1}` };
+-    }
+-    XLSX.utils.book_append_sheet(wb, wsLines, "سطرهای سند");
+-    XLSX.writeFile(wb, `journal-${entryNumber || "draft"}-${Date.now()}.xlsx`);
++    const html = buildJournalReportHtml(buildReportMeta(), buildReportLines());
++    const blob = new Blob(["\ufeff" + html], {
++      type: "application/vnd.ms-excel;charset=utf-8;",
++    });
++    const url = URL.createObjectURL(blob);
++    const a = document.createElement("a");
++    a.href = url;
++    a.download = `journal-${entryNumber || "draft"}-${Date.now()}.xls`;
++    document.body.appendChild(a);
++    a.click();
++    a.remove();
++    URL.revokeObjectURL(url);
+   }

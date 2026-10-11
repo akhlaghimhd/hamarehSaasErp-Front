@@ -1,0 +1,60 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -991,8 +891,39 @@
+           className="pb-0"
++          showBack={false}
+           breadcrumbs={[
+             { label: "حسابداری", href: "/dashboard/finance" },
+-            { label: "اسناد", href: "/dashboard/finance/journals" },
++            { label: "اسناد" },
+             { label: formMode === "new" ? "جدید" : "جزئیات" },
+           ]}
++          actions={
++            <Button type="button" variant="outline" size="sm" className="h-8" onClick={closeForm}>
++              <ArrowRight className="h-4 w-4 ml-1" />
++              بازگشت به لیست
++            </Button>
++          }
+         />
++
++        {draftRestoredAt ? (
++          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex flex-wrap items-center justify-between gap-2">
++            <span>
++              پیش‌نویس ذخیره‌نشده از جلسه قبل بازیابی شد
++              {draftRestoredAt ? ` (${toFaDigits(draftRestoredAt.replace("T", " ").slice(0, 19))})` : ""}.
++            </span>
++            <Button
++              type="button"
++              size="sm"
++              variant="ghost"
++              className="h-7 text-amber-900"
++              onClick={() => {
++                clearLocalDraft();
++                setDescription("");
++                setLines([emptyLine(), emptyLine()]);
++                setDirty(false);
++                setDraftRestoredAt(null);
++              }}
++            >
++              شروع از صفر
++            </Button>
++          </div>
++        ) : null}
+ 
+@@ -1076,4 +1007,4 @@
+                 <th className="px-2 py-1 min-w-[120px]">شرح سطر</th>
+-                <th className="px-2 py-1 min-w-[8rem] w-32">بدهکار</th>
+-                <th className="px-2 py-1 min-w-[8rem] w-32">بستانکار</th>
++                <th className="px-2 py-1 min-w-[8rem] w-32 text-sky-800 bg-sky-50/70">بدهکار</th>
++                <th className="px-2 py-1 min-w-[8rem] w-32 text-emerald-800 bg-emerald-50/70">بستانکار</th>
+                 {costCenters.length > 0 ? (
+@@ -1099,5 +1030,5 @@
+                       : idx % 2 === 1
+-                        ? "bg-muted/35"
+-                        : "bg-background",
+-                    lineComplete && !l.is_system_balance && "bg-emerald-50/50"
++                        ? "bg-slate-100/90 dark:bg-muted/50"
++                        : "bg-white dark:bg-background",
++                    lineComplete && !l.is_system_balance && "border-s-[3px] border-s-emerald-500"
+                   )}

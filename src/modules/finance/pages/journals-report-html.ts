@@ -39,7 +39,7 @@ export function buildJournalReportHtml(
 ): string {
   const rowsHtml = lines
     .map((l, idx) => {
-      const bg = l.isSystemBalance ? "#fffbeb" : idx % 2 === 1 ? "#f8fafc" : "#ffffff";
+      const bg = l.isSystemBalance ? "#fffbeb" : idx % 2 === 1 ? "#e2e8f0" : "#ffffff";
       return `<tr style="background:${bg}">
         <td class="c">${toFaDigits(idx + 1)}</td>
         <td>${l.accountLabel || "—"}</td>
@@ -99,7 +99,7 @@ export function buildJournalReportHtml(
     </tr>
     <tr>
       <td class="k">زمان خروجی</td><td class="v">${meta.exportedAt}</td>
-      <td class="k">وضعیت تراز</td><td class="v">${meta.isBalanced ? "تراز ✓" : "نامتراز"}</td>
+      <td class="k">وضعیت تراز</td><td class="v">${meta.isBalanced ? "تراز ✓" : "ناتراز"}</td>
     </tr>
     <tr>
       <td class="k">شرح سند</td><td class="v" colspan="3">${meta.description || "—"}</td>

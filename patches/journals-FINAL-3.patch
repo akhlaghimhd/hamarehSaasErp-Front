@@ -1,0 +1,48 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -367,14 +501,18 @@
+       } else {
+         setLines(
+-          items.map((it) => ({
+-            key: it.journal_item_id ?? Math.random().toString(36).slice(2),
+-            account_id: it.account_id,
+-            debit: Number(it.debit_amount || 0) > 0 ? String(Number(it.debit_amount)) : "",
+-            credit:
+-              Number(it.credit_amount || 0) > 0 ? String(Number(it.credit_amount)) : "",
+-            description: it.description ?? "",
+-            cost_center_id: it.cost_center_id ?? "",
+-            business_unit_id: it.business_unit_id ?? "",
+-          }))
++          items.map((it) => {
++            const desc = it.description ?? "";
++            return {
++              key: it.journal_item_id ?? Math.random().toString(36).slice(2),
++              account_id: it.account_id,
++              debit: Number(it.debit_amount || 0) > 0 ? String(Number(it.debit_amount)) : "",
++              credit:
++                Number(it.credit_amount || 0) > 0 ? String(Number(it.credit_amount)) : "",
++              description: desc,
++              cost_center_id: it.cost_center_id ?? "",
++              business_unit_id: it.business_unit_id ?? "",
++              is_system_balance: isSystemBalanceDescription(desc),
++            };
++          })
+         );
+       }
+@@ -506,5 +644,7 @@
+     const balDesc =
+       description.trim() ||
+-      (diff > 0 ? "بستانکار تراز (سیستم)" : "بدهکار تراز (سیستم)");
++      (diff > 0
++        ? `بستانکار ${SYSTEM_BALANCE_MARK}`
++        : `بدهکار ${SYSTEM_BALANCE_MARK}`);
+ 
+     setLines((prev) => {
+@@ -546,5 +686,5 @@
+       ["زمان خروجی", now],
+       ["شماره سند", entryNumber ? toFaDigits(entryNumber) : "پیش‌نویس"],
+-      ["تاریخ سند", documentDate ? toFaDigits(documentDate) : "—"],
++      ["تاریخ سند", documentDate ? formatJalaliDate(documentDate) : "—"],
+       ["دوره", periodLabel(periodId)],
+       ["شرح", description || "—"],
