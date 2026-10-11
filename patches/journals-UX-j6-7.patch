@@ -1,0 +1,32 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -1339,15 +1243,4 @@
+                   {canPost ? (
+-                    <Button
+-                      type="button"
+-                      size="sm"
+-                      className="h-9"
+-                      disabled={saving || !isBalanced}
+-                      onClick={() => void doSave(true)}
+-                      title="F9"
+-                    >
+-                      {saving ? (
+-                        <Loader2 className="h-4 w-4 animate-spin ml-1" />
+-                      ) : (
+-                        <CheckCircle2 className="h-4 w-4 ml-1" />
+-                      )}
++                    <Button type="button" size="sm" className="h-9" disabled={saving || !isBalanced} onClick={() => void doSave(true)} title="F9">
++                      {saving ? <Loader2 className="h-4 w-4 animate-spin ml-1" /> : <CheckCircle2 className="h-4 w-4 ml-1" />}
+                       ذخیره و ثبت قطعی
+@@ -1362,3 +1255,3 @@
+ 
+-        <Dialog open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
++<Dialog open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
+           <DialogContent>
+@@ -1367,3 +1260,4 @@
+               <DialogDescription>
+-                تغییرات ذخیره‌نشده دارید. اگر خارج شوید این تغییرات از بین می‌رود.
++                تغییرات ذخیره‌نشده دارید. با خروج از این صفحه این تغییرات از بین می‌رود
++                (پیش‌نویس محلی فقط تا وقتی مرورگر را نبندید یا «شروع از صفر» نزنید نگه داشته می‌شود).
+               </DialogDescription>
