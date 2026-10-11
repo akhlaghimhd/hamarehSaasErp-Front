@@ -1,0 +1,59 @@
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -1335,12 +1519,51 @@
+           { label: "اسناد" },
+         ]}
+         actions={
+-          canCreate ? (
+-            <Button size="sm" onClick={openNew}>
+-              <Plus className="h-4 w-4 ml-1" />
+-              سند جدید
++          <div className="flex items-center gap-1.5 flex-wrap">
++            <Button type="button" size="sm" variant="outline" className="h-8" onClick={exportListExcel} title="خروجی اکسل">
++              <FileSpreadsheet className="h-3.5 w-3.5 ml-1" />
++              اکسل
+             </Button>
+-          ) : undefined
++            <Button type="button" size="sm" variant="outline" className="h-8" onClick={exportListPdf} title="خروجی PDF">
++              <FileDown className="h-3.5 w-3.5 ml-1" />
++              PDF
++            </Button>
++            <div className="relative">
++              <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => setColMenuOpen((v) => !v)}>
++                ستون‌ها
++              </Button>
++              {colMenuOpen ? (
++                <div className="absolute left-0 top-full z-50 mt-1 w-44 rounded-md border bg-popover p-2 shadow-md text-xs space-y-1">
++                  {(
++                    [
++                      ["number", "شماره"],
++                      ["date", "تاریخ"],
++                      ["period", "دوره"],
++                      ["status", "وضعیت"],
++                      ["desc", "شرح"],
++                      ["debit", "بدهکار"],
++                      ["credit", "بستانکار"],
++                    ] as const
++                  ).map(([k, lab]) => (
++                    <label key={k} className="flex items-center gap-2 cursor-pointer px-1 py-0.5 hover:bg-accent rounded">
++                      <input
++                        type="checkbox"
++                        checked={visibleCols[k] !== false}
++                        onChange={(e) => setVisibleCols((prev) => ({ ...prev, [k]: e.target.checked }))}
++                      />
++                      {lab}
++                    </label>
++                  ))}
++                </div>
++              ) : null}
++            </div>
++            {canCreate ? (
++              <Button size="sm" className="h-8" onClick={openNew}>
++                <Plus className="h-4 w-4 ml-1" />
++                سند جدید
++              </Button>
++            ) : null}
++          </div>
+         }
+       />
+ 
