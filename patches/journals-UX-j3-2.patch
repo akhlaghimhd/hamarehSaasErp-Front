@@ -1,0 +1,123 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -530,4 +530,119 @@
+ 
+ 
++
++  const authUser = useAuthStore((s) => s.user);
++  const authOrg = useAuthStore((s) => s.organization);
++
++  function journalMetaRows(): string[][] {
++    const companyName =
++      (companies ?? []).find((c) => c.company_id === primaryCompanyId)?.name ??
++      authOrg?.tenant_name ??
++      "—";
++    const userLabel = authUser
++      ? `${authUser.first_name ?? ""} ${authUser.last_name ?? ""}`.trim() ||
++        authUser.email ||
++        authUser.mobile ||
++        "—"
++      : "—";
++    const now = new Date().toLocaleString("fa-IR");
++    return [
++      ["گزارش سند حسابداری"],
++      ["شرکت", companyName],
++      ["سازمان", authOrg?.tenant_name ?? "—"],
++      ["کاربر", String(userLabel)],
++      ["زمان خروجی", now],
++      ["شماره سند", entryNumber ? toFaDigits(entryNumber) : "پیش‌نویس"],
++      ["تاریخ سند", documentDate ? toFaDigits(documentDate) : "—"],
++      ["دوره", periodLabel(periodId)],
++      ["شرح", description || "—"],
++      [],
++    ];
++  }
++
++  function exportJournalExcel() {
++    const meta = journalMetaRows();
++    const header = [
++      "#",
++      "حساب",
++      "شرح",
++      "بدهکار",
++      "بستانکار",
++      "مرکز هزینه",
++      "واحد کسب‌وکار",
++      "تراز سیستم",
++    ];
++    const body = lines.map((l, idx) => [
++      toFaDigits(idx + 1),
++      accountLabel(l.account_id),
++      l.description || "",
++      parseAmount(l.debit) ? formatMoney(parseAmount(l.debit)) : "",
++      parseAmount(l.credit) ? formatMoney(parseAmount(l.credit)) : "",
++      costCenters.find((c) => c.cost_center_id === l.cost_center_id)?.name ?? "",
++      businessUnits.find((b) => b.business_unit_id === l.business_unit_id)?.name ?? "",
++      l.is_system_balance ? "بله" : "",
++    ]);
++    const totals = [
++      [],
++      ["جمع بدهکار", formatMoney(lineTotals.debit)],
++      ["جمع بستانکار", formatMoney(lineTotals.credit)],
++      ["اختلاف", formatMoney(lineTotals.diff)],
++    ];
++    const aoa = [...meta, header, ...body, ...totals];
++    const ws = XLSX.utils.aoa_to_sheet(aoa);
++    const wb = XLSX.utils.book_new();
++    XLSX.utils.book_append_sheet(wb, ws, "سند");
++    XLSX.writeFile(wb, `journal-${entryNumber || "draft"}-${Date.now()}.xlsx`);
++  }
++
++  function exportJournalPdf() {
++    const meta = journalMetaRows();
++    const rowsHtml = lines
++      .map((l, idx) => {
++        const bg = l.is_system_balance ? "#fffbeb" : idx % 2 === 1 ? "#f4f4f5" : "#fff";
++        return `<tr style="background:${bg}">
++          <td>${toFaDigits(idx + 1)}</td>
++          <td>${accountLabel(l.account_id)}</td>
++          <td>${l.description || "—"}</td>
++          <td style="text-align:left">${parseAmount(l.debit) ? formatMoney(parseAmount(l.debit)) : "—"}</td>
++          <td style="text-align:left">${parseAmount(l.credit) ? formatMoney(parseAmount(l.credit)) : "—"}</td>
++        </tr>`;
++      })
++      .join("");
++    const metaHtml = meta
++      .filter((r) => r.length)
++      .map((r) => `<div><strong>${r[0]}</strong>${r[1] != null ? ": " + r[1] : ""}</div>`)
++      .join("");
++    const html = `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/>
++      <title>سند حسابداری</title>
++      <style>
++        body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#111}
++        h1{font-size:16px;margin:0 0 12px}
++        table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px}
++        th,td{border:1px solid #ddd;padding:6px 8px;text-align:right}
++        th{background:#f4f4f5}
++        .meta{font-size:12px;line-height:1.7}
++        .totals{margin-top:12px;font-size:12px}
++      </style></head><body>
++      <h1>سند حسابداری</h1>
++      <div class="meta">${metaHtml}</div>
++      <table>
++        <thead><tr><th>#</th><th>حساب</th><th>شرح</th><th>بدهکار</th><th>بستانکار</th></tr></thead>
++        <tbody>${rowsHtml}</tbody>
++      </table>
++      <div class="totals">
++        <div>جمع بدهکار: ${formatMoney(lineTotals.debit)}</div>
++        <div>جمع بستانکار: ${formatMoney(lineTotals.credit)}</div>
++        <div>وضعیت: ${isBalanced ? "تراز" : "نامتراز"}</div>
++      </div>
++      <script>window.onload=function(){window.print();}</script>
++      </body></html>`;
++    const w = window.open("", "_blank");
++    if (!w) {
++      setMsg("مرورگر پنجره چاپ را مسدود کرد.");
++      return;
++    }
++    w.document.write(html);
++    w.document.close();
++  }
+ 
+   async function doSave(andPost: boolean) {
