@@ -1,0 +1,15 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -17,5 +17,4 @@
+   FileDown,
+ } from "lucide-react";
+-import * as XLSX from "xlsx";
+ import { PageHeader } from "@/shared/components/layout/page-header";
+ import { Button } from "@/shared/components/ui/button";
+@@ -47,4 +46,5 @@
+ import { journalService } from "../services/journal-service";
+ import { AccountTypeahead, OptionTypeahead } from "./journals-account-typeahead";
++import { buildJournalReportHtml } from "./journals-report-html";
+ import {
+   FinancePermissions,
