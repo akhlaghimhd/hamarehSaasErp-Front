@@ -1,0 +1,106 @@
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -211,8 +211,9 @@
+       status: statusFilter || undefined,
+       company_id: primaryCompanyId || undefined,
+       period_id: periodFilter || undefined,
++      deleted: showDeleted || undefined,
+     }),
+-    [statusFilter, primaryCompanyId, periodFilter]
++    [statusFilter, primaryCompanyId, periodFilter, showDeleted]
+   );
+ 
+   const { data, isLoading, error, refetch } = useJournals(filters);
+@@ -1570,12 +1571,22 @@
+               <FileDown className="h-3.5 w-3.5 ml-1" />
+               PDF
+             </Button>
+-            <div className="relative">
+-              <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => setColMenuOpen((v) => !v)}>
++            <Button
++              type="button"
++              size="sm"
++              variant={showDeleted ? "default" : "outline"}
++              className="h-7 text-xs"
++              onClick={() => setShowDeleted((v) => !v)}
++              title="سطل حذف"
++            >
++              سطل حذف
++            </Button>
++            <div className="relative" data-col-menu>
++              <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => setColMenuOpen((v) => !v)}>
+                 ستون‌ها
+               </Button>
+               {colMenuOpen ? (
+-                <div className="absolute left-0 top-full z-50 mt-1 w-44 rounded-md border bg-popover p-2 shadow-md text-xs space-y-1">
++                <div data-col-menu className="absolute left-0 top-full z-50 mt-1 w-44 rounded-md border bg-popover p-2 shadow-md text-xs space-y-1">
+                   {(
+                     [
+                       ["number", "شماره"],
+@@ -1853,12 +1864,30 @@
+                             برگشت
+                           </Button>
+                         ) : null}
+-                        {j.status === "DRAFT" && canDelete ? (
++                        {showDeleted ? (
++                          canDelete ? (
++                            <Button
++                              size="sm"
++                              variant="outline"
++                              className="h-7 text-xs"
++                              disabled={restoreMut.isPending}
++                              onClick={() => {
++                                void restoreMut
++                                  .mutateAsync(j.journal_entry_id)
++                                  .then(() => toast.success("از سطل حذف بازیابی شد."))
++                                  .catch((e: Error) => toast.error(e.message));
++                              }}
++                            >
++                              بازیابی
++                            </Button>
++                          ) : null
++                        ) : j.status === "DRAFT" && canDelete ? (
+                           <Button
+                             size="sm"
+                             variant="ghost"
+-                            className="h-8 px-2 text-destructive"
++                            className="h-7 px-2 text-destructive"
+                             onClick={() => setDeleteTarget(j)}
++                            title="حذف (فقط ایجادکننده یا مدیر)"
+                           >
+                             <Trash2 className="h-3.5 w-3.5" />
+                           </Button>
+@@ -1876,10 +1905,29 @@
+ 
+       {filtered.length > 0 ? (
+         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground px-1">
+-          <span>
+-            {toFaDigits((listPage - 1) * pageSize + 1)}–
+-            {toFaDigits(Math.min(listPage * pageSize, filtered.length))} از {toFaDigits(filtered.length)}
+-          </span>
++          <div className="flex items-center gap-2">
++            <span>
++              {toFaDigits((listPage - 1) * pageSize + 1)}–
++              {toFaDigits(Math.min(listPage * pageSize, filtered.length))} از {toFaDigits(filtered.length)}
++            </span>
++            <label className="flex items-center gap-1">
++              <span className="text-muted-foreground">در صفحه</span>
++              <select
++                className="h-7 rounded-md border bg-background px-1.5 text-xs"
++                value={pageSize}
++                onChange={(e) => {
++                  setPageSize(Number(e.target.value));
++                  setListPage(1);
++                }}
++              >
++                {[10, 15, 25, 50].map((n) => (
++                  <option key={n} value={n}>
++                    {toFaDigits(n)}
++                  </option>
++                ))}
++              </select>
++            </label>
++          </div>
+           <div className="flex items-center gap-1">
+             <Button
+               type="button"
