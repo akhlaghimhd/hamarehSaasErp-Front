@@ -1,0 +1,49 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -855,14 +902,16 @@
+         {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+ 
+-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/95 backdrop-blur">
+-          <div className="mx-auto max-w-6xl flex flex-wrap items-center justify-between gap-3 px-4 py-3">
++        </div>
++
++        <div className="shrink-0 border-t bg-background z-10">
++          <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
+             <div className="flex flex-wrap gap-4 text-sm">
+               <span>
+                 بدهکار:{" "}
+-                <strong className="font-mono">{formatMoney(lineTotals.debit)}</strong>
++                <strong className="font-mono tabular-nums">{formatMoney(lineTotals.debit)}</strong>
+               </span>
+               <span>
+                 بستانکار:{" "}
+-                <strong className="font-mono">{formatMoney(lineTotals.credit)}</strong>
++                <strong className="font-mono tabular-nums">{formatMoney(lineTotals.credit)}</strong>
+               </span>
+               <span
+@@ -896,5 +945,5 @@
+                     disabled={saving}
+                     onClick={() => void doSave(false)}
+-                    title="Ctrl+S"
++                    title="Alt+S"
+                   >
+                     ذخیره پیش‌نویس
+@@ -905,5 +954,5 @@
+                       disabled={saving || !isBalanced}
+                       onClick={() => void doSave(true)}
+-                      title="Ctrl+Enter"
++                      title="Alt+Enter"
+                     >
+                       {saving ? (
+@@ -1080,8 +1129,8 @@
+                       {j.description ?? "—"}
+                     </td>
+-                    <td className="px-3 py-2 font-mono text-xs">
++                    <td className="px-3 py-2 font-mono tabular-nums text-xs">
+                       {t.debit ? formatMoney(t.debit) : "—"}
+                     </td>
+-                    <td className="px-3 py-2 font-mono text-xs">
++                    <td className="px-3 py-2 font-mono tabular-nums text-xs">
+                       {t.credit ? formatMoney(t.credit) : "—"}
+                     </td>
