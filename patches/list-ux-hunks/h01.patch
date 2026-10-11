@@ -1,0 +1,38 @@
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -293,6 +310,35 @@
+     if (dateTo) list = list.filter((j) => (j.document_date ?? "").slice(0, 10) <= dateTo);
+     return list;
+   }, [data, search, dateFrom, dateTo]);
++
++  useEffect(() => {
++    setListPage(1);
++    setSelectedIds([]);
++  }, [statusFilter, periodFilter, dateFrom, dateTo, search]);
++
++  useEffect(() => {
++    try {
++      localStorage.setItem("finance.journals.list-cols.v1", JSON.stringify(visibleCols));
++    } catch { /* ignore */ }
++  }, [visibleCols]);
++
++  const paged = useMemo(() => {
++    const start = (listPage - 1) * pageSize;
++    return filtered.slice(start, start + pageSize);
++  }, [filtered, listPage, pageSize]);
++
++  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
++
++  function toggleSelect(id: string) {
++    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
++  }
++  function toggleSelectAllPage() {
++    const ids = paged.map((j) => j.journal_entry_id);
++    const allOn = ids.length > 0 && ids.every((id) => selectedIds.includes(id));
++    if (allOn) setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
++    else setSelectedIds((prev) => Array.from(new Set([...prev, ...ids])));
++  }
++
+ 
+   const statusCounts = useMemo(() => {
+     const all = data ?? [];
