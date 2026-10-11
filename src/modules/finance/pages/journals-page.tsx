@@ -1,1 +1,1 @@
-LOADING_FROM_FILE
+file:///tmp/journals-page.tsx
