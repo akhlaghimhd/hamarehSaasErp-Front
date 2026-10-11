@@ -15,11 +15,15 @@ export const journalService = {
     company_id?: string;
     period_id?: string;
     status?: string;
+    deleted?: boolean;
+    limit?: number;
   }): Promise<JournalEntryDto[]> {
     const q = new URLSearchParams();
     if (params?.company_id) q.set("company_id", params.company_id);
     if (params?.period_id) q.set("period_id", params.period_id);
     if (params?.status) q.set("status", params.status);
+    if (params?.deleted) q.set("deleted", "1");
+    if (params?.limit) q.set("limit", String(params.limit));
     const qs = q.toString();
     const envelope = await apiGet(
       qs ? `${financePaths.journals}?${qs}` : financePaths.journals
@@ -48,6 +52,11 @@ export const journalService = {
 
   async deleteDraft(id: string): Promise<void> {
     await apiDelete(financePaths.journal(id));
+  },
+
+  async restoreDraft(id: string): Promise<JournalEntryDto> {
+    const envelope = await apiPost(financePaths.journalRestore(id), {});
+    return unwrapData<JournalEntryDto>(envelope);
   },
 
   async post(id: string): Promise<JournalEntryDto> {
