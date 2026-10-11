@@ -9,6 +9,7 @@ export const financePaths = {
   journal: (id: string) => `${FINANCE_BASE}/journals/${id}`,
   journalPost: (id: string) => `${FINANCE_BASE}/journals/${id}/post`,
   journalReverse: (id: string) => `${FINANCE_BASE}/journals/${id}/reverse`,
+  journalRestore: (id: string) => `${FINANCE_BASE}/journals/${id}/restore`,
   periodControls: `${FINANCE_BASE}/period-controls`,
   periodSoftClose: `${FINANCE_BASE}/period-controls/soft-close`,
   periodHardClose: `${FINANCE_BASE}/period-controls/hard-close`,
