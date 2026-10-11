@@ -1,0 +1,112 @@
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -1443,51 +1697,74 @@
+           <table className="w-full text-sm">
+             <thead>
+               <tr className="border-b text-right text-xs text-muted-foreground">
+-                <th className="px-3 py-2 font-medium">شماره</th>
+-                <th className="px-3 py-2 font-medium">تاریخ</th>
+-                <th className="px-3 py-2 font-medium">دوره</th>
+-                <th className="px-3 py-2 font-medium">وضعیت</th>
+-                <th className="px-3 py-2 font-medium">شرح</th>
+-                <th className="px-3 py-2 font-medium min-w-[8rem] text-sky-800">بدهکار</th>
+-                <th className="px-3 py-2 font-medium text-emerald-800">بستانکار</th>
+-                <th className="px-3 py-2 font-medium">عملیات</th>
++                <th className="px-2 py-1.5 w-8">
++                  <input
++                    type="checkbox"
++                    checked={paged.length > 0 && paged.every((j) => selectedIds.includes(j.journal_entry_id))}
++                    onChange={toggleSelectAllPage}
++                    aria-label="انتخاب همه صفحه"
++                  />
++                </th>
++                {visibleCols.number !== false ? <th className="px-2 py-1.5 font-medium">شماره</th> : null}
++                {visibleCols.date !== false ? <th className="px-2 py-1.5 font-medium">تاریخ</th> : null}
++                {visibleCols.period !== false ? <th className="px-2 py-1.5 font-medium">دوره</th> : null}
++                {visibleCols.status !== false ? <th className="px-2 py-1.5 font-medium">وضعیت</th> : null}
++                {visibleCols.desc !== false ? <th className="px-2 py-1.5 font-medium">شرح</th> : null}
++                {visibleCols.debit !== false ? <th className="px-2 py-1.5 font-medium min-w-[7rem] text-sky-800">بدهکار</th> : null}
++                {visibleCols.credit !== false ? <th className="px-2 py-1.5 font-medium text-emerald-800">بستانکار</th> : null}
++                {visibleCols.actions !== false ? <th className="px-2 py-1.5 font-medium">عملیات</th> : null}
+               </tr>
+             </thead>
+             <tbody>
+-              {filtered.map((j) => {
++              {paged.map((j) => {
+                 const t = sumLines(j.items as JournalItemDto[] | undefined);
+                 return (
+                   <tr
+                     key={j.journal_entry_id}
+                     className="border-b border-border/50 hover:bg-muted/40"
+                   >
+-                    <td className="px-3 py-2 text-xs font-medium tabular-nums">
+-                      {j.entry_number ? toFaDigits(j.entry_number) : "—"}
++                    <td className="px-2 py-1.5">
++                      <input
++                        type="checkbox"
++                        checked={selectedIds.includes(j.journal_entry_id)}
++                        onChange={() => toggleSelect(j.journal_entry_id)}
++                        aria-label="انتخاب"
++                      />
+                     </td>
+-                    <td className="px-3 py-2 text-xs">
+-                      {formatJalaliDate(j.document_date)}
+-                    </td>
+-                    <td className="px-3 py-2 text-xs">{periodLabel(j.period_id)}</td>
+-                    <td className="px-3 py-2">
+-                      <span
+-                        className={cn(
+-                          "rounded border px-1.5 py-0.5 text-[10px] font-medium",
+-                          statusChip[j.status] ?? "bg-muted"
+-                        )}
+-                      >
+-                        {statusLabel[j.status] ?? j.status}
+-                      </span>
+-                    </td>
+-                    <td className="px-3 py-2 max-w-[180px] truncate text-xs">
+-                      {j.description ?? "—"}
+-                    </td>
+-                    <td className="px-3 py-2 tabular-nums text-xs">
+-                      {t.debit ? formatMoney(t.debit) : "—"}
+-                    </td>
+-                    <td className="px-3 py-2 tabular-nums text-xs">
+-                      {t.credit ? formatMoney(t.credit) : "—"}
+-                    </td>
+-                    <td className="px-3 py-2">
++                    {visibleCols.number !== false ? (
++                      <td className="px-2 py-1.5 text-xs font-medium tabular-nums">
++                        {j.entry_number ? toFaDigits(j.entry_number) : "—"}
++                      </td>
++                    ) : null}
++                    {visibleCols.date !== false ? (
++                      <td className="px-2 py-1.5 text-xs">{formatJalaliDate(j.document_date)}</td>
++                    ) : null}
++                    {visibleCols.period !== false ? (
++                      <td className="px-2 py-1.5 text-xs">{periodLabel(j.period_id)}</td>
++                    ) : null}
++                    {visibleCols.status !== false ? (
++                      <td className="px-2 py-1.5">
++                        <span
++                          className={cn(
++                            "rounded border px-1.5 py-0.5 text-[10px] font-medium",
++                            statusChip[j.status] ?? "bg-muted"
++                          )}
++                        >
++                          {statusLabel[j.status] ?? j.status}
++                        </span>
++                      </td>
++                    ) : null}
++                    {visibleCols.desc !== false ? (
++                      <td className="px-2 py-1.5 max-w-[180px] truncate text-xs">{j.description ?? "—"}</td>
++                    ) : null}
++                    {visibleCols.debit !== false ? (
++                      <td className="px-2 py-1.5 tabular-nums text-xs">{t.debit ? formatMoney(t.debit) : "—"}</td>
++                    ) : null}
++                    {visibleCols.credit !== false ? (
++                      <td className="px-2 py-1.5 tabular-nums text-xs">{t.credit ? formatMoney(t.credit) : "—"}</td>
++                    ) : null}
++                    {visibleCols.actions !== false ? (
++                    <td className="px-2 py-1.5">
+                       <div className="flex flex-wrap gap-1">
+                         <Button
+                           size="sm"
