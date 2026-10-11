@@ -1,0 +1,60 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -641,17 +641,20 @@
+             />
+           </div>
+-          <div className="space-y-1">
++          <div className="space-y-1 min-w-[180px]">
+             <label className="text-xs text-muted-foreground">دوره مالی</label>
+-            <select
+-              className="h-9 rounded-md border bg-background px-2 text-sm min-w-[160px]"
+-              value={periodId}
++            <OptionTypeahead
++              valueId={periodId}
++              displayLabel={periodId === DEMO_PERIOD_ID ? "دوره جاری (دمو)" : periodLabel(periodId)}
++              options={[
++                { id: DEMO_PERIOD_ID, label: "دوره جاری (دمو)", searchText: "دوره جاری دمو" },
++              ]}
++              placeholder="جستجوی دوره…"
+               disabled={viewOnly}
+-              onChange={(e) => {
++              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
++              onSelect={(id) => {
+                 markDirty();
+-                setPeriodId(e.target.value);
++                setPeriodId(id);
+               }}
+-            >
+-              <option value={DEMO_PERIOD_ID}>دوره جاری (دمو)</option>
+-            </select>
++            />
+           </div>
+           <div className="space-y-1 flex-1 min-w-[200px]">
+@@ -682,5 +685,5 @@
+           <div className="space-y-1">
+             <label className="text-xs text-muted-foreground">شماره</label>
+-            <div className="h-9 px-3 flex items-center rounded-md border bg-muted/40 text-xs text-muted-foreground font-mono">
++            <div className="h-9 px-3 flex items-center rounded-md border bg-muted/40 text-xs text-muted-foreground tabular-nums">
+               {entryNumber ? toFaDigits(entryNumber) : "پس از ثبت قطعی"}
+             </div>
+@@ -712,5 +715,5 @@
+             <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+               <Keyboard className="h-3.5 w-3.5" />
+-              Alt+S پیش‌نویس · Alt+Enter قطعی · Alt+B تراز · Alt+N سطر
++              F2 پیش‌نویس · F9 قطعی · F4 تراز · F7 سطر
+             </span>
+           </div>
+@@ -747,10 +750,10 @@
+                   )}
+                 >
+-                  <td className="px-2 py-1.5 text-xs text-muted-foreground font-mono">
++                  <td className="px-2 py-1.5 text-xs text-muted-foreground tabular-nums">
+                     {toFaDigits(idx + 1)}
+                   </td>
+                   <td className="px-2 py-1.5 relative">
+                     {viewOnly ? (
+-                      <span className="text-xs font-mono tabular-nums">{accountLabel(l.account_id)}</span>
++                      <span className="text-xs tabular-nums">{accountLabel(l.account_id)}</span>
+                     ) : (
+                       <AccountTypeahead
