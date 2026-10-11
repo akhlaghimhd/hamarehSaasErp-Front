@@ -14,7 +14,10 @@ import {
   Search,
   Link2,
   Keyboard,
+  FileSpreadsheet,
+  FileDown,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
@@ -27,7 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/components/ui/dialog";
-import { usePermission } from "@/auth";
+import { usePermission, useAuthStore } from "@/auth";
 import { useCompanies } from "@/modules/organization/hooks/use-companies";
 import {
   costCenterService,
@@ -80,9 +83,11 @@ type LineForm = {
   description: string;
   cost_center_id: string;
   business_unit_id: string;
+  /** سطر تراز ساخته‌شده توسط سیستم */
+  is_system_balance?: boolean;
 };
 
-function emptyLine(desc = ""): LineForm {
+function emptyLine(desc = "", system = false): LineForm {
   return {
     key: Math.random().toString(36).slice(2),
     account_id: "",
@@ -91,6 +96,7 @@ function emptyLine(desc = ""): LineForm {
     description: desc,
     cost_center_id: "",
     business_unit_id: "",
+    is_system_balance: system || undefined,
   };
 }
 
@@ -469,27 +475,174 @@ export function JournalsPage() {
   }
 
   function fillBalanceOnLast() {
-    if (lines.length === 0) return;
-    const others = lines.slice(0, -1);
     let d = 0;
     let c = 0;
-    for (const l of others) {
+    for (const l of lines) {
       d += parseAmount(l.debit);
       c += parseAmount(l.credit);
     }
     const diff = Math.round((d - c) * 100) / 100;
-    if (diff === 0) return;
+    if (diff === 0) {
+      setMsg("سند هم‌اکنون تراز است.");
+      return;
+    }
     markDirty();
+    const abs = Math.abs(diff);
+    const amountPatch =
+      diff > 0
+        ? { credit: String(abs), debit: "" as string }
+        : { debit: String(abs), credit: "" as string };
+    const balDesc =
+      description.trim() ||
+      (diff > 0 ? "بستانکار تراز (سیستم)" : "بدهکار تراز (سیستم)");
+
     setLines((prev) => {
-      const copy = [...prev];
-      const i = copy.length - 1;
-      if (diff > 0) {
-        copy[i] = { ...copy[i], credit: String(Math.abs(diff)), debit: "" };
-      } else {
-        copy[i] = { ...copy[i], debit: String(Math.abs(diff)), credit: "" };
+      // پاک کردن پرچم سیستم قبلی روی سطرهایی که دیگر نقش تراز ندارند
+      const cleared = prev.map((l) =>
+        l.is_system_balance ? { ...l, is_system_balance: undefined } : l
+      );
+      const last = cleared[cleared.length - 1];
+      const lastReusable =
+        last &&
+        !last.account_id &&
+        parseAmount(last.debit) === 0 &&
+        parseAmount(last.credit) === 0;
+
+      if (lastReusable) {
+        const next = [...cleared];
+        next[next.length - 1] = {
+          ...last,
+          ...amountPatch,
+          description: last.description.trim() || balDesc,
+          is_system_balance: true,
+        };
+        return next;
       }
-      return copy;
+      return [
+        ...cleared,
+        {
+          ...emptyLine(balDesc, true),
+          ...amountPatch,
+        },
+      ];
     });
+  }
+
+
+
+  const authUser = useAuthStore((s) => s.user);
+  const authOrg = useAuthStore((s) => s.organization);
+
+  function journalMetaRows(): string[][] {
+    const companyName =
+      (companies ?? []).find((c) => c.company_id === primaryCompanyId)?.name ??
+      authOrg?.tenant_name ??
+      "—";
+    const userLabel = authUser
+      ? `${authUser.first_name ?? ""} ${authUser.last_name ?? ""}`.trim() ||
+        authUser.email ||
+        authUser.mobile ||
+        "—"
+      : "—";
+    const now = new Date().toLocaleString("fa-IR");
+    return [
+      ["گزارش سند حسابداری"],
+      ["شرکت", companyName],
+      ["سازمان", authOrg?.tenant_name ?? "—"],
+      ["کاربر", String(userLabel)],
+      ["زمان خروجی", now],
+      ["شماره سند", entryNumber ? toFaDigits(entryNumber) : "پیش‌نویس"],
+      ["تاریخ سند", documentDate ? toFaDigits(documentDate) : "—"],
+      ["دوره", periodLabel(periodId)],
+      ["شرح", description || "—"],
+      [],
+    ];
+  }
+
+  function exportJournalExcel() {
+    const meta = journalMetaRows();
+    const header = [
+      "#",
+      "حساب",
+      "شرح",
+      "بدهکار",
+      "بستانکار",
+      "مرکز هزینه",
+      "واحد کسب‌وکار",
+      "تراز سیستم",
+    ];
+    const body = lines.map((l, idx) => [
+      toFaDigits(idx + 1),
+      accountLabel(l.account_id),
+      l.description || "",
+      parseAmount(l.debit) ? formatMoney(parseAmount(l.debit)) : "",
+      parseAmount(l.credit) ? formatMoney(parseAmount(l.credit)) : "",
+      costCenters.find((c) => c.cost_center_id === l.cost_center_id)?.name ?? "",
+      businessUnits.find((b) => b.business_unit_id === l.business_unit_id)?.name ?? "",
+      l.is_system_balance ? "بله" : "",
+    ]);
+    const totals = [
+      [],
+      ["جمع بدهکار", formatMoney(lineTotals.debit)],
+      ["جمع بستانکار", formatMoney(lineTotals.credit)],
+      ["اختلاف", formatMoney(lineTotals.diff)],
+    ];
+    const aoa = [...meta, header, ...body, ...totals];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "سند");
+    XLSX.writeFile(wb, `journal-${entryNumber || "draft"}-${Date.now()}.xlsx`);
+  }
+
+  function exportJournalPdf() {
+    const meta = journalMetaRows();
+    const rowsHtml = lines
+      .map((l, idx) => {
+        const bg = l.is_system_balance ? "#fffbeb" : idx % 2 === 1 ? "#f4f4f5" : "#fff";
+        return `<tr style="background:${bg}">
+          <td>${toFaDigits(idx + 1)}</td>
+          <td>${accountLabel(l.account_id)}</td>
+          <td>${l.description || "—"}</td>
+          <td style="text-align:left">${parseAmount(l.debit) ? formatMoney(parseAmount(l.debit)) : "—"}</td>
+          <td style="text-align:left">${parseAmount(l.credit) ? formatMoney(parseAmount(l.credit)) : "—"}</td>
+        </tr>`;
+      })
+      .join("");
+    const metaHtml = meta
+      .filter((r) => r.length)
+      .map((r) => `<div><strong>${r[0]}</strong>${r[1] != null ? ": " + r[1] : ""}</div>`)
+      .join("");
+    const html = `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/>
+      <title>سند حسابداری</title>
+      <style>
+        body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#111}
+        h1{font-size:16px;margin:0 0 12px}
+        table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px}
+        th,td{border:1px solid #ddd;padding:6px 8px;text-align:right}
+        th{background:#f4f4f5}
+        .meta{font-size:12px;line-height:1.7}
+        .totals{margin-top:12px;font-size:12px}
+      </style></head><body>
+      <h1>سند حسابداری</h1>
+      <div class="meta">${metaHtml}</div>
+      <table>
+        <thead><tr><th>#</th><th>حساب</th><th>شرح</th><th>بدهکار</th><th>بستانکار</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+      <div class="totals">
+        <div>جمع بدهکار: ${formatMoney(lineTotals.debit)}</div>
+        <div>جمع بستانکار: ${formatMoney(lineTotals.credit)}</div>
+        <div>وضعیت: ${isBalanced ? "تراز" : "نامتراز"}</div>
+      </div>
+      <script>window.onload=function(){window.print();}</script>
+      </body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) {
+      setMsg("مرورگر پنجره چاپ را مسدود کرد.");
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
   }
 
   async function doSave(andPost: boolean) {
@@ -617,16 +770,15 @@ export function JournalsPage() {
       <div className="space-y-4" style={FORM_FONT}>
         <PageHeader
           title={title}
-          description="سطرهای سند باید تراز باشند؛ شماره سند هنگام ثبت قطعی اختصاص می‌یابد"
+          className="pb-0"
           breadcrumbs={[
-            { label: "داشبورد", href: "/dashboard" },
             { label: "حسابداری", href: "/dashboard/finance" },
             { label: "اسناد", href: "/dashboard/finance/journals" },
             { label: formMode === "new" ? "جدید" : "جزئیات" },
           ]}
         />
 
-        <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-3">
+        <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-2.5">
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">تاریخ سند</label>
             <ShamsiDatePicker
@@ -667,10 +819,16 @@ export function JournalsPage() {
               onChange={(e) => {
                 const v = e.target.value;
                 markDirty();
-                setDescription(v);
-                setLines((prev) =>
-                  prev.map((l) => (l.description.trim() ? l : { ...l, description: v }))
-                );
+                setDescription((prevDesc) => {
+                  setLines((linesPrev) =>
+                    linesPrev.map((l) =>
+                      !l.description.trim() || l.description === prevDesc
+                        ? { ...l, description: v }
+                        : l
+                    )
+                  );
+                  return v;
+                });
               }}
             />
           </div>
@@ -725,11 +883,22 @@ export function JournalsPage() {
                   key={l.key}
                   className={cn(
                     "border-b border-border/50 align-middle",
-                    lineComplete && "bg-emerald-50/60"
+                    l.is_system_balance
+                      ? "bg-amber-50/90 ring-1 ring-inset ring-amber-200/70"
+                      : idx % 2 === 1
+                        ? "bg-muted/35"
+                        : "bg-background",
+                    lineComplete && !l.is_system_balance && "bg-emerald-50/50"
                   )}
+                  title={l.is_system_balance ? "سطر تراز ساخته‌شده توسط سیستم" : undefined}
                 >
                   <td className="px-2 py-1.5 text-xs text-muted-foreground tabular-nums">
-                    {toFaDigits(idx + 1)}
+                    <span className="inline-flex flex-col items-center gap-0.5">
+                      {toFaDigits(idx + 1)}
+                      {l.is_system_balance ? (
+                        <span className="text-[9px] text-amber-700 font-medium">تراز</span>
+                      ) : null}
+                    </span>
                   </td>
                   <td className="px-2 py-1.5 relative">
                     {viewOnly ? (
@@ -904,8 +1073,8 @@ export function JournalsPage() {
         {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
 
         <div className="sticky bottom-0 z-10 mt-2 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-          <div className="flex flex-wrap items-center justify-between gap-3 px-1 py-2.5">
-            <div className="flex flex-wrap gap-4 text-sm">
+          <div className="flex flex-col gap-2 px-1 py-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
               <span>
                 بدهکار:{" "}
                 <strong className="tabular-nums">{formatMoney(lineTotals.debit)}</strong>
@@ -926,14 +1095,31 @@ export function JournalsPage() {
                     ? `بدهکار بیشتر: ${formatMoney(lineTotals.diff)}`
                     : `بستانکار بیشتر: ${formatMoney(Math.abs(lineTotals.diff))}`}
               </span>
-              {!isBalanced && lineTotals.debit + lineTotals.credit > 0 ? (
-                <span className="text-xs text-amber-700/80">
-                  برای ثبت قطعی باید تراز شود
-                </span>
-              ) : null}
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="ghost" onClick={closeForm}>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9"
+                onClick={() => exportJournalExcel()}
+                title="خروجی اکسل"
+              >
+                <FileSpreadsheet className="h-4 w-4 ml-1" />
+                اکسل
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9"
+                onClick={() => exportJournalPdf()}
+                title="خروجی PDF"
+              >
+                <FileDown className="h-4 w-4 ml-1" />
+                PDF
+              </Button>
+              <Button type="button" variant="ghost" size="sm" className="h-9" onClick={closeForm}>
                 <X className="h-4 w-4 ml-1" />
                 بستن
               </Button>
@@ -942,6 +1128,8 @@ export function JournalsPage() {
                   <Button
                     type="button"
                     variant="outline"
+                    size="sm"
+                    className="h-9"
                     disabled={saving}
                     onClick={() => void doSave(false)}
                     title="F2"
@@ -951,6 +1139,8 @@ export function JournalsPage() {
                   {canPost ? (
                     <Button
                       type="button"
+                      size="sm"
+                      className="h-9"
                       disabled={saving || !isBalanced}
                       onClick={() => void doSave(true)}
                       title="F9"
