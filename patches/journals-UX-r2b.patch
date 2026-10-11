@@ -1,0 +1,31 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -601,5 +601,6 @@
+ 
+     return (
+-      <div className="space-y-4 pb-24">
++      <div className="flex flex-col min-h-0 h-[calc(100dvh-3.5rem)]">
++        <div className="shrink-0 px-1 pt-1">
+         <PageHeader
+           title={title}
+@@ -612,5 +613,7 @@
+           ]}
+         />
+-
++        </div>
++
++        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 px-1 py-2">
+         <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-3">
+           <div className="space-y-1">
+@@ -873,6 +876,8 @@
+         {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+ 
+-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/95 backdrop-blur">
+-          <div className="mx-auto max-w-6xl flex flex-wrap items-center justify-between gap-3 px-4 py-3">
++        </div>
++
++        <div className="shrink-0 border-t bg-background z-10">
++          <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
+             <div className="flex flex-wrap gap-4 text-sm">
+               <span>
