@@ -8,16 +8,269 @@
    const [selectedIds, setSelectedIds] = useState<string[]>([]);
    const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
    const [colMenuOpen, setColMenuOpen] = useState(false);
-@@ -208,6 +207,8 @@
+@@ -205,14 +204,16 @@
+     return { number: true, date: true, period: true, status: true, desc: true, debit: true, credit: true, actions: true };
+   });
  
++
++  const showDeleted = statusFilter === "__DELETED__";
  
    const filters = useMemo(
-+  const showDeleted = statusFilter === "__DELETED__";
-+
-+  const filters = useMemo(
      () => ({
 -      status: statusFilter || undefined,
 +      status: showDeleted ? undefined : statusFilter || undefined,
        company_id: primaryCompanyId || undefined,
        period_id: periodFilter || undefined,
        deleted: showDeleted || undefined,
+     }),
+     [statusFilter, primaryCompanyId, periodFilter, showDeleted]
+   );
+@@ -314,7 +315,7 @@
+   useEffect(() => {
+     setListPage(1);
+     setSelectedIds([]);
+-  }, [statusFilter, periodFilter, dateFrom, dateTo, search, showDeleted, pageSize]);
++  }, [statusFilter, periodFilter, dateFrom, dateTo, search, pageSize]);
+ 
+   useEffect(() => {
+     if (!colMenuOpen) return;
+@@ -1094,6 +1095,22 @@
+     toast.success(`${toFaDigits(ok)} پیش‌نویس حذف شد.`);
+     void refetch();
+   }
++
++  async function bulkRestoreSelected() {
++    const ids = [...selectedIds];
++    if (!ids.length) return;
++    let ok = 0;
++    for (const id of ids) {
++      try {
++        await restoreMut.mutateAsync(id);
++        ok += 1;
++      } catch {
++        /* continue */
++      }
++    }
++    setSelectedIds([]);
++    toast.success(`${toFaDigits(ok)} سند بازیابی شد.`);
++    void refetch();
++  }
+ 
+   if (formMode !== null) {
+@@ -1553,7 +1570,7 @@
+   }
+ 
+   return (
+-    <div className="space-y-4">
++    <div className="flex min-h-0 flex-col gap-3">
+       <PageHeader
+         title="اسناد حسابداری"
+-        description="پیش‌نویس، ثبت قطعی و برگشت — با کنترل تراز"
++        description="پیش‌نویس، ثبت قطعی و برگشت"
+@@ -1573,15 +1590,6 @@
+               <FileDown className="h-3.5 w-3.5 ml-1" />
+               PDF
+             </Button>
+-            <Button
+-              type="button"
+-              size="sm"
+-              variant={showDeleted ? "default" : "outline"}
+-              className="h-7 text-xs"
+-              onClick={() => setShowDeleted((v) => !v)}
+-              title="سطل حذف"
+-            >
+-              سطل حذف
+-            </Button>
+             <div className="relative" data-col-menu>
+@@ -1625,14 +1633,26 @@
+       {selectedIds.length > 0 ? (
+         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50/60 px-2 py-1.5 text-xs">
+           <span className="text-sky-900">{toFaDigits(selectedIds.length)} مورد انتخاب شده</span>
+-          {canPost ? (
+-            <Button type="button" size="sm" className="h-7" variant="secondary" onClick={() => void bulkPostSelected()}>
+-              ثبت قطعی گروهی
+-            </Button>
+-          ) : null}
+-          {canDelete ? (
+-            <Button type="button" size="sm" className="h-7" variant="destructive" onClick={requestBulkDelete}>
+-              حذف پیش‌نویس‌ها
+-            </Button>
+-          ) : null}
++          {showDeleted ? (
++            canDelete ? (
++              <Button type="button" size="sm" className="h-7" variant="secondary" disabled={restoreMut.isPending} onClick={() => void bulkRestoreSelected()}>
++                بازیابی گروهی
++              </Button>
++            ) : null
++          ) : (
++            <>
++              {canPost ? (
++                <Button type="button" size="sm" className="h-7" variant="secondary" onClick={() => void bulkPostSelected()}>
++                  ثبت قطعی گروهی
++                </Button>
++              ) : null}
++              {canDelete ? (
++                <Button type="button" size="sm" className="h-7" variant="destructive" onClick={requestBulkDelete}>
++                  حذف پیش‌نویس‌ها
++                </Button>
++              ) : null}
++            </>
++          )}
+           <Button type="button" size="sm" className="h-7" variant="ghost" onClick={() => setSelectedIds([])}>
+             لغو انتخاب
+           </Button>
+@@ -1645,17 +1665,20 @@
+                 : statusFilter === "POSTED"
+                   ? `ثبت‌شده (${toFaDigits(statusCounts.POSTED)})`
+                   : statusFilter === "REVERSED"
+-                      ? `برگشت‌خورده (${toFaDigits(statusCounts.REVERSED)})`
+-                      : statusFilter
++                    ? `برگشت‌خورده (${toFaDigits(statusCounts.REVERSED)})`
++                    : statusFilter === "__DELETED__"
++                      ? "حذف‌شده‌ها"
++                      : statusFilter
+             }
+             options={[
+               { id: "", label: `همه (${toFaDigits(statusCounts.all)})`, searchText: "همه" },
+               { id: "DRAFT", label: `پیش‌نویس (${toFaDigits(statusCounts.DRAFT)})`, searchText: "پیش‌نویس DRAFT" },
+               { id: "POSTED", label: `ثبت‌شده (${toFaDigits(statusCounts.POSTED)})`, searchText: "ثبت‌شده POSTED" },
+               { id: "REVERSED", label: `برگشت‌خورده (${toFaDigits(statusCounts.REVERSED)})`, searchText: "برگشت REVERSED" },
++              { id: "__DELETED__", label: "حذف‌شده‌ها", searchText: "حذف شده سطل بازیافت" },
+             ]}
+@@ -1845,55 +1868,75 @@
+                     <td className="px-2 py-1.5">
+                       <div className="flex flex-wrap gap-1">
+-                        <Button
+-                          size="sm"
+-                          variant="ghost"
+-                          className="h-8 px-2"
+-                          onClick={() => void openEdit(j, j.status !== "DRAFT")}
+-                        >
+-                          {j.status === "DRAFT" && canUpdate ? (
+-                            <Pencil className="h-3.5 w-3.5" />
+-                          ) : (
+-                            "مشاهده"
+-                          )}
+-                        </Button>
+-                        {canCreate ? (
+-                          <Button
+-                            size="sm"
+-                            variant="ghost"
+-                            className="h-8 px-2"
+-                            title="کپی"
+-                            onClick={() => openCopy(j)}
+-                          >
+-                            <Copy className="h-3.5 w-3.5" />
+-                          </Button>
+-                        ) : null}
+-                        {j.status === "DRAFT" && canPost ? (
+-                          <Button
+-                            size="sm"
+-                            variant="secondary"
+-                            className="h-8"
+-                            disabled={postMut.isPending}
+-                            onClick={() =>
+-                              void postMut
+-                                .mutateAsync(j.journal_entry_id)
+-                                .then(() => toast.success("سند ثبت قطعی شد."))
+-                                .catch((e: Error) => toast.error(e.message))
+-                            }
+-                          >
+-                            ثبت قطعی
+-                          </Button>
+-                        ) : null}
+-                        {j.status === "POSTED" && !j.reverses_entry_id && canReverse ? (
+-                          <Button
+-                            size="sm"
+-                            variant="outline"
+-                            className="h-8"
+-                            onClick={() => setReverseTarget(j)}
+-                          >
+-                            <Undo2 className="h-3.5 w-3.5 ml-1" />
+-                            برگشت
+-                          </Button>
+-                        ) : null}
+                         {showDeleted ? (
+                           canDelete ? (
+                             <Button
+                               size="sm"
+                               variant="outline"
+                               className="h-7 text-xs"
+                               disabled={restoreMut.isPending}
+                               onClick={() => {
+                                 void restoreMut
+                                   .mutateAsync(j.journal_entry_id)
+-                                  .then(() => toast.success("از سطل حذف بازیابی شد."))
++                                  .then(() => toast.success("بازیابی شد."))
+                                   .catch((e: Error) => toast.error(e.message));
+                               }}
+                             >
+                               بازیابی
+                             </Button>
+                           ) : null
+-                        ) : j.status === "DRAFT" && canDelete ? (
+-                          <Button
+-                            size="sm"
+-                            variant="ghost"
+-                            className="h-7 px-2 text-destructive"
+-                            onClick={() => setDeleteTarget(j)}
+-                            title="حذف (فقط ایجادکننده یا مدیر)"
+-                          >
+-                            <Trash2 className="h-3.5 w-3.5" />
+-                          </Button>
++                        ) : (
++                          <>
++                            <Button
++                              size="sm"
++                              variant="ghost"
++                              className="h-8 px-2"
++                              onClick={() => void openEdit(j, j.status !== "DRAFT")}
++                            >
++                              {j.status === "DRAFT" && canUpdate ? (
++                                <Pencil className="h-3.5 w-3.5" />
++                              ) : (
++                                "مشاهده"
++                              )}
++                            </Button>
++                            {canCreate ? (
++                              <Button size="sm" variant="ghost" className="h-8 px-2" title="کپی" onClick={() => openCopy(j)}>
++                                <Copy className="h-3.5 w-3.5" />
++                              </Button>
++                            ) : null}
++                            {j.status === "DRAFT" && canPost ? (
++                              <Button
++                                size="sm"
++                                variant="secondary"
++                                className="h-8"
++                                disabled={postMut.isPending}
++                                onClick={() =>
++                                  void postMut
++                                    .mutateAsync(j.journal_entry_id)
++                                    .then(() => toast.success("سند ثبت قطعی شد."))
++                                    .catch((e: Error) => toast.error(e.message))
++                                }
++                              >
++                                ثبت قطعی
++                              </Button>
++                            ) : null}
++                            {j.status === "POSTED" && !j.reverses_entry_id && canReverse ? (
++                              <Button size="sm" variant="outline" className="h-8" onClick={() => setReverseTarget(j)}>
++                                <Undo2 className="h-3.5 w-3.5 ml-1" />
++                                برگشت
++                              </Button>
++                            ) : null}
++                            {j.status === "DRAFT" && canDelete ? (
++                              <Button
++                                size="sm"
++                                variant="ghost"
++                                className="h-7 px-2 text-destructive"
++                                onClick={() => setDeleteTarget(j)}
++                                title="حذف (فقط ایجادکننده یا مدیر)"
++                              >
++                                <Trash2 className="h-3.5 w-3.5" />
++                              </Button>
++                            ) : null}
++                          </>
+                         )}
+                       </div>
+                     </td>
