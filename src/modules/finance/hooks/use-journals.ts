@@ -13,6 +13,7 @@ export function useJournals(filters?: {
   company_id?: string;
   period_id?: string;
   status?: string;
+  deleted?: boolean;
 }) {
   return useQuery({
     queryKey: financeJournalKeys.list(filters),
@@ -70,6 +71,16 @@ export function useDeleteJournal() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => journalService.deleteDraft(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: financeJournalKeys.all });
+    },
+  });
+}
+
+export function useRestoreJournal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => journalService.restoreDraft(id),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: financeJournalKeys.all });
     },
