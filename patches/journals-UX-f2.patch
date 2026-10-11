@@ -1,0 +1,53 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -799,4 +802,5 @@
+                     <Input
+                       className={AMOUNT_INPUT_CLASS}
++                      style={FORM_FONT}
+                       dir="ltr"
+                       inputMode="decimal"
+@@ -812,4 +816,5 @@
+                     <Input
+                       className={AMOUNT_INPUT_CLASS}
++                      style={FORM_FONT}
+                       dir="ltr"
+                       inputMode="decimal"
+@@ -829,16 +834,25 @@
+                         </span>
+                       ) : (
+-                        <select
+-                          className="h-8 w-full rounded-md border bg-background px-2 text-xs"
+-                          value={l.cost_center_id}
+-                          onChange={(e) => updateLine(l.key, { cost_center_id: e.target.value })}
+-                        >
+-                          <option value="">—</option>
+-                          {costCenters.map((c) => (
+-                            <option key={c.cost_center_id} value={c.cost_center_id}>
+-                              {toFaDigits(c.code)} — {c.name}
+-                            </option>
+-                          ))}
+-                        </select>
++                        <OptionTypeahead
++                          valueId={l.cost_center_id}
++                          displayLabel={
++                            l.cost_center_id
++                              ? (() => {
++                                  const c = costCenters.find((x) => x.cost_center_id === l.cost_center_id);
++                                  return c ? `${toFaDigits(c.code)} — ${c.name}` : "";
++                                })()
++                              : ""
++                          }
++                          options={[
++                            { id: "", label: "—", searchText: "" },
++                            ...costCenters.map((c) => ({
++                              id: c.cost_center_id,
++                              label: `${toFaDigits(c.code)} — ${c.name}`,
++                              searchText: `${c.code} ${c.name}`,
++                            })),
++                          ]}
++                          placeholder="مرکز هزینه…"
++                          onSelect={(id) => updateLine(l.key, { cost_center_id: id })}
++                        />
+                       )}
+                     </td>
