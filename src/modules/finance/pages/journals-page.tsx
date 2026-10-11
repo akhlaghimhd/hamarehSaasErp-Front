@@ -44,6 +44,7 @@ import {
   usePostJournal,
   useReverseJournal,
   useDeleteJournal,
+  useRestoreJournal,
 } from "../hooks/use-journals";
 import { useAccountFlat } from "../hooks/use-accounts";
 import { journalService } from "../services/journal-service";
