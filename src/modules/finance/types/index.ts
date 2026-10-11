@@ -101,6 +101,8 @@ export interface JournalEntryDto {
   description?: string | null;
   reverses_entry_id?: string | null;
   reversed_by_entry_id?: string | null;
+  created_by?: string | null;
+  deleted_at?: string | null;
   items?: JournalItemDto[];
 }
 
