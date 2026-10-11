@@ -1,0 +1,97 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -749,28 +928,26 @@
+                   <td className="px-2 py-1.5">
+                     <Input
+-                      className="h-8 text-xs font-mono text-left"
++                      className={AMOUNT_INPUT_CLASS}
+                       dir="ltr"
+                       inputMode="decimal"
+-                      value={l.debit ? toFaDigits(l.debit) : ""}
++                      value={l.debit ? formatAmountDisplay(l.debit) : ""}
+                       disabled={viewOnly}
+-                      onChange={(e) =>
+-                        updateLine(l.key, {
+-                          debit: toAsciiDigits(e.target.value).replace(/[^\d.]/g, ""),
+-                        })
+-                      }
++                      onChange={(e) => {
++                        const raw = toAsciiDigits(e.target.value).replace(/,/g, "").replace(/[^0-9.]/g, "");
++                        updateLine(l.key, { debit: raw });
++                      }}
+                     />
+                   </td>
+                   <td className="px-2 py-1.5">
+                     <Input
+-                      className="h-8 text-xs font-mono text-left"
++                      className={AMOUNT_INPUT_CLASS}
+                       dir="ltr"
+                       inputMode="decimal"
+-                      value={l.credit ? toFaDigits(l.credit) : ""}
++                      value={l.credit ? formatAmountDisplay(l.credit) : ""}
+                       disabled={viewOnly}
+-                      onChange={(e) =>
+-                        updateLine(l.key, {
+-                          credit: toAsciiDigits(e.target.value).replace(/[^\d.]/g, ""),
+-                        })
+-                      }
++                      onChange={(e) => {
++                        const raw = toAsciiDigits(e.target.value).replace(/,/g, "").replace(/[^0-9.]/g, "");
++                        updateLine(l.key, { credit: raw });
++                      }}
+                     />
+                   </td>
+@@ -847,5 +1024,5 @@
+               <Button type="button" size="sm" variant="secondary" onClick={fillBalanceOnLast}>
+                 تراز آخرین سطر
+-                <span className="mr-1 text-[10px] text-muted-foreground">Ctrl+B</span>
++                <span className="mr-1 text-[10px] text-muted-foreground">Alt+B</span>
+               </Button>
+             </div>
+@@ -855,14 +1032,16 @@
+         {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+ 
+-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/95 backdrop-blur">
+-          <div className="mx-auto max-w-6xl flex flex-wrap items-center justify-between gap-3 px-4 py-3">
++        </div>
++
++        <div className="shrink-0 border-t bg-background z-10">
++          <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
+             <div className="flex flex-wrap gap-4 text-sm">
+               <span>
+                 بدهکار:{" "}
+-                <strong className="font-mono">{formatMoney(lineTotals.debit)}</strong>
++                <strong className="font-mono tabular-nums">{formatMoney(lineTotals.debit)}</strong>
+               </span>
+               <span>
+                 بستانکار:{" "}
+-                <strong className="font-mono">{formatMoney(lineTotals.credit)}</strong>
++                <strong className="font-mono tabular-nums">{formatMoney(lineTotals.credit)}</strong>
+               </span>
+               <span
+@@ -896,5 +1075,5 @@
+                     disabled={saving}
+                     onClick={() => void doSave(false)}
+-                    title="Ctrl+S"
++                    title="Alt+S"
+                   >
+                     ذخیره پیش‌نویس
+@@ -905,5 +1084,5 @@
+                       disabled={saving || !isBalanced}
+                       onClick={() => void doSave(true)}
+-                      title="Ctrl+Enter"
++                      title="Alt+Enter"
+                     >
+                       {saving ? (
+@@ -1080,8 +1259,8 @@
+                       {j.description ?? "—"}
+                     </td>
+-                    <td className="px-3 py-2 font-mono text-xs">
++                    <td className="px-3 py-2 font-mono tabular-nums text-xs">
+                       {t.debit ? formatMoney(t.debit) : "—"}
+                     </td>
+-                    <td className="px-3 py-2 font-mono text-xs">
++                    <td className="px-3 py-2 font-mono tabular-nums text-xs">
+                       {t.credit ? formatMoney(t.credit) : "—"}
+                     </td>
