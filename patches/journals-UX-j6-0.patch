@@ -1,0 +1,38 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -2,4 +2,5 @@
+ 
+ import { useMemo, useState, useCallback, useEffect } from "react";
++import { useRouter } from "next/navigation";
+ import {
+   Loader2,
+@@ -16,6 +17,6 @@
+   FileSpreadsheet,
+   FileDown,
++  ArrowRight,
+ } from "lucide-react";
+-import * as XLSX from "xlsx";
+ import { PageHeader } from "@/shared/components/layout/page-header";
+ import { Button } from "@/shared/components/ui/button";
+@@ -47,4 +48,5 @@
+ import { journalService } from "../services/journal-service";
+ import { AccountTypeahead, OptionTypeahead } from "./journals-account-typeahead";
++import { buildJournalReportHtml } from "./journals-report-html";
+ import {
+   FinancePermissions,
+@@ -87,4 +89,6 @@
+ };
+ 
++const JOURNAL_DRAFT_KEY = "finance.journal.form-draft.v1";
++
+ function emptyLine(desc = "", system = false): LineForm {
+   return {
+@@ -233,4 +237,7 @@
+   const [dirty, setDirty] = useState(false);
+   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
++  const [pendingNavHref, setPendingNavHref] = useState<string | null>(null);
++  const [draftRestoredAt, setDraftRestoredAt] = useState<string | null>(null);
++  const router = useRouter();
+   /** typeahead حساب روی هر سطر */
+   const [accountFocusKey, setAccountFocusKey] = useState<string | null>(null);
