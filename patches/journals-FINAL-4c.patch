@@ -1,0 +1,72 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -863,2 +721,36 @@
+     w.document.close();
++  }
++
++  function buildReportMeta() {
++    const meta = journalMetaRows();
++    return {
++      companyName: meta.find((r) => r[0] === "شرکت")?.[1] ?? "—",
++      orgName: meta.find((r) => r[0] === "سازمان")?.[1] ?? "—",
++      entryNumber,
++      documentDate: documentDate ? formatJalaliDate(documentDate) : "—",
++      periodLabel: periodLabel(periodId),
++      userLabel: meta.find((r) => r[0] === "کاربر")?.[1] ?? "—",
++      exportedAt: meta.find((r) => r[0] === "زمان خروجی")?.[1] ?? "—",
++      description,
++      isBalanced,
++      totalDebit: lineTotals.debit,
++      totalCredit: lineTotals.credit,
++      totalDiff: lineTotals.diff,
++    };
++  }
++
++  function buildReportLines() {
++    return lines.map((l) => {
++      const cc = costCenters.find((c) => c.cost_center_id === l.cost_center_id);
++      const bu = businessUnits.find((b) => b.business_unit_id === l.business_unit_id);
++      return {
++        accountLabel: accountLabel(l.account_id),
++        description: l.description || "",
++        debit: parseAmount(l.debit),
++        credit: parseAmount(l.credit),
++        costCenterLabel: cc ? `${toFaDigits(cc.code)} — ${cc.name}` : "",
++        businessUnitLabel: bu ? `${toFaDigits(bu.code)} — ${bu.name}` : "",
++        isSystemBalance: !!l.is_system_balance || isSystemBalanceDescription(l.description || ""),
++      };
++    });
+   }
+@@ -880,10 +772,18 @@
+     const built = lines
+-      .map((l) => ({
+-        account_id: l.account_id,
+-        debit_amount: parseAmount(l.debit) || undefined,
+-        credit_amount: parseAmount(l.credit) || undefined,
+-        description: l.description.trim() || description.trim() || undefined,
+-        cost_center_id: l.cost_center_id || undefined,
+-        business_unit_id: l.business_unit_id || undefined,
+-      }))
++      .map((l) => {
++        let desc = (l.description || "").trim() || description.trim() || "";
++        if (l.is_system_balance && desc && !isSystemBalanceDescription(desc)) {
++          desc = `${desc} — ${SYSTEM_BALANCE_MARK}`;
++        } else if (l.is_system_balance && !desc) {
++          desc = SYSTEM_BALANCE_MARK;
++        }
++        return {
++          account_id: l.account_id,
++          debit_amount: parseAmount(l.debit) || undefined,
++          credit_amount: parseAmount(l.credit) || undefined,
++          description: desc || undefined,
++          cost_center_id: l.cost_center_id || undefined,
++          business_unit_id: l.business_unit_id || undefined,
++        };
++      })
+       .filter((l) => l.account_id && (l.debit_amount || l.credit_amount));
+@@ -987,3 +887,3 @@
+     return (
+-      <div className="space-y-4" style={FORM_FONT}>
++      <div className="flex flex-col gap-2" style={{ ...FORM_FONT, minHeight: "calc(100dvh - 7.5rem)" }}>
+         <PageHeader
