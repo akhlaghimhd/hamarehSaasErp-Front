@@ -1,0 +1,22 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -820,8 +820,14 @@
+                 const v = e.target.value;
+                 markDirty();
+-                setDescription(v);
+-                setLines((prev) =>
+-                  prev.map((l) => (l.description.trim() ? l : { ...l, description: v }))
+-                );
++                setDescription((prevDesc) => {
++                  setLines((linesPrev) =>
++                    linesPrev.map((l) =>
++                      !l.description.trim() || l.description === prevDesc
++                        ? { ...l, description: v }
++                        : l
++                    )
++                  );
++                  return v;
++                });
+               }}
+             />
