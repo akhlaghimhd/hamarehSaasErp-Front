@@ -318,11 +318,11 @@ export function JournalsPage() {
     if (!colMenuOpen) return;
     const onDoc = (e: MouseEvent) => {
       const el = e.target as HTMLElement | null;
-      if (el?.closest?.(""[data-col-menu]"")) return;
+      if (el?.closest?.("[data-col-menu]")) return;
       setColMenuOpen(false);
     };
-    document.addEventListener(""mousedown"", onDoc);
-    return () => document.removeEventListener(""mousedown"", onDoc);
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
   }, [colMenuOpen]);
 
   useEffect(() => {
