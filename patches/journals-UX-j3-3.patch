@@ -1,0 +1,104 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -771,7 +771,6 @@
+         <PageHeader
+           title={title}
+-          description="سطرهای سند باید تراز باشند؛ شماره سند هنگام ثبت قطعی اختصاص می‌یابد"
++          className="pb-0"
+           breadcrumbs={[
+-            { label: "داشبورد", href: "/dashboard" },
+             { label: "حسابداری", href: "/dashboard/finance" },
+             { label: "اسناد", href: "/dashboard/finance/journals" },
+@@ -780,5 +779,5 @@
+         />
+ 
+-        <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-3">
++        <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-2.5">
+           <div className="space-y-1">
+             <label className="text-xs text-muted-foreground">تاریخ سند</label>
+@@ -879,9 +878,20 @@
+                   className={cn(
+                     "border-b border-border/50 align-middle",
+-                    lineComplete && "bg-emerald-50/60"
++                    l.is_system_balance
++                      ? "bg-amber-50/90 ring-1 ring-inset ring-amber-200/70"
++                      : idx % 2 === 1
++                        ? "bg-muted/35"
++                        : "bg-background",
++                    lineComplete && !l.is_system_balance && "bg-emerald-50/50"
+                   )}
++                  title={l.is_system_balance ? "سطر تراز ساخته‌شده توسط سیستم" : undefined}
+                 >
+                   <td className="px-2 py-1.5 text-xs text-muted-foreground tabular-nums">
+-                    {toFaDigits(idx + 1)}
++                    <span className="inline-flex flex-col items-center gap-0.5">
++                      {toFaDigits(idx + 1)}
++                      {l.is_system_balance ? (
++                        <span className="text-[9px] text-amber-700 font-medium">تراز</span>
++                      ) : null}
++                    </span>
+                   </td>
+                   <td className="px-2 py-1.5 relative">
+@@ -1057,7 +1067,7 @@
+         {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+ 
+-        <div className="sticky bottom-0 z-10 mt-2 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+-          <div className="flex flex-wrap items-center justify-between gap-3 px-1 py-2.5">
+-            <div className="flex flex-wrap gap-4 text-sm">
++        <div className="sticky bottom-0 z-10 mt-2 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
++          <div className="flex flex-col gap-2 px-1 py-2 sm:flex-row sm:items-center sm:justify-between">
++            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+               <span>
+                 بدهکار:{" "}
+@@ -1080,12 +1090,29 @@
+                     : `بستانکار بیشتر: ${formatMoney(Math.abs(lineTotals.diff))}`}
+               </span>
+-              {!isBalanced && lineTotals.debit + lineTotals.credit > 0 ? (
+-                <span className="text-xs text-amber-700/80">
+-                  برای ثبت قطعی باید تراز شود
+-                </span>
+-              ) : null}
+             </div>
+-            <div className="flex flex-wrap gap-2">
+-              <Button type="button" variant="ghost" onClick={closeForm}>
++            <div className="flex flex-wrap items-center gap-2 shrink-0">
++              <Button
++                type="button"
++                variant="outline"
++                size="sm"
++                className="h-9"
++                onClick={() => exportJournalExcel()}
++                title="خروجی اکسل"
++              >
++                <FileSpreadsheet className="h-4 w-4 ml-1" />
++                اکسل
++              </Button>
++              <Button
++                type="button"
++                variant="outline"
++                size="sm"
++                className="h-9"
++                onClick={() => exportJournalPdf()}
++                title="خروجی PDF"
++              >
++                <FileDown className="h-4 w-4 ml-1" />
++                PDF
++              </Button>
++              <Button type="button" variant="ghost" size="sm" className="h-9" onClick={closeForm}>
+                 <X className="h-4 w-4 ml-1" />
+                 بستن
+@@ -1096,4 +1123,6 @@
+                     type="button"
+                     variant="outline"
++                    size="sm"
++                    className="h-9"
+                     disabled={saving}
+                     onClick={() => void doSave(false)}
+@@ -1105,4 +1134,6 @@
+                     <Button
+                       type="button"
++                      size="sm"
++                      className="h-9"
+                       disabled={saving || !isBalanced}
+                       onClick={() => void doSave(true)}
