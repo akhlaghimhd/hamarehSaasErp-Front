@@ -1652,6 +1652,7 @@ export function JournalsPage() {
               { id: "DRAFT", label: `پیش‌نویس (${toFaDigits(statusCounts.DRAFT)})`, searchText: "پیش‌نویس DRAFT" },
               { id: "POSTED", label: `ثبت‌شده (${toFaDigits(statusCounts.POSTED)})`, searchText: "ثبت‌شده POSTED" },
               { id: "REVERSED", label: `برگشت‌خورده (${toFaDigits(statusCounts.REVERSED)})`, searchText: "برگشت REVERSED" },
+              { id: "__DELETED__", label: "حذف‌شده‌ها", searchText: "حذف شده سطل بازیافت" },
             ]}
             placeholder="وضعیت…"
             className="h-8 w-full rounded-md border bg-background px-2 text-xs"
