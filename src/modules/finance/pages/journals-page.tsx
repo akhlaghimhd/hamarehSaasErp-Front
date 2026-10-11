@@ -193,7 +193,6 @@ export function JournalsPage() {
   const [search, setSearch] = useState("");
   const [listPage, setListPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
-  const [showDeleted, setShowDeleted] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const [colMenuOpen, setColMenuOpen] = useState(false);
@@ -205,6 +204,8 @@ export function JournalsPage() {
     return { number: true, date: true, period: true, status: true, desc: true, debit: true, credit: true, actions: true };
   });
 
+
+  const showDeleted = statusFilter === "__DELETED__";
 
   const filters = useMemo(
     () => ({
@@ -314,7 +315,7 @@ export function JournalsPage() {
   useEffect(() => {
     setListPage(1);
     setSelectedIds([]);
-  }, [statusFilter, periodFilter, dateFrom, dateTo, search, showDeleted, pageSize]);
+  }, [statusFilter, periodFilter, dateFrom, dateTo, search, pageSize]);
 
   useEffect(() => {
     if (!colMenuOpen) return;
@@ -1571,16 +1572,6 @@ export function JournalsPage() {
               <FileDown className="h-3.5 w-3.5 ml-1" />
               PDF
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={showDeleted ? "default" : "outline"}
-              className="h-7 text-xs"
-              onClick={() => setShowDeleted((v) => !v)}
-              title="سطل حذف"
-            >
-              سطل حذف
-            </Button>
             <div className="relative" data-col-menu>
               <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => setColMenuOpen((v) => !v)}>
                 ستون‌ها
@@ -1610,7 +1601,7 @@ export function JournalsPage() {
                 </div>
               ) : null}
             </div>
-            {canCreate ? (
+            {!showDeleted && canCreate ? (
               <Button size="sm" className="h-8" onClick={openNew}>
                 <Plus className="h-4 w-4 ml-1" />
                 سند جدید
@@ -1734,7 +1725,7 @@ export function JournalsPage() {
           <div className="p-6 text-center space-y-3">
             <FileText className="h-8 w-8 mx-auto text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">سندی ثبت نشده است.</p>
-            {canCreate ? (
+            {!showDeleted && canCreate ? (
               <Button size="sm" onClick={openNew}>
                 <Plus className="h-4 w-4 ml-1" />
                 ثبت اولین سند
@@ -1826,7 +1817,7 @@ export function JournalsPage() {
                             "مشاهده"
                           )}
                         </Button>
-                        {canCreate ? (
+                        {!showDeleted && canCreate ? (
                           <Button
                             size="sm"
                             variant="ghost"
@@ -1837,7 +1828,7 @@ export function JournalsPage() {
                             <Copy className="h-3.5 w-3.5" />
                           </Button>
                         ) : null}
-                        {j.status === "DRAFT" && canPost ? (
+                        {!showDeleted && j.status === "DRAFT" && canPost ? (
                           <Button
                             size="sm"
                             variant="secondary"
@@ -1853,7 +1844,7 @@ export function JournalsPage() {
                             ثبت قطعی
                           </Button>
                         ) : null}
-                        {j.status === "POSTED" && !j.reverses_entry_id && canReverse ? (
+                        {!showDeleted && j.status === "POSTED" && !j.reverses_entry_id && canReverse ? (
                           <Button
                             size="sm"
                             variant="outline"
