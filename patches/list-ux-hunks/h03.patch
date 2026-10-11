@@ -1,0 +1,73 @@
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -998,26 +1158,50 @@
+           </div>
+           <div className="space-y-1 flex-1 min-w-[200px]">
+             <label className="text-xs text-muted-foreground">شرح سند</label>
+-            <Input
+-              className="h-9"
+-              placeholder="شرح کلی سند (خودکار روی سطرهای خالی)"
+-              value={description}
+-              disabled={viewOnly}
+-              onChange={(e) => {
+-                const v = e.target.value;
+-                markDirty();
+-                setDescription((prevDesc) => {
+-                  setLines((linesPrev) =>
+-                    linesPrev.map((l) =>
+-                      !l.description.trim() || l.description === prevDesc
+-                        ? { ...l, description: v }
+-                        : l
+-                    )
+-                  );
+-                  return v;
+-                });
+-              }}
+-            />
++            <div className="relative">
++              <Input
++                className="h-9 pe-8"
++                placeholder="شرح کلی سند (خودکار روی سطرهای خالی)"
++                value={description}
++                disabled={viewOnly}
++                onChange={(e) => {
++                  const v = e.target.value;
++                  markDirty();
++                  setDescription((prevDesc) => {
++                    setLines((linesPrev) =>
++                      linesPrev.map((l) =>
++                        !l.description.trim() || l.description === prevDesc
++                          ? { ...l, description: v }
++                          : l
++                      )
++                    );
++                    return v;
++                  });
++                }}
++              />
++              {!viewOnly && description ? (
++                <button
++                  type="button"
++                  className="absolute left-1.5 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground"
++                  title="پاک کردن شرح"
++                  onClick={() => {
++                    markDirty();
++                    setDescription((prevDesc) => {
++                      setLines((linesPrev) =>
++                        linesPrev.map((l) =>
++                          !l.description.trim() || l.description === prevDesc
++                            ? { ...l, description: "" }
++                            : l
++                        )
++                      );
++                      return "";
++                    });
++                  }}
++                >
++                  <X className="h-3.5 w-3.5" />
++                </button>
++              ) : null}
++            </div>
+           </div>
+           <div className="space-y-1">
+             <label className="text-xs text-muted-foreground">شماره</label>
