@@ -39,7 +39,7 @@ export function buildJournalReportHtml(
 ): string {
   const rowsHtml = lines
     .map((l, idx) => {
-      const bg = l.isSystemBalance ? "#fffbeb" : idx % 2 === 1 ? "#e2e8f0" : "#ffffff";
+      const bg = l.isSystemBalance ? "#fffbeb" : idx % 2 === 1 ? "#f8fafc" : "#ffffff";
       return `<tr style="background:${bg}">
         <td class="c">${toFaDigits(idx + 1)}</td>
         <td>${l.accountLabel || "—"}</td>

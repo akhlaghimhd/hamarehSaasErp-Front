@@ -16,6 +16,7 @@ import {
   FileSpreadsheet,
   FileDown,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
@@ -45,7 +46,6 @@ import {
 import { useAccountFlat } from "../hooks/use-accounts";
 import { journalService } from "../services/journal-service";
 import { AccountTypeahead, OptionTypeahead } from "./journals-account-typeahead";
-import { buildJournalReportHtml } from "./journals-report-html";
 import {
   FinancePermissions,
   DEMO_PERIOD_ID,
@@ -304,57 +304,20 @@ export function JournalsPage() {
   const isBalanced = lineTotals.debit > 0 && lineTotals.diff === 0;
 
   function openNew() {
-    setViewOnly(false);
-    setFormError(null);
-    setMsg(null);
-    setAccountQuery("");
-    setMeta({});
-    setAccountFocusKey(null);
-    setAccountTypeQuery("");
-    // بازیابی پیش‌نویس محلی در صورت وجود
-    try {
-      const raw = localStorage.getItem(JOURNAL_DRAFT_KEY);
-      if (raw) {
-        const d = JSON.parse(raw) as {
-          formMode?: "new" | string;
-          documentDate?: string;
-          periodId?: string;
-          description?: string;
-          lines?: LineForm[];
-          entryNumber?: string | null;
-          primaryCompanyId?: string;
-          savedAt?: string;
-        };
-        if (d.lines && Array.isArray(d.lines) && d.lines.length > 0) {
-          setFormMode(d.formMode === "new" || !d.formMode ? "new" : String(d.formMode));
-          setDocumentDate(d.documentDate || todayIso());
-          setPeriodId(d.periodId || DEMO_PERIOD_ID);
-          setDescription(d.description || "");
-          setLines(
-            d.lines.map((l) => ({
-              ...emptyLine(),
-              ...l,
-              key: l.key || Math.random().toString(36).slice(2),
-            }))
-          );
-          setEntryNumber(d.entryNumber ?? null);
-          if (d.primaryCompanyId) setPrimaryCompanyId(d.primaryCompanyId);
-          setDirty(true);
-          setDraftRestoredAt(d.savedAt || new Date().toISOString());
-          return;
-        }
-      }
-    } catch {
-      /* ignore corrupt draft */
-    }
     setFormMode("new");
+    setViewOnly(false);
     setDocumentDate(todayIso());
     setPeriodId(DEMO_PERIOD_ID);
     setDescription("");
     setLines([emptyLine(), emptyLine()]);
+    setFormError(null);
+    setMsg(null);
     setEntryNumber(null);
+    setAccountQuery("");
     setDirty(false);
-    setDraftRestoredAt(null);
+    setMeta({});
+    setAccountFocusKey(null);
+    setAccountTypeQuery("");
   }
 
   function markDirty() {
@@ -366,86 +329,8 @@ export function JournalsPage() {
     setRecentAccountIds((prev) => [id, ...prev.filter((x) => x !== id)].slice(0, 8));
   }
 
-
-  useEffect(() => {
-    if (formMode === null || viewOnly || !dirty) return;
-    const timer = window.setTimeout(() => {
-      try {
-        localStorage.setItem(
-          JOURNAL_DRAFT_KEY,
-          JSON.stringify({
-            formMode,
-            documentDate,
-            periodId,
-            description,
-            lines,
-            entryNumber,
-            primaryCompanyId,
-            savedAt: new Date().toISOString(),
-          })
-        );
-      } catch {
-        /* ignore */
-      }
-    }, 400);
-    return () => window.clearTimeout(timer);
-  }, [
-    formMode,
-    viewOnly,
-    dirty,
-    documentDate,
-    periodId,
-    description,
-    lines,
-    entryNumber,
-    primaryCompanyId,
-  ]);
-
-  useEffect(() => {
-    if (!dirty || viewOnly || formMode === null) return;
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [dirty, viewOnly, formMode]);
-
-  useEffect(() => {
-    if (!dirty || viewOnly || formMode === null) return;
-    const onClick = (e: MouseEvent) => {
-      if (e.defaultPrevented || e.button !== 0) return;
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      const a = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
-      if (!a) return;
-      const href = a.getAttribute("href");
-      if (!href || href.startsWith("#")) return;
-      if (href.startsWith("http") && !href.includes(window.location.host)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (href.replace(/\/$/, "") === "/dashboard/finance/journals") {
-        setPendingNavHref(null);
-      } else {
-        setPendingNavHref(href);
-      }
-      setLeaveConfirmOpen(true);
-    };
-    document.addEventListener("click", onClick, true);
-    return () => document.removeEventListener("click", onClick, true);
-  }, [dirty, viewOnly, formMode]);
-
-  function clearLocalDraft() {
-    try {
-      localStorage.removeItem(JOURNAL_DRAFT_KEY);
-    } catch {
-      /* ignore */
-    }
-    setDraftRestoredAt(null);
-  }
-
   function closeForm() {
     if (dirty && !viewOnly) {
-      setPendingNavHref(null);
       setLeaveConfirmOpen(true);
       return;
     }
@@ -456,13 +341,7 @@ export function JournalsPage() {
   function confirmLeaveForm() {
     setLeaveConfirmOpen(false);
     setDirty(false);
-    clearLocalDraft();
-    const href = pendingNavHref;
-    setPendingNavHref(null);
     setFormMode(null);
-    if (href) {
-      router.push(href);
-    }
   }
 
   async function openEdit(j: JournalEntryDto, readonly: boolean) {
@@ -674,25 +553,167 @@ export function JournalsPage() {
   }
 
   function exportJournalExcel() {
-    const html = buildJournalReportHtml(buildReportMeta(), buildReportLines());
-    const blob = new Blob(["\ufeff" + html], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `journal-${entryNumber || "draft"}-${Date.now()}.xls`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    const meta = journalMetaRows();
+    const wb = XLSX.utils.book_new();
+
+    // شیت ۱: مشخصات
+    const metaAoa: (string | number)[][] = [
+      ["مشخصات سند حسابداری"],
+      [],
+      ...meta.filter((r) => r.length > 0),
+      [],
+      ["جمع بدهکار", lineTotals.debit],
+      ["جمع بستانکار", lineTotals.credit],
+      ["اختلاف", lineTotals.diff],
+      ["وضعیت", isBalanced ? "تراز" : "نامتراز"],
+    ];
+    const wsMeta = XLSX.utils.aoa_to_sheet(metaAoa);
+    wsMeta["!cols"] = [{ wch: 18 }, { wch: 40 }];
+    XLSX.utils.book_append_sheet(wb, wsMeta, "مشخصات");
+
+    // شیت ۲: سطرها
+    const header = [
+      "ردیف",
+      "حساب",
+      "شرح سطر",
+      "بدهکار",
+      "بستانکار",
+      "مرکز هزینه",
+      "واحد کسب‌وکار",
+      "نوع سطر",
+    ];
+    const body = lines.map((l, idx) => [
+      idx + 1,
+      accountLabel(l.account_id),
+      l.description || "",
+      parseAmount(l.debit) || "",
+      parseAmount(l.credit) || "",
+      costCenters.find((c) => c.cost_center_id === l.cost_center_id)
+        ? `${costCenters.find((c) => c.cost_center_id === l.cost_center_id)!.code} — ${costCenters.find((c) => c.cost_center_id === l.cost_center_id)!.name}`
+        : "",
+      businessUnits.find((b) => b.business_unit_id === l.business_unit_id)
+        ? `${businessUnits.find((b) => b.business_unit_id === l.business_unit_id)!.code} — ${businessUnits.find((b) => b.business_unit_id === l.business_unit_id)!.name}`
+        : "",
+      l.is_system_balance ? "تراز سیستم" : "عادی",
+    ]);
+    const totalRow = [
+      "",
+      "",
+      "جمع",
+      lineTotals.debit,
+      lineTotals.credit,
+      "",
+      "",
+      "",
+    ];
+    const wsLines = XLSX.utils.aoa_to_sheet([header, ...body, [], totalRow]);
+    wsLines["!cols"] = [
+      { wch: 6 },
+      { wch: 36 },
+      { wch: 28 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 22 },
+      { wch: 22 },
+      { wch: 12 },
+    ];
+    // محدوده جدول برای خوانایی در اکسل
+    if (wsLines["!ref"]) {
+      wsLines["!autofilter"] = { ref: `A1:H${body.length + 1}` };
+    }
+    XLSX.utils.book_append_sheet(wb, wsLines, "سطرهای سند");
+    XLSX.writeFile(wb, `journal-${entryNumber || "draft"}-${Date.now()}.xlsx`);
   }
 
   function exportJournalPdf() {
-    const html = buildJournalReportHtml(buildReportMeta(), buildReportLines()).replace(
-      "</body>",
-      "<script>window.onload=function(){window.print();}</script></body>"
-    );
+    const meta = journalMetaRows();
+    const companyName = meta.find((r) => r[0] === "شرکت")?.[1] ?? "—";
+    const userLabel = meta.find((r) => r[0] === "کاربر")?.[1] ?? "—";
+    const now = meta.find((r) => r[0] === "زمان خروجی")?.[1] ?? "—";
+    const orgName = meta.find((r) => r[0] === "سازمان")?.[1] ?? "—";
+
+    const rowsHtml = lines
+      .map((l, idx) => {
+        const bg = l.is_system_balance ? "#fffbeb" : idx % 2 === 1 ? "#f8fafc" : "#fff";
+        const cc = costCenters.find((c) => c.cost_center_id === l.cost_center_id);
+        const bu = businessUnits.find((b) => b.business_unit_id === l.business_unit_id);
+        return `<tr style="background:${bg}">
+          <td class="c">${toFaDigits(idx + 1)}</td>
+          <td>${accountLabel(l.account_id)}</td>
+          <td>${l.description || "—"}</td>
+          <td class="n">${parseAmount(l.debit) ? formatMoney(parseAmount(l.debit)) : "—"}</td>
+          <td class="n">${parseAmount(l.credit) ? formatMoney(parseAmount(l.credit)) : "—"}</td>
+          <td>${cc ? `${toFaDigits(cc.code)} — ${cc.name}` : "—"}</td>
+          <td>${bu ? `${toFaDigits(bu.code)} — ${bu.name}` : "—"}</td>
+          <td class="c">${l.is_system_balance ? "تراز" : "—"}</td>
+        </tr>`;
+      })
+      .join("");
+
+    const html = `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/>
+      <title>سند حسابداری ${entryNumber ? toFaDigits(entryNumber) : "پیش‌نویس"}</title>
+      <style>
+        *{box-sizing:border-box}
+        body{font-family:Tahoma,Arial,sans-serif;padding:16px 20px;color:#111;font-size:11px}
+        h1{font-size:15px;margin:0 0 10px;text-align:center}
+        .meta{width:100%;border-collapse:collapse;margin-bottom:12px}
+        .meta td{border:1px solid #cbd5e1;padding:4px 8px;vertical-align:top}
+        .meta td.k{width:18%;background:#f1f5f9;font-weight:600;white-space:nowrap}
+        .meta td.v{width:32%}
+        table.lines{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:4px}
+        table.lines th,table.lines td{border:1px solid #94a3b8;padding:4px 6px;text-align:right}
+        table.lines th{background:#e2e8f0;font-weight:600}
+        td.n,th.n{text-align:left;font-variant-numeric:tabular-nums;direction:ltr}
+        td.c,th.c{text-align:center}
+        .totals{margin-top:10px;width:100%;border-collapse:collapse}
+        .totals td{border:1px solid #94a3b8;padding:5px 8px}
+        .totals td.k{background:#f1f5f9;font-weight:600;width:30%}
+        @media print{body{padding:8px} a{display:none}}
+      </style></head><body>
+      <h1>سند حسابداری</h1>
+      <table class="meta">
+        <tr>
+          <td class="k">شرکت</td><td class="v">${companyName}</td>
+          <td class="k">سازمان</td><td class="v">${orgName}</td>
+        </tr>
+        <tr>
+          <td class="k">شماره سند</td><td class="v">${entryNumber ? toFaDigits(entryNumber) : "پیش‌نویس"}</td>
+          <td class="k">تاریخ سند</td><td class="v">${documentDate ? toFaDigits(documentDate) : "—"}</td>
+        </tr>
+        <tr>
+          <td class="k">دوره مالی</td><td class="v">${periodLabel(periodId)}</td>
+          <td class="k">کاربر</td><td class="v">${userLabel}</td>
+        </tr>
+        <tr>
+          <td class="k">زمان خروجی</td><td class="v">${now}</td>
+          <td class="k">وضعیت تراز</td><td class="v">${isBalanced ? "تراز ✓" : "نامتراز"}</td>
+        </tr>
+        <tr>
+          <td class="k">شرح سند</td><td class="v" colspan="3">${description || "—"}</td>
+        </tr>
+      </table>
+      <table class="lines">
+        <thead>
+          <tr>
+            <th class="c">#</th>
+            <th>حساب</th>
+            <th>شرح سطر</th>
+            <th class="n">بدهکار</th>
+            <th class="n">بستانکار</th>
+            <th>مرکز هزینه</th>
+            <th>واحد کسب‌وکار</th>
+            <th class="c">نوع</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+      <table class="totals">
+        <tr><td class="k">جمع بدهکار</td><td class="n">${formatMoney(lineTotals.debit)}</td></tr>
+        <tr><td class="k">جمع بستانکار</td><td class="n">${formatMoney(lineTotals.credit)}</td></tr>
+        <tr><td class="k">اختلاف</td><td class="n">${formatMoney(lineTotals.diff)}</td></tr>
+      </table>
+      <script>window.onload=function(){window.print();}</script>
+      </body></html>`;
     const w = window.open("", "_blank");
     if (!w) {
       setMsg("مرورگر پنجره چاپ را مسدود کرد.");
@@ -700,74 +721,6 @@ export function JournalsPage() {
     }
     w.document.write(html);
     w.document.close();
-  }
-
-  function buildReportMeta() {
-    const meta = journalMetaRows();
-    return {
-      companyName: meta.find((r) => r[0] === "شرکت")?.[1] ?? "—",
-      orgName: meta.find((r) => r[0] === "سازمان")?.[1] ?? "—",
-      entryNumber,
-      documentDate,
-      periodLabel: periodLabel(periodId),
-      userLabel: meta.find((r) => r[0] === "کاربر")?.[1] ?? "—",
-      exportedAt: meta.find((r) => r[0] === "زمان خروجی")?.[1] ?? "—",
-      description,
-      isBalanced,
-      totalDebit: lineTotals.debit,
-      totalCredit: lineTotals.credit,
-      totalDiff: lineTotals.diff,
-    };
-  }
-
-  function buildReportLines() {
-    return lines.map((l) => {
-      const cc = costCenters.find((c) => c.cost_center_id === l.cost_center_id);
-      const bu = businessUnits.find((b) => b.business_unit_id === l.business_unit_id);
-      return {
-        accountLabel: accountLabel(l.account_id),
-        description: l.description || "",
-        debit: parseAmount(l.debit),
-        credit: parseAmount(l.credit),
-        costCenterLabel: cc ? `${toFaDigits(cc.code)} — ${cc.name}` : "",
-        businessUnitLabel: bu ? `${toFaDigits(bu.code)} — ${bu.name}` : "",
-        isSystemBalance: l.is_system_balance,
-      };
-    });
-  }
-
-  function buildReportMeta() {
-    const meta = journalMetaRows();
-    return {
-      companyName: meta.find((r) => r[0] === "شرکت")?.[1] ?? "—",
-      orgName: meta.find((r) => r[0] === "سازمان")?.[1] ?? "—",
-      entryNumber,
-      documentDate,
-      periodLabel: periodLabel(periodId),
-      userLabel: meta.find((r) => r[0] === "کاربر")?.[1] ?? "—",
-      exportedAt: meta.find((r) => r[0] === "زمان خروجی")?.[1] ?? "—",
-      description,
-      isBalanced,
-      totalDebit: lineTotals.debit,
-      totalCredit: lineTotals.credit,
-      totalDiff: lineTotals.diff,
-    };
-  }
-
-  function buildReportLines() {
-    return lines.map((l) => {
-      const cc = costCenters.find((c) => c.cost_center_id === l.cost_center_id);
-      const bu = businessUnits.find((b) => b.business_unit_id === l.business_unit_id);
-      return {
-        accountLabel: accountLabel(l.account_id),
-        description: l.description || "",
-        debit: parseAmount(l.debit),
-        credit: parseAmount(l.credit),
-        costCenterLabel: cc ? `${toFaDigits(cc.code)} — ${cc.name}` : "",
-        businessUnitLabel: bu ? `${toFaDigits(bu.code)} — ${bu.name}` : "",
-        isSystemBalance: l.is_system_balance,
-      };
-    });
   }
 
   async function doSave(andPost: boolean) {
@@ -892,7 +845,7 @@ export function JournalsPage() {
           : "ویرایش پیش‌نویس";
 
     return (
-      <div className="flex flex-col gap-2" style={{ ...FORM_FONT, minHeight: "calc(100dvh - 7.5rem)" }}>
+      <div className="space-y-4" style={FORM_FONT}>
         <PageHeader
           title={title}
           className="pb-0"
@@ -981,8 +934,8 @@ export function JournalsPage() {
                 <th className="px-2 py-1 w-10">#</th>
                 <th className="px-2 py-1 min-w-[200px]">حساب</th>
                 <th className="px-2 py-1 min-w-[120px]">شرح سطر</th>
-                <th className="px-2 py-1 min-w-[8rem] w-32 text-sky-800 bg-sky-50/70">بدهکار</th>
-                <th className="px-2 py-1 min-w-[8rem] w-32 text-emerald-800 bg-emerald-50/70">بستانکار</th>
+                <th className="px-2 py-1 min-w-[8rem] w-32">بدهکار</th>
+                <th className="px-2 py-1 min-w-[8rem] w-32">بستانکار</th>
                 {costCenters.length > 0 ? (
                   <th className="px-2 py-1 min-w-[120px]">مرکز هزینه</th>
                 ) : null}
@@ -1064,9 +1017,9 @@ export function JournalsPage() {
                       onChange={(e) => updateLine(l.key, { description: e.target.value })}
                     />
                   </td>
-                  <td className="px-2 py-1.5 bg-sky-50/30">
+                  <td className="px-2 py-1.5">
                     <Input
-                      className={cn(AMOUNT_INPUT_CLASS, "text-sky-900")}
+                      className={AMOUNT_INPUT_CLASS}
                       style={FORM_FONT}
                       dir="ltr"
                       inputMode="decimal"
@@ -1078,9 +1031,9 @@ export function JournalsPage() {
                       }}
                     />
                   </td>
-                  <td className="px-2 py-1.5 bg-emerald-50/30">
+                  <td className="px-2 py-1.5">
                     <Input
-                      className={cn(AMOUNT_INPUT_CLASS, "text-emerald-900")}
+                      className={AMOUNT_INPUT_CLASS}
                       style={FORM_FONT}
                       dir="ltr"
                       inputMode="decimal"
@@ -1193,11 +1146,11 @@ export function JournalsPage() {
         <div className="sticky bottom-0 z-10 mt-2 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
           <div className="flex flex-col gap-2 px-1 py-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-              <span className="text-sky-800">
+              <span>
                 بدهکار:{" "}
                 <strong className="tabular-nums">{formatMoney(lineTotals.debit)}</strong>
               </span>
-              <span className="text-emerald-800">
+              <span>
                 بستانکار:{" "}
                 <strong className="tabular-nums">{formatMoney(lineTotals.credit)}</strong>
               </span>
@@ -1256,8 +1209,19 @@ export function JournalsPage() {
                     <span className="mr-1 text-[10px] text-muted-foreground">F2</span>
                   </Button>
                   {canPost ? (
-                    <Button type="button" size="sm" className="h-9" disabled={saving || !isBalanced} onClick={() => void doSave(true)} title="F9">
-                      {saving ? <Loader2 className="h-4 w-4 animate-spin ml-1" /> : <CheckCircle2 className="h-4 w-4 ml-1" />}
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-9"
+                      disabled={saving || !isBalanced}
+                      onClick={() => void doSave(true)}
+                      title="F9"
+                    >
+                      {saving ? (
+                        <Loader2 className="h-4 w-4 animate-spin ml-1" />
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4 ml-1" />
+                      )}
                       ذخیره و ثبت قطعی
                       <span className="mr-1 text-[10px] opacity-80">F9</span>
                     </Button>
@@ -1268,13 +1232,12 @@ export function JournalsPage() {
           </div>
         </div>
 
-<Dialog open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
+        <Dialog open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>خروج از فرم</DialogTitle>
               <DialogDescription>
-                تغییرات ذخیره‌نشده دارید. با خروج از این صفحه این تغییرات از بین می‌رود
-                (پیش‌نویس محلی فقط تا وقتی مرورگر را نبندید یا «شروع از صفر» نزنید نگه داشته می‌شود).
+                تغییرات ذخیره‌نشده دارید. اگر خارج شوید این تغییرات از بین می‌رود.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -1415,8 +1378,8 @@ export function JournalsPage() {
                 <th className="px-3 py-2 font-medium">دوره</th>
                 <th className="px-3 py-2 font-medium">وضعیت</th>
                 <th className="px-3 py-2 font-medium">شرح</th>
-                <th className="px-3 py-2 font-medium min-w-[8rem] text-sky-800">بدهکار</th>
-                <th className="px-3 py-2 font-medium text-emerald-800">بستانکار</th>
+                <th className="px-3 py-2 font-medium min-w-[8rem]">بدهکار</th>
+                <th className="px-3 py-2 font-medium">بستانکار</th>
                 <th className="px-3 py-2 font-medium">عملیات</th>
               </tr>
             </thead>
