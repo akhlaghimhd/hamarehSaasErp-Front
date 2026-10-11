@@ -1,0 +1,73 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -476,26 +476,58 @@
+ 
+   function fillBalanceOnLast() {
+-    if (lines.length === 0) return;
+-    const others = lines.slice(0, -1);
+     let d = 0;
+     let c = 0;
+-    for (const l of others) {
++    for (const l of lines) {
+       d += parseAmount(l.debit);
+       c += parseAmount(l.credit);
+     }
+     const diff = Math.round((d - c) * 100) / 100;
+-    if (diff === 0) return;
++    if (diff === 0) {
++      setMsg("سند هم‌اکنون تراز است.");
++      return;
++    }
+     markDirty();
++    const abs = Math.abs(diff);
++    const amountPatch =
++      diff > 0
++        ? { credit: String(abs), debit: "" as string }
++        : { debit: String(abs), credit: "" as string };
++    const balDesc =
++      description.trim() ||
++      (diff > 0 ? "بستانکار تراز (سیستم)" : "بدهکار تراز (سیستم)");
++
+     setLines((prev) => {
+-      const copy = [...prev];
+-      const i = copy.length - 1;
+-      if (diff > 0) {
+-        copy[i] = { ...copy[i], credit: String(Math.abs(diff)), debit: "" };
+-      } else {
+-        copy[i] = { ...copy[i], debit: String(Math.abs(diff)), credit: "" };
++      // پاک کردن پرچم سیستم قبلی روی سطرهایی که دیگر نقش تراز ندارند
++      const cleared = prev.map((l) =>
++        l.is_system_balance ? { ...l, is_system_balance: undefined } : l
++      );
++      const last = cleared[cleared.length - 1];
++      const lastReusable =
++        last &&
++        !last.account_id &&
++        parseAmount(last.debit) === 0 &&
++        parseAmount(last.credit) === 0;
++
++      if (lastReusable) {
++        const next = [...cleared];
++        next[next.length - 1] = {
++          ...last,
++          ...amountPatch,
++          description: last.description.trim() || balDesc,
++          is_system_balance: true,
++        };
++        return next;
+       }
+-      return copy;
++      return [
++        ...cleared,
++        {
++          ...emptyLine(balDesc, true),
++          ...amountPatch,
++        },
++      ];
+     });
+   }
++
++
+ 
+   async function doSave(andPost: boolean) {
