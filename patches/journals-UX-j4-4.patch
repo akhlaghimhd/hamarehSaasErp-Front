@@ -1,0 +1,89 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -641,28 +651,65 @@
+       .join("");
+-    const metaHtml = meta
+-      .filter((r) => r.length)
+-      .map((r) => `<div><strong>${r[0]}</strong>${r[1] != null ? ": " + r[1] : ""}</div>`)
+-      .join("");
++
+     const html = `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/>
+-      <title>سند حسابداری</title>
++      <title>سند حسابداری ${entryNumber ? toFaDigits(entryNumber) : "پیش‌نویس"}</title>
+       <style>
+-        body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#111}
+-        h1{font-size:16px;margin:0 0 12px}
+-        table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px}
+-        th,td{border:1px solid #ddd;padding:6px 8px;text-align:right}
+-        th{background:#f4f4f5}
+-        .meta{font-size:12px;line-height:1.7}
+-        .totals{margin-top:12px;font-size:12px}
++        *{box-sizing:border-box}
++        body{font-family:Tahoma,Arial,sans-serif;padding:16px 20px;color:#111;font-size:11px}
++        h1{font-size:15px;margin:0 0 10px;text-align:center}
++        .meta{width:100%;border-collapse:collapse;margin-bottom:12px}
++        .meta td{border:1px solid #cbd5e1;padding:4px 8px;vertical-align:top}
++        .meta td.k{width:18%;background:#f1f5f9;font-weight:600;white-space:nowrap}
++        .meta td.v{width:32%}
++        table.lines{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:4px}
++        table.lines th,table.lines td{border:1px solid #94a3b8;padding:4px 6px;text-align:right}
++        table.lines th{background:#e2e8f0;font-weight:600}
++        td.n,th.n{text-align:left;font-variant-numeric:tabular-nums;direction:ltr}
++        td.c,th.c{text-align:center}
++        .totals{margin-top:10px;width:100%;border-collapse:collapse}
++        .totals td{border:1px solid #94a3b8;padding:5px 8px}
++        .totals td.k{background:#f1f5f9;font-weight:600;width:30%}
++        @media print{body{padding:8px} a{display:none}}
+       </style></head><body>
+       <h1>سند حسابداری</h1>
+-      <div class="meta">${metaHtml}</div>
+-      <table>
+-        <thead><tr><th>#</th><th>حساب</th><th>شرح</th><th>بدهکار</th><th>بستانکار</th></tr></thead>
++      <table class="meta">
++        <tr>
++          <td class="k">شرکت</td><td class="v">${companyName}</td>
++          <td class="k">سازمان</td><td class="v">${orgName}</td>
++        </tr>
++        <tr>
++          <td class="k">شماره سند</td><td class="v">${entryNumber ? toFaDigits(entryNumber) : "پیش‌نویس"}</td>
++          <td class="k">تاریخ سند</td><td class="v">${documentDate ? toFaDigits(documentDate) : "—"}</td>
++        </tr>
++        <tr>
++          <td class="k">دوره مالی</td><td class="v">${periodLabel(periodId)}</td>
++          <td class="k">کاربر</td><td class="v">${userLabel}</td>
++        </tr>
++        <tr>
++          <td class="k">زمان خروجی</td><td class="v">${now}</td>
++          <td class="k">وضعیت تراز</td><td class="v">${isBalanced ? "تراز ✓" : "نامتراز"}</td>
++        </tr>
++        <tr>
++          <td class="k">شرح سند</td><td class="v" colspan="3">${description || "—"}</td>
++        </tr>
++      </table>
++      <table class="lines">
++        <thead>
++          <tr>
++            <th class="c">#</th>
++            <th>حساب</th>
++            <th>شرح سطر</th>
++            <th class="n">بدهکار</th>
++            <th class="n">بستانکار</th>
++            <th>مرکز هزینه</th>
++            <th>واحد کسب‌وکار</th>
++            <th class="c">نوع</th>
++          </tr>
++        </thead>
+         <tbody>${rowsHtml}</tbody>
+       </table>
+-      <div class="totals">
+-        <div>جمع بدهکار: ${formatMoney(lineTotals.debit)}</div>
+-        <div>جمع بستانکار: ${formatMoney(lineTotals.credit)}</div>
+-        <div>وضعیت: ${isBalanced ? "تراز" : "نامتراز"}</div>
+-      </div>
++      <table class="totals">
++        <tr><td class="k">جمع بدهکار</td><td class="n">${formatMoney(lineTotals.debit)}</td></tr>
++        <tr><td class="k">جمع بستانکار</td><td class="n">${formatMoney(lineTotals.credit)}</td></tr>
++        <tr><td class="k">اختلاف</td><td class="n">${formatMoney(lineTotals.diff)}</td></tr>
++      </table>
+       <script>window.onload=function(){window.print();}</script>
