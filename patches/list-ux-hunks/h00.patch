@@ -1,0 +1,27 @@
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -189,7 +189,24 @@
+   const [dateFrom, setDateFrom] = useState("");
+   const [dateTo, setDateTo] = useState("");
+   const [search, setSearch] = useState("");
++  const [listPage, setListPage] = useState(1);
++  const [pageSize] = useState(15);
++  const [selectedIds, setSelectedIds] = useState<string[]>([]);
++  const [colMenuOpen, setColMenuOpen] = useState(false);
++  const [visibleCols, setVisibleCols] = useState<Record<string, boolean>>(() => {
++    try {
++      const raw = localStorage.getItem("finance.journals.list-cols.v1");
++      if (raw) return { ...{ number: true, date: true, period: true, status: true, desc: true, debit: true, credit: true, actions: true }, ...JSON.parse(raw) };
++    } catch { /* ignore */ }
++    return { number: true, date: true, period: true, status: true, desc: true, debit: true, credit: true, actions: true };
++  });
++
+   const [msg, setMsg] = useState<string | null>(null);
++  useEffect(() => {
++    if (!msg) return;
++    const t = window.setTimeout(() => setMsg(null), 4500);
++    return () => window.clearTimeout(t);
++  }, [msg]);
+ 
+   const filters = useMemo(
+     () => ({
