@@ -1,0 +1,66 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -14,5 +14,4 @@
+   Search,
+   Link2,
+-  Keyboard,
+   FileSpreadsheet,
+   FileDown,
+@@ -439,16 +438,23 @@
+     markDirty();
+     const key = Math.random().toString(36).slice(2);
+-    setLines((prev) => [
+-      ...prev,
+-      {
+-        key,
+-        account_id: "",
+-        debit: "",
+-        credit: "",
+-        description: description,
+-        cost_center_id: "",
+-        business_unit_id: "",
+-      },
+-    ]);
++    const row: LineForm = {
++      key,
++      account_id: "",
++      debit: "",
++      credit: "",
++      description: description,
++      cost_center_id: "",
++      business_unit_id: "",
++    };
++    setLines((prev) => {
++      // سطرهای جدید همیشه قبل از سطر تراز سیستم قرار می‌گیرند
++      const balIdx = prev.findIndex((l) => l.is_system_balance);
++      if (balIdx >= 0) {
++        const next = [...prev];
++        next.splice(balIdx, 0, row);
++        return next;
++      }
++      return [...prev, row];
++    });
+     setAccountFocusKey(key);
+     setAccountTypeQuery("");
+@@ -476,7 +482,9 @@
+ 
+   function fillBalanceOnLast() {
++    // فقط سطرهای عادی (غیرسیستمی) در جمع لحاظ می‌شوند
++    const normal = lines.filter((l) => !l.is_system_balance);
+     let d = 0;
+     let c = 0;
+-    for (const l of lines) {
++    for (const l of normal) {
+       d += parseAmount(l.debit);
+       c += parseAmount(l.credit);
+@@ -484,5 +492,8 @@
+     const diff = Math.round((d - c) * 100) / 100;
+     if (diff === 0) {
+-      setMsg("سند هم‌اکنون تراز است.");
++      // اگر تراز است، سطر تراز سیستم را حذف کن
++      markDirty();
++      setLines((prev) => prev.filter((l) => !l.is_system_balance));
++      setMsg("سند تراز است؛ سطر تراز سیستم حذف شد.");
+       return;
+     }
