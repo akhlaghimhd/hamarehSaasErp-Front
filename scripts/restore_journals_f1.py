@@ -22,6 +22,12 @@ parts = sorted(parts_dir.glob("part_*.txt"))
 if len(parts) < 10:
     raise SystemExit(f"expected 10 parts in {parts_dir}, found {len(parts)}")
 
-data = "".join(p.read_text().strip() for p in parts)
+# strip whitespace/newlines per part; remove any residual whitespace in join
+data = "".join(p.read_text(encoding="utf-8").strip() for p in parts)
+data = "".join(data.split())
+pad = (-len(data)) % 4
+if pad:
+    data += "=" * pad
+
 out.write_bytes(zlib.decompress(base64.b64decode(data)))
 print("OK wrote", out, "bytes", out.stat().st_size)
