@@ -189,7 +189,24 @@ export function JournalsPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
+  const [listPage, setListPage] = useState(1);
+  const [pageSize] = useState(15);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [colMenuOpen, setColMenuOpen] = useState(false);
+  const [visibleCols, setVisibleCols] = useState<Record<string, boolean>>(() => {
+    try {
+      const raw = localStorage.getItem("finance.journals.list-cols.v1");
+      if (raw) return { ...{ number: true, date: true, period: true, status: true, desc: true, debit: true, credit: true, actions: true }, ...JSON.parse(raw) };
+    } catch { /* ignore */ }
+    return { number: true, date: true, period: true, status: true, desc: true, debit: true, credit: true, actions: true };
+  });
+
   const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (!msg) return;
+    const t = window.setTimeout(() => setMsg(null), 4500);
+    return () => window.clearTimeout(t);
+  }, [msg]);
 
   const filters = useMemo(
     () => ({
@@ -293,6 +310,35 @@ export function JournalsPage() {
     if (dateTo) list = list.filter((j) => (j.document_date ?? "").slice(0, 10) <= dateTo);
     return list;
   }, [data, search, dateFrom, dateTo]);
+
+  useEffect(() => {
+    setListPage(1);
+    setSelectedIds([]);
+  }, [statusFilter, periodFilter, dateFrom, dateTo, search]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("finance.journals.list-cols.v1", JSON.stringify(visibleCols));
+    } catch { /* ignore */ }
+  }, [visibleCols]);
+
+  const paged = useMemo(() => {
+    const start = (listPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, listPage, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+  function toggleSelectAllPage() {
+    const ids = paged.map((j) => j.journal_entry_id);
+    const allOn = ids.length > 0 && ids.every((id) => selectedIds.includes(id));
+    if (allOn) setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+    else setSelectedIds((prev) => Array.from(new Set([...prev, ...ids])));
+  }
+
 
   const statusCounts = useMemo(() => {
     const all = data ?? [];
@@ -892,6 +938,120 @@ export function JournalsPage() {
     );
   }
 
+
+  function exportListExcel() {
+    const rows = filtered;
+    const head = ["شماره", "تاریخ", "دوره", "وضعیت", "شرح", "بدهکار", "بستانکار"];
+    const body = rows.map((j) => {
+      const t = sumLines(j.items as JournalItemDto[] | undefined);
+      return [
+        j.entry_number || "—",
+        formatJalaliDate(j.document_date),
+        periodLabel(j.period_id),
+        statusLabel[j.status] ?? j.status,
+        j.description ?? "",
+        t.debit ? String(t.debit) : "",
+        t.credit ? String(t.credit) : "",
+      ];
+    });
+    const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
+    const csv = "\ufeff" + [head, ...body].map((r) => r.map(esc).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `journals-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
+
+  function exportListPdf() {
+    const rows = filtered;
+    const trs = rows
+      .map((j) => {
+        const t = sumLines(j.items as JournalItemDto[] | undefined);
+        return `<tr>
+          <td>${j.entry_number ? toFaDigits(j.entry_number) : "—"}</td>
+          <td>${formatJalaliDate(j.document_date)}</td>
+          <td>${periodLabel(j.period_id)}</td>
+          <td>${statusLabel[j.status] ?? j.status}</td>
+          <td>${(j.description ?? "—").replace(/</g, "<")}</td>
+          <td>${t.debit ? formatMoney(t.debit) : "—"}</td>
+          <td>${t.credit ? formatMoney(t.credit) : "—"}</td>
+        </tr>`;
+      })
+      .join("");
+    const html = `<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/>
+      <title>اسناد حسابداری</title>
+      <style>
+        body{font-family:Tahoma,Arial,sans-serif;font-size:11px;padding:16px}
+        h1{font-size:16px;margin:0 0 8px}
+        table{width:100%;border-collapse:collapse}
+        th,td{border:1px solid #cbd5e1;padding:4px 6px;text-align:right}
+        th{background:#f1f5f9}
+        .meta{color:#64748b;margin-bottom:12px}
+      </style></head><body>
+      <h1>فهرست اسناد حسابداری</h1>
+      <div class="meta">تعداد: ${toFaDigits(rows.length)} — ${toFaDigits(new Date().toLocaleString("fa-IR"))}</div>
+      <table><thead><tr>
+        <th>شماره</th><th>تاریخ</th><th>دوره</th><th>وضعیت</th><th>شرح</th><th>بدهکار</th><th>بستانکار</th>
+      </tr></thead><tbody>${trs}</tbody></table>
+      </body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) {
+      setMsg("مرورگر پنجره چاپ را مسدود کرد.");
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    w.print();
+  }
+
+  async function bulkPostSelected() {
+    const drafts = (data ?? []).filter((j) => selectedIds.includes(j.journal_entry_id) && j.status === "DRAFT");
+    if (!drafts.length) {
+      setMsg("پیش‌نویسی در انتخاب‌ها نیست.");
+      return;
+    }
+    let ok = 0;
+    for (const j of drafts) {
+      try {
+        await postMut.mutateAsync(j.journal_entry_id);
+        ok += 1;
+      } catch {
+        /* continue */
+      }
+    }
+    setSelectedIds([]);
+    setMsg(`${toFaDigits(ok)} سند ثبت قطعی شد.`);
+    void refetch();
+  }
+
+  async function bulkDeleteSelected() {
+    const drafts = (data ?? []).filter((j) => selectedIds.includes(j.journal_entry_id) && j.status === "DRAFT");
+    if (!drafts.length) {
+      setMsg("فقط پیش‌نویس قابل حذف گروهی است.");
+      return;
+    }
+    if (!window.confirm(`حذف ${toFaDigits(drafts.length)} پیش‌نویس؟`)) return;
+    let ok = 0;
+    for (const j of drafts) {
+      try {
+        await deleteMut.mutateAsync(j.journal_entry_id);
+        ok += 1;
+      } catch {
+        /* continue */
+      }
+    }
+    setSelectedIds([]);
+    setMsg(`${toFaDigits(ok)} پیش‌نویس حذف شد.`);
+    void refetch();
+  }
+
   if (formMode !== null) {
     const title =
       formMode === "new"
@@ -998,26 +1158,50 @@ export function JournalsPage() {
           </div>
           <div className="space-y-1 flex-1 min-w-[200px]">
             <label className="text-xs text-muted-foreground">شرح سند</label>
-            <Input
-              className="h-9"
-              placeholder="شرح کلی سند (خودکار روی سطرهای خالی)"
-              value={description}
-              disabled={viewOnly}
-              onChange={(e) => {
-                const v = e.target.value;
-                markDirty();
-                setDescription((prevDesc) => {
-                  setLines((linesPrev) =>
-                    linesPrev.map((l) =>
-                      !l.description.trim() || l.description === prevDesc
-                        ? { ...l, description: v }
-                        : l
-                    )
-                  );
-                  return v;
-                });
-              }}
-            />
+            <div className="relative">
+              <Input
+                className="h-9 pe-8"
+                placeholder="شرح کلی سند (خودکار روی سطرهای خالی)"
+                value={description}
+                disabled={viewOnly}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  markDirty();
+                  setDescription((prevDesc) => {
+                    setLines((linesPrev) =>
+                      linesPrev.map((l) =>
+                        !l.description.trim() || l.description === prevDesc
+                          ? { ...l, description: v }
+                          : l
+                      )
+                    );
+                    return v;
+                  });
+                }}
+              />
+              {!viewOnly && description ? (
+                <button
+                  type="button"
+                  className="absolute left-1.5 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground"
+                  title="پاک کردن شرح"
+                  onClick={() => {
+                    markDirty();
+                    setDescription((prevDesc) => {
+                      setLines((linesPrev) =>
+                        linesPrev.map((l) =>
+                          !l.description.trim() || l.description === prevDesc
+                            ? { ...l, description: "" }
+                            : l
+                        )
+                      );
+                      return "";
+                    });
+                  }}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+            </div>
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">شماره</label>
@@ -1335,12 +1519,51 @@ export function JournalsPage() {
           { label: "اسناد" },
         ]}
         actions={
-          canCreate ? (
-            <Button size="sm" onClick={openNew}>
-              <Plus className="h-4 w-4 ml-1" />
-              سند جدید
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Button type="button" size="sm" variant="outline" className="h-8" onClick={exportListExcel} title="خروجی اکسل">
+              <FileSpreadsheet className="h-3.5 w-3.5 ml-1" />
+              اکسل
             </Button>
-          ) : undefined
+            <Button type="button" size="sm" variant="outline" className="h-8" onClick={exportListPdf} title="خروجی PDF">
+              <FileDown className="h-3.5 w-3.5 ml-1" />
+              PDF
+            </Button>
+            <div className="relative">
+              <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => setColMenuOpen((v) => !v)}>
+                ستون‌ها
+              </Button>
+              {colMenuOpen ? (
+                <div className="absolute left-0 top-full z-50 mt-1 w-44 rounded-md border bg-popover p-2 shadow-md text-xs space-y-1">
+                  {(
+                    [
+                      ["number", "شماره"],
+                      ["date", "تاریخ"],
+                      ["period", "دوره"],
+                      ["status", "وضعیت"],
+                      ["desc", "شرح"],
+                      ["debit", "بدهکار"],
+                      ["credit", "بستانکار"],
+                    ] as const
+                  ).map(([k, lab]) => (
+                    <label key={k} className="flex items-center gap-2 cursor-pointer px-1 py-0.5 hover:bg-accent rounded">
+                      <input
+                        type="checkbox"
+                        checked={visibleCols[k] !== false}
+                        onChange={(e) => setVisibleCols((prev) => ({ ...prev, [k]: e.target.checked }))}
+                      />
+                      {lab}
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            {canCreate ? (
+              <Button size="sm" className="h-8" onClick={openNew}>
+                <Plus className="h-4 w-4 ml-1" />
+                سند جدید
+              </Button>
+            ) : null}
+          </div>
         }
       />
 
@@ -1350,7 +1573,26 @@ export function JournalsPage() {
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
+      {selectedIds.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50/60 px-2 py-1.5 text-xs">
+          <span className="text-sky-900">{toFaDigits(selectedIds.length)} مورد انتخاب شده</span>
+          {canPost ? (
+            <Button type="button" size="sm" className="h-7" variant="secondary" onClick={() => void bulkPostSelected()}>
+              ثبت قطعی گروهی
+            </Button>
+          ) : null}
+          {canDelete ? (
+            <Button type="button" size="sm" className="h-7" variant="destructive" onClick={() => void bulkDeleteSelected()}>
+              حذف پیش‌نویس‌ها
+            </Button>
+          ) : null}
+          <Button type="button" size="sm" className="h-7" variant="ghost" onClick={() => setSelectedIds([])}>
+            لغو انتخاب
+          </Button>
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap items-end gap-1.5 rounded-lg border bg-card px-2 py-1.5">
         <div className="space-y-1 min-w-[160px]">
           <label className="text-xs text-muted-foreground">وضعیت</label>
           <OptionTypeahead
@@ -1373,7 +1615,7 @@ export function JournalsPage() {
               { id: "REVERSED", label: `برگشت‌خورده (${toFaDigits(statusCounts.REVERSED)})`, searchText: "برگشت REVERSED" },
             ]}
             placeholder="وضعیت…"
-            className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+            className="h-8 w-full rounded-md border bg-background px-2 text-xs"
             onSelect={setStatusFilter}
           />
         </div>
@@ -1393,26 +1635,38 @@ export function JournalsPage() {
               { id: DEMO_PERIOD_ID, label: "دوره جاری (دمو)", searchText: "دوره جاری دمو" },
             ]}
             placeholder="دوره…"
-            className="h-9 w-full rounded-md border bg-background px-2 text-sm min-w-[140px]"
+            className="h-8 w-full rounded-md border bg-background px-2 text-xs min-w-[120px]"
             onSelect={setPeriodFilter}
           />
         </div>
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">از تاریخ</label>
-          <ShamsiDatePicker value={dateFrom} onChange={setDateFrom} className="h-9 w-40" placeholder="از" />
+          <ShamsiDatePicker value={dateFrom} onChange={setDateFrom} className="h-8 w-36" placeholder="از" />
         </div>
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">تا تاریخ</label>
-          <ShamsiDatePicker value={dateTo} onChange={setDateTo} className="h-9 w-40" placeholder="تا" />
+          <ShamsiDatePicker value={dateTo} onChange={setDateTo} className="h-8 w-36" placeholder="تا" />
         </div>
         <div className="space-y-1 flex-1 min-w-[160px]">
           <label className="text-xs text-muted-foreground">جستجو</label>
-          <Input
-            className="h-9"
-            placeholder="شماره یا شرح…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <div className="relative">
+            <Input
+              className="h-8 pe-7 text-xs"
+              placeholder="شماره یا شرح…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search ? (
+              <button
+                type="button"
+                className="absolute left-1 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center text-muted-foreground"
+                onClick={() => setSearch("")}
+                title="پاک کردن"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -1443,51 +1697,74 @@ export function JournalsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-right text-xs text-muted-foreground">
-                <th className="px-3 py-2 font-medium">شماره</th>
-                <th className="px-3 py-2 font-medium">تاریخ</th>
-                <th className="px-3 py-2 font-medium">دوره</th>
-                <th className="px-3 py-2 font-medium">وضعیت</th>
-                <th className="px-3 py-2 font-medium">شرح</th>
-                <th className="px-3 py-2 font-medium min-w-[8rem] text-sky-800">بدهکار</th>
-                <th className="px-3 py-2 font-medium text-emerald-800">بستانکار</th>
-                <th className="px-3 py-2 font-medium">عملیات</th>
+                <th className="px-2 py-1.5 w-8">
+                  <input
+                    type="checkbox"
+                    checked={paged.length > 0 && paged.every((j) => selectedIds.includes(j.journal_entry_id))}
+                    onChange={toggleSelectAllPage}
+                    aria-label="انتخاب همه صفحه"
+                  />
+                </th>
+                {visibleCols.number !== false ? <th className="px-2 py-1.5 font-medium">شماره</th> : null}
+                {visibleCols.date !== false ? <th className="px-2 py-1.5 font-medium">تاریخ</th> : null}
+                {visibleCols.period !== false ? <th className="px-2 py-1.5 font-medium">دوره</th> : null}
+                {visibleCols.status !== false ? <th className="px-2 py-1.5 font-medium">وضعیت</th> : null}
+                {visibleCols.desc !== false ? <th className="px-2 py-1.5 font-medium">شرح</th> : null}
+                {visibleCols.debit !== false ? <th className="px-2 py-1.5 font-medium min-w-[7rem] text-sky-800">بدهکار</th> : null}
+                {visibleCols.credit !== false ? <th className="px-2 py-1.5 font-medium text-emerald-800">بستانکار</th> : null}
+                {visibleCols.actions !== false ? <th className="px-2 py-1.5 font-medium">عملیات</th> : null}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((j) => {
+              {paged.map((j) => {
                 const t = sumLines(j.items as JournalItemDto[] | undefined);
                 return (
                   <tr
                     key={j.journal_entry_id}
                     className="border-b border-border/50 hover:bg-muted/40"
                   >
-                    <td className="px-3 py-2 text-xs font-medium tabular-nums">
-                      {j.entry_number ? toFaDigits(j.entry_number) : "—"}
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(j.journal_entry_id)}
+                        onChange={() => toggleSelect(j.journal_entry_id)}
+                        aria-label="انتخاب"
+                      />
                     </td>
-                    <td className="px-3 py-2 text-xs">
-                      {formatJalaliDate(j.document_date)}
-                    </td>
-                    <td className="px-3 py-2 text-xs">{periodLabel(j.period_id)}</td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={cn(
-                          "rounded border px-1.5 py-0.5 text-[10px] font-medium",
-                          statusChip[j.status] ?? "bg-muted"
-                        )}
-                      >
-                        {statusLabel[j.status] ?? j.status}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 max-w-[180px] truncate text-xs">
-                      {j.description ?? "—"}
-                    </td>
-                    <td className="px-3 py-2 tabular-nums text-xs">
-                      {t.debit ? formatMoney(t.debit) : "—"}
-                    </td>
-                    <td className="px-3 py-2 tabular-nums text-xs">
-                      {t.credit ? formatMoney(t.credit) : "—"}
-                    </td>
-                    <td className="px-3 py-2">
+                    {visibleCols.number !== false ? (
+                      <td className="px-2 py-1.5 text-xs font-medium tabular-nums">
+                        {j.entry_number ? toFaDigits(j.entry_number) : "—"}
+                      </td>
+                    ) : null}
+                    {visibleCols.date !== false ? (
+                      <td className="px-2 py-1.5 text-xs">{formatJalaliDate(j.document_date)}</td>
+                    ) : null}
+                    {visibleCols.period !== false ? (
+                      <td className="px-2 py-1.5 text-xs">{periodLabel(j.period_id)}</td>
+                    ) : null}
+                    {visibleCols.status !== false ? (
+                      <td className="px-2 py-1.5">
+                        <span
+                          className={cn(
+                            "rounded border px-1.5 py-0.5 text-[10px] font-medium",
+                            statusChip[j.status] ?? "bg-muted"
+                          )}
+                        >
+                          {statusLabel[j.status] ?? j.status}
+                        </span>
+                      </td>
+                    ) : null}
+                    {visibleCols.desc !== false ? (
+                      <td className="px-2 py-1.5 max-w-[180px] truncate text-xs">{j.description ?? "—"}</td>
+                    ) : null}
+                    {visibleCols.debit !== false ? (
+                      <td className="px-2 py-1.5 tabular-nums text-xs">{t.debit ? formatMoney(t.debit) : "—"}</td>
+                    ) : null}
+                    {visibleCols.credit !== false ? (
+                      <td className="px-2 py-1.5 tabular-nums text-xs">{t.credit ? formatMoney(t.credit) : "—"}</td>
+                    ) : null}
+                    {visibleCols.actions !== false ? (
+                    <td className="px-2 py-1.5">
                       <div className="flex flex-wrap gap-1">
                         <Button
                           size="sm"
@@ -1551,6 +1828,7 @@ export function JournalsPage() {
                         ) : null}
                       </div>
                     </td>
+                    ) : null}
                   </tr>
                 );
               })}
@@ -1558,6 +1836,40 @@ export function JournalsPage() {
           </table>
         )}
       </div>
+
+      {filtered.length > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground px-1">
+          <span>
+            {toFaDigits((listPage - 1) * pageSize + 1)}–
+            {toFaDigits(Math.min(listPage * pageSize, filtered.length))} از {toFaDigits(filtered.length)}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7"
+              disabled={listPage <= 1}
+              onClick={() => setListPage((pg) => Math.max(1, pg - 1))}
+            >
+              قبلی
+            </Button>
+            <span className="px-2 tabular-nums">
+              {toFaDigits(listPage)} / {toFaDigits(totalPages)}
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7"
+              disabled={listPage >= totalPages}
+              onClick={() => setListPage((pg) => Math.min(totalPages, pg + 1))}
+            >
+              بعدی
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <Dialog open={!!reverseTarget} onOpenChange={(o) => !o && setReverseTarget(null)}>
         <DialogContent>
