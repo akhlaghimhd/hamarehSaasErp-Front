@@ -1,0 +1,52 @@
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -78,16 +78,46 @@
+   REVERSED: "bg-slate-100 text-slate-600 border-slate-200",
+ };
+ 
+-/** ADR-FIN-002 N10: DRAFT → draft_number (DR-…), else entry_number (JE-…) */
++/** ADR-FIN-002 N10: نمایش اختصاری فارسی — پ.ن / س.ق + ارقام فارسی */
+ function displayJournalNumber(j: {
+   status?: string;
+   entry_number?: string | null;
+   draft_number?: string | null;
+ }): string {
+-  if ((j.status || "").toUpperCase() === "DRAFT") {
+-    return j.draft_number || j.entry_number || "—";
+-  }
+-  return j.entry_number || j.draft_number || "—";
++  const status = (j.status || "").toUpperCase();
++  let raw =
++    status === "DRAFT"
++      ? j.draft_number || j.entry_number || ""
++      : j.entry_number || j.draft_number || "";
++  if (!raw) return "—";
++
++  // نرمال‌سازی پیشوندهای قدیمی
++  raw = raw.replace(/^DRAFT-/i, "DR-");
++
++  const m = raw.match(/^(DR|JE)-(\d{4})-(\d+)$/i);
++  if (m) {
++    const kind = m[1].toUpperCase() === "DR" ? "پ.ن" : "س.ق";
++    let year = m[2];
++    const gy = Number(year);
++    // سال میلادی ذخیره‌شده را برای نمایش به شمسی نزدیک می‌کنیم
++    if (gy >= 2000 && gy <= 2100) {
++      try {
++        const { jy } = toJalaliParts(gy, 6, 15);
++        year = String(jy);
++      } catch {
++        /* keep gregorian */
++      }
++    }
++    return toFaDigits(`${kind}-${year}-${m[3]}`);
++  }
++
++  const m2 = raw.match(/^DR-(\d+)$/i);
++  if (m2) return toFaDigits(`پ.ن-${m2[1]}`);
++
++  const m3 = raw.match(/^JE-(\d+)$/i);
++  if (m3) return toFaDigits(`س.ق-${m3[1]}`);
++
++  return toFaDigits(raw);
+ }
