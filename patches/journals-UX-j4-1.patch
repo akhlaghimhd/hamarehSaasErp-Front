@@ -1,0 +1,52 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -498,36 +509,18 @@
+ 
+     setLines((prev) => {
+-      // پاک کردن پرچم سیستم قبلی روی سطرهایی که دیگر نقش تراز ندارند
+-      const cleared = prev.map((l) =>
+-        l.is_system_balance ? { ...l, is_system_balance: undefined } : l
+-      );
+-      const last = cleared[cleared.length - 1];
+-      const lastReusable =
+-        last &&
+-        !last.account_id &&
+-        parseAmount(last.debit) === 0 &&
+-        parseAmount(last.credit) === 0;
+-
+-      if (lastReusable) {
+-        const next = [...cleared];
+-        next[next.length - 1] = {
+-          ...last,
+-          ...amountPatch,
+-          description: last.description.trim() || balDesc,
+-          is_system_balance: true,
+-        };
+-        return next;
+-      }
+-      return [
+-        ...cleared,
+-        {
+-          ...emptyLine(balDesc, true),
+-          ...amountPatch,
+-        },
+-      ];
++      // همه سطرهای تراز قبلی حذف؛ یکی در انتها ساخته/به‌روز می‌شود
++      const normals = prev.filter((l) => !l.is_system_balance);
++      const balanceRow: LineForm = {
++        key: prev.find((l) => l.is_system_balance)?.key ?? Math.random().toString(36).slice(2),
++        account_id: prev.find((l) => l.is_system_balance)?.account_id ?? "",
++        cost_center_id: prev.find((l) => l.is_system_balance)?.cost_center_id ?? "",
++        business_unit_id: prev.find((l) => l.is_system_balance)?.business_unit_id ?? "",
++        description: balDesc,
++        is_system_balance: true,
++        ...amountPatch,
++      };
++      return [...normals, balanceRow];
+     });
+   }
+-
+-
+ 
+   const authUser = useAuthStore((s) => s.user);
