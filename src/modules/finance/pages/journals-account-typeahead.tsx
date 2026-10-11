@@ -22,6 +22,10 @@ type Props = {
 
 const VAZIR = { fontFamily: "var(--font-vazirmatn), Tahoma, Arial, sans-serif" } as const;
 
+function digitsToFa(s: string): string {
+  return s.replace(/[0-9]/g, (d) => toFaDigits(d));
+}
+
 export function OptionTypeahead({
   valueId,
   displayLabel,
@@ -45,7 +49,12 @@ export function OptionTypeahead({
     const ql = q.toLowerCase();
     return options.filter((o) => {
       const hay = (o.searchText ?? o.label).toLowerCase();
-      return hay.includes(ql) || hay.includes(ascii) || toFaDigits(hay).includes(q);
+      return (
+        hay.includes(ql) ||
+        hay.includes(ascii) ||
+        toAsciiDigits(hay).includes(ascii) ||
+        toFaDigits(hay).includes(q)
+      );
     });
   })();
 
@@ -53,7 +62,7 @@ export function OptionTypeahead({
     const el = inputRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    setPanel({ top: r.bottom + 2, left: r.left, width: Math.max(r.width, 200) });
+    setPanel({ top: r.bottom + 2, left: r.left, width: Math.max(r.width, 220) });
   }
 
   useLayoutEffect(() => {
@@ -81,15 +90,18 @@ export function OptionTypeahead({
   }
 
   return (
-    <div className="relative">
+    <div className="relative min-w-0">
       <input
         ref={inputRef}
         data-line-key={dataLineKey}
         disabled={disabled}
-        className={className ?? "h-8 w-full rounded-md border bg-background px-2 text-xs tabular-nums"}
+        className={
+          className ??
+          "h-8 w-full min-w-0 rounded-md border bg-background px-1.5 text-[11px] tabular-nums"
+        }
         style={VAZIR}
         placeholder={placeholder}
-        value={open ? query : displayLabel}
+        value={open ? digitsToFa(query) : displayLabel}
         onFocus={(e) => {
           setOpen(true);
           setQuery("");
@@ -98,7 +110,7 @@ export function OptionTypeahead({
         }}
         onChange={(e) => {
           setOpen(true);
-          setQuery(e.target.value);
+          setQuery(digitsToFa(e.target.value));
         }}
         onBlur={() => {
           window.setTimeout(() => {
