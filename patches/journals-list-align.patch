@@ -1,0 +1,23 @@
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -193,7 +193,6 @@
+   const [search, setSearch] = useState("");
+   const [listPage, setListPage] = useState(1);
+   const [pageSize, setPageSize] = useState(15);
+-  const [showDeleted, setShowDeleted] = useState(false);
+   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+   const [colMenuOpen, setColMenuOpen] = useState(false);
+@@ -208,6 +207,8 @@
+ 
+ 
+   const filters = useMemo(
++  const showDeleted = statusFilter === "__DELETED__";
++
++  const filters = useMemo(
+     () => ({
+-      status: statusFilter || undefined,
++      status: showDeleted ? undefined : statusFilter || undefined,
+       company_id: primaryCompanyId || undefined,
+       period_id: periodFilter || undefined,
+       deleted: showDeleted || undefined,
