@@ -1,0 +1,29 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -629,11 +629,21 @@
+     const meta = journalMetaRows();
++    const companyName = meta.find((r) => r[0] === "شرکت")?.[1] ?? "—";
++    const userLabel = meta.find((r) => r[0] === "کاربر")?.[1] ?? "—";
++    const now = meta.find((r) => r[0] === "زمان خروجی")?.[1] ?? "—";
++    const orgName = meta.find((r) => r[0] === "سازمان")?.[1] ?? "—";
++
+     const rowsHtml = lines
+       .map((l, idx) => {
+-        const bg = l.is_system_balance ? "#fffbeb" : idx % 2 === 1 ? "#f4f4f5" : "#fff";
++        const bg = l.is_system_balance ? "#fffbeb" : idx % 2 === 1 ? "#f8fafc" : "#fff";
++        const cc = costCenters.find((c) => c.cost_center_id === l.cost_center_id);
++        const bu = businessUnits.find((b) => b.business_unit_id === l.business_unit_id);
+         return `<tr style="background:${bg}">
+-          <td>${toFaDigits(idx + 1)}</td>
++          <td class="c">${toFaDigits(idx + 1)}</td>
+           <td>${accountLabel(l.account_id)}</td>
+           <td>${l.description || "—"}</td>
+-          <td style="text-align:left">${parseAmount(l.debit) ? formatMoney(parseAmount(l.debit)) : "—"}</td>
+-          <td style="text-align:left">${parseAmount(l.credit) ? formatMoney(parseAmount(l.credit)) : "—"}</td>
++          <td class="n">${parseAmount(l.debit) ? formatMoney(parseAmount(l.debit)) : "—"}</td>
++          <td class="n">${parseAmount(l.credit) ? formatMoney(parseAmount(l.credit)) : "—"}</td>
++          <td>${cc ? `${toFaDigits(cc.code)} — ${cc.name}` : "—"}</td>
++          <td>${bu ? `${toFaDigits(bu.code)} — ${bu.name}` : "—"}</td>
++          <td class="c">${l.is_system_balance ? "تراز" : "—"}</td>
+         </tr>`;
