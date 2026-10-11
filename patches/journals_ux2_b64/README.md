@@ -1,12 +1,10 @@
-# Journals UX2 payload
+# journals UX2 payload
 
-After `git pull origin develop`:
+Run from repo root:
 
-```powershell
+```bash
 python scripts/apply_journals_ux2.py
-git add src/modules/finance/pages/journals-page.tsx
-git commit -m "fix(fin): journals UX2 display compact export reverse-link"
-git push origin develop
 ```
 
-Requires part_00..part_10 under this folder.
+Expects 11 files `part_00.txt` … `part_10.txt` (zlib+base64 of journals-page.tsx UX2).
+After apply: commit the restored `src/modules/finance/pages/journals-page.tsx`.
