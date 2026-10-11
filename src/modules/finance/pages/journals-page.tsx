@@ -209,7 +209,7 @@ export function JournalsPage() {
 
   const filters = useMemo(
     () => ({
-      status: statusFilter || undefined,
+      status: showDeleted ? undefined : statusFilter || undefined,
       company_id: primaryCompanyId || undefined,
       period_id: periodFilter || undefined,
       deleted: showDeleted || undefined,
