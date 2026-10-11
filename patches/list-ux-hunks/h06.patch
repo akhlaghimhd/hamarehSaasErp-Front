@@ -1,0 +1,11 @@
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -1373,7 +1615,7 @@
+               { id: "REVERSED", label: `برگشت‌خورده (${toFaDigits(statusCounts.REVERSED)})`, searchText: "برگشت REVERSED" },
+             ]}
+             placeholder="وضعیت…"
+-            className="h-9 w-full rounded-md border bg-background px-2 text-sm"
++            className="h-8 w-full rounded-md border bg-background px-2 text-xs"
+             onSelect={setStatusFilter}
+           />
+         </div>

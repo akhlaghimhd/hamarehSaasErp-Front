@@ -1,0 +1,10 @@
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -1551,6 +1828,7 @@
+                         ) : null}
+                       </div>
+                     </td>
++                    ) : null}
+                   </tr>
+                 );
+               })}
