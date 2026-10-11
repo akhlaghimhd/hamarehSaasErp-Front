@@ -62,7 +62,7 @@ export function OptionTypeahead({
     const el = inputRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    setPanel({ top: r.bottom + 2, left: r.left, width: Math.max(r.width, 220) });
+    setPanel({ top: r.bottom + 2, left: r.left, width: Math.max(r.width, 140) });
   }
 
   useLayoutEffect(() => {
@@ -87,6 +87,7 @@ export function OptionTypeahead({
     onSelect(o.id);
     setOpen(false);
     setQuery("");
+    window.setTimeout(() => inputRef.current?.blur(), 0);
   }
 
   return (
@@ -107,6 +108,13 @@ export function OptionTypeahead({
           setQuery("");
           e.target.select();
           requestAnimationFrame(placePanel);
+        }}
+        onClick={() => {
+          if (!open) {
+            setOpen(true);
+            setQuery("");
+            requestAnimationFrame(placePanel);
+          }
         }}
         onChange={(e) => {
           setOpen(true);
@@ -141,7 +149,7 @@ export function OptionTypeahead({
       />
       {open && panel ? (
         <div
-          className="z-[80] max-h-52 overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md"
+          className="z-[80] max-h-36 overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md"
           style={{ position: "fixed", top: panel.top, left: panel.left, width: panel.width, ...VAZIR }}
         >
           {filtered.length === 0 ? (
@@ -160,6 +168,7 @@ export function OptionTypeahead({
                   onSelect(o.id);
                   setOpen(false);
                   setQuery("");
+                  window.setTimeout(() => inputRef.current?.blur(), 0);
                 }}
                 onMouseEnter={() => setHighlight(i)}
               >
