@@ -43,7 +43,7 @@ import {
 } from "../hooks/use-journals";
 import { useAccountFlat } from "../hooks/use-accounts";
 import { journalService } from "../services/journal-service";
-import { AccountTypeahead } from "./journals-account-typeahead";
+import { AccountTypeahead, OptionTypeahead } from "./journals-account-typeahead";
 import {
   FinancePermissions,
   DEMO_PERIOD_ID,
@@ -130,7 +130,10 @@ function formatAmountDisplay(raw: string): string {
 }
 
 const AMOUNT_INPUT_CLASS =
-  "h-8 text-xs font-mono tabular-nums text-left tracking-tight";
+  "h-8 text-xs tabular-nums text-left tracking-tight";
+
+const FORM_FONT =
+  { fontFamily: "var(--font-vazirmatn), Tahoma, Arial, sans-serif" } as const;
 
 function sumLines(
   items: Array<{ debit_amount?: number | string; credit_amount?: number | string }> | undefined
@@ -575,19 +578,19 @@ export function JournalsPage() {
   useEffect(() => {
     if (formMode === null || viewOnly) return;
     function onKey(e: KeyboardEvent) {
-      // فقط Alt — Ctrl/Meta با میانبرهای مرورگر تداخل دارند
-      if (!e.altKey || e.ctrlKey || e.metaKey) return;
-      const k = e.key.toLowerCase();
-      if (k === "s") {
+      // F-keys در وب پایدارتر از Alt/Ctrl هستند (Alt اغلب منوی مرورگر را می‌گیرد)
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const code = e.code;
+      if (code === "F2") {
         e.preventDefault();
         if (!saving) void doSave(false);
-      } else if (k === "enter") {
+      } else if (code === "F9") {
         e.preventDefault();
         if (!saving && isBalanced && canPost) void doSave(true);
-      } else if (k === "b") {
+      } else if (code === "F4") {
         e.preventDefault();
         fillBalanceOnLast();
-      } else if (k === "n") {
+      } else if (code === "F7") {
         e.preventDefault();
         addLine();
       }
@@ -611,8 +614,7 @@ export function JournalsPage() {
           : "ویرایش پیش‌نویس";
 
     return (
-      <div className="flex flex-col min-h-0 h-[calc(100dvh-3.5rem)]">
-        <div className="shrink-0 px-1 pt-1">
+      <div className="space-y-4" style={FORM_FONT}>
         <PageHeader
           title={title}
           description="سطرهای سند باید تراز باشند؛ شماره سند هنگام ثبت قطعی اختصاص می‌یابد"
@@ -623,9 +625,7 @@ export function JournalsPage() {
             { label: formMode === "new" ? "جدید" : "جزئیات" },
           ]}
         />
-        </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 px-1 py-2">
         <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-3">
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">تاریخ سند</label>
@@ -640,19 +640,22 @@ export function JournalsPage() {
               placeholder="انتخاب تاریخ"
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1 min-w-[180px]">
             <label className="text-xs text-muted-foreground">دوره مالی</label>
-            <select
-              className="h-9 rounded-md border bg-background px-2 text-sm min-w-[160px]"
-              value={periodId}
+            <OptionTypeahead
+              valueId={periodId}
+              displayLabel={periodId === DEMO_PERIOD_ID ? "دوره جاری (دمو)" : periodLabel(periodId)}
+              options={[
+                { id: DEMO_PERIOD_ID, label: "دوره جاری (دمو)", searchText: "دوره جاری دمو" },
+              ]}
+              placeholder="جستجوی دوره…"
               disabled={viewOnly}
-              onChange={(e) => {
+              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              onSelect={(id) => {
                 markDirty();
-                setPeriodId(e.target.value);
+                setPeriodId(id);
               }}
-            >
-              <option value={DEMO_PERIOD_ID}>دوره جاری (دمو)</option>
-            </select>
+            />
           </div>
           <div className="space-y-1 flex-1 min-w-[200px]">
             <label className="text-xs text-muted-foreground">شرح سند</label>
@@ -681,7 +684,7 @@ export function JournalsPage() {
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">شماره</label>
-            <div className="h-9 px-3 flex items-center rounded-md border bg-muted/40 text-xs text-muted-foreground font-mono">
+            <div className="h-9 px-3 flex items-center rounded-md border bg-muted/40 text-xs text-muted-foreground tabular-nums">
               {entryNumber ? toFaDigits(entryNumber) : "پس از ثبت قطعی"}
             </div>
           </div>
@@ -711,7 +714,7 @@ export function JournalsPage() {
             </span>
             <span className="text-[11px] text-muted-foreground flex items-center gap-1">
               <Keyboard className="h-3.5 w-3.5" />
-              Alt+S پیش‌نویس · Alt+Enter قطعی · Alt+B تراز · Alt+N سطر
+              F2 پیش‌نویس · F9 قطعی · F4 تراز · F7 سطر
             </span>
           </div>
         ) : null}
@@ -746,12 +749,12 @@ export function JournalsPage() {
                     lineComplete && "bg-emerald-50/60"
                   )}
                 >
-                  <td className="px-2 py-1.5 text-xs text-muted-foreground font-mono">
+                  <td className="px-2 py-1.5 text-xs text-muted-foreground tabular-nums">
                     {toFaDigits(idx + 1)}
                   </td>
                   <td className="px-2 py-1.5 relative">
                     {viewOnly ? (
-                      <span className="text-xs font-mono tabular-nums">{accountLabel(l.account_id)}</span>
+                      <span className="text-xs tabular-nums">{accountLabel(l.account_id)}</span>
                     ) : (
                       <AccountTypeahead
                         lineKey={l.key}
@@ -798,6 +801,7 @@ export function JournalsPage() {
                   <td className="px-2 py-1.5">
                     <Input
                       className={AMOUNT_INPUT_CLASS}
+                      style={FORM_FONT}
                       dir="ltr"
                       inputMode="decimal"
                       value={l.debit ? formatAmountDisplay(l.debit) : ""}
@@ -811,6 +815,7 @@ export function JournalsPage() {
                   <td className="px-2 py-1.5">
                     <Input
                       className={AMOUNT_INPUT_CLASS}
+                      style={FORM_FONT}
                       dir="ltr"
                       inputMode="decimal"
                       value={l.credit ? formatAmountDisplay(l.credit) : ""}
@@ -828,18 +833,27 @@ export function JournalsPage() {
                           {costCenters.find((c) => c.cost_center_id === l.cost_center_id)?.name ?? "—"}
                         </span>
                       ) : (
-                        <select
-                          className="h-8 w-full rounded-md border bg-background px-2 text-xs"
-                          value={l.cost_center_id}
-                          onChange={(e) => updateLine(l.key, { cost_center_id: e.target.value })}
-                        >
-                          <option value="">—</option>
-                          {costCenters.map((c) => (
-                            <option key={c.cost_center_id} value={c.cost_center_id}>
-                              {toFaDigits(c.code)} — {c.name}
-                            </option>
-                          ))}
-                        </select>
+                        <OptionTypeahead
+                          valueId={l.cost_center_id}
+                          displayLabel={
+                            l.cost_center_id
+                              ? (() => {
+                                  const c = costCenters.find((x) => x.cost_center_id === l.cost_center_id);
+                                  return c ? `${toFaDigits(c.code)} — ${c.name}` : "";
+                                })()
+                              : ""
+                          }
+                          options={[
+                            { id: "", label: "—", searchText: "" },
+                            ...costCenters.map((c) => ({
+                              id: c.cost_center_id,
+                              label: `${toFaDigits(c.code)} — ${c.name}`,
+                              searchText: `${c.code} ${c.name}`,
+                            })),
+                          ]}
+                          placeholder="مرکز هزینه…"
+                          onSelect={(id) => updateLine(l.key, { cost_center_id: id })}
+                        />
                       )}
                     </td>
                   ) : null}
@@ -850,18 +864,27 @@ export function JournalsPage() {
                           {businessUnits.find((b) => b.business_unit_id === l.business_unit_id)?.name ?? "—"}
                         </span>
                       ) : (
-                        <select
-                          className="h-8 w-full rounded-md border bg-background px-2 text-xs"
-                          value={l.business_unit_id}
-                          onChange={(e) => updateLine(l.key, { business_unit_id: e.target.value })}
-                        >
-                          <option value="">—</option>
-                          {businessUnits.map((b) => (
-                            <option key={b.business_unit_id} value={b.business_unit_id}>
-                              {toFaDigits(b.code)} — {b.name}
-                            </option>
-                          ))}
-                        </select>
+                        <OptionTypeahead
+                          valueId={l.business_unit_id}
+                          displayLabel={
+                            l.business_unit_id
+                              ? (() => {
+                                  const b = businessUnits.find((x) => x.business_unit_id === l.business_unit_id);
+                                  return b ? `${toFaDigits(b.code)} — ${b.name}` : "";
+                                })()
+                              : ""
+                          }
+                          options={[
+                            { id: "", label: "—", searchText: "" },
+                            ...businessUnits.map((b) => ({
+                              id: b.business_unit_id,
+                              label: `${toFaDigits(b.code)} — ${b.name}`,
+                              searchText: `${b.code} ${b.name}`,
+                            })),
+                          ]}
+                          placeholder="واحد کسب‌وکار…"
+                          onSelect={(id) => updateLine(l.key, { business_unit_id: id })}
+                        />
                       )}
                     </td>
                   ) : null}
@@ -889,11 +912,11 @@ export function JournalsPage() {
               <Button type="button" size="sm" variant="outline" onClick={addLine}>
                 <Plus className="h-3.5 w-3.5 ml-1" />
                 افزودن سطر
-                <span className="mr-1 text-[10px] text-muted-foreground">Alt+N</span>
+                <span className="mr-1 text-[10px] text-muted-foreground">F7</span>
               </Button>
               <Button type="button" size="sm" variant="secondary" onClick={fillBalanceOnLast}>
                 تراز آخرین سطر
-                <span className="mr-1 text-[10px] text-muted-foreground">Alt+B</span>
+                <span className="mr-1 text-[10px] text-muted-foreground">F4</span>
               </Button>
             </div>
           ) : null}
@@ -901,18 +924,16 @@ export function JournalsPage() {
 
         {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
 
-        </div>
-
-        <div className="shrink-0 border-t bg-background z-10">
-          <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
+        <div className="sticky bottom-0 z-10 mt-2 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-1 py-2.5">
             <div className="flex flex-wrap gap-4 text-sm">
               <span>
                 بدهکار:{" "}
-                <strong className="font-mono tabular-nums">{formatMoney(lineTotals.debit)}</strong>
+                <strong className="tabular-nums">{formatMoney(lineTotals.debit)}</strong>
               </span>
               <span>
                 بستانکار:{" "}
-                <strong className="font-mono tabular-nums">{formatMoney(lineTotals.credit)}</strong>
+                <strong className="tabular-nums">{formatMoney(lineTotals.credit)}</strong>
               </span>
               <span
                 className={cn(
@@ -944,7 +965,7 @@ export function JournalsPage() {
                     variant="outline"
                     disabled={saving}
                     onClick={() => void doSave(false)}
-                    title="Alt+S"
+                    title="F2"
                   >
                     ذخیره پیش‌نویس
                   </Button>
@@ -953,7 +974,7 @@ export function JournalsPage() {
                       type="button"
                       disabled={saving || !isBalanced}
                       onClick={() => void doSave(true)}
-                      title="Alt+Enter"
+                      title="F9"
                     >
                       {saving ? (
                         <Loader2 className="h-4 w-4 animate-spin ml-1" />
@@ -1018,31 +1039,51 @@ export function JournalsPage() {
       ) : null}
 
       <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
-        <div className="space-y-1">
+        <div className="space-y-1 min-w-[160px]">
           <label className="text-xs text-muted-foreground">وضعیت</label>
-          <select
-            className="h-9 rounded-md border bg-background px-2 text-sm"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">همه ({toFaDigits(statusCounts.all)})</option>
-            <option value="DRAFT">پیش‌نویس ({toFaDigits(statusCounts.DRAFT)})</option>
-            <option value="POSTED">ثبت‌شده ({toFaDigits(statusCounts.POSTED)})</option>
-            <option value="REVERSED">
-              برگشت‌خورده ({toFaDigits(statusCounts.REVERSED)})
-            </option>
-          </select>
+          <OptionTypeahead
+            valueId={statusFilter}
+            displayLabel={
+              !statusFilter
+                ? `همه (${toFaDigits(statusCounts.all)})`
+                : statusFilter === "DRAFT"
+                  ? `پیش‌نویس (${toFaDigits(statusCounts.DRAFT)})`
+                  : statusFilter === "POSTED"
+                    ? `ثبت‌شده (${toFaDigits(statusCounts.POSTED)})`
+                    : statusFilter === "REVERSED"
+                      ? `برگشت‌خورده (${toFaDigits(statusCounts.REVERSED)})`
+                      : statusFilter
+            }
+            options={[
+              { id: "", label: `همه (${toFaDigits(statusCounts.all)})`, searchText: "همه" },
+              { id: "DRAFT", label: `پیش‌نویس (${toFaDigits(statusCounts.DRAFT)})`, searchText: "پیش‌نویس DRAFT" },
+              { id: "POSTED", label: `ثبت‌شده (${toFaDigits(statusCounts.POSTED)})`, searchText: "ثبت‌شده POSTED" },
+              { id: "REVERSED", label: `برگشت‌خورده (${toFaDigits(statusCounts.REVERSED)})`, searchText: "برگشت REVERSED" },
+            ]}
+            placeholder="وضعیت…"
+            className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+            onSelect={setStatusFilter}
+          />
         </div>
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">دوره</label>
-          <select
-            className="h-9 rounded-md border bg-background px-2 text-sm"
-            value={periodFilter}
-            onChange={(e) => setPeriodFilter(e.target.value)}
-          >
-            <option value="">همه دوره‌ها</option>
-            <option value={DEMO_PERIOD_ID}>دوره جاری (دمو)</option>
-          </select>
+          <OptionTypeahead
+            valueId={periodFilter}
+            displayLabel={
+              !periodFilter
+                ? "همه دوره‌ها"
+                : periodFilter === DEMO_PERIOD_ID
+                  ? "دوره جاری (دمو)"
+                  : periodLabel(periodFilter)
+            }
+            options={[
+              { id: "", label: "همه دوره‌ها", searchText: "همه" },
+              { id: DEMO_PERIOD_ID, label: "دوره جاری (دمو)", searchText: "دوره جاری دمو" },
+            ]}
+            placeholder="دوره…"
+            className="h-9 w-full rounded-md border bg-background px-2 text-sm min-w-[140px]"
+            onSelect={setPeriodFilter}
+          />
         </div>
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">از تاریخ</label>
@@ -1108,7 +1149,7 @@ export function JournalsPage() {
                     key={j.journal_entry_id}
                     className="border-b border-border/50 hover:bg-muted/40"
                   >
-                    <td className="px-3 py-2 font-mono text-xs font-medium">
+                    <td className="px-3 py-2 text-xs font-medium tabular-nums">
                       {j.entry_number ? toFaDigits(j.entry_number) : "—"}
                     </td>
                     <td className="px-3 py-2 text-xs">
@@ -1128,10 +1169,10 @@ export function JournalsPage() {
                     <td className="px-3 py-2 max-w-[180px] truncate text-xs">
                       {j.description ?? "—"}
                     </td>
-                    <td className="px-3 py-2 font-mono tabular-nums text-xs">
+                    <td className="px-3 py-2 tabular-nums text-xs">
                       {t.debit ? formatMoney(t.debit) : "—"}
                     </td>
-                    <td className="px-3 py-2 font-mono tabular-nums text-xs">
+                    <td className="px-3 py-2 tabular-nums text-xs">
                       {t.credit ? formatMoney(t.credit) : "—"}
                     </td>
                     <td className="px-3 py-2">
