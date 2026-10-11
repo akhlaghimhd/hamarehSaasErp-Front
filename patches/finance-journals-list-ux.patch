@@ -1,0 +1,163 @@
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -218,6 +218,15 @@
+   );
+ 
+   const { data, isLoading, error, refetch } = useJournals(filters);
++  /** شمارنده‌ها باید از کل (غیرحذف‌شده) باشند نه از فیلتر وضعیت فعلی */
++  const { data: activeForCounts } = useJournals({
++    company_id: primaryCompanyId || undefined,
++    period_id: periodFilter || undefined,
++  });
++  const { data: deletedForCounts } = useJournals({
++    company_id: primaryCompanyId || undefined,
++    deleted: true,
++  });
+   const { data: accountsFlat } = useAccountFlat();
+ 
+   const [costCenters, setCostCenters] = useState<CostCenterDto[]>([]);
+@@ -353,14 +362,15 @@
+ 
+ 
+   const statusCounts = useMemo(() => {
+-    const all = data ?? [];
++    const all = activeForCounts ?? [];
+     return {
+       all: all.length,
+       DRAFT: all.filter((j) => j.status === "DRAFT").length,
+       POSTED: all.filter((j) => j.status === "POSTED").length,
+       REVERSED: all.filter((j) => j.status === "REVERSED").length,
++      DELETED: (deletedForCounts ?? []).length,
+     };
+-  }, [data]);
++  }, [activeForCounts, deletedForCounts]);
+ 
+   const lineTotals = useMemo(() => {
+     let d = 0;
+@@ -409,7 +419,6 @@
+             }))
+           );
+           setEntryNumber(d.entryNumber ?? null);
+-          if (d.primaryCompanyId) setPrimaryCompanyId(d.primaryCompanyId);
+           setDirty(true);
+           setDraftRestoredAt(d.savedAt || new Date().toISOString());
+           return;
+@@ -1096,6 +1105,26 @@
+     void refetch();
+   }
+ 
++  async function bulkRestoreSelected() {
++    const rows = (data ?? []).filter((j) => selectedIds.includes(j.journal_entry_id));
++    if (!rows.length) {
++      toast.error("موردی انتخاب نشده است.");
++      return;
++    }
++    let ok = 0;
++    for (const j of rows) {
++      try {
++        await restoreMut.mutateAsync(j.journal_entry_id);
++        ok += 1;
++      } catch {
++        /* continue */
++      }
++    }
++    setSelectedIds([]);
++    toast.success(`${toFaDigits(ok)} سند از سطل حذف بازیابی شد.`);
++    void refetch();
++  }
++
+   if (formMode !== null) {
+     const title =
+       formMode === "new"
+@@ -1601,7 +1630,7 @@
+                 </div>
+               ) : null}
+             </div>
+-            {!showDeleted && canCreate ? (
++            {canCreate ? (
+               <Button size="sm" className="h-8" onClick={openNew}>
+                 <Plus className="h-4 w-4 ml-1" />
+                 سند جدید
+@@ -1615,16 +1644,33 @@
+       {selectedIds.length > 0 ? (
+         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50/60 px-2 py-1.5 text-xs">
+           <span className="text-sky-900">{toFaDigits(selectedIds.length)} مورد انتخاب شده</span>
+-          {canPost ? (
+-            <Button type="button" size="sm" className="h-7" variant="secondary" onClick={() => void bulkPostSelected()}>
+-              ثبت قطعی گروهی
+-            </Button>
+-          ) : null}
+-          {canDelete ? (
+-            <Button type="button" size="sm" className="h-7" variant="destructive" onClick={requestBulkDelete}>
+-              حذف پیش‌نویس‌ها
+-            </Button>
+-          ) : null}
++          {showDeleted ? (
++            canDelete ? (
++              <Button
++                type="button"
++                size="sm"
++                className="h-7"
++                variant="secondary"
++                disabled={restoreMut.isPending}
++                onClick={() => void bulkRestoreSelected()}
++              >
++                بازیابی گروهی
++              </Button>
++            ) : null
++          ) : (
++            <>
++              {canPost ? (
++                <Button type="button" size="sm" className="h-7" variant="secondary" onClick={() => void bulkPostSelected()}>
++                  ثبت قطعی گروهی
++                </Button>
++              ) : null}
++              {canDelete ? (
++                <Button type="button" size="sm" className="h-7" variant="destructive" onClick={requestBulkDelete}>
++                  حذف پیش‌نویس‌ها
++                </Button>
++              ) : null}
++            </>
++          )}
+           <Button type="button" size="sm" className="h-7" variant="ghost" onClick={() => setSelectedIds([])}>
+             لغو انتخاب
+           </Button>
+@@ -1645,14 +1691,20 @@
+                     ? `ثبت‌شده (${toFaDigits(statusCounts.POSTED)})`
+                     : statusFilter === "REVERSED"
+                       ? `برگشت‌خورده (${toFaDigits(statusCounts.REVERSED)})`
+-                      : statusFilter
++                      : statusFilter === "__DELETED__"
++                        ? `حذف‌شده‌ها (${toFaDigits(statusCounts.DELETED)})`
++                        : statusFilter
+             }
+             options={[
+               { id: "", label: `همه (${toFaDigits(statusCounts.all)})`, searchText: "همه" },
+-              { id: "DRAFT", label: `پیش‌نویس (${toFaDigits(statusCounts.DRAFT)})`, searchText: "پیش‌نویس DRAFT" },
+-              { id: "POSTED", label: `ثبت‌شده (${toFaDigits(statusCounts.POSTED)})`, searchText: "ثبت‌شده POSTED" },
+-              { id: "REVERSED", label: `برگشت‌خورده (${toFaDigits(statusCounts.REVERSED)})`, searchText: "برگشت REVERSED" },
+-              { id: "__DELETED__", label: "حذف‌شده‌ها", searchText: "حذف شده سطل بازیافت" },
++              { id: "DRAFT", label: `پیش‌نویس (${toFaDigits(statusCounts.DRAFT)})`, searchText: "پیش‌نویس" },
++              { id: "POSTED", label: `ثبت‌شده (${toFaDigits(statusCounts.POSTED)})`, searchText: "ثبت‌شده" },
++              { id: "REVERSED", label: `برگشت‌خورده (${toFaDigits(statusCounts.REVERSED)})`, searchText: "برگشت" },
++              {
++                id: "__DELETED__",
++                label: `حذف‌شده‌ها (${toFaDigits(statusCounts.DELETED)})`,
++                searchText: "حذف شده سطل بازیافت",
++              },
+             ]}
+             placeholder="وضعیت…"
+             className="h-8 w-full rounded-md border bg-background px-2 text-xs"
+@@ -1773,7 +1825,11 @@
+                     </td>
+                     {visibleCols.number !== false ? (
+                       <td className="px-2 py-1.5 text-xs font-medium tabular-nums">
+-                        {j.entry_number ? toFaDigits(j.entry_number) : "—"}
++                        {j.entry_number
++                          ? toFaDigits(j.entry_number)
++                          : j.status === "DRAFT"
++                            ? "پ.ن"
++                            : "—"}
+                       </td>
+                     ) : null}
+                     {visibleCols.date !== false ? (
