@@ -130,7 +130,7 @@ function formatAmountDisplay(raw: string): string {
 }
 
 const AMOUNT_INPUT_CLASS =
-  "h-8 text-xs tabular-nums text-left tracking-tight";
+  "h-8 w-full min-w-[7.5rem] text-[11px] tabular-nums text-left tracking-tight px-1.5";
 
 const FORM_FONT =
   { fontFamily: "var(--font-vazirmatn), Tahoma, Arial, sans-serif" } as const;
@@ -659,28 +659,20 @@ export function JournalsPage() {
           </div>
           <div className="space-y-1 flex-1 min-w-[200px]">
             <label className="text-xs text-muted-foreground">شرح سند</label>
-            <div className="flex gap-2">
-              <Input
-                className="h-9"
-                placeholder="شرح کلی سند"
-                value={description}
-                disabled={viewOnly}
-                onChange={(e) => { markDirty(); setDescription(e.target.value); }}
-              />
-              {!viewOnly ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-9 shrink-0"
-                  title="کپی شرح سند روی سطرهای بدون شرح"
-                  disabled={!description.trim()}
-                  onClick={copyDescriptionToEmptyLines}
-                >
-                  کپی به سطرها
-                </Button>
-              ) : null}
-            </div>
+            <Input
+              className="h-9"
+              placeholder="شرح کلی سند (خودکار روی سطرهای خالی)"
+              value={description}
+              disabled={viewOnly}
+              onChange={(e) => {
+                const v = e.target.value;
+                markDirty();
+                setDescription(v);
+                setLines((prev) =>
+                  prev.map((l) => (l.description.trim() ? l : { ...l, description: v }))
+                );
+              }}
+            />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">شماره</label>
@@ -699,23 +691,10 @@ export function JournalsPage() {
         )}
 
         {!viewOnly ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                className="h-9 pr-8 text-xs"
-                placeholder="جستجوی حساب (کد یا نام)…"
-                value={accountQuery}
-                onChange={(e) => setAccountQuery(e.target.value)}
-              />
-            </div>
-            <span className="text-xs text-muted-foreground">
-              {toFaDigits(filteredAccounts.length)} حساب قابل ثبت
-            </span>
-            <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-              <Keyboard className="h-3.5 w-3.5" />
-              F2 پیش‌نویس · F9 قطعی · F4 تراز · F7 سطر
-            </span>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            <Keyboard className="h-3.5 w-3.5" />
+            <span>F2 پیش‌نویس · F9 قطعی · F4 تراز · F7 سطر</span>
+            <span className="text-muted-foreground/80">· تایپ در ستون حساب برای جستجو</span>
           </div>
         ) : null}
 
@@ -724,10 +703,10 @@ export function JournalsPage() {
             <thead>
               <tr className="border-b text-right text-xs text-muted-foreground bg-muted/30">
                 <th className="px-2 py-1 w-10">#</th>
-                <th className="px-2 py-1 min-w-[200px]">حساب (تفصیلی)</th>
+                <th className="px-2 py-1 min-w-[200px]">حساب</th>
                 <th className="px-2 py-1 min-w-[120px]">شرح سطر</th>
-                <th className="px-2 py-1 w-28">بدهکار</th>
-                <th className="px-2 py-1 w-28">بستانکار</th>
+                <th className="px-2 py-1 min-w-[8rem] w-32">بدهکار</th>
+                <th className="px-2 py-1 min-w-[8rem] w-32">بستانکار</th>
                 {costCenters.length > 0 ? (
                   <th className="px-2 py-1 min-w-[120px]">مرکز هزینه</th>
                 ) : null}
@@ -1136,7 +1115,7 @@ export function JournalsPage() {
                 <th className="px-3 py-2 font-medium">دوره</th>
                 <th className="px-3 py-2 font-medium">وضعیت</th>
                 <th className="px-3 py-2 font-medium">شرح</th>
-                <th className="px-3 py-2 font-medium">بدهکار</th>
+                <th className="px-3 py-2 font-medium min-w-[8rem]">بدهکار</th>
                 <th className="px-3 py-2 font-medium">بستانکار</th>
                 <th className="px-3 py-2 font-medium">عملیات</th>
               </tr>
