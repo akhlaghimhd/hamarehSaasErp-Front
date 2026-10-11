@@ -1,0 +1,62 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -44,5 +44,5 @@
+ import { useAccountFlat } from "../hooks/use-accounts";
+ import { journalService } from "../services/journal-service";
+-import { AccountTypeahead } from "./journals-account-typeahead";
++import { AccountTypeahead, OptionTypeahead } from "./journals-account-typeahead";
+ import {
+   FinancePermissions,
+@@ -131,5 +131,8 @@
+ 
+ const AMOUNT_INPUT_CLASS =
+-  "h-8 text-xs font-mono tabular-nums text-left tracking-tight";
++  "h-8 text-xs tabular-nums text-left tracking-tight";
++
++const FORM_FONT =
++  { fontFamily: "var(--font-vazirmatn), Tahoma, Arial, sans-serif" } as const;
+ 
+ function sumLines(
+@@ -576,17 +579,17 @@
+     if (formMode === null || viewOnly) return;
+     function onKey(e: KeyboardEvent) {
+-      // فقط Alt — Ctrl/Meta با میانبرهای مرورگر تداخل دارند
+-      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+-      const k = e.key.toLowerCase();
+-      if (k === "s") {
++      // F-keys در وب پایدارتر از Alt/Ctrl هستند (Alt اغلب منوی مرورگر را می‌گیرد)
++      if (e.ctrlKey || e.metaKey || e.altKey) return;
++      const code = e.code;
++      if (code === "F2") {
+         e.preventDefault();
+         if (!saving) void doSave(false);
+-      } else if (k === "enter") {
++      } else if (code === "F9") {
+         e.preventDefault();
+         if (!saving && isBalanced && canPost) void doSave(true);
+-      } else if (k === "b") {
++      } else if (code === "F4") {
+         e.preventDefault();
+         fillBalanceOnLast();
+-      } else if (k === "n") {
++      } else if (code === "F7") {
+         e.preventDefault();
+         addLine();
+@@ -612,6 +615,5 @@
+ 
+     return (
+-      <div className="flex flex-col min-h-0 h-[calc(100dvh-3.5rem)]">
+-        <div className="shrink-0 px-1 pt-1">
++      <div className="space-y-4" style={FORM_FONT}>
+         <PageHeader
+           title={title}
+@@ -624,7 +626,5 @@
+           ]}
+         />
+-        </div>
+-
+-        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 px-1 py-2">
++
+         <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-3">
+           <div className="space-y-1">
