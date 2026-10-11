@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Decode FIN-CSN-F1 journals-page from split zlib+base64 parts in patches/journals_f1_b64.
+"""Restore FIN-CSN-F1 journals-page.tsx from patches/journals_f1_b64/part_*.txt
 
-Alternative if parts missing:
-  git checkout 052df6197ca66f3a7b9542d299e67493b219bc3b -- src/modules/finance/pages/journals-page.tsx
-  # then copy journals-page-impl.F1.tsx from project artifacts over the same path
+Run from Front repo root after: git pull origin develop
+
+  python scripts/restore_journals_f1.py
+  git add src/modules/finance/pages/journals-page.tsx
+  git commit -m "feat(fin): FIN-CSN-F1 journals multi-company + DR/JE display"
+  git push origin develop
 """
 from __future__ import annotations
 
@@ -15,13 +18,10 @@ root = pathlib.Path(__file__).resolve().parents[1]
 parts_dir = root / "patches" / "journals_f1_b64"
 out = root / "src" / "modules" / "finance" / "pages" / "journals-page.tsx"
 
-if not parts_dir.is_dir():
-    raise SystemExit(f"missing {parts_dir} — use git checkout 052df619 path or artifacts F1 file")
-
 parts = sorted(parts_dir.glob("part_*.txt"))
-if not parts:
-    raise SystemExit(f"no part_*.txt in {parts_dir}")
+if len(parts) < 10:
+    raise SystemExit(f"expected 10 parts in {parts_dir}, found {len(parts)}")
 
 data = "".join(p.read_text().strip() for p in parts)
 out.write_bytes(zlib.decompress(base64.b64decode(data)))
-print("wrote", out, "bytes", out.stat().st_size)
+print("OK wrote", out, "bytes", out.stat().st_size)
