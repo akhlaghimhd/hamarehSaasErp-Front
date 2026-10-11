@@ -1,0 +1,75 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -44,4 +44,5 @@
+ import { useAccountFlat } from "../hooks/use-accounts";
+ import { journalService } from "../services/journal-service";
++import { AccountTypeahead } from "./journals-account-typeahead";
+ import {
+   FinancePermissions,
+@@ -114,4 +115,22 @@
+ }
+ 
++/** نمایش مبلغ در ورودی با جداکننده هزارگان (ارقام فارسی) */
++function formatAmountDisplay(raw: string): string {
++  const ascii = toAsciiDigits(raw).replace(/,/g, "").trim();
++  if (!ascii) return "";
++  const neg = ascii.startsWith("-");
++  const body = neg ? ascii.slice(1) : ascii;
++  if (!/^\d*\.?\d*$/.test(body) || body === "" || body === ".") {
++    return toFaDigits(ascii);
++  }
++  const [intPart, decPart] = body.split(".");
++  const grouped = (intPart || "0").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
++  const out = decPart !== undefined ? `${grouped}.${decPart}` : grouped;
++  return toFaDigits(neg ? `-${out}` : out);
++}
++
++const AMOUNT_INPUT_CLASS =
++  "h-8 text-xs font-mono tabular-nums text-left tracking-tight";
++
+ function sumLines(
+   items: Array<{ debit_amount?: number | string; credit_amount?: number | string }> | undefined
+@@ -131,4 +150,5 @@
+   return jalaliToIso(jy, jm, jd);
+ }
++
+ 
+ export function JournalsPage() {
+@@ -205,4 +225,8 @@
+   const [dirty, setDirty] = useState(false);
+   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
++  /** typeahead حساب روی هر سطر */
++  const [accountFocusKey, setAccountFocusKey] = useState<string | null>(null);
++  const [accountTypeQuery, setAccountTypeQuery] = useState("");
++  const [accountHighlightIdx, setAccountHighlightIdx] = useState(0);
+ 
+   const filteredAccounts = useMemo(() => {
+@@ -285,4 +309,6 @@
+     setDirty(false);
+     setMeta({});
++    setAccountFocusKey(null);
++    setAccountTypeQuery("");
+   }
+ 
+@@ -416,8 +442,11 @@
+       },
+     ]);
++    setAccountFocusKey(key);
++    setAccountTypeQuery("");
++    setAccountHighlightIdx(0);
+     requestAnimationFrame(() => {
+       const el = document.querySelector(
+-        `select[data-line-key="${key}"]`
+-      ) as HTMLSelectElement | null;
++        `input[data-line-key="${key}"]`
++      ) as HTMLInputElement | null;
+       el?.focus();
+     });
+@@ -487,5 +516,5 @@
+ 
+     if (built.length < 2) {
+-      setFormError("حداقل دو آرتیکل با حساب و مبلغ لازم است.");
++      setFormError("حداقل دو سطر با حساب و مبلغ لازم است.");
+       return;
+     }
