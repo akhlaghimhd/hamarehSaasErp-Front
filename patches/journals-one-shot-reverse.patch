@@ -1,0 +1,20 @@
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -1828,7 +1828,7 @@
+                             ثبت قطعی
+                           </Button>
+                         ) : null}
+-                        {j.status === "POSTED" && canReverse ? (
++                        {j.status === "POSTED" && !j.reverses_entry_id && canReverse ? (
+                           <Button
+                             size="sm"
+                             variant="outline"
+@@ -1921,7 +1921,7 @@
+           <DialogHeader>
+             <DialogTitle>برگشت سند</DialogTitle>
+             <DialogDescription>
+-              سند معکوس صادر می‌شود و سند اصلی برگشت‌خورده علامت می‌خورد.
++              سند معکوس صادر و ثبت قطعی می‌شود؛ سند اصلی برگشت‌خورده می‌شود. سند برگشت دیگر قابل برگشت نیست.
+               {reverseTarget?.entry_number
+                 ? ` شماره: ${toFaDigits(reverseTarget.entry_number)}`
+                 : ""}
