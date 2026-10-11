@@ -192,6 +192,7 @@ export function JournalsPage() {
   const [listPage, setListPage] = useState(1);
   const [pageSize] = useState(15);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const [colMenuOpen, setColMenuOpen] = useState(false);
   const [visibleCols, setVisibleCols] = useState<Record<string, boolean>>(() => {
     try {
@@ -204,7 +205,8 @@ export function JournalsPage() {
   const [msg, setMsg] = useState<string | null>(null);
   useEffect(() => {
     if (!msg) return;
-    const t = window.setTimeout(() => setMsg(null), 4500);
+    const isErr = msg.includes("خطا") || msg.includes("ممکن نشد") || msg.includes("مسدود");
+    const t = window.setTimeout(() => setMsg(null), isErr ? 8000 : 3500);
     return () => window.clearTimeout(t);
   }, [msg]);
 
@@ -314,6 +316,7 @@ export function JournalsPage() {
   useEffect(() => {
     setListPage(1);
     setSelectedIds([]);
+    setMsg(null);
   }, [statusFilter, periodFilter, dateFrom, dateTo, search]);
 
   useEffect(() => {
@@ -939,8 +942,22 @@ export function JournalsPage() {
   }
 
 
+  function buildListFilterSummary(): string {
+    const parts: string[] = [];
+    if (statusFilter) parts.push(`وضعیت: ${statusLabel[statusFilter] ?? statusFilter}`);
+    else parts.push("وضعیت: همه");
+    if (periodFilter) parts.push(`دوره: ${periodLabel(periodFilter)}`);
+    else parts.push("دوره: همه");
+    if (dateFrom) parts.push(`از تاریخ: ${formatJalaliDate(dateFrom)}`);
+    if (dateTo) parts.push(`تا تاریخ: ${formatJalaliDate(dateTo)}`);
+    if (search.trim()) parts.push(`جستجو: ${search.trim()}`);
+    parts.push(`تعداد ردیف: ${toFaDigits(filtered.length)}`);
+    return parts.join(" | ");
+  }
+
   function exportListExcel() {
     const rows = filtered;
+    const filterLine = buildListFilterSummary();
     const head = ["شماره", "تاریخ", "دوره", "وضعیت", "شرح", "بدهکار", "بستانکار"];
     const body = rows.map((j) => {
       const t = sumLines(j.items as JournalItemDto[] | undefined);
@@ -955,7 +972,19 @@ export function JournalsPage() {
       ];
     });
     const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
-    const csv = "\ufeff" + [head, ...body].map((r) => r.map(esc).join(",")).join("\n");
+    const meta = [
+      ["گزارش فهرست اسناد حسابداری"],
+      ["فیلترها", filterLine],
+      ["زمان خروجی", new Date().toLocaleString("fa-IR")],
+      [],
+    ];
+    const csv =
+      "\ufeff" +
+      [
+        ...meta.map((r) => r.map(esc).join(",")),
+        head.map(esc).join(","),
+        ...body.map((r) => r.map(esc).join(",")),
+      ].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -970,6 +999,7 @@ export function JournalsPage() {
 
   function exportListPdf() {
     const rows = filtered;
+    const filterLine = buildListFilterSummary();
     const trs = rows
       .map((j) => {
         const t = sumLines(j.items as JournalItemDto[] | undefined);
@@ -992,17 +1022,18 @@ export function JournalsPage() {
         table{width:100%;border-collapse:collapse}
         th,td{border:1px solid #cbd5e1;padding:4px 6px;text-align:right}
         th{background:#f1f5f9}
-        .meta{color:#64748b;margin-bottom:12px}
+        .meta{color:#64748b;margin-bottom:8px;line-height:1.6}
       </style></head><body>
       <h1>فهرست اسناد حسابداری</h1>
-      <div class="meta">تعداد: ${toFaDigits(rows.length)} — ${toFaDigits(new Date().toLocaleString("fa-IR"))}</div>
+      <div class="meta">فیلترها: ${filterLine.replace(/</g, "<")}</div>
+      <div class="meta">زمان خروجی: ${toFaDigits(new Date().toLocaleString("fa-IR"))}</div>
       <table><thead><tr>
         <th>شماره</th><th>تاریخ</th><th>دوره</th><th>وضعیت</th><th>شرح</th><th>بدهکار</th><th>بستانکار</th>
       </tr></thead><tbody>${trs}</tbody></table>
       </body></html>`;
     const w = window.open("", "_blank");
     if (!w) {
-      setMsg("مرورگر پنجره چاپ را مسدود کرد.");
+      setMsg("مرورگر پنجره چاپ را مسدود کرد. اجازه پاپ‌آپ را فعال کنید.");
       return;
     }
     w.document.write(html);
@@ -1031,13 +1062,19 @@ export function JournalsPage() {
     void refetch();
   }
 
-  async function bulkDeleteSelected() {
+  function requestBulkDelete() {
     const drafts = (data ?? []).filter((j) => selectedIds.includes(j.journal_entry_id) && j.status === "DRAFT");
     if (!drafts.length) {
       setMsg("فقط پیش‌نویس قابل حذف گروهی است.");
       return;
     }
-    if (!window.confirm(`حذف ${toFaDigits(drafts.length)} پیش‌نویس؟`)) return;
+    setBulkDeleteConfirmOpen(true);
+  }
+
+  async function confirmBulkDelete() {
+    const drafts = (data ?? []).filter((j) => selectedIds.includes(j.journal_entry_id) && j.status === "DRAFT");
+    setBulkDeleteConfirmOpen(false);
+    if (!drafts.length) return;
     let ok = 0;
     for (const j of drafts) {
       try {
@@ -1568,8 +1605,22 @@ export function JournalsPage() {
       />
 
       {msg ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-          {msg}
+        <div
+          className={
+            msg.includes("خطا") || msg.includes("ممکن نشد") || msg.includes("مسدود")
+              ? "rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 flex items-start gap-2"
+              : "rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 flex items-start gap-2"
+          }
+        >
+          <span className="flex-1">{msg}</span>
+          <button
+            type="button"
+            className="shrink-0 h-6 w-6 inline-flex items-center justify-center rounded hover:bg-black/5"
+            title="بستن"
+            onClick={() => setMsg(null)}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
       ) : null}
 
@@ -1582,7 +1633,7 @@ export function JournalsPage() {
             </Button>
           ) : null}
           {canDelete ? (
-            <Button type="button" size="sm" className="h-7" variant="destructive" onClick={() => void bulkDeleteSelected()}>
+            <Button type="button" size="sm" className="h-7" variant="destructive" onClick={requestBulkDelete}>
               حذف پیش‌نویس‌ها
             </Button>
           ) : null}
@@ -1870,6 +1921,28 @@ export function JournalsPage() {
           </div>
         </div>
       ) : null}
+
+      <Dialog open={bulkDeleteConfirmOpen} onOpenChange={setBulkDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>حذف گروهی پیش‌نویس</DialogTitle>
+            <DialogDescription>
+              {toFaDigits(
+                (data ?? []).filter((j) => selectedIds.includes(j.journal_entry_id) && j.status === "DRAFT").length
+              )}{" "}
+              پیش‌نویس انتخاب‌شده حذف نرم می‌شود. ادامه می‌دهید؟
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setBulkDeleteConfirmOpen(false)}>
+              انصراف
+            </Button>
+            <Button type="button" variant="destructive" onClick={() => void confirmBulkDelete()}>
+              حذف
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!reverseTarget} onOpenChange={(o) => !o && setReverseTarget(null)}>
         <DialogContent>
