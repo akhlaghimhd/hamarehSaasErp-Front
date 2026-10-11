@@ -13,7 +13,6 @@ import {
   FileText,
   Search,
   Link2,
-  Keyboard,
   FileSpreadsheet,
   FileDown,
 } from "lucide-react";
@@ -438,18 +437,25 @@ export function JournalsPage() {
   function addLine() {
     markDirty();
     const key = Math.random().toString(36).slice(2);
-    setLines((prev) => [
-      ...prev,
-      {
-        key,
-        account_id: "",
-        debit: "",
-        credit: "",
-        description: description,
-        cost_center_id: "",
-        business_unit_id: "",
-      },
-    ]);
+    const row: LineForm = {
+      key,
+      account_id: "",
+      debit: "",
+      credit: "",
+      description: description,
+      cost_center_id: "",
+      business_unit_id: "",
+    };
+    setLines((prev) => {
+      // سطرهای جدید همیشه قبل از سطر تراز سیستم قرار می‌گیرند
+      const balIdx = prev.findIndex((l) => l.is_system_balance);
+      if (balIdx >= 0) {
+        const next = [...prev];
+        next.splice(balIdx, 0, row);
+        return next;
+      }
+      return [...prev, row];
+    });
     setAccountFocusKey(key);
     setAccountTypeQuery("");
     setAccountHighlightIdx(0);
@@ -475,15 +481,20 @@ export function JournalsPage() {
   }
 
   function fillBalanceOnLast() {
+    // فقط سطرهای عادی (غیرسیستمی) در جمع لحاظ می‌شوند
+    const normal = lines.filter((l) => !l.is_system_balance);
     let d = 0;
     let c = 0;
-    for (const l of lines) {
+    for (const l of normal) {
       d += parseAmount(l.debit);
       c += parseAmount(l.credit);
     }
     const diff = Math.round((d - c) * 100) / 100;
     if (diff === 0) {
-      setMsg("سند هم‌اکنون تراز است.");
+      // اگر تراز است، سطر تراز سیستم را حذف کن
+      markDirty();
+      setLines((prev) => prev.filter((l) => !l.is_system_balance));
+      setMsg("سند تراز است؛ سطر تراز سیستم حذف شد.");
       return;
     }
     markDirty();
@@ -497,38 +508,20 @@ export function JournalsPage() {
       (diff > 0 ? "بستانکار تراز (سیستم)" : "بدهکار تراز (سیستم)");
 
     setLines((prev) => {
-      // پاک کردن پرچم سیستم قبلی روی سطرهایی که دیگر نقش تراز ندارند
-      const cleared = prev.map((l) =>
-        l.is_system_balance ? { ...l, is_system_balance: undefined } : l
-      );
-      const last = cleared[cleared.length - 1];
-      const lastReusable =
-        last &&
-        !last.account_id &&
-        parseAmount(last.debit) === 0 &&
-        parseAmount(last.credit) === 0;
-
-      if (lastReusable) {
-        const next = [...cleared];
-        next[next.length - 1] = {
-          ...last,
-          ...amountPatch,
-          description: last.description.trim() || balDesc,
-          is_system_balance: true,
-        };
-        return next;
-      }
-      return [
-        ...cleared,
-        {
-          ...emptyLine(balDesc, true),
-          ...amountPatch,
-        },
-      ];
+      // همه سطرهای تراز قبلی حذف؛ یکی در انتها ساخته/به‌روز می‌شود
+      const normals = prev.filter((l) => !l.is_system_balance);
+      const balanceRow: LineForm = {
+        key: prev.find((l) => l.is_system_balance)?.key ?? Math.random().toString(36).slice(2),
+        account_id: prev.find((l) => l.is_system_balance)?.account_id ?? "",
+        cost_center_id: prev.find((l) => l.is_system_balance)?.cost_center_id ?? "",
+        business_unit_id: prev.find((l) => l.is_system_balance)?.business_unit_id ?? "",
+        description: balDesc,
+        is_system_balance: true,
+        ...amountPatch,
+      };
+      return [...normals, balanceRow];
     });
   }
-
-
 
   const authUser = useAuthStore((s) => s.user);
   const authOrg = useAuthStore((s) => s.organization);
@@ -561,79 +554,164 @@ export function JournalsPage() {
 
   function exportJournalExcel() {
     const meta = journalMetaRows();
+    const wb = XLSX.utils.book_new();
+
+    // شیت ۱: مشخصات
+    const metaAoa: (string | number)[][] = [
+      ["مشخصات سند حسابداری"],
+      [],
+      ...meta.filter((r) => r.length > 0),
+      [],
+      ["جمع بدهکار", lineTotals.debit],
+      ["جمع بستانکار", lineTotals.credit],
+      ["اختلاف", lineTotals.diff],
+      ["وضعیت", isBalanced ? "تراز" : "نامتراز"],
+    ];
+    const wsMeta = XLSX.utils.aoa_to_sheet(metaAoa);
+    wsMeta["!cols"] = [{ wch: 18 }, { wch: 40 }];
+    XLSX.utils.book_append_sheet(wb, wsMeta, "مشخصات");
+
+    // شیت ۲: سطرها
     const header = [
-      "#",
+      "ردیف",
       "حساب",
-      "شرح",
+      "شرح سطر",
       "بدهکار",
       "بستانکار",
       "مرکز هزینه",
       "واحد کسب‌وکار",
-      "تراز سیستم",
+      "نوع سطر",
     ];
     const body = lines.map((l, idx) => [
-      toFaDigits(idx + 1),
+      idx + 1,
       accountLabel(l.account_id),
       l.description || "",
-      parseAmount(l.debit) ? formatMoney(parseAmount(l.debit)) : "",
-      parseAmount(l.credit) ? formatMoney(parseAmount(l.credit)) : "",
-      costCenters.find((c) => c.cost_center_id === l.cost_center_id)?.name ?? "",
-      businessUnits.find((b) => b.business_unit_id === l.business_unit_id)?.name ?? "",
-      l.is_system_balance ? "بله" : "",
+      parseAmount(l.debit) || "",
+      parseAmount(l.credit) || "",
+      costCenters.find((c) => c.cost_center_id === l.cost_center_id)
+        ? `${costCenters.find((c) => c.cost_center_id === l.cost_center_id)!.code} — ${costCenters.find((c) => c.cost_center_id === l.cost_center_id)!.name}`
+        : "",
+      businessUnits.find((b) => b.business_unit_id === l.business_unit_id)
+        ? `${businessUnits.find((b) => b.business_unit_id === l.business_unit_id)!.code} — ${businessUnits.find((b) => b.business_unit_id === l.business_unit_id)!.name}`
+        : "",
+      l.is_system_balance ? "تراز سیستم" : "عادی",
     ]);
-    const totals = [
-      [],
-      ["جمع بدهکار", formatMoney(lineTotals.debit)],
-      ["جمع بستانکار", formatMoney(lineTotals.credit)],
-      ["اختلاف", formatMoney(lineTotals.diff)],
+    const totalRow = [
+      "",
+      "",
+      "جمع",
+      lineTotals.debit,
+      lineTotals.credit,
+      "",
+      "",
+      "",
     ];
-    const aoa = [...meta, header, ...body, ...totals];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "سند");
+    const wsLines = XLSX.utils.aoa_to_sheet([header, ...body, [], totalRow]);
+    wsLines["!cols"] = [
+      { wch: 6 },
+      { wch: 36 },
+      { wch: 28 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 22 },
+      { wch: 22 },
+      { wch: 12 },
+    ];
+    // محدوده جدول برای خوانایی در اکسل
+    if (wsLines["!ref"]) {
+      wsLines["!autofilter"] = { ref: `A1:H${body.length + 1}` };
+    }
+    XLSX.utils.book_append_sheet(wb, wsLines, "سطرهای سند");
     XLSX.writeFile(wb, `journal-${entryNumber || "draft"}-${Date.now()}.xlsx`);
   }
 
   function exportJournalPdf() {
     const meta = journalMetaRows();
+    const companyName = meta.find((r) => r[0] === "شرکت")?.[1] ?? "—";
+    const userLabel = meta.find((r) => r[0] === "کاربر")?.[1] ?? "—";
+    const now = meta.find((r) => r[0] === "زمان خروجی")?.[1] ?? "—";
+    const orgName = meta.find((r) => r[0] === "سازمان")?.[1] ?? "—";
+
     const rowsHtml = lines
       .map((l, idx) => {
-        const bg = l.is_system_balance ? "#fffbeb" : idx % 2 === 1 ? "#f4f4f5" : "#fff";
+        const bg = l.is_system_balance ? "#fffbeb" : idx % 2 === 1 ? "#f8fafc" : "#fff";
+        const cc = costCenters.find((c) => c.cost_center_id === l.cost_center_id);
+        const bu = businessUnits.find((b) => b.business_unit_id === l.business_unit_id);
         return `<tr style="background:${bg}">
-          <td>${toFaDigits(idx + 1)}</td>
+          <td class="c">${toFaDigits(idx + 1)}</td>
           <td>${accountLabel(l.account_id)}</td>
           <td>${l.description || "—"}</td>
-          <td style="text-align:left">${parseAmount(l.debit) ? formatMoney(parseAmount(l.debit)) : "—"}</td>
-          <td style="text-align:left">${parseAmount(l.credit) ? formatMoney(parseAmount(l.credit)) : "—"}</td>
+          <td class="n">${parseAmount(l.debit) ? formatMoney(parseAmount(l.debit)) : "—"}</td>
+          <td class="n">${parseAmount(l.credit) ? formatMoney(parseAmount(l.credit)) : "—"}</td>
+          <td>${cc ? `${toFaDigits(cc.code)} — ${cc.name}` : "—"}</td>
+          <td>${bu ? `${toFaDigits(bu.code)} — ${bu.name}` : "—"}</td>
+          <td class="c">${l.is_system_balance ? "تراز" : "—"}</td>
         </tr>`;
       })
       .join("");
-    const metaHtml = meta
-      .filter((r) => r.length)
-      .map((r) => `<div><strong>${r[0]}</strong>${r[1] != null ? ": " + r[1] : ""}</div>`)
-      .join("");
+
     const html = `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/>
-      <title>سند حسابداری</title>
+      <title>سند حسابداری ${entryNumber ? toFaDigits(entryNumber) : "پیش‌نویس"}</title>
       <style>
-        body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#111}
-        h1{font-size:16px;margin:0 0 12px}
-        table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px}
-        th,td{border:1px solid #ddd;padding:6px 8px;text-align:right}
-        th{background:#f4f4f5}
-        .meta{font-size:12px;line-height:1.7}
-        .totals{margin-top:12px;font-size:12px}
+        *{box-sizing:border-box}
+        body{font-family:Tahoma,Arial,sans-serif;padding:16px 20px;color:#111;font-size:11px}
+        h1{font-size:15px;margin:0 0 10px;text-align:center}
+        .meta{width:100%;border-collapse:collapse;margin-bottom:12px}
+        .meta td{border:1px solid #cbd5e1;padding:4px 8px;vertical-align:top}
+        .meta td.k{width:18%;background:#f1f5f9;font-weight:600;white-space:nowrap}
+        .meta td.v{width:32%}
+        table.lines{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:4px}
+        table.lines th,table.lines td{border:1px solid #94a3b8;padding:4px 6px;text-align:right}
+        table.lines th{background:#e2e8f0;font-weight:600}
+        td.n,th.n{text-align:left;font-variant-numeric:tabular-nums;direction:ltr}
+        td.c,th.c{text-align:center}
+        .totals{margin-top:10px;width:100%;border-collapse:collapse}
+        .totals td{border:1px solid #94a3b8;padding:5px 8px}
+        .totals td.k{background:#f1f5f9;font-weight:600;width:30%}
+        @media print{body{padding:8px} a{display:none}}
       </style></head><body>
       <h1>سند حسابداری</h1>
-      <div class="meta">${metaHtml}</div>
-      <table>
-        <thead><tr><th>#</th><th>حساب</th><th>شرح</th><th>بدهکار</th><th>بستانکار</th></tr></thead>
+      <table class="meta">
+        <tr>
+          <td class="k">شرکت</td><td class="v">${companyName}</td>
+          <td class="k">سازمان</td><td class="v">${orgName}</td>
+        </tr>
+        <tr>
+          <td class="k">شماره سند</td><td class="v">${entryNumber ? toFaDigits(entryNumber) : "پیش‌نویس"}</td>
+          <td class="k">تاریخ سند</td><td class="v">${documentDate ? toFaDigits(documentDate) : "—"}</td>
+        </tr>
+        <tr>
+          <td class="k">دوره مالی</td><td class="v">${periodLabel(periodId)}</td>
+          <td class="k">کاربر</td><td class="v">${userLabel}</td>
+        </tr>
+        <tr>
+          <td class="k">زمان خروجی</td><td class="v">${now}</td>
+          <td class="k">وضعیت تراز</td><td class="v">${isBalanced ? "تراز ✓" : "نامتراز"}</td>
+        </tr>
+        <tr>
+          <td class="k">شرح سند</td><td class="v" colspan="3">${description || "—"}</td>
+        </tr>
+      </table>
+      <table class="lines">
+        <thead>
+          <tr>
+            <th class="c">#</th>
+            <th>حساب</th>
+            <th>شرح سطر</th>
+            <th class="n">بدهکار</th>
+            <th class="n">بستانکار</th>
+            <th>مرکز هزینه</th>
+            <th>واحد کسب‌وکار</th>
+            <th class="c">نوع</th>
+          </tr>
+        </thead>
         <tbody>${rowsHtml}</tbody>
       </table>
-      <div class="totals">
-        <div>جمع بدهکار: ${formatMoney(lineTotals.debit)}</div>
-        <div>جمع بستانکار: ${formatMoney(lineTotals.credit)}</div>
-        <div>وضعیت: ${isBalanced ? "تراز" : "نامتراز"}</div>
-      </div>
+      <table class="totals">
+        <tr><td class="k">جمع بدهکار</td><td class="n">${formatMoney(lineTotals.debit)}</td></tr>
+        <tr><td class="k">جمع بستانکار</td><td class="n">${formatMoney(lineTotals.credit)}</td></tr>
+        <tr><td class="k">اختلاف</td><td class="n">${formatMoney(lineTotals.diff)}</td></tr>
+      </table>
       <script>window.onload=function(){window.print();}</script>
       </body></html>`;
     const w = window.open("", "_blank");
@@ -848,13 +926,6 @@ export function JournalsPage() {
           </div>
         )}
 
-        {!viewOnly ? (
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-            <Keyboard className="h-3.5 w-3.5" />
-            <span>F2 پیش‌نویس · F9 قطعی · F4 تراز · F7 سطر</span>
-            <span className="text-muted-foreground/80">· تایپ در ستون حساب برای جستجو</span>
-          </div>
-        ) : null}
 
         <div className="rounded-xl border bg-card overflow-x-auto">
           <table className="w-full text-sm">
@@ -1063,7 +1134,7 @@ export function JournalsPage() {
                 <span className="mr-1 text-[10px] text-muted-foreground">F7</span>
               </Button>
               <Button type="button" size="sm" variant="secondary" onClick={fillBalanceOnLast}>
-                تراز آخرین سطر
+                تراز سند
                 <span className="mr-1 text-[10px] text-muted-foreground">F4</span>
               </Button>
             </div>
@@ -1135,6 +1206,7 @@ export function JournalsPage() {
                     title="F2"
                   >
                     ذخیره پیش‌نویس
+                    <span className="mr-1 text-[10px] text-muted-foreground">F2</span>
                   </Button>
                   {canPost ? (
                     <Button
@@ -1151,6 +1223,7 @@ export function JournalsPage() {
                         <CheckCircle2 className="h-4 w-4 ml-1" />
                       )}
                       ذخیره و ثبت قطعی
+                      <span className="mr-1 text-[10px] opacity-80">F9</span>
                     </Button>
                   ) : null}
                 </>
