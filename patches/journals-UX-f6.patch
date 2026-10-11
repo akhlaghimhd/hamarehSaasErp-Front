@@ -1,0 +1,21 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -1109,5 +1150,5 @@
+                     className="border-b border-border/50 hover:bg-muted/40"
+                   >
+-                    <td className="px-3 py-2 font-mono text-xs font-medium">
++                    <td className="px-3 py-2 text-xs font-medium tabular-nums">
+                       {j.entry_number ? toFaDigits(j.entry_number) : "—"}
+                     </td>
+@@ -1129,8 +1170,8 @@
+                       {j.description ?? "—"}
+                     </td>
+-                    <td className="px-3 py-2 font-mono tabular-nums text-xs">
++                    <td className="px-3 py-2 tabular-nums text-xs">
+                       {t.debit ? formatMoney(t.debit) : "—"}
+                     </td>
+-                    <td className="px-3 py-2 font-mono tabular-nums text-xs">
++                    <td className="px-3 py-2 tabular-nums text-xs">
+                       {t.credit ? formatMoney(t.credit) : "—"}
+                     </td>
