@@ -1,0 +1,54 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -547,15 +576,17 @@
+     if (formMode === null || viewOnly) return;
+     function onKey(e: KeyboardEvent) {
+-      const mod = e.ctrlKey || e.metaKey;
+-      if (mod && e.key.toLowerCase() === "s") {
++      // فقط Alt — Ctrl/Meta با میانبرهای مرورگر تداخل دارند
++      if (!e.altKey || e.ctrlKey || e.metaKey) return;
++      const k = e.key.toLowerCase();
++      if (k === "s") {
+         e.preventDefault();
+         if (!saving) void doSave(false);
+-      } else if (mod && e.key === "Enter") {
++      } else if (k === "enter") {
+         e.preventDefault();
+         if (!saving && isBalanced && canPost) void doSave(true);
+-      } else if (mod && e.key.toLowerCase() === "b") {
++      } else if (k === "b") {
+         e.preventDefault();
+         fillBalanceOnLast();
+-      } else if (e.altKey && e.key.toLowerCase() === "n") {
++      } else if (k === "n") {
+         e.preventDefault();
+         addLine();
+@@ -581,8 +612,9 @@
+ 
+     return (
+-      <div className="space-y-4 pb-24">
++      <div className="flex flex-col min-h-0 h-[calc(100dvh-3.5rem)]">
++        <div className="shrink-0 px-1 pt-1">
+         <PageHeader
+           title={title}
+-          description="آرتیکل‌ها باید تراز باشند؛ شماره سند هنگام ثبت قطعی اختصاص می‌یابد"
++          description="سطرهای سند باید تراز باشند؛ شماره سند هنگام ثبت قطعی اختصاص می‌یابد"
+           breadcrumbs={[
+             { label: "داشبورد", href: "/dashboard" },
+@@ -592,5 +624,7 @@
+           ]}
+         />
+-
++        </div>
++
++        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 px-1 py-2">
+         <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-3">
+           <div className="space-y-1">
+@@ -678,5 +712,5 @@
+             <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+               <Keyboard className="h-3.5 w-3.5" />
+-              Ctrl+S پیش‌نویس · Ctrl+Enter قطعی · Ctrl+B تراز · Alt+N سطر
++              Alt+S پیش‌نویس · Alt+Enter قطعی · Alt+B تراز · Alt+N سطر
+             </span>
+           </div>
