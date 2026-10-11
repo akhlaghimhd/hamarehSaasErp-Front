@@ -6,7 +6,10 @@
    useDeleteJournal,
 +  useRestoreJournal,
  } from "../hooks/use-journals";
-@@ -191,8 +192,10 @@
+ import { useAccountFlat } from "../hooks/use-accounts";
+ import { journalService } from "../services/journal-service";
+@@ -191,7 +192,8 @@
+   const [dateTo, setDateTo] = useState("");
    const [search, setSearch] = useState("");
    const [listPage, setListPage] = useState(1);
 -  const [pageSize] = useState(15);
@@ -15,8 +18,7 @@
    const [selectedIds, setSelectedIds] = useState<string[]>([]);
    const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
    const [colMenuOpen, setColMenuOpen] = useState(false);
-@@ -210,10 +213,11 @@
-     () => ({
+@@ -209,8 +211,9 @@
        status: statusFilter || undefined,
        company_id: primaryCompanyId || undefined,
        period_id: periodFilter || undefined,
@@ -25,12 +27,17 @@
 -    [statusFilter, primaryCompanyId, periodFilter]
 +    [statusFilter, primaryCompanyId, periodFilter, showDeleted]
    );
-@@ -240,6 +244,7 @@
+ 
+   const { data, isLoading, error, refetch } = useJournals(filters);
+@@ -241,6 +244,7 @@
    const postMut = usePostJournal();
    const reverseMut = useReverseJournal();
    const deleteMut = useDeleteJournal();
 +  const restoreMut = useRestoreJournal();
-@@ -310,9 +315,22 @@
+ 
+   const [formMode, setFormMode] = useState<"new" | string | null>(null);
+   const [viewOnly, setViewOnly] = useState(false);
+@@ -310,7 +314,18 @@
    useEffect(() => {
      setListPage(1);
      setSelectedIds([]);
@@ -40,14 +47,17 @@
 +  useEffect(() => {
 +    if (!colMenuOpen) return;
 +    const onDoc = (e: MouseEvent) => {
-+      const t = e.target as HTMLElement | null;
-+      if (t?.closest?.("[data-col-menu]")) return;
++      const el = e.target as HTMLElement | null;
++      if (el?.closest?.("[data-col-menu]")) return;
 +      setColMenuOpen(false);
 +    };
 +    document.addEventListener("mousedown", onDoc);
 +    return () => document.removeEventListener("mousedown", onDoc);
 +  }, [colMenuOpen]);
-@@ -1535,7 +1553,7 @@
+ 
+   useEffect(() => {
+     try {
+@@ -1537,31 +1552,41 @@
    }
  
    return (
@@ -94,7 +104,10 @@
                {colMenuOpen ? (
 -                <div className="absolute left-0 top-full z-50 mt-1 w-44 rounded-md border bg-popover p-2 shadow-md text-xs space-y-1">
 +                <div data-col-menu className="absolute left-0 top-full z-50 mt-1 w-44 rounded-md border bg-popover p-2 shadow-md text-xs space-y-1">
-@@ -1845,16 +1863,36 @@
+                   {(
+                     [
+                       ["number", "شماره"],
+@@ -1845,16 +1870,36 @@
                              برگشت
                            </Button>
                          ) : null}
@@ -128,7 +141,11 @@
                              <Trash2 className="h-3.5 w-3.5" />
                            </Button>
                          ) : null}
-@@ -1861,9 +1899,28 @@
+                       </div>
+                     </td>
+                     ) : null}
+@@ -1862,10 +1907,29 @@
+ 
        {filtered.length > 0 ? (
          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground px-1">
 -          <span>
@@ -159,3 +176,5 @@
 +            </label>
 +          </div>
            <div className="flex items-center gap-1">
+             <Button
+               type="button"
