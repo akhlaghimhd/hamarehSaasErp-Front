@@ -1,0 +1,123 @@
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -892,6 +938,120 @@
+     );
+   }
+ 
++
++  function exportListExcel() {
++    const rows = filtered;
++    const head = ["شماره", "تاریخ", "دوره", "وضعیت", "شرح", "بدهکار", "بستانکار"];
++    const body = rows.map((j) => {
++      const t = sumLines(j.items as JournalItemDto[] | undefined);
++      return [
++        j.entry_number || "—",
++        formatJalaliDate(j.document_date),
++        periodLabel(j.period_id),
++        statusLabel[j.status] ?? j.status,
++        j.description ?? "",
++        t.debit ? String(t.debit) : "",
++        t.credit ? String(t.credit) : "",
++      ];
++    });
++    const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
++    const csv = "\ufeff" + [head, ...body].map((r) => r.map(esc).join(",")).join("\n");
++    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
++    const url = URL.createObjectURL(blob);
++    const a = document.createElement("a");
++    a.href = url;
++    a.download = `journals-${new Date().toISOString().slice(0, 10)}.csv`;
++    a.rel = "noopener";
++    document.body.appendChild(a);
++    a.click();
++    a.remove();
++    window.setTimeout(() => URL.revokeObjectURL(url), 1500);
++  }
++
++  function exportListPdf() {
++    const rows = filtered;
++    const trs = rows
++      .map((j) => {
++        const t = sumLines(j.items as JournalItemDto[] | undefined);
++        return `<tr>
++          <td>${j.entry_number ? toFaDigits(j.entry_number) : "—"}</td>
++          <td>${formatJalaliDate(j.document_date)}</td>
++          <td>${periodLabel(j.period_id)}</td>
++          <td>${statusLabel[j.status] ?? j.status}</td>
++          <td>${(j.description ?? "—").replace(/</g, "<")}</td>
++          <td>${t.debit ? formatMoney(t.debit) : "—"}</td>
++          <td>${t.credit ? formatMoney(t.credit) : "—"}</td>
++        </tr>`;
++      })
++      .join("");
++    const html = `<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/>
++      <title>اسناد حسابداری</title>
++      <style>
++        body{font-family:Tahoma,Arial,sans-serif;font-size:11px;padding:16px}
++        h1{font-size:16px;margin:0 0 8px}
++        table{width:100%;border-collapse:collapse}
++        th,td{border:1px solid #cbd5e1;padding:4px 6px;text-align:right}
++        th{background:#f1f5f9}
++        .meta{color:#64748b;margin-bottom:12px}
++      </style></head><body>
++      <h1>فهرست اسناد حسابداری</h1>
++      <div class="meta">تعداد: ${toFaDigits(rows.length)} — ${toFaDigits(new Date().toLocaleString("fa-IR"))}</div>
++      <table><thead><tr>
++        <th>شماره</th><th>تاریخ</th><th>دوره</th><th>وضعیت</th><th>شرح</th><th>بدهکار</th><th>بستانکار</th>
++      </tr></thead><tbody>${trs}</tbody></table>
++      </body></html>`;
++    const w = window.open("", "_blank");
++    if (!w) {
++      setMsg("مرورگر پنجره چاپ را مسدود کرد.");
++      return;
++    }
++    w.document.write(html);
++    w.document.close();
++    w.focus();
++    w.print();
++  }
++
++  async function bulkPostSelected() {
++    const drafts = (data ?? []).filter((j) => selectedIds.includes(j.journal_entry_id) && j.status === "DRAFT");
++    if (!drafts.length) {
++      setMsg("پیش‌نویسی در انتخاب‌ها نیست.");
++      return;
++    }
++    let ok = 0;
++    for (const j of drafts) {
++      try {
++        await postMut.mutateAsync(j.journal_entry_id);
++        ok += 1;
++      } catch {
++        /* continue */
++      }
++    }
++    setSelectedIds([]);
++    setMsg(`${toFaDigits(ok)} سند ثبت قطعی شد.`);
++    void refetch();
++  }
++
++  async function bulkDeleteSelected() {
++    const drafts = (data ?? []).filter((j) => selectedIds.includes(j.journal_entry_id) && j.status === "DRAFT");
++    if (!drafts.length) {
++      setMsg("فقط پیش‌نویس قابل حذف گروهی است.");
++      return;
++    }
++    if (!window.confirm(`حذف ${toFaDigits(drafts.length)} پیش‌نویس؟`)) return;
++    let ok = 0;
++    for (const j of drafts) {
++      try {
++        await deleteMut.mutateAsync(j.journal_entry_id);
++        ok += 1;
++      } catch {
++        /* continue */
++      }
++    }
++    setSelectedIds([]);
++    setMsg(`${toFaDigits(ok)} پیش‌نویس حذف شد.`);
++    void refetch();
++  }
++
+   if (formMode !== null) {
+     const title =
+       formMode === "new"
