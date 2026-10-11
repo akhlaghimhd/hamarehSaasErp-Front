@@ -1,0 +1,126 @@
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -970,6 +999,7 @@
+ 
+   function exportListPdf() {
+     const rows = filtered;
++    const filterLine = buildListFilterSummary();
+     const trs = rows
+       .map((j) => {
+         const t = sumLines(j.items as JournalItemDto[] | undefined);
+@@ -978,7 +1008,7 @@
+           <td>${formatJalaliDate(j.document_date)}</td>
+           <td>${periodLabel(j.period_id)}</td>
+           <td>${statusLabel[j.status] ?? j.status}</td>
+-          <td>${(j.description ?? "—").replace(/</g, "<")}</td>
++          <td>${(j.description ?? "—").replace(/</g, "<")}</td>
+           <td>${t.debit ? formatMoney(t.debit) : "—"}</td>
+           <td>${t.credit ? formatMoney(t.credit) : "—"}</td>
+         </tr>`;
+@@ -992,17 +1022,18 @@
+         table{width:100%;border-collapse:collapse}
+         th,td{border:1px solid #cbd5e1;padding:4px 6px;text-align:right}
+         th{background:#f1f5f9}
+-        .meta{color:#64748b;margin-bottom:12px}
++        .meta{color:#64748b;margin-bottom:8px;line-height:1.6}
+       </style></head><body>
+       <h1>فهرست اسناد حسابداری</h1>
+-      <div class="meta">تعداد: ${toFaDigits(rows.length)} — ${toFaDigits(new Date().toLocaleString("fa-IR"))}</div>
++      <div class="meta">فیلترها: ${filterLine.replace(/</g, "<")}</div>
++      <div class="meta">زمان خروجی: ${toFaDigits(new Date().toLocaleString("fa-IR"))}</div>
+       <table><thead><tr>
+         <th>شماره</th><th>تاریخ</th><th>دوره</th><th>وضعیت</th><th>شرح</th><th>بدهکار</th><th>بستانکار</th>
+       </tr></thead><tbody>${trs}</tbody></table>
+       </body></html>`;
+     const w = window.open("", "_blank");
+     if (!w) {
+-      setMsg("مرورگر پنجره چاپ را مسدود کرد.");
++      setMsg("مرورگر پنجره چاپ را مسدود کرد. اجازه پاپ‌آپ را فعال کنید.");
+       return;
+     }
+     w.document.write(html);
+@@ -1031,13 +1062,19 @@
+     void refetch();
+   }
+ 
+-  async function bulkDeleteSelected() {
++  function requestBulkDelete() {
+     const drafts = (data ?? []).filter((j) => selectedIds.includes(j.journal_entry_id) && j.status === "DRAFT");
+     if (!drafts.length) {
+       setMsg("فقط پیش‌نویس قابل حذف گروهی است.");
+       return;
+     }
+-    if (!window.confirm(`حذف ${toFaDigits(drafts.length)} پیش‌نویس؟`)) return;
++    setBulkDeleteConfirmOpen(true);
++  }
++
++  async function confirmBulkDelete() {
++    const drafts = (data ?? []).filter((j) => selectedIds.includes(j.journal_entry_id) && j.status === "DRAFT");
++    setBulkDeleteConfirmOpen(false);
++    if (!drafts.length) return;
+     let ok = 0;
+     for (const j of drafts) {
+       try {
+@@ -1568,8 +1605,22 @@
+       />
+ 
+       {msg ? (
+-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+-          {msg}
++        <div
++          className={
++            msg.includes("خطا") || msg.includes("ممکن نشد") || msg.includes("مسدود")
++              ? "rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 flex items-start gap-2"
++              : "rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 flex items-start gap-2"
++          }
++        >
++          <span className="flex-1">{msg}</span>
++          <button
++            type="button"
++            className="shrink-0 h-6 w-6 inline-flex items-center justify-center rounded hover:bg-black/5"
++            title="بستن"
++            onClick={() => setMsg(null)}
++          >
++            <X className="h-3.5 w-3.5" />
++          </button>
+         </div>
+       ) : null}
+ 
+@@ -1582,7 +1633,7 @@
+             </Button>
+           ) : null}
+           {canDelete ? (
+-            <Button type="button" size="sm" className="h-7" variant="destructive" onClick={() => void bulkDeleteSelected()}>
++            <Button type="button" size="sm" className="h-7" variant="destructive" onClick={requestBulkDelete}>
+               حذف پیش‌نویس‌ها
+             </Button>
+           ) : null}
+@@ -1871,6 +1922,28 @@
+         </div>
+       ) : null}
+ 
++      <Dialog open={bulkDeleteConfirmOpen} onOpenChange={setBulkDeleteConfirmOpen}>
++        <DialogContent>
++          <DialogHeader>
++            <DialogTitle>حذف گروهی پیش‌نویس</DialogTitle>
++            <DialogDescription>
++              {toFaDigits(
++                (data ?? []).filter((j) => selectedIds.includes(j.journal_entry_id) && j.status === "DRAFT").length
++              )}{" "}
++              پیش‌نویس انتخاب‌شده حذف نرم می‌شود. ادامه می‌دهید؟
++            </DialogDescription>
++          </DialogHeader>
++          <DialogFooter>
++            <Button type="button" variant="outline" onClick={() => setBulkDeleteConfirmOpen(false)}>
++              انصراف
++            </Button>
++            <Button type="button" variant="destructive" onClick={() => void confirmBulkDelete()}>
++              حذف
++            </Button>
++          </DialogFooter>
++        </DialogContent>
++      </Dialog>
++
+       <Dialog open={!!reverseTarget} onOpenChange={(o) => !o && setReverseTarget(null)}>
+         <DialogContent>
+           <DialogHeader>
