@@ -1,0 +1,26 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -881,9 +928,2 @@
+ 
+-        {!viewOnly ? (
+-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+-            <Keyboard className="h-3.5 w-3.5" />
+-            <span>F2 پیش‌نویس · F9 قطعی · F4 تراز · F7 سطر</span>
+-            <span className="text-muted-foreground/80">· تایپ در ستون حساب برای جستجو</span>
+-          </div>
+-        ) : null}
+ 
+@@ -1096,3 +1136,3 @@
+               <Button type="button" size="sm" variant="secondary" onClick={fillBalanceOnLast}>
+-                تراز آخرین سطر
++                تراز سند
+                 <span className="mr-1 text-[10px] text-muted-foreground">F4</span>
+@@ -1168,2 +1208,3 @@
+                     ذخیره پیش‌نویس
++                    <span className="mr-1 text-[10px] text-muted-foreground">F2</span>
+                   </Button>
+@@ -1184,2 +1225,3 @@
+                       ذخیره و ثبت قطعی
++                      <span className="mr-1 text-[10px] opacity-80">F9</span>
+                     </Button>
