@@ -1,0 +1,51 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -749,28 +798,26 @@
+                   <td className="px-2 py-1.5">
+                     <Input
+-                      className="h-8 text-xs font-mono text-left"
++                      className={AMOUNT_INPUT_CLASS}
+                       dir="ltr"
+                       inputMode="decimal"
+-                      value={l.debit ? toFaDigits(l.debit) : ""}
++                      value={l.debit ? formatAmountDisplay(l.debit) : ""}
+                       disabled={viewOnly}
+-                      onChange={(e) =>
+-                        updateLine(l.key, {
+-                          debit: toAsciiDigits(e.target.value).replace(/[^\d.]/g, ""),
+-                        })
+-                      }
++                      onChange={(e) => {
++                        const raw = toAsciiDigits(e.target.value).replace(/,/g, "").replace(/[^0-9.]/g, "");
++                        updateLine(l.key, { debit: raw });
++                      }}
+                     />
+                   </td>
+                   <td className="px-2 py-1.5">
+                     <Input
+-                      className="h-8 text-xs font-mono text-left"
++                      className={AMOUNT_INPUT_CLASS}
+                       dir="ltr"
+                       inputMode="decimal"
+-                      value={l.credit ? toFaDigits(l.credit) : ""}
++                      value={l.credit ? formatAmountDisplay(l.credit) : ""}
+                       disabled={viewOnly}
+-                      onChange={(e) =>
+-                        updateLine(l.key, {
+-                          credit: toAsciiDigits(e.target.value).replace(/[^\d.]/g, ""),
+-                        })
+-                      }
++                      onChange={(e) => {
++                        const raw = toAsciiDigits(e.target.value).replace(/,/g, "").replace(/[^0-9.]/g, "");
++                        updateLine(l.key, { credit: raw });
++                      }}
+                     />
+                   </td>
+@@ -847,5 +894,5 @@
+               <Button type="button" size="sm" variant="secondary" onClick={fillBalanceOnLast}>
+                 تراز آخرین سطر
+-                <span className="mr-1 text-[10px] text-muted-foreground">Ctrl+B</span>
++                <span className="mr-1 text-[10px] text-muted-foreground">Alt+B</span>
+               </Button>
+             </div>
