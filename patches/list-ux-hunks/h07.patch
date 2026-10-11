@@ -1,0 +1,50 @@
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -1393,26 +1635,38 @@
+               { id: DEMO_PERIOD_ID, label: "دوره جاری (دمو)", searchText: "دوره جاری دمو" },
+             ]}
+             placeholder="دوره…"
+-            className="h-9 w-full rounded-md border bg-background px-2 text-sm min-w-[140px]"
++            className="h-8 w-full rounded-md border bg-background px-2 text-xs min-w-[120px]"
+             onSelect={setPeriodFilter}
+           />
+         </div>
+         <div className="space-y-1">
+           <label className="text-xs text-muted-foreground">از تاریخ</label>
+-          <ShamsiDatePicker value={dateFrom} onChange={setDateFrom} className="h-9 w-40" placeholder="از" />
++          <ShamsiDatePicker value={dateFrom} onChange={setDateFrom} className="h-8 w-36" placeholder="از" />
+         </div>
+         <div className="space-y-1">
+           <label className="text-xs text-muted-foreground">تا تاریخ</label>
+-          <ShamsiDatePicker value={dateTo} onChange={setDateTo} className="h-9 w-40" placeholder="تا" />
++          <ShamsiDatePicker value={dateTo} onChange={setDateTo} className="h-8 w-36" placeholder="تا" />
+         </div>
+         <div className="space-y-1 flex-1 min-w-[160px]">
+           <label className="text-xs text-muted-foreground">جستجو</label>
+-          <Input
+-            className="h-9"
+-            placeholder="شماره یا شرح…"
+-            value={search}
+-            onChange={(e) => setSearch(e.target.value)}
+-          />
++          <div className="relative">
++            <Input
++              className="h-8 pe-7 text-xs"
++              placeholder="شماره یا شرح…"
++              value={search}
++              onChange={(e) => setSearch(e.target.value)}
++            />
++            {search ? (
++              <button
++                type="button"
++                className="absolute left-1 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center text-muted-foreground"
++                onClick={() => setSearch("")}
++                title="پاک کردن"
++              >
++                <X className="h-3.5 w-3.5" />
++              </button>
++            ) : null}
++          </div>
+         </div>
+       </div>
+ 
