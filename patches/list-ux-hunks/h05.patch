@@ -1,0 +1,30 @@
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -1350,7 +1573,26 @@
+         </div>
+       ) : null}
+ 
+-      <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
++      {selectedIds.length > 0 ? (
++        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50/60 px-2 py-1.5 text-xs">
++          <span className="text-sky-900">{toFaDigits(selectedIds.length)} مورد انتخاب شده</span>
++          {canPost ? (
++            <Button type="button" size="sm" className="h-7" variant="secondary" onClick={() => void bulkPostSelected()}>
++              ثبت قطعی گروهی
++            </Button>
++          ) : null}
++          {canDelete ? (
++            <Button type="button" size="sm" className="h-7" variant="destructive" onClick={() => void bulkDeleteSelected()}>
++              حذف پیش‌نویس‌ها
++            </Button>
++          ) : null}
++          <Button type="button" size="sm" className="h-7" variant="ghost" onClick={() => setSelectedIds([])}>
++            لغو انتخاب
++          </Button>
++        </div>
++      ) : null}
++
++      <div className="flex flex-wrap items-end gap-1.5 rounded-lg border bg-card px-2 py-1.5">
+         <div className="space-y-1 min-w-[160px]">
+           <label className="text-xs text-muted-foreground">وضعیت</label>
+           <OptionTypeahead
