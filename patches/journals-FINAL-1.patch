@@ -1,0 +1,67 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -305,18 +318,56 @@
+ 
+   function openNew() {
++    setViewOnly(false);
++    setFormError(null);
++    setMsg(null);
++    setAccountQuery("");
++    setMeta({});
++    setAccountFocusKey(null);
++    setAccountTypeQuery("");
++    try {
++      const raw = localStorage.getItem(JOURNAL_DRAFT_KEY);
++      if (raw) {
++        const d = JSON.parse(raw) as {
++          formMode?: "new" | string;
++          documentDate?: string;
++          periodId?: string;
++          description?: string;
++          lines?: LineForm[];
++          entryNumber?: string | null;
++          primaryCompanyId?: string;
++          savedAt?: string;
++        };
++        if (d.lines && Array.isArray(d.lines) && d.lines.length > 0) {
++          setFormMode(d.formMode === "new" || !d.formMode ? "new" : String(d.formMode));
++          setDocumentDate(d.documentDate || todayIso());
++          setPeriodId(d.periodId || DEMO_PERIOD_ID);
++          setDescription(d.description || "");
++          setLines(
++            d.lines.map((l) => ({
++              ...emptyLine(),
++              ...l,
++              key: l.key || Math.random().toString(36).slice(2),
++              is_system_balance:
++                l.is_system_balance || isSystemBalanceDescription(l.description || ""),
++            }))
++          );
++          setEntryNumber(d.entryNumber ?? null);
++          if (d.primaryCompanyId) setPrimaryCompanyId(d.primaryCompanyId);
++          setDirty(true);
++          setDraftRestoredAt(d.savedAt || new Date().toISOString());
++          return;
++        }
++      }
++    } catch {
++      /* ignore */
++    }
+     setFormMode("new");
+-    setViewOnly(false);
+     setDocumentDate(todayIso());
+     setPeriodId(DEMO_PERIOD_ID);
+     setDescription("");
+     setLines([emptyLine(), emptyLine()]);
+-    setFormError(null);
+-    setMsg(null);
+     setEntryNumber(null);
+-    setAccountQuery("");
+     setDirty(false);
+-    setMeta({});
+-    setAccountFocusKey(null);
+-    setAccountTypeQuery("");
++    setDraftRestoredAt(null);
+   }
+ 
