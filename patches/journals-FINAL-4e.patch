@@ -1,0 +1,66 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -1285,6 +1216,6 @@
+ 
+-        <div className="sticky bottom-0 z-10 mt-2 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+-          <div className="flex flex-col gap-2 px-1 py-2 sm:flex-row sm:items-center sm:justify-between">
++                <div className="mt-auto shrink-0 border-t bg-background px-1 py-3">
++          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+-              <span>
++              <span className="text-sky-800">
+                 بدهکار:{" "}
+@@ -1292,3 +1223,3 @@
+               </span>
+-              <span>
++              <span className="text-emerald-800">
+                 بستانکار:{" "}
+@@ -1296,8 +1227,3 @@
+               </span>
+-              <span
+-                className={cn(
+-                  "font-medium",
+-                  isBalanced ? "text-emerald-700" : "text-amber-800"
+-                )}
+-              >
++              <span className={cn("font-medium", isBalanced ? "text-emerald-700" : "text-amber-800")}>
+                 {isBalanced
+@@ -1309,25 +1235,14 @@
+             </div>
+-            <div className="flex flex-wrap items-center gap-2 shrink-0">
+-              <Button
+-                type="button"
+-                variant="outline"
+-                size="sm"
+-                className="h-9"
+-                onClick={() => exportJournalExcel()}
+-                title="خروجی اکسل"
+-              >
+-                <FileSpreadsheet className="h-4 w-4 ml-1" />
+-                اکسل
+-              </Button>
+-              <Button
+-                type="button"
+-                variant="outline"
+-                size="sm"
+-                className="h-9"
+-                onClick={() => exportJournalPdf()}
+-                title="خروجی PDF"
+-              >
+-                <FileDown className="h-4 w-4 ml-1" />
+-                PDF
+-              </Button>
++            <div className="flex flex-wrap items-center gap-2">
++              <div className="flex flex-wrap gap-2">
++                <Button type="button" variant="outline" size="sm" className="h-9" onClick={() => exportJournalExcel()} title="خروجی اکسل">
++                  <FileSpreadsheet className="h-4 w-4 ml-1" />
++                  اکسل
++                </Button>
++                <Button type="button" variant="outline" size="sm" className="h-9" onClick={() => exportJournalPdf()} title="خروجی PDF">
++                  <FileDown className="h-4 w-4 ml-1" />
++                  PDF
++                </Button>
++              </div>
++              <div className="hidden sm:block w-px h-6 bg-border mx-1" aria-hidden />
+               <Button type="button" variant="ghost" size="sm" className="h-9" onClick={closeForm}>
