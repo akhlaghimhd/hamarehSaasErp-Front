@@ -1,0 +1,36 @@
+diff --git a/src/modules/finance/pages/journals-page.tsx b/src/modules/finance/pages/journals-page.tsx
+--- a/src/modules/finance/pages/journals-page.tsx
++++ b/src/modules/finance/pages/journals-page.tsx
+@@ -15,5 +15,8 @@
+   Link2,
+   Keyboard,
++  FileSpreadsheet,
++  FileDown,
+ } from "lucide-react";
++import * as XLSX from "xlsx";
+ import { PageHeader } from "@/shared/components/layout/page-header";
+ import { Button } from "@/shared/components/ui/button";
+@@ -28,5 +31,5 @@
+   DialogTitle,
+ } from "@/shared/components/ui/dialog";
+-import { usePermission } from "@/auth";
++import { usePermission, useAuthStore } from "@/auth";
+ import { useCompanies } from "@/modules/organization/hooks/use-companies";
+ import {
+@@ -81,7 +84,9 @@
+   cost_center_id: string;
+   business_unit_id: string;
++  /** سطر تراز ساخته‌شده توسط سیستم */
++  is_system_balance?: boolean;
+ };
+ 
+-function emptyLine(desc = ""): LineForm {
++function emptyLine(desc = "", system = false): LineForm {
+   return {
+     key: Math.random().toString(36).slice(2),
+@@ -92,4 +97,5 @@
+     cost_center_id: "",
+     business_unit_id: "",
++    is_system_balance: system || undefined,
+   };
+ }
