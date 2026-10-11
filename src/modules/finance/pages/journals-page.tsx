@@ -431,8 +431,10 @@ export function JournalsPage() {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const a = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
       if (!a) return;
+      // لینک دانلود / blob نباید به‌عنوان ناوبری گرفته شود
+      if (a.hasAttribute("download") || a.dataset.download === "1") return;
       const href = a.getAttribute("href");
-      if (!href || href.startsWith("#")) return;
+      if (!href || href.startsWith("#") || href.startsWith("blob:") || href.startsWith("data:")) return;
       if (href.startsWith("http") && !href.includes(window.location.host)) return;
       e.preventDefault();
       e.stopPropagation();
@@ -700,11 +702,25 @@ export function JournalsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `journal-${entryNumber || "draft"}-${Date.now()}.xls`;
+    a.setAttribute("download", `journal-${entryNumber || "draft"}-${Date.now()}.xls`);
+    a.setAttribute("data-download", "1");
+    a.rel = "noopener";
+    a.style.display = "none";
     document.body.appendChild(a);
+    // جلوگیری از navigation و تداخل با گارد خروج
+    a.addEventListener(
+      "click",
+      (ev) => {
+        ev.stopPropagation();
+      },
+      true
+    );
     a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    // revoke را کمی دیرتر تا دانلود در کروم/اج شروع شود
+    window.setTimeout(() => {
+      a.remove();
+      URL.revokeObjectURL(url);
+    }, 1500);
   }
 
   function exportJournalPdf() {
