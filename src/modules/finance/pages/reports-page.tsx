@@ -1,38 +1,30 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { usePermission } from "@/auth";
-import { useCompanies } from "@/modules/organization/hooks/use-companies";
 import {
   useBalanceSheet,
   useProfitAndLoss,
   useTrialBalance,
 } from "../hooks/use-reports";
+import { useFinanceCompanyScope } from "../hooks/use-finance-company-scope";
 import { DEMO_PERIOD_ID, FinancePermissions } from "../types";
 
 export function ReportsPage() {
   const canView = usePermission(FinancePermissions.reportView);
-  const { data: companies } = useCompanies();
+  const { companies, multiCompany, companyId, setCompanyId } =
+    useFinanceCompanyScope();
 
-  const primaryCompanyId = useMemo(() => {
-    const list = companies ?? [];
-    const p = list.find((c) => c.is_primary) ?? list[0];
-    return p?.company_id ?? null;
-  }, [companies]);
-
-  const [companyId, setCompanyId] = useState<string>("");
   const [periodId, setPeriodId] = useState(DEMO_PERIOD_ID);
   const [tab, setTab] = useState<"tb" | "pl" | "bs">("tb");
 
-  const effectiveCompany = companyId || primaryCompanyId;
-
-  const tb = useTrialBalance(effectiveCompany, periodId);
-  const pl = useProfitAndLoss(effectiveCompany, periodId);
-  const bs = useBalanceSheet(effectiveCompany, periodId);
+  const tb = useTrialBalance(companyId || null, periodId);
+  const pl = useProfitAndLoss(companyId || null, periodId);
+  const bs = useBalanceSheet(companyId || null, periodId);
 
   if (!canView) {
     return (
@@ -53,21 +45,26 @@ export function ReportsPage() {
       />
 
       <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
-        <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">شرکت</label>
-          <select
-            className="h-9 min-w-[180px] rounded-md border bg-background px-2 text-sm"
-            value={effectiveCompany ?? ""}
-            onChange={(e) => setCompanyId(e.target.value)}
-          >
-            <option value="">—</option>
-            {(companies ?? []).map((c) => (
-              <option key={c.company_id} value={c.company_id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {multiCompany ? (
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">شرکت</label>
+            <select
+              className="h-9 min-w-[180px] rounded-md border bg-background px-2 text-sm"
+              value={companyId}
+              onChange={(e) => setCompanyId(e.target.value)}
+            >
+              {companies.map((c) => (
+                <option key={c.company_id} value={c.company_id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="text-xs text-muted-foreground self-center">
+            شرکت: {companies[0]?.name ?? "—"}
+          </div>
+        )}
         <div className="space-y-1 flex-1 min-w-[200px]">
           <label className="text-xs text-muted-foreground">شناسه دوره (UUID)</label>
           <Input value={periodId} onChange={(e) => setPeriodId(e.target.value)} />
@@ -127,9 +124,15 @@ export function ReportsPage() {
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : pl.data ? (
             <div className="space-y-2 text-sm">
-              <div>جمع درآمد: <strong>{pl.data.total_revenue}</strong></div>
-              <div>جمع هزینه: <strong>{pl.data.total_expense}</strong></div>
-              <div>سود (زیان) خالص: <strong>{pl.data.net_income}</strong></div>
+              <div>
+                جمع درآمد: <strong>{pl.data.total_revenue}</strong>
+              </div>
+              <div>
+                جمع هزینه: <strong>{pl.data.total_expense}</strong>
+              </div>
+              <div>
+                سود (زیان) خالص: <strong>{pl.data.net_income}</strong>
+              </div>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">داده‌ای نیست</p>
@@ -141,7 +144,9 @@ export function ReportsPage() {
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : bs.data ? (
             <div className="space-y-2 text-sm">
-              <div>جمع دارایی: <strong>{bs.data.total_assets}</strong></div>
+              <div>
+                جمع دارایی: <strong>{bs.data.total_assets}</strong>
+              </div>
               <div>
                 جمع بدهی و حقوق:{" "}
                 <strong>{bs.data.total_liabilities_equity}</strong>
