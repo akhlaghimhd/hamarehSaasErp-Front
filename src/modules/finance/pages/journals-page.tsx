@@ -66,6 +66,7 @@ import {
   type JournalEntryDto,
   type JournalItemDto,
 } from "../types";
+import { displayJournalNumber } from "../lib/display-journal-number";
 import { ApiClientError } from "@/api";
 import {
   cn,
@@ -87,25 +88,6 @@ const statusChip: Record<string, string> = {
   POSTED: "bg-emerald-50 text-emerald-800 border-emerald-200",
   REVERSED: "bg-slate-100 text-slate-600 border-slate-200",
 };
-
-/** ADR-FIN-002 N10: DRAFT → draft_number (DR-…), else entry_number (JE-…)
- *  نمایش فارسی: DR → پ.ن ، JE → س.ق + ارقام فارسی
- */
-function displayJournalNumber(j: {
-  status?: string;
-  entry_number?: string | null;
-  draft_number?: string | null;
-}): string {
-  const isDraft = (j.status || "").toUpperCase() === "DRAFT";
-  let raw = (isDraft ? j.draft_number || j.entry_number : j.entry_number || j.draft_number) || "";
-  if (!raw) return "—";
-  // legacy DRAFT-000001 → DR-000001
-  raw = raw.replace(/^DRAFT[-_]?/i, "DR-");
-  // map prefixes to Persian abbrev
-  raw = raw.replace(/^DR[-_]?/i, "پ.ن-");
-  raw = raw.replace(/^JE[-_]?/i, "س.ق-");
-  return toFaDigits(raw);
-}
 
 
 type LineForm = {
