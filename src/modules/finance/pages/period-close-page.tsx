@@ -1,36 +1,28 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { Button } from "@/shared/components/ui/button";
 import { usePermission } from "@/auth";
-import { useCompanies } from "@/modules/organization/hooks/use-companies";
 import { periodCloseService } from "../services/period-close-service";
+import { useFinanceCompanyScope } from "../hooks/use-finance-company-scope";
 import { DEMO_PERIOD_ID, FinancePermissions, type PeriodCloseItemDto } from "../types";
 
 export function PeriodClosePage() {
   const canView = usePermission(FinancePermissions.periodView);
   const canClose = usePermission(FinancePermissions.periodClose);
-  const { data: companies } = useCompanies();
+  const { companies, multiCompany, companyId, setCompanyId } =
+    useFinanceCompanyScope();
 
-  const primaryCompanyId = useMemo(() => {
-    const list = companies ?? [];
-    const p = list.find((c) => c.is_primary) ?? list[0];
-    return p?.company_id ?? null;
-  }, [companies]);
-
-  const [companyId, setCompanyId] = useState("");
   const [periodId, setPeriodId] = useState(DEMO_PERIOD_ID);
   const [items, setItems] = useState<PeriodCloseItemDto[]>([]);
   const [hasBlocking, setHasBlocking] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const effectiveCompany = companyId || primaryCompanyId;
 
   const evaluateMut = useMutation({
-    mutationFn: () =>
-      periodCloseService.evaluate(effectiveCompany as string, periodId),
+    mutationFn: () => periodCloseService.evaluate(companyId, periodId),
     onSuccess: (data) => {
       setItems(data.items ?? data.checklist?.items_json ?? []);
       setHasBlocking(!!(data.checklist?.has_blocking ?? data.has_blocking));
@@ -40,13 +32,13 @@ export function PeriodClosePage() {
   });
 
   const softMut = useMutation({
-    mutationFn: () => periodCloseService.softClose(effectiveCompany as string, periodId),
+    mutationFn: () => periodCloseService.softClose(companyId, periodId),
     onSuccess: () => setMsg("دوره نیمه‌بسته شد."),
     onError: (e: Error) => setMsg(e.message || "بستن ممکن نیست"),
   });
 
   const hardMut = useMutation({
-    mutationFn: () => periodCloseService.hardClose(effectiveCompany as string, periodId),
+    mutationFn: () => periodCloseService.hardClose(companyId, periodId),
     onSuccess: () => setMsg("دوره قطعی بسته شد."),
     onError: (e: Error) => setMsg(e.message || "بستن قطعی ممکن نیست"),
   });
@@ -70,21 +62,26 @@ export function PeriodClosePage() {
       />
 
       <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
-        <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">شرکت</label>
-          <select
-            className="h-9 min-w-[180px] rounded-md border bg-background px-2 text-sm"
-            value={effectiveCompany ?? ""}
-            onChange={(e) => setCompanyId(e.target.value)}
-          >
-            <option value="">—</option>
-            {(companies ?? []).map((c) => (
-              <option key={c.company_id} value={c.company_id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {multiCompany ? (
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">شرکت</label>
+            <select
+              className="h-9 min-w-[180px] rounded-md border bg-background px-2 text-sm"
+              value={companyId}
+              onChange={(e) => setCompanyId(e.target.value)}
+            >
+              {companies.map((c) => (
+                <option key={c.company_id} value={c.company_id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="text-xs text-muted-foreground self-center">
+            شرکت: {companies[0]?.name ?? "—"}
+          </div>
+        )}
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">Period ID</label>
           <input
@@ -95,7 +92,7 @@ export function PeriodClosePage() {
         </div>
         <Button
           size="sm"
-          disabled={!effectiveCompany || evaluateMut.isPending}
+          disabled={!companyId || evaluateMut.isPending}
           onClick={() => void evaluateMut.mutateAsync()}
         >
           {evaluateMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
