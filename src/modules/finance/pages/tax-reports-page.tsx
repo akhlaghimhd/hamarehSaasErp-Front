@@ -1,44 +1,43 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { usePermission } from "@/auth";
-import { useCompanies } from "@/modules/organization/hooks/use-companies";
 import { taxService } from "../services/tax-service";
+import { useFinanceCompanyScope } from "../hooks/use-finance-company-scope";
 import { FinancePermissions } from "../types";
 
 export function TaxReportsPage() {
   const canView = usePermission(FinancePermissions.taxView);
-  const { data: companies } = useCompanies();
-  const primaryCompanyId = useMemo(() => {
-    const list = companies ?? [];
-    return (list.find((c) => c.is_primary) ?? list[0])?.company_id ?? "";
-  }, [companies]);
+  const { companies, multiCompany, companyId, setCompanyId } =
+    useFinanceCompanyScope();
 
-  const [companyId, setCompanyId] = useState("");
-  const effectiveCo = companyId || primaryCompanyId;
   const [from, setFrom] = useState("2026-01-01");
   const [to, setTo] = useState("2026-12-31");
   const [runKey, setRunKey] = useState(0);
 
   const summaryQ = useQuery({
-    queryKey: ["finance", "vat-summary", effectiveCo, from, to, runKey],
-    queryFn: () => taxService.vatSummary(effectiveCo, from, to),
-    enabled: canView && !!effectiveCo && runKey > 0,
+    queryKey: ["finance", "vat-summary", companyId, from, to, runKey],
+    queryFn: () => taxService.vatSummary(companyId, from, to),
+    enabled: canView && !!companyId && runKey > 0,
   });
 
   const reconQ = useQuery({
-    queryKey: ["finance", "moodian-recon", effectiveCo, from, to, runKey],
-    queryFn: () => taxService.moodianRecon(effectiveCo, from, to),
-    enabled: canView && !!effectiveCo && runKey > 0,
+    queryKey: ["finance", "moodian-recon", companyId, from, to, runKey],
+    queryFn: () => taxService.moodianRecon(companyId, from, to),
+    enabled: canView && !!companyId && runKey > 0,
   });
 
   if (!canView) {
-    return <div className="p-6 text-sm text-amber-700">مجوز مشاهده گزارش مالیاتی را ندارید.</div>;
+    return (
+      <div className="p-6 text-sm text-amber-700">
+        مجوز مشاهده گزارش مالیاتی را ندارید.
+      </div>
+    );
   }
 
   return (
@@ -56,18 +55,23 @@ export function TaxReportsPage() {
       <div className="grid gap-2 rounded-xl border bg-card p-3 sm:grid-cols-4">
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">شرکت</label>
-          <select
-            className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-            value={effectiveCo}
-            onChange={(e) => setCompanyId(e.target.value)}
-          >
-            <option value="">—</option>
-            {(companies ?? []).map((c) => (
-              <option key={c.company_id} value={c.company_id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          {multiCompany ? (
+            <select
+              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              value={companyId}
+              onChange={(e) => setCompanyId(e.target.value)}
+            >
+              {companies.map((c) => (
+                <option key={c.company_id} value={c.company_id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="h-9 flex items-center text-sm text-muted-foreground">
+              {companies[0]?.name ?? "—"}
+            </div>
+          )}
         </div>
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">از</label>
@@ -81,7 +85,7 @@ export function TaxReportsPage() {
           <Button
             size="sm"
             className="w-full"
-            disabled={!effectiveCo}
+            disabled={!companyId}
             onClick={() => setRunKey((k) => k + 1)}
           >
             اجرا
