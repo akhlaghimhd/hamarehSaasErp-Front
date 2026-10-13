@@ -17,10 +17,12 @@ export function useAccountTree() {
   });
 }
 
-export function useAccountFlat() {
+export function useAccountFlat(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: financeAccountKeys.flat,
     queryFn: () => accountService.listFlat(),
+    staleTime: 60_000,
+    enabled: options?.enabled ?? true,
   });
 }
 
