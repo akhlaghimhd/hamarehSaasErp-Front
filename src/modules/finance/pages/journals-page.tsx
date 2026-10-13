@@ -288,6 +288,19 @@ export function JournalsPage() {
   const [businessUnits, setBusinessUnits] = useState<BusinessUnitDto[]>([]);
   const activeFormCompanyId = formCompanyId || primaryCompanyId;
 
+  const postMut = usePostJournal();
+  const reverseMut = useReverseJournal();
+  const deleteMut = useDeleteJournal();
+  const restoreMut = useRestoreJournal();
+
+  const [formMode, setFormMode] = useState<"new" | string | null>(null);
+  useEffect(() => {
+    if (formMode === null || !activeFormCompanyId) return;
+    void costCenterService.list(activeFormCompanyId).then(setCostCenters).catch(() => setCostCenters([]));
+    void businessUnitService.list().then(setBusinessUnits).catch(() => setBusinessUnits([]));
+  }, [formMode, activeFormCompanyId]);
+  const { data: accountsFlat } = useAccountFlat({ enabled: formMode !== null });
+
   const postableAccounts = useMemo(
     () => (accountsFlat ?? []).filter((a) => a.is_postable !== false),
     [accountsFlat]
@@ -302,18 +315,6 @@ export function JournalsPage() {
     [postableAccounts]
   );
 
-  const postMut = usePostJournal();
-  const reverseMut = useReverseJournal();
-  const deleteMut = useDeleteJournal();
-  const restoreMut = useRestoreJournal();
-
-  const [formMode, setFormMode] = useState<"new" | string | null>(null);
-  useEffect(() => {
-    if (formMode === null || !activeFormCompanyId) return;
-    void costCenterService.list(activeFormCompanyId).then(setCostCenters).catch(() => setCostCenters([]));
-    void businessUnitService.list().then(setBusinessUnits).catch(() => setBusinessUnits([]));
-  }, [formMode, activeFormCompanyId]);
-  const { data: accountsFlat } = useAccountFlat({ enabled: formMode !== null });
 
   const [viewOnly, setViewOnly] = useState(false);
   const [documentDate, setDocumentDate] = useState(todayIso());
