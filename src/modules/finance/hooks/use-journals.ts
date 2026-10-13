@@ -9,15 +9,20 @@ export const financeJournalKeys = {
   list: (filters?: object) => ["finance", "journals", "list", filters] as const,
 };
 
-export function useJournals(filters?: {
-  company_id?: string;
-  period_id?: string;
-  status?: string;
-  deleted?: boolean;
-}) {
+export function useJournals(
+  filters?: {
+    company_id?: string;
+    period_id?: string;
+    status?: string;
+    deleted?: boolean;
+  },
+  options?: { enabled?: boolean }
+) {
   return useQuery({
     queryKey: financeJournalKeys.list(filters),
     queryFn: () => journalService.list(filters),
+    staleTime: 30_000,
+    enabled: options?.enabled ?? true,
   });
 }
 
