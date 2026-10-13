@@ -7,6 +7,7 @@ import type { CreateJournalPayload } from "../types";
 export const financeJournalKeys = {
   all: ["finance", "journals"] as const,
   list: (filters?: object) => ["finance", "journals", "list", filters] as const,
+  summary: (filters?: object) => ["finance", "journals", "summary", filters] as const,
 };
 
 export function useJournals(
@@ -21,6 +22,18 @@ export function useJournals(
   return useQuery({
     queryKey: financeJournalKeys.list(filters),
     queryFn: () => journalService.list(filters),
+    staleTime: 30_000,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useJournalSummary(
+  filters?: { company_id?: string; period_id?: string },
+  options?: { enabled?: boolean }
+) {
+  return useQuery({
+    queryKey: financeJournalKeys.summary(filters),
+    queryFn: () => journalService.summary(filters),
     staleTime: 30_000,
     enabled: options?.enabled ?? true,
   });

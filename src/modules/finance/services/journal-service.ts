@@ -10,6 +10,14 @@ function unwrapData<T>(envelope: unknown): T {
   return envelope as T;
 }
 
+export type JournalStatusSummary = {
+  all: number;
+  DRAFT: number;
+  POSTED: number;
+  REVERSED: number;
+  DELETED: number;
+};
+
 export const journalService = {
   async list(params?: {
     company_id?: string;
@@ -30,6 +38,28 @@ export const journalService = {
     );
     const data = unwrapData<JournalEntryDto[] | unknown>(envelope);
     return Array.isArray(data) ? data : [];
+  },
+
+  /** Badge counts only — no row payload. */
+  async summary(params?: {
+    company_id?: string;
+    period_id?: string;
+  }): Promise<JournalStatusSummary> {
+    const q = new URLSearchParams();
+    if (params?.company_id) q.set("company_id", params.company_id);
+    if (params?.period_id) q.set("period_id", params.period_id);
+    const qs = q.toString();
+    const envelope = await apiGet(
+      qs ? `${financePaths.journalsSummary}?${qs}` : financePaths.journalsSummary
+    );
+    const data = unwrapData<JournalStatusSummary>(envelope);
+    return {
+      all: Number(data?.all ?? 0),
+      DRAFT: Number(data?.DRAFT ?? 0),
+      POSTED: Number(data?.POSTED ?? 0),
+      REVERSED: Number(data?.REVERSED ?? 0),
+      DELETED: Number(data?.DELETED ?? 0),
+    };
   },
 
   async getById(id: string): Promise<JournalEntryDto> {
