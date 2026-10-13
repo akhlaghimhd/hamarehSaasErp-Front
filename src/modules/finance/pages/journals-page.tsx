@@ -51,6 +51,7 @@ import {
 } from "@/modules/organization/services/org-extended-service";
 import {
   useJournals,
+  useJournalSummary,
   usePostJournal,
   useReverseJournal,
   useDeleteJournal,
@@ -275,10 +276,10 @@ export function JournalsPage() {
     useJournals(baseListFilters);
   const { data: filteredList, isLoading: loadingFiltered, error: errorFiltered, refetch: refetchFiltered } =
     useJournals(filters, { enabled: needsSeparateList });
-  const { data: deletedForCounts } = useJournals(
-    { company_id: effectiveListCompanyId, deleted: true },
-    { enabled: true }
-  );
+  const { data: statusSummary } = useJournalSummary({
+    company_id: effectiveListCompanyId,
+    period_id: periodFilter || undefined,
+  });
   const data = needsSeparateList ? filteredList : activeForCounts;
   const isLoading = needsSeparateList ? loadingFiltered : loadingActive;
   const error = needsSeparateList ? errorFiltered : errorActive;
@@ -422,24 +423,33 @@ export function JournalsPage() {
 
 
   const statusCounts = useMemo(() => {
+    if (statusSummary) {
+      return {
+        all: statusSummary.all,
+        DRAFT: statusSummary.DRAFT,
+        POSTED: statusSummary.POSTED,
+        REVERSED: statusSummary.REVERSED,
+        DELETED: statusSummary.DELETED,
+      };
+    }
     const all = activeForCounts ?? [];
     return {
       all: all.length,
       DRAFT: all.filter((j) => j.status === "DRAFT").length,
       POSTED: all.filter((j) => j.status === "POSTED").length,
       REVERSED: all.filter((j) => j.status === "REVERSED").length,
-      DELETED: (deletedForCounts ?? []).length,
+      DELETED: 0,
     };
-  }, [activeForCounts, deletedForCounts]);
+  }, [statusSummary, activeForCounts]);
 
   /** نگاشت id → شماره نمایشی برای نشانگر ارتباط برگشت */
   const numberById = useMemo(() => {
     const m = new Map<string, string>();
-    for (const j of [...(activeForCounts ?? []), ...(deletedForCounts ?? []), ...(data ?? [])]) {
+    for (const j of [...(activeForCounts ?? []), ...(data ?? [])]) {
       m.set(j.journal_entry_id, displayJournalNumber(j));
     }
     return m;
-  }, [activeForCounts, deletedForCounts, data]);
+  }, [activeForCounts, data]);
 
   const lineTotals = useMemo(() => {
     let d = 0;
