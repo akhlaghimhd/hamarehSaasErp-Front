@@ -97,6 +97,8 @@ export interface JournalEntryDto {
   entry_number?: string | null;
   /** ADR-FIN-002 — retained after post (DR-… series) */
   draft_number?: string | null;
+  items_debit_sum?: number | string | null;
+  items_credit_sum?: number | string | null;
   document_date: string;
   posting_date?: string | null;
   status: JournalStatus | string;
