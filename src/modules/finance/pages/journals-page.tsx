@@ -184,7 +184,7 @@ function journalTotals(j: JournalEntryDto): { debit: number; credit: number } {
   if (any.items_debit_sum != null || any.items_credit_sum != null) {
     return { debit: Number(any.items_debit_sum || 0), credit: Number(any.items_credit_sum || 0) };
   }
-  return journalTotals(j);
+  return sumLines(j.items as JournalItemDto[] | undefined);
 }
 
 function todayIso(): string {
