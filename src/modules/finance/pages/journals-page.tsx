@@ -176,6 +176,17 @@ function sumLines(
   return { debit: d, credit: c };
 }
 
+function journalTotals(j: JournalEntryDto): { debit: number; credit: number } {
+  const any = j as JournalEntryDto & {
+    items_debit_sum?: number | string | null;
+    items_credit_sum?: number | string | null;
+  };
+  if (any.items_debit_sum != null || any.items_credit_sum != null) {
+    return { debit: Number(any.items_debit_sum || 0), credit: Number(any.items_credit_sum || 0) };
+  }
+  return journalTotals(j);
+}
+
 function todayIso(): string {
   const n = new Date();
   const { jy, jm, jd } = toJalaliParts(n.getFullYear(), n.getMonth() + 1, n.getDate());
@@ -251,26 +262,31 @@ export function JournalsPage() {
     [statusFilter, effectiveListCompanyId, periodFilter, showDeleted]
   );
 
-  const { data, isLoading, error, refetch } = useJournals(filters);
-  /** شمارنده‌ها باید از کل (غیرحذف‌شده) باشند نه از فیلتر وضعیت فعلی */
-  const { data: activeForCounts } = useJournals({
-    company_id: effectiveListCompanyId,
-    period_id: periodFilter || undefined,
-  });
-  const { data: deletedForCounts } = useJournals({
-    company_id: effectiveListCompanyId,
-    deleted: true,
-  });
-  const { data: accountsFlat } = useAccountFlat();
+  /** one base list for counts; filtered list only when status/deleted needed */
+  const baseListFilters = useMemo(
+    () => ({
+      company_id: effectiveListCompanyId,
+      period_id: periodFilter || undefined,
+    }),
+    [effectiveListCompanyId, periodFilter]
+  );
+  const needsSeparateList = Boolean(statusFilter) || showDeleted;
+  const { data: activeForCounts, isLoading: loadingActive, error: errorActive, refetch: refetchActive } =
+    useJournals(baseListFilters);
+  const { data: filteredList, isLoading: loadingFiltered, error: errorFiltered, refetch: refetchFiltered } =
+    useJournals(filters, { enabled: needsSeparateList });
+  const { data: deletedForCounts } = useJournals(
+    { company_id: effectiveListCompanyId, deleted: true },
+    { enabled: true }
+  );
+  const data = needsSeparateList ? filteredList : activeForCounts;
+  const isLoading = needsSeparateList ? loadingFiltered : loadingActive;
+  const error = needsSeparateList ? errorFiltered : errorActive;
+  const refetch = needsSeparateList ? refetchFiltered : refetchActive;
 
   const [costCenters, setCostCenters] = useState<CostCenterDto[]>([]);
   const [businessUnits, setBusinessUnits] = useState<BusinessUnitDto[]>([]);
   const activeFormCompanyId = formCompanyId || primaryCompanyId;
-  useEffect(() => {
-    if (!activeFormCompanyId) return;
-    void costCenterService.list(activeFormCompanyId).then(setCostCenters).catch(() => setCostCenters([]));
-    void businessUnitService.list().then(setBusinessUnits).catch(() => setBusinessUnits([]));
-  }, [activeFormCompanyId]);
 
   const postableAccounts = useMemo(
     () => (accountsFlat ?? []).filter((a) => a.is_postable !== false),
@@ -292,6 +308,13 @@ export function JournalsPage() {
   const restoreMut = useRestoreJournal();
 
   const [formMode, setFormMode] = useState<"new" | string | null>(null);
+  useEffect(() => {
+    if (formMode === null || !activeFormCompanyId) return;
+    void costCenterService.list(activeFormCompanyId).then(setCostCenters).catch(() => setCostCenters([]));
+    void businessUnitService.list().then(setBusinessUnits).catch(() => setBusinessUnits([]));
+  }, [formMode, activeFormCompanyId]);
+  const { data: accountsFlat } = useAccountFlat({ enabled: formMode !== null });
+
   const [viewOnly, setViewOnly] = useState(false);
   const [documentDate, setDocumentDate] = useState(todayIso());
   const [description, setDescription] = useState("");
@@ -1028,7 +1051,7 @@ export function JournalsPage() {
     const filterLine = buildListFilterSummary();
     const head = ["شماره", "تاریخ", "دوره", "وضعیت", "شرح", "بدهکار", "بستانکار"];
     const body = rows.map((j) => {
-      const t = sumLines(j.items as JournalItemDto[] | undefined);
+      const t = journalTotals(j);
       return [
         displayJournalNumber(j),
         formatJalaliDate(j.document_date),
@@ -1072,7 +1095,7 @@ export function JournalsPage() {
     const filterLine = buildListFilterSummary();
     const trs = rows
       .map((j) => {
-        const t = sumLines(j.items as JournalItemDto[] | undefined);
+        const t = journalTotals(j);
         return `<tr>
           <td>${displayJournalNumber(j)}</td>
           <td>${formatJalaliDate(j.document_date)}</td>
@@ -1968,7 +1991,7 @@ export function JournalsPage() {
             </thead>
             <tbody>
               {paged.map((j) => {
-                const t = sumLines(j.items as JournalItemDto[] | undefined);
+                const t = journalTotals(j);
                 return (
                   <tr
                     key={j.journal_entry_id}
