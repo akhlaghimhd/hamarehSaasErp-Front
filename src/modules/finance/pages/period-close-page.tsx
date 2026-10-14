@@ -13,8 +13,16 @@ import { DEMO_PERIOD_ID, FinancePermissions, type PeriodCloseItemDto } from "../
 export function PeriodClosePage() {
   const canView = usePermission(FinancePermissions.periodView);
   const canClose = usePermission(FinancePermissions.periodClose);
-  const { companies, multiCompany, companyId, setCompanyId } =
-    useFinanceCompanyScope();
+  const {
+    companies,
+    multiCompany,
+    companyId,
+    setCompanyId,
+    canOperateSelected,
+    isTechnicalOwnerReadOnly,
+    isGroupObserver,
+  } = useFinanceCompanyScope();
+  const canCloseOp = canClose && canOperateSelected;
 
   const [periodId, setPeriodId] = useState(DEMO_PERIOD_ID);
   const [items, setItems] = useState<PeriodCloseItemDto[]>([]);
@@ -61,27 +69,29 @@ export function PeriodClosePage() {
         ]}
       />
 
-      <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
+      {(isTechnicalOwnerReadOnly || isGroupObserver) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+          دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش روی شرکت‌های زیرمجموعه مجاز نیست.
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-end gap-3">
         {multiCompany ? (
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">شرکت</label>
             <select
-              className="h-9 min-w-[180px] rounded-md border bg-background px-2 text-sm"
+              className="h-9 rounded-md border bg-background px-2 text-sm"
               value={companyId}
               onChange={(e) => setCompanyId(e.target.value)}
             >
               {companies.map((c) => (
                 <option key={c.company_id} value={c.company_id}>
-                  {c.name}
+                  {(c as { name?: string }).name || c.company_id.slice(0, 8)}
                 </option>
               ))}
             </select>
           </div>
-        ) : (
-          <div className="text-xs text-muted-foreground self-center">
-            شرکت: {companies[0]?.name ?? "—"}
-          </div>
-        )}
+        ) : null}
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">Period ID</label>
           <input
@@ -131,7 +141,7 @@ export function PeriodClosePage() {
           ))}
         </ul>
 
-        {canClose ? (
+        {canCloseOp ? (
           <div className="flex flex-wrap gap-2 pt-2">
             <Button
               size="sm"
