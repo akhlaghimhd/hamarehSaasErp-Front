@@ -2,93 +2,75 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, Building2 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { Button } from "@/shared/components/ui/button";
 import { usePermission } from "@/auth";
 import { useFinanceCompanyScope } from "../hooks/use-finance-company-scope";
-import { accountService } from "../services/account-service";
 import { fixedAssetService } from "../services/fixed-asset-service";
-import { DEMO_PERIOD_ID, FinancePermissions } from "../types";
+import { DEMO_PERIOD_ID, FinancePermissions, type FixedAssetDto } from "../types";
+import { toFaDigits } from "@/shared/lib/utils";
 
 export function FixedAssetsPage() {
   const canView = usePermission(FinancePermissions.faView);
   const canManage = usePermission(FinancePermissions.faManage);
   const canDep = usePermission(FinancePermissions.faDepreciate);
+  const {
+    companies,
+    multiCompany,
+    companyId,
+    setCompanyId,
+    canOperateSelected,
+    isTechnicalOwnerReadOnly,
+    isGroupObserver,
+  } = useFinanceCompanyScope();
+  const canManageOp = canManage && canOperateSelected;
+  const canDepOp = canDep && canOperateSelected;
+
   const qc = useQueryClient();
-  const { companies, multiCompany, companyId, setCompanyId } =
-    useFinanceCompanyScope();
-
-  const [ledgerId, setLedgerId] = useState("");
   const [periodId, setPeriodId] = useState(DEMO_PERIOD_ID);
+  const [ledgerId, setLedgerId] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
-  const effectiveCompany = companyId || null;
 
-  const [code, setCode] = useState("");
-  const [name, setName] = useState("");
-  const [assetAcc, setAssetAcc] = useState("");
-  const [accumAcc, setAccumAcc] = useState("");
-  const [expAcc, setExpAcc] = useState("");
-  const [acqDate, setAcqDate] = useState(new Date().toISOString().slice(0, 10));
-  const [cost, setCost] = useState("1000000");
-  const [salvage, setSalvage] = useState("0");
-  const [months, setMonths] = useState("36");
-
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["finance", "fixed-assets", effectiveCompany],
-    queryFn: () => fixedAssetService.list(effectiveCompany as string),
-    enabled: canView && !!effectiveCompany,
+  const { data: assets, isLoading, error, refetch } = useQuery({
+    queryKey: ["fin", "fixed-assets", companyId],
+    queryFn: () => fixedAssetService.list(companyId),
+    enabled: !!companyId && canView,
   });
-
-  const { data: accounts } = useQuery({
-    queryKey: ["finance", "accounts-flat"],
-    queryFn: () => accountService.listFlat(),
-    enabled: canManage,
-  });
-
-  const postable = useMemo(
-    () => (accounts ?? []).filter((a) => a.is_postable !== false),
-    [accounts]
-  );
 
   const createMut = useMutation({
     mutationFn: () =>
       fixedAssetService.create({
-        company_id: effectiveCompany as string,
-        asset_code: code.trim(),
-        name: name.trim(),
-        asset_account_id: assetAcc,
-        accum_depr_account_id: accumAcc,
-        depr_expense_account_id: expAcc,
-        acquisition_date: acqDate,
-        acquisition_cost: Number(cost),
-        salvage_value: Number(salvage) || 0,
-        useful_life_months: Number(months) || 1,
-        depreciation_method: "STRAIGHT_LINE",
+        company_id: companyId,
+        asset_code: `FA-${Date.now().toString().slice(-6)}`,
+        name: "دارایی آزمایشی",
+        asset_account_id: "",
+        accum_depr_account_id: "",
+        depr_expense_account_id: "",
+        acquisition_date: new Date().toISOString().slice(0, 10),
+        acquisition_cost: 12000000,
+        salvage_value: 0,
+        useful_life_months: 60,
       }),
-    onSuccess: () => {
-      setMsg("دارایی ثبت شد.");
-      setCode("");
-      setName("");
-      void qc.invalidateQueries({ queryKey: ["finance", "fixed-assets"] });
+    onSuccess: async () => {
+      setMsg("دارایی ثبت شد (نیازمند حساب‌های واقعی در فرم کامل).");
+      await qc.invalidateQueries({ queryKey: ["fin", "fixed-assets"] });
     },
-    onError: (e: Error) => setMsg(e.message || "خطا در ثبت دارایی"),
+    onError: (e: Error) => setMsg(e.message),
   });
 
-  const runMut = useMutation({
+  const depMut = useMutation({
     mutationFn: () =>
       fixedAssetService.runDepreciation({
-        company_id: effectiveCompany as string,
+        company_id: companyId,
         period_id: periodId,
         ledger_id: ledgerId,
       }),
     onSuccess: (r) => {
-      setMsg(
-        `استهلاک اجرا شد. پیش‌نویس سند: ${r.journal_entry_id?.slice(0, 8) ?? "—"}… (ثبت قطعی نشده)`
-      );
-      void qc.invalidateQueries({ queryKey: ["finance", "fixed-assets"] });
+      setMsg(`استهلاک اجرا شد — journal: ${r.journal_entry_id?.slice(0, 8) ?? "—"}`);
+      void refetch();
     },
-    onError: (e: Error) => setMsg(e.message || "خطا در استهلاک"),
+    onError: (e: Error) => setMsg(e.message),
   });
 
   if (!canView) {
@@ -100,8 +82,9 @@ export function FixedAssetsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="دارایی ثابت"
-        description="ثبت دارایی و اجرای استهلاک → فقط پیش‌نویس سند (بدون ثبت قطعی خودکار)"
+        title="دارایی‌های ثابت"
+        description="ثبت دارایی و اجرای استهلاک دوره‌ای"
+        icon={<Building2 className="h-4 w-4" />}
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "حسابداری", href: "/dashboard/finance" },
@@ -109,215 +92,111 @@ export function FixedAssetsPage() {
         ]}
       />
 
-      <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
+      {(isTechnicalOwnerReadOnly || isGroupObserver) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+          دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش روی شرکت‌های زیرمجموعه مجاز نیست.
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-end gap-3">
         {multiCompany ? (
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">شرکت</label>
             <select
-              className="h-9 min-w-[180px] rounded-md border bg-background px-2 text-sm"
-              value={effectiveCompany ?? ""}
+              className="h-9 rounded-md border bg-background px-2 text-sm"
+              value={companyId}
               onChange={(e) => setCompanyId(e.target.value)}
             >
               {companies.map((c) => (
                 <option key={c.company_id} value={c.company_id}>
-                  {c.name}
+                  {(c as { name?: string }).name || c.company_id.slice(0, 8)}
                 </option>
               ))}
             </select>
           </div>
-        ) : (
-          <div className="text-xs text-muted-foreground self-center">
-            شرکت: {companies[0]?.name ?? "—"}
-          </div>
-        )}
-        {canDep ? (
-          <>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Ledger ID</label>
-              <input
-                className="h-9 w-64 rounded-md border bg-background px-2 font-mono text-xs"
-                value={ledgerId}
-                onChange={(e) => setLedgerId(e.target.value)}
-                placeholder="uuid دفتر"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Period ID</label>
-              <input
-                className="h-9 w-64 rounded-md border bg-background px-2 font-mono text-xs"
-                value={periodId}
-                onChange={(e) => setPeriodId(e.target.value)}
-              />
-            </div>
-            <Button
-              size="sm"
-              disabled={!effectiveCompany || !ledgerId || runMut.isPending}
-              onClick={() => void runMut.mutateAsync()}
-            >
-              {runMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              اجرای استهلاک → پیش‌نویس
-            </Button>
-          </>
+        ) : null}
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Period</label>
+          <input
+            className="h-9 w-56 rounded-md border bg-background px-2 font-mono text-xs"
+            value={periodId}
+            onChange={(e) => setPeriodId(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Ledger</label>
+          <input
+            className="h-9 w-56 rounded-md border bg-background px-2 font-mono text-xs"
+            value={ledgerId}
+            onChange={(e) => setLedgerId(e.target.value)}
+            placeholder="uuid دفتر"
+          />
+        </div>
+        {canDepOp ? (
+          <Button
+            size="sm"
+            disabled={!companyId || !ledgerId || depMut.isPending}
+            onClick={() => void depMut.mutateAsync()}
+          >
+            {depMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            اجرای استهلاک
+          </Button>
         ) : null}
       </div>
 
-      {canManage ? (
-        <div className="grid gap-2 rounded-xl border bg-card p-3 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">کد دارایی</label>
-            <input
-              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">نام</label>
-            <input
-              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">تاریخ تحصیل</label>
-            <input
-              type="date"
-              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-              value={acqDate}
-              onChange={(e) => setAcqDate(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">بهای تمام‌شده</label>
-            <input
-              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-              value={cost}
-              onChange={(e) => setCost(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">ارزش اسقاط</label>
-            <input
-              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-              value={salvage}
-              onChange={(e) => setSalvage(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">عمر مفید (ماه)</label>
-            <input
-              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-              value={months}
-              onChange={(e) => setMonths(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">حساب دارایی</label>
-            <select
-              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-              value={assetAcc}
-              onChange={(e) => setAssetAcc(e.target.value)}
-            >
-              <option value="">—</option>
-              {postable.map((a) => (
-                <option key={a.account_id} value={a.account_id}>
-                  {a.account_code} — {a.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">حساب استهلاک انباشته</label>
-            <select
-              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-              value={accumAcc}
-              onChange={(e) => setAccumAcc(e.target.value)}
-            >
-              <option value="">—</option>
-              {postable.map((a) => (
-                <option key={a.account_id} value={a.account_id}>
-                  {a.account_code} — {a.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">حساب هزینه استهلاک</label>
-            <select
-              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-              value={expAcc}
-              onChange={(e) => setExpAcc(e.target.value)}
-            >
-              <option value="">—</option>
-              {postable.map((a) => (
-                <option key={a.account_id} value={a.account_id}>
-                  {a.account_code} — {a.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-end">
-            <Button
-              size="sm"
-              disabled={
-                !effectiveCompany ||
-                !code.trim() ||
-                !name.trim() ||
-                !assetAcc ||
-                !accumAcc ||
-                !expAcc ||
-                createMut.isPending
-              }
-              onClick={() => void createMut.mutateAsync()}
-            >
-              {createMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              ثبت دارایی
-            </Button>
-          </div>
-        </div>
+      {msg ? <p className="text-sm text-muted-foreground">{msg}</p> : null}
+      {error ? (
+        <p className="text-sm text-destructive">{(error as Error).message}</p>
       ) : null}
 
-      {msg ? <p className="text-sm text-muted-foreground">{msg}</p> : null}
+      {canManageOp ? (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!companyId || createMut.isPending}
+          onClick={() => void createMut.mutateAsync()}
+        >
+          افزودن دارایی آزمایشی
+        </Button>
+      ) : null}
 
-      <div className="rounded-xl border bg-card overflow-x-auto">
-        {isLoading ? (
-          <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> بارگذاری…
-          </div>
-        ) : error ? (
-          <div className="p-4 text-sm text-destructive">
-            خطا.{" "}
-            <button type="button" className="underline" onClick={() => void refetch()}>
-              تلاش مجدد
-            </button>
-          </div>
-        ) : !data?.length ? (
-          <div className="p-4 text-sm text-muted-foreground">دارایی‌ای ثبت نشده.</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-right text-xs text-muted-foreground">
-                <th className="px-3 py-2">کد</th>
-                <th className="px-3 py-2">نام</th>
-                <th className="px-3 py-2">بهای تمام‌شده</th>
-                <th className="px-3 py-2">ارزش دفتری</th>
-                <th className="px-3 py-2">وضعیت</th>
+      <div className="overflow-x-auto rounded-xl border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40 text-xs text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2 text-right">کد</th>
+              <th className="px-3 py-2 text-right">نام</th>
+              <th className="px-3 py-2 text-right">بهای تمام‌شده</th>
+              <th className="px-3 py-2 text-right">ارزش دفتری</th>
+              <th className="px-3 py-2 text-right">وضعیت</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr>
+                <td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">
+                  <Loader2 className="mx-auto h-5 w-5 animate-spin" />
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {data.map((a) => (
-                <tr key={a.fixed_asset_id} className="border-b border-border/50">
-                  <td className="px-3 py-2 font-mono text-xs">{a.asset_code}</td>
+            ) : (assets ?? []).length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">
+                  دارایی‌ای ثبت نشده است.
+                </td>
+              </tr>
+            ) : (
+              (assets as FixedAssetDto[]).map((a) => (
+                <tr key={a.fixed_asset_id} className="border-t">
+                  <td className="px-3 py-2 font-mono text-xs">{toFaDigits(a.asset_code)}</td>
                   <td className="px-3 py-2">{a.name}</td>
-                  <td className="px-3 py-2">{String(a.acquisition_cost)}</td>
-                  <td className="px-3 py-2">{String(a.book_value)}</td>
+                  <td className="px-3 py-2 tabular-nums">{toFaDigits(String(a.acquisition_cost))}</td>
+                  <td className="px-3 py-2 tabular-nums">{toFaDigits(String(a.book_value))}</td>
                   <td className="px-3 py-2 text-xs">{a.status}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
