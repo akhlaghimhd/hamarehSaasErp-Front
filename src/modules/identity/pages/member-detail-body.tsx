@@ -17,6 +17,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/shared/components/ui/dialog";
 import { useAuthStore, usePermission } from "@/auth";
+import { useIdentityHoldingAccess } from "../hooks/use-identity-holding-access";
 import { ApiClientError } from "@/api";
 import { toFaDigits } from "@/shared/lib/utils";
 import {
@@ -79,6 +80,9 @@ export function MemberDetailBody() {
   const canUpdate = usePermission(IdentityPermissions.userUpdate);
   const canManageOwner = useAuthStore((s) => s.securityContext?.is_owner === true);
   const canDelete = usePermission(IdentityPermissions.userDelete);
+  const { canMutateMembers, isGroupObserver } = useIdentityHoldingAccess();
+  const canUpdateOp = canUpdateOp && canMutateMembers;
+  const canDeleteOp = canDeleteOp && canMutateMembers;
   const canViewHistory = usePermission(IdentityPermissions.membershipHistoryView);
   const canViewProfile = usePermission(IdentityPermissions.profileView);
   const canRequestPrivileged = usePermission(IdentityPermissions.privilegedRequest);
@@ -314,12 +318,12 @@ export function MemberDetailBody() {
                 درخواست دسترسی اضطراری
               </Button>
             ) : null}
-            {canUpdate ? (
+            {canUpdateOp ? (
               <Button type="button" variant="outline" size="sm" disabled={updateMutation.isPending} onClick={() => void onToggleStatus()}>
                 {active ? "غیرفعال‌سازی" : "فعال‌سازی"}
               </Button>
             ) : null}
-            {canDelete && !isSelf ? (
+            {canDeleteOp && !isSelf ? (
               <Button type="button" variant="destructive" size="sm" onClick={() => setConfirmDelete(true)}>حذف از سازمان</Button>
             ) : null}
           </div>
@@ -375,7 +379,7 @@ export function MemberDetailBody() {
             <CardTitle className="text-base">اطلاعات هویتی</CardTitle>
             <div className="flex items-center gap-2">
               <StatusChip label={active ? "فعال" : "غیرفعال"} tone={active ? "success" : "neutral"} />
-              {canUpdate && !editingIdentity ? (
+              {canUpdateOp && !editingIdentity ? (
                 <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5" onClick={startEditIdentity}>
                   <Pencil className="h-3.5 w-3.5" />ویرایش
                 </Button>
@@ -438,8 +442,8 @@ export function MemberDetailBody() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <AssignRolesCard userId={data.user_id ?? ""} />
-        <AssignScopesCard tenantUserId={data.tenant_user_id ?? ""} />
+        {canMutateMembers ? <AssignRolesCard userId={data.user_id ?? ""} /> : null}
+        {canMutateMembers ? <AssignScopesCard tenantUserId={data.tenant_user_id ?? ""} /> : null}
       </div>
 
       {canViewHistory ? (

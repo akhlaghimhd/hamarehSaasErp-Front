@@ -22,6 +22,7 @@ import { useAuthStore, usePermission } from "@/auth";
 import { cn, toFaDigits } from "@/shared/lib/utils";
 import { useCreateTenantUser, useRestoreTenantUser, useSoftDeleteTenantUser, useTenantUsers, useUpdateTenantUser } from "../hooks/use-tenant-users";
 import { MembersCompanyFilter } from "../components/members-company-filter";
+import { useIdentityHoldingAccess } from "../hooks/use-identity-holding-access";
 import { IdentityPermissions, type TenantUserDto } from "../types";
 import { MSG_LOAD_ERROR, MSG_NO_ACCESS } from "../lib/ui-copy";
 import { downloadMembersImportTemplate, exportMembersExcel, exportMembersPdf, readSpreadsheetTable } from "../lib/members-export";
@@ -40,6 +41,11 @@ export function MembersListPage() {
   const canUpdate = usePermission(IdentityPermissions.userUpdate);
   const canDelete = usePermission(IdentityPermissions.userDelete);
   const canRestore = usePermission(IdentityPermissions.userRestore);
+  const { canMutateMembers, isGroupObserver } = useIdentityHoldingAccess();
+  const canCreateOp = canCreateOp && canMutateMembers;
+  const canUpdateOp = canUpdateOp && canMutateMembers;
+  const canDeleteOp = canDeleteOp && canMutateMembers;
+  const canRestoreOp = canRestoreOp && canMutateMembers;
   const currentUserId = useAuthStore((s) => s.user?.user_id);
 
   const [membershipFilter, setMembershipFilter] = useState<MembershipListFilter>("active");
@@ -261,7 +267,7 @@ export function MembersListPage() {
           breadcrumbs={[{ label: "داشبورد", href: "/dashboard" }, { label: "هویت و دسترسی", href: "/dashboard/identity" }, { label: "کاربران" }]}
           actions={
             <div className="flex flex-wrap items-center gap-2">
-              {canCreate ? (
+              {canCreateOp ? (
                 <>
                   <input ref={importRef} type="file" accept=".xlsx,.xls,.xlsm,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void onImportFile(f); }} />
                   <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5" disabled={importBusy || bulkBusy} onClick={() => importRef.current?.click()}>
@@ -303,6 +309,12 @@ export function MembersListPage() {
               <SelectItem value="deleted">کاربران حذف‌شده</SelectItem>
             </SelectContent>
           </Select>
+          
+      {isGroupObserver && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+          دسترسی شما در این بخش فقط مشاهده است؛ ایجاد یا ویرایش عضو مجاز نیست.
+        </div>
+      )}
           <MembersCompanyFilter value={companyFilter} onChange={(v) => { setCompanyFilter(v); setPage(1); }} />
           {!isDeletedView ? (
             <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as StatusFilter); setPage(1); }}>
@@ -473,7 +485,7 @@ export function MembersListPage() {
                           <IconAction label="مشاهده" onClick={() => { window.location.href = memberDetailPath(row.tenant_user_id); }}>
                             <Eye className="h-3.5 w-3.5" />
                           </IconAction>
-                          {!isDeletedView && canUpdate && !isSelf ? (
+                          {!isDeletedView && canUpdateOp && !isSelf ? (
                             active ? (
                               <IconAction label="غیرفعال‌سازی" onClick={() => void deactivateOne(row)}>
                                 <UserMinus className="h-3.5 w-3.5" />
@@ -484,7 +496,7 @@ export function MembersListPage() {
                               </IconAction>
                             )
                           ) : null}
-                          {!isDeletedView && canDelete && !isSelf ? (
+                          {!isDeletedView && canDeleteOp && !isSelf ? (
                             <IconAction label="حذف از سازمان" variant="destructive" onClick={() => void deleteOne(row)}>
                               <Trash2 className="h-3.5 w-3.5" />
                             </IconAction>
