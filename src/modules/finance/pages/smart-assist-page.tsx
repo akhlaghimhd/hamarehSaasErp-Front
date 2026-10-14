@@ -6,6 +6,7 @@ import { Loader2, Sparkles } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { Button } from "@/shared/components/ui/button";
 import { usePermission } from "@/auth";
+import { useFinanceCompanyScope } from "../hooks/use-finance-company-scope";
 import { useCompanies } from "@/modules/organization/hooks/use-companies";
 import { smartAssistService } from "../services/smart-assist-service";
 import { DEMO_PERIOD_ID, FinancePermissions } from "../types";
@@ -14,6 +15,20 @@ export function SmartAssistPage() {
   const canView = usePermission(FinancePermissions.smartView);
   const canNl = usePermission(FinancePermissions.smartNl);
   const canDecide = usePermission(FinancePermissions.smartDecide);
+
+  const {
+    companies: scopeCompanies,
+    multiCompany: scopeMulti,
+    companyId: scopeCompanyId,
+    setCompanyId: setScopeCompanyId,
+    canOperateCompany,
+    canOperateSelected,
+    isTechnicalOwnerReadOnly,
+    isGroupObserver,
+  } = useFinanceCompanyScope();
+  const canNlOp = canNl && canOperateSelected;
+  const canDecideOp = canDecide && canOperateSelected;
+  const canMutateCompany = canOperateSelected;
   const { data: companies } = useCompanies();
 
   const primaryCompanyId = useMemo(() => {
@@ -52,7 +67,7 @@ export function SmartAssistPage() {
   });
 
   const { data: insightsData, refetch: refetchInsights, isFetching } = useQuery({
-    queryKey: ["finance", "pl-insights", effectiveCo, periodId],
+    queryKey: ["fin", "pl-insights", effectiveCo, periodId],
     queryFn: () => smartAssistService.plInsights(effectiveCo, periodId),
     enabled: false,
   });
@@ -67,66 +82,70 @@ export function SmartAssistPage() {
     <div className="space-y-4">
       <PageHeader
         title="دستیار هوشمند حسابداری"
-        description="K2 پیشنهاد حساب · K5 بینش سود/زیان · K6 دستور → فقط پیش‌نویس"
+        description="پیشنهاد حساب، دستور زبان طبیعی، بینش P&L"
+        icon={<Sparkles className="h-4 w-4" />}
         breadcrumbs={[
           { label: "داشبورد", href: "/dashboard" },
           { label: "حسابداری", href: "/dashboard/finance" },
-          { label: "دستیار هوشمند" },
+          { label: "دستیار" },
         ]}
       />
 
-      {msg ? <p className="text-sm text-muted-foreground">{msg}</p> : null}
+      {(isTechnicalOwnerReadOnly || isGroupObserver) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+          دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش روی شرکت‌های زیرمجموعه مجاز نیست.
+        </div>
+      )}
 
-      <div className="grid gap-2 rounded-xl border bg-card p-3 sm:grid-cols-3">
+      <div className="flex flex-wrap gap-3">
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">شرکت</label>
           <select
-            className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+            className="h-9 rounded-md border bg-background px-2 text-sm"
             value={effectiveCo}
             onChange={(e) => setCompanyId(e.target.value)}
           >
-            <option value="">—</option>
             {(companies ?? []).map((c) => (
               <option key={c.company_id} value={c.company_id}>
-                {c.name}
+                {(c as { name?: string }).name || c.company_id.slice(0, 8)}
               </option>
             ))}
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Period ID</label>
+          <label className="text-xs text-muted-foreground">Period</label>
           <input
-            className="h-9 w-full rounded-md border bg-background px-2 font-mono text-xs"
+            className="h-9 w-56 rounded-md border bg-background px-2 font-mono text-xs"
             value={periodId}
             onChange={(e) => setPeriodId(e.target.value)}
           />
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Ledger ID</label>
+          <label className="text-xs text-muted-foreground">Ledger ID (برای NL)</label>
           <input
-            className="h-9 w-full rounded-md border bg-background px-2 font-mono text-xs"
+            className="h-9 w-56 rounded-md border bg-background px-2 font-mono text-xs"
             value={ledgerId}
             onChange={(e) => setLedgerId(e.target.value)}
           />
         </div>
       </div>
 
+      {msg ? <p className="text-sm text-muted-foreground">{msg}</p> : null}
+
       <div className="space-y-2 rounded-xl border bg-card p-3">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <Sparkles className="h-4 w-4 text-primary" /> K2 — پیشنهاد حساب از تاریخچه
-        </div>
+        <div className="text-sm font-medium">پیشنهاد حساب</div>
         <div className="flex flex-wrap gap-2">
           <input
-            className="h-9 min-w-[160px] flex-1 rounded-md border bg-background px-2 text-sm"
+            className="h-9 flex-1 min-w-[12rem] rounded-md border bg-background px-2 text-sm"
             value={hint}
             onChange={(e) => setHint(e.target.value)}
-            placeholder="راهنمای توضیح"
           />
           <Button
             size="sm"
             disabled={!effectiveCo || suggestMut.isPending}
             onClick={() => void suggestMut.mutateAsync()}
           >
+            {suggestMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             پیشنهاد
           </Button>
         </div>
@@ -135,13 +154,13 @@ export function SmartAssistPage() {
             {suggestMut.data.suggestions.map((s) => (
               <li
                 key={s.account_id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-2 py-1"
+                className="flex items-center justify-between gap-2 rounded-md border px-2 py-1"
               >
                 <span>
                   <span className="font-mono text-xs">{s.account_code}</span> {s.name}
                   <span className="ms-2 text-xs text-muted-foreground">{s.reason}</span>
                 </span>
-                {canDecide ? (
+                {canDecideOp ? (
                   <Button
                     size="sm"
                     variant="outline"
@@ -171,7 +190,7 @@ export function SmartAssistPage() {
         />
         <Button
           size="sm"
-          disabled={!canNl || !effectiveCo || !ledgerId || nlMut.isPending}
+          disabled={!canNlOp || !effectiveCo || !ledgerId || nlMut.isPending}
           onClick={() => void nlMut.mutateAsync()}
         >
           {nlMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
