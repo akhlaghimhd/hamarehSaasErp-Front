@@ -1,1 +1,6 @@
-LOAD_FROM_ARTIFACTS_journals-page.FIN-HOLD-W2.tsx
+"use client";
+
+// TEMP_RESTORE_MARKER — will be replaced
+export function JournalsPage() {
+  return null;
+}
