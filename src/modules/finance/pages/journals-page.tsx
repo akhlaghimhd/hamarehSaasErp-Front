@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -43,6 +43,7 @@ import {
 } from "@/shared/components/ui/dialog";
 import { usePermission, useAuthStore } from "@/auth";
 import { useCompanies } from "@/modules/organization/hooks/use-companies";
+import { useFinanceCompanyScope } from "../hooks/use-finance-company-scope";
 import {
   costCenterService,
   businessUnitService,
@@ -202,6 +203,11 @@ export function JournalsPage() {
   const canDelete = usePermission(FinancePermissions.journalDelete);
   const canPost = usePermission(FinancePermissions.journalPost);
   const canReverse = usePermission(FinancePermissions.journalReverse);
+
+  const { canOperateCompany, isTechnicalOwnerReadOnly, isGroupObserver } =
+    useFinanceCompanyScope();
+  const canOperateOn = (companyId?: string | null) =>
+    canOperateCompany(String(companyId || ""));
 
   const { data: companies } = useCompanies();
   const primaryCompanyId = useMemo(() => {
@@ -1022,7 +1028,7 @@ export function JournalsPage() {
         if (!saving) void doSave(false);
       } else if (code === "F9") {
         e.preventDefault();
-        if (!saving && isBalanced && canPost) void doSave(true);
+        if (!saving && isBalanced && canPost && canOperateOn(formCompanyId || primaryCompanyId)) void doSave(true);
       } else if (code === "F4") {
         e.preventDefault();
         fillBalanceOnLast();
@@ -1713,7 +1719,7 @@ export function JournalsPage() {
         ]}
         actions={
           <div className="flex items-center gap-1.5 flex-wrap">
-            {canCreate ? (
+            {canCreate && canOperateOn(formCompanyId || primaryCompanyId) ? (
               <Button type="button" size="sm" className="h-8" onClick={openNew}>
                 <Plus className="h-4 w-4 ml-1" />
                 ╪│┘╪» ╪ش╪»█î╪»
@@ -1724,6 +1730,12 @@ export function JournalsPage() {
       />
 
 
+
+      {(isTechnicalOwnerReadOnly || isGroupObserver) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+          دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش سند روی شرکت‌های زیرمجموعه مجاز نیست.
+        </div>
+      )}
       {selectedIds.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50/60 px-2 py-1.5 text-xs">
           <span className="text-sky-900">{toFaDigits(selectedIds.length)} ┘à┘ê╪▒╪» ╪د┘╪ز╪«╪د╪ذ ╪┤╪»┘ç</span>
@@ -1742,7 +1754,7 @@ export function JournalsPage() {
             ) : null
           ) : (
             <>
-              {canPost ? (
+              {canPost && !isTechnicalOwnerReadOnly && !isGroupObserver ? (
                 <Button type="button" size="sm" className="h-7" variant="secondary" onClick={() => void bulkPostSelected()}>
                   ╪س╪ذ╪ز ┘é╪╖╪╣█î ┌»╪▒┘ê┘ç█î
                 </Button>
@@ -1971,7 +1983,7 @@ export function JournalsPage() {
           <div className="p-6 text-center space-y-3">
             <FileText className="h-8 w-8 mx-auto text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">╪│┘╪»█î ╪س╪ذ╪ز ┘╪┤╪»┘ç ╪د╪│╪ز.</p>
-            {!showDeleted && canCreate ? (
+            {!showDeleted && canCreate && canOperateOn(formCompanyId || primaryCompanyId) ? (
               <Button size="sm" onClick={openNew}>
                 <Plus className="h-4 w-4 ml-1" />
                 ╪س╪ذ╪ز ╪د┘ê┘█î┘ ╪│┘╪»
@@ -2073,13 +2085,13 @@ export function JournalsPage() {
                           className="h-8 px-2"
                           onClick={() => void openEdit(j, j.status !== "DRAFT")}
                         >
-                          {j.status === "DRAFT" && canUpdate ? (
+                          {j.status === "DRAFT" && canUpdate && canOperateOn(j.company_id) ? (
                             <Pencil className="h-3.5 w-3.5" />
                           ) : (
                             "┘à╪┤╪د┘ç╪»┘ç"
                           )}
                         </Button>
-                        {!showDeleted && canCreate ? (
+                        {!showDeleted && canCreate && canOperateOn(formCompanyId || primaryCompanyId) ? (
                           <Button
                             size="sm"
                             variant="ghost"
@@ -2090,7 +2102,7 @@ export function JournalsPage() {
                             <Copy className="h-3.5 w-3.5" />
                           </Button>
                         ) : null}
-                        {!showDeleted && j.status === "DRAFT" && canPost ? (
+                        {!showDeleted && j.status === "DRAFT" && canPost && canOperateOn(j.company_id) ? (
                           <Button
                             size="sm"
                             variant="secondary"
@@ -2106,7 +2118,7 @@ export function JournalsPage() {
                             ╪س╪ذ╪ز ┘é╪╖╪╣█î
                           </Button>
                         ) : null}
-                        {!showDeleted && j.status === "POSTED" && !j.reverses_entry_id && canReverse ? (
+                        {!showDeleted && j.status === "POSTED" && !j.reverses_entry_id && canReverse && canOperateOn(j.company_id) ? (
                           <Button
                             size="sm"
                             variant="outline"
