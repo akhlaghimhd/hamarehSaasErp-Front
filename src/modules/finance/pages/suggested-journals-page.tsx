@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/shared/components/ui/dialog";
 import { usePermission } from "@/auth";
+import { useFinanceCompanyScope } from "../hooks/use-finance-company-scope";
 import { useCompanies } from "@/modules/organization/hooks/use-companies";
 import { useAccountFlat } from "../hooks/use-accounts";
 import { suggestedJournalService } from "../services/suggested-journal-service";
@@ -57,7 +58,11 @@ function lineCredit(l: SuggestedJournalLineDto): number {
 export function SuggestedJournalsPage() {
   const canView = usePermission(FinancePermissions.suggestView);
   const canDecide = usePermission(FinancePermissions.suggestDecide);
-  const qc = useQueryClient();
+
+  const {
+    canOperateSelected, isTechnicalOwnerReadOnly, isGroupObserver,
+  } = useFinanceCompanyScope();
+  const canDecideOp = canDecide && canOperateSelected;  const qc = useQueryClient();
   const { data: companies } = useCompanies();
   const { data: accountsFlat } = useAccountFlat();
 
@@ -212,6 +217,11 @@ export function SuggestedJournalsPage() {
           { label: "پیشنهادها" },
         ]}
       />
+      {(isTechnicalOwnerReadOnly || isGroupObserver) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+          دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش روی شرکت‌های زیرمجموعه مجاز نیست.
+        </div>
+      )}
 
       {msg ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">

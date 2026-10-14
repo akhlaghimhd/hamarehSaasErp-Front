@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from "@/shared/components/ui/dialog";
 import { usePermission } from "@/auth";
+import { useFinanceCompanyScope } from "../hooks/use-finance-company-scope";
 import { useCompanies } from "@/modules/organization/hooks/use-companies";
 import {
   bankReconService,
@@ -102,7 +103,11 @@ function newDraftLine(date: string): DraftLine {
 export function BankReconPage() {
   const canView = usePermission(FinancePermissions.treasuryView);
   const canManage = usePermission(FinancePermissions.treasuryManage);
-  const qc = useQueryClient();
+
+  const {
+    canOperateSelected, isTechnicalOwnerReadOnly, isGroupObserver,
+  } = useFinanceCompanyScope();
+  const canManageOp = canManage && canOperateSelected;  const qc = useQueryClient();
   const { data: companies } = useCompanies();
 
   const primaryCompanyId = useMemo(() => {
@@ -288,6 +293,11 @@ export function BankReconPage() {
             { label: "جدید" },
           ]}
         />
+      {(isTechnicalOwnerReadOnly || isGroupObserver) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+          دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش روی شرکت‌های زیرمجموعه مجاز نیست.
+        </div>
+      )}
 
         <div className="grid gap-3 sm:grid-cols-2 rounded-xl border bg-card p-4">
           <div className="space-y-1 sm:col-span-2">
@@ -583,7 +593,7 @@ export function BankReconPage() {
             <p className="text-sm text-muted-foreground">
               صورت‌حسابی ثبت نشده است.
             </p>
-            {canManage ? (
+            {canManageOp ? (
               <Button size="sm" onClick={openNew}>
                 <Plus className="h-4 w-4 ml-1" />
                 ثبت اولین صورت‌حساب
@@ -697,7 +707,7 @@ export function BankReconPage() {
                               </span>
                             </td>
                             <td className="px-3 py-2">
-                              {canManage && ln.status === "OPEN" ? (
+                              {canManageOp && ln.status === "OPEN" ? (
                                 <Button
                                   size="sm"
                                   variant="secondary"

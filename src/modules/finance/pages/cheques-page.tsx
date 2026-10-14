@@ -91,7 +91,11 @@ export function ChequesPage() {
   const canView = usePermission(FinancePermissions.treasuryView);
   const canManage = usePermission(FinancePermissions.treasuryManage);
   const qc = useQueryClient();
-  const { companies, multiCompany, companyId, setCompanyId } = useFinanceCompanyScope();
+  const {
+    companies, multiCompany, companyId, setCompanyId,
+    canOperateSelected, isTechnicalOwnerReadOnly, isGroupObserver,
+  } = useFinanceCompanyScope();
+  const canManageOp = canManage && canOperateSelected;
 
   const [statusFilter, setStatusFilter] = useState("");
   const [directionFilter, setDirectionFilter] = useState("");
@@ -246,6 +250,11 @@ export function ChequesPage() {
             { label: "جدید" },
           ]}
         />
+      {(isTechnicalOwnerReadOnly || isGroupObserver) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+          دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش روی شرکت‌های زیرمجموعه مجاز نیست.
+        </div>
+      )}
         {multiCompany ? (
           <div className="space-y-1 max-w-xs">
             <label className="text-xs text-muted-foreground">شرکت</label>
@@ -448,7 +457,7 @@ export function ChequesPage() {
           <div className="p-6 text-center space-y-3">
             <FileCheck2 className="h-8 w-8 mx-auto text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">چکی ثبت نشده است.</p>
-            {canManage ? (
+            {canManageOp ? (
               <Button size="sm" onClick={openNew}>
                 <Plus className="h-4 w-4 ml-1" />
                 ثبت اولین چک
@@ -507,7 +516,7 @@ export function ChequesPage() {
                       </span>
                     </td>
                     <td className="px-3 py-2">
-                      {canManage && next.length > 0 ? (
+                      {canManageOp && next.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {next.map((s) => (
                             <Button

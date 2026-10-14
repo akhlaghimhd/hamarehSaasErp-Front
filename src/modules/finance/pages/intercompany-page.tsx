@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { Button } from "@/shared/components/ui/button";
 import { usePermission } from "@/auth";
+import { useFinanceCompanyScope } from "../hooks/use-finance-company-scope";
 import { useCompanies } from "@/modules/organization/hooks/use-companies";
 import { accountService } from "../services/account-service";
 import { intercompanyService } from "../services/intercompany-service";
@@ -14,7 +15,11 @@ import { DEMO_PERIOD_ID, FinancePermissions } from "../types";
 export function IntercompanyPage() {
   const canView = usePermission(FinancePermissions.icView);
   const canManage = usePermission(FinancePermissions.icManage);
-  const { data: companies } = useCompanies();
+
+  const {
+    canOperateSelected, isTechnicalOwnerReadOnly, isGroupObserver,
+  } = useFinanceCompanyScope();
+  const canManageOp = canManage && canOperateSelected;  const { data: companies } = useCompanies();
 
   const [fromCo, setFromCo] = useState("");
   const [toCo, setToCo] = useState("");
@@ -117,10 +122,15 @@ export function IntercompanyPage() {
           { label: "بین شرکتی" },
         ]}
       />
+      {(isTechnicalOwnerReadOnly || isGroupObserver) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+          دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش روی شرکت‌های زیرمجموعه مجاز نیست.
+        </div>
+      )}
 
       {msg ? <p className="text-sm text-muted-foreground">{msg}</p> : null}
 
-      {canManage ? (
+      {canManageOp ? (
         <div className="space-y-4">
           <div className="grid gap-2 rounded-xl border bg-card p-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-1">

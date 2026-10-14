@@ -94,7 +94,12 @@ export function OpenItemsPage() {
   const canView = canViewAr || canViewAp;
 
   const qc = useQueryClient();
-  const { companies, multiCompany, companyId, setCompanyId } = useFinanceCompanyScope();
+  const {
+    companies, multiCompany, companyId, setCompanyId,
+    canOperateSelected, isTechnicalOwnerReadOnly, isGroupObserver,
+  } = useFinanceCompanyScope();
+  const canManageArOp = canManageAr && canOperateSelected;
+  const canManageApOp = canManageAp && canOperateSelected;
 
   const [side, setSide] = useState<"AR" | "AP">("AR");
   const [search, setSearch] = useState("");
@@ -102,6 +107,7 @@ export function OpenItemsPage() {
   const effectiveCompany = companyId || null;
 
   const canManage = side === "AR" ? canManageAr : canManageAp;
+  const canManageOp = canManage && canOperateSelected;
 
   const listQ = useQuery({
     queryKey: ["finance", "open-items", effectiveCompany, side],
@@ -290,6 +296,11 @@ export function OpenItemsPage() {
             { label: "جدید" },
           ]}
         />
+      {(isTechnicalOwnerReadOnly || isGroupObserver) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+          دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش روی شرکت‌های زیرمجموعه مجاز نیست.
+        </div>
+      )}
 
         <div className="grid gap-3 sm:grid-cols-2 rounded-xl border bg-card p-4">
           <div className="space-y-1 sm:col-span-2">
@@ -491,7 +502,7 @@ export function OpenItemsPage() {
         ) : !rows.length ? (
           <div className="p-6 text-center space-y-3">
             <p className="text-sm text-muted-foreground">مورد بازی برای این فیلتر ثبت نشده است.</p>
-            {canManage ? (
+            {canManageOp ? (
               <Button size="sm" onClick={openNew}>
                 <Plus className="h-4 w-4 ml-1" />
                 ثبت فاکتور دستی
@@ -516,7 +527,7 @@ export function OpenItemsPage() {
               {rows.map((r) => {
                 const open = Number(r.open_amount || 0);
                 const canAlloc =
-                  canManage && open > 0 && (r.status === "OPEN" || r.status === "PARTIAL");
+                  canManageOp && open > 0 && (r.status === "OPEN" || r.status === "PARTIAL");
                 return (
                   <tr key={r.open_item_id} className="border-b border-border/50 hover:bg-muted/40">
                     <td className="px-3 py-2 text-xs max-w-[140px] truncate">{partyName(r)}</td>

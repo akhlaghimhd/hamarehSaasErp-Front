@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/shared/components/ui/dialog";
 import { usePermission } from "@/auth";
+import { useFinanceCompanyScope } from "../hooks/use-finance-company-scope";
 import { useCompanies } from "@/modules/organization/hooks/use-companies";
 import { useAccountFlat } from "../hooks/use-accounts";
 import {
@@ -84,7 +85,12 @@ export function TreasuryPage() {
   const canView = usePermission(FinancePermissions.treasuryView);
   const canManage = usePermission(FinancePermissions.treasuryManage);
   const canPost = usePermission(FinancePermissions.treasuryPost);
-  const qc = useQueryClient();
+
+  const {
+    canOperateSelected, isTechnicalOwnerReadOnly, isGroupObserver,
+  } = useFinanceCompanyScope();
+  const canManageOp = canManage && canOperateSelected;
+  const canPostOp = canPost && canOperateSelected;  const qc = useQueryClient();
   const { data: companies } = useCompanies();
   const primaryCompanyId = useMemo(() => {
     const list = companies ?? [];
@@ -355,6 +361,11 @@ export function TreasuryPage() {
             { label: "جدید" },
           ]}
         />
+      {(isTechnicalOwnerReadOnly || isGroupObserver) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+          دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش روی شرکت‌های زیرمجموعه مجاز نیست.
+        </div>
+      )}
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
@@ -401,7 +412,7 @@ export function TreasuryPage() {
               <label className="text-xs text-muted-foreground">
                 حساب نقدی / بانکی
               </label>
-              {canManage ? (
+              {canManageOp ? (
                 <button
                   type="button"
                   className="text-[11px] text-primary hover:underline"
@@ -668,7 +679,7 @@ export function TreasuryPage() {
             <p className="text-sm text-muted-foreground">
               سند خزانه‌ای ثبت نشده است.
             </p>
-            {canManage ? (
+            {canManageOp ? (
               <Button size="sm" onClick={openNew}>
                 <Plus className="h-4 w-4 ml-1" />
                 ثبت اولین سند
