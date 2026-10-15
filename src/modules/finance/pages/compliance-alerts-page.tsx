@@ -7,12 +7,15 @@ import { PageHeader } from "@/shared/components/layout/page-header";
 import { Button } from "@/shared/components/ui/button";
 import { usePermission } from "@/auth";
 import { useCompanies } from "@/modules/organization/hooks/use-companies";
+import { useFinanceCompanyScope } from "../hooks/use-finance-company-scope";
 import { complianceService } from "../services/compliance-service";
 import { FinancePermissions } from "../types";
 
 export function ComplianceAlertsPage() {
   const canView = usePermission(FinancePermissions.complianceView);
   const canManage = usePermission(FinancePermissions.complianceManage);
+  const { canOperateCompany, isTechnicalOwnerReadOnly, isGroupObserver } =
+    useFinanceCompanyScope();
   const qc = useQueryClient();
   const { data: companies } = useCompanies();
 
@@ -24,6 +27,10 @@ export function ComplianceAlertsPage() {
 
   const [companyId, setCompanyId] = useState("");
   const effectiveCompany = companyId || primaryCompanyId;
+  const canManageOp =
+    canManage &&
+    !!effectiveCompany &&
+    canOperateCompany(String(effectiveCompany));
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["finance", "alerts", effectiveCompany],
@@ -61,6 +68,12 @@ export function ComplianceAlertsPage() {
         ]}
       />
 
+      {(isTechnicalOwnerReadOnly || isGroupObserver) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+          دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش روی شرکت‌های زیرمجموعه مجاز نیست.
+        </div>
+      )}
+
       <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">شرکت</label>
@@ -77,7 +90,7 @@ export function ComplianceAlertsPage() {
             ))}
           </select>
         </div>
-        {canManage && effectiveCompany ? (
+        {canManageOp ? (
           <Button
             size="sm"
             disabled={scanMut.isPending}
@@ -138,7 +151,7 @@ export function ComplianceAlertsPage() {
                     {a.message}
                   </td>
                   <td className="px-3 py-2">
-                    {canManage ? (
+                    {canManageOp ? (
                       <Button
                         size="sm"
                         variant="outline"
