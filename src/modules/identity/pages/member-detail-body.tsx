@@ -80,7 +80,7 @@ export function MemberDetailBody() {
   const canUpdate = usePermission(IdentityPermissions.userUpdate);
   const canManageOwner = useAuthStore((s) => s.securityContext?.is_owner === true);
   const canDelete = usePermission(IdentityPermissions.userDelete);
-  const { canMutateMembers, isGroupObserver } = useIdentityHoldingAccess();
+  const { canMutateMembers, isGroupObserver, isBranchScopedOnly } = useIdentityHoldingAccess();
   const canUpdateOp = canUpdateOp && canMutateMembers;
   const canDeleteOp = canDeleteOp && canMutateMembers;
   const canViewHistory = usePermission(IdentityPermissions.membershipHistoryView);

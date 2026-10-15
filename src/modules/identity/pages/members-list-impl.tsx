@@ -41,7 +41,7 @@ export function MembersListPage() {
   const canUpdate = usePermission(IdentityPermissions.userUpdate);
   const canDelete = usePermission(IdentityPermissions.userDelete);
   const canRestore = usePermission(IdentityPermissions.userRestore);
-  const { canMutateMembers, isGroupObserver } = useIdentityHoldingAccess();
+  const { canMutateMembers, isGroupObserver, isBranchScopedOnly } = useIdentityHoldingAccess();
   const canCreateOp = canCreateOp && canMutateMembers;
   const canUpdateOp = canUpdateOp && canMutateMembers;
   const canDeleteOp = canDeleteOp && canMutateMembers;
@@ -313,6 +313,12 @@ export function MembersListPage() {
       {isGroupObserver && (
         <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
           دسترسی شما در این بخش فقط مشاهده است؛ ایجاد یا ویرایش عضو مجاز نیست.
+        </div>
+      )}
+          
+      {isBranchScopedOnly && (
+        <div className="rounded-lg border border-sky-200 bg-sky-50/80 px-3 py-2 text-xs text-sky-900">
+          مدیریت شما محدود به اعضای شعبهٔ مجاز است؛ اعضای سایر شعب یا شرکت‌ها در این فهرست دیده نمی‌شوند.
         </div>
       )}
           <MembersCompanyFilter value={companyFilter} onChange={(v) => { setCompanyFilter(v); setPage(1); }} />
