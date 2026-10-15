@@ -43,6 +43,9 @@ export function SmartAssistPage() {
   const [hint, setHint] = useState("هزینه");
   const [msg, setMsg] = useState<string | null>(null);
   const effectiveCo = companyId || primaryCompanyId;
+  const canOperateEffective = canOperateCompany(effectiveCo);
+  const canNlOpEff = canNl && canOperateEffective;
+  const canDecideOpEff = canDecide && canOperateEffective;
 
   const suggestMut = useMutation({
     mutationFn: () =>
@@ -160,7 +163,7 @@ export function SmartAssistPage() {
                   <span className="font-mono text-xs">{s.account_code}</span> {s.name}
                   <span className="ms-2 text-xs text-muted-foreground">{s.reason}</span>
                 </span>
-                {canDecideOp ? (
+                {canDecideOpEff ? (
                   <Button
                     size="sm"
                     variant="outline"
@@ -190,7 +193,7 @@ export function SmartAssistPage() {
         />
         <Button
           size="sm"
-          disabled={!canNlOp || !effectiveCo || !ledgerId || nlMut.isPending}
+          disabled={!canNlOpEff || !effectiveCo || !ledgerId || nlMut.isPending}
           onClick={() => void nlMut.mutateAsync()}
         >
           {nlMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
