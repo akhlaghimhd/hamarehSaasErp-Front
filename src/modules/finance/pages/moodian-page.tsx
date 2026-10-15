@@ -5,11 +5,14 @@ import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { Button } from "@/shared/components/ui/button";
 import { usePermission } from "@/auth";
+import { useFinanceCompanyScope } from "../hooks/use-finance-company-scope";
 import { moodianService } from "../services/moodian-service";
 import { FinancePermissions, MOODIAN_STATUS_LABELS } from "../types";
 
 export function MoodianPage() {
   const canView = usePermission(FinancePermissions.moodianView);
+  const { canOperateCompany, isTechnicalOwnerReadOnly, isGroupObserver } =
+    useFinanceCompanyScope();
   const qc = useQueryClient();
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -40,6 +43,12 @@ export function MoodianPage() {
           { label: "مودیان" },
         ]}
       />
+
+      {(isTechnicalOwnerReadOnly || isGroupObserver) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+          دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش روی شرکت‌های زیرمجموعه مجاز نیست.
+        </div>
+      )}
 
       <div className="rounded-xl border bg-card overflow-x-auto">
         {isLoading ? (
@@ -78,7 +87,7 @@ export function MoodianPage() {
                   </td>
                   <td className="px-3 py-2 text-xs">{s.submitted_at ?? "—"}</td>
                   <td className="px-3 py-2">
-                    {s.external_ref && s.status !== "ACCEPTED" ? (
+                    {s.external_ref && s.status !== "ACCEPTED" && canOperateCompany(s.company_id) ? (
                       <Button
                         size="sm"
                         variant="secondary"
