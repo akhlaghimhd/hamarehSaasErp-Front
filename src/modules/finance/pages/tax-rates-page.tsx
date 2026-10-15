@@ -7,12 +7,16 @@ import { PageHeader } from "@/shared/components/layout/page-header";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { usePermission } from "@/auth";
+import { useFinanceCompanyScope } from "../hooks/use-finance-company-scope";
 import { taxService } from "../services/tax-service";
 import { FinancePermissions } from "../types";
 
 export function TaxRatesPage() {
   const canView = usePermission(FinancePermissions.taxView);
   const canManage = usePermission(FinancePermissions.taxManage);
+  const { isTechnicalOwnerReadOnly, isGroupObserver } = useFinanceCompanyScope();
+  // Tenant-level rate catalog: observers/read-only owners cannot mutate
+  const canManageOp = canManage && !isTechnicalOwnerReadOnly && !isGroupObserver;
   const qc = useQueryClient();
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -56,7 +60,13 @@ export function TaxRatesPage() {
         ]}
       />
 
-      {canManage ? (
+      {(isTechnicalOwnerReadOnly || isGroupObserver) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+          دسترسی شما در این سطح فقط مشاهده و گزارش است؛ تغییر نرخ مالیاتی در این نقش مجاز نیست.
+        </div>
+      )}
+
+      {canManageOp ? (
         <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">کد</label>
