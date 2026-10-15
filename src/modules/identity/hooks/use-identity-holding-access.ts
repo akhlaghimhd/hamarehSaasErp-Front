@@ -5,10 +5,11 @@ import { useAuthStore } from "@/auth";
 import { useCompanies } from "@/modules/organization/hooks/use-companies";
 
 /**
- * IDORG-T14 / ADR-ID-ORG-004 G25 — Identity holding actor flags for members UX.
+ * IDORG-T14 / T17 — Identity holding actor flags for members UX.
  * - group observer: list/read only (no create/update/delete/assign)
- * - technical owner: may mutate Identity (catalog/members) even without COMPANY scopes
- * - company operator: backend enforces COMPANY scope; FE hides nothing extra beyond perms
+ * - technical owner: may mutate Identity even without COMPANY scopes
+ * - company operator: backend enforces COMPANY scope
+ * - branch operator (T17): backend enforces BRANCH scope; FE shows scoped banner
  */
 export function useIdentityHoldingAccess() {
   const securityContext = useAuthStore((s) => s.securityContext);
@@ -33,6 +34,21 @@ export function useIdentityHoldingAccess() {
     );
   }, [securityContext]);
 
+  const operateBranchIds = useMemo(() => {
+    const scopes = securityContext?.scopes ?? [];
+    return Array.from(
+      new Set(
+        scopes
+          .filter(
+            (s) =>
+              String(s.scope_type || "").toUpperCase() === "BRANCH" &&
+              s.reference_id
+          )
+          .map((s) => String(s.reference_id))
+      )
+    );
+  }, [securityContext]);
+
   const isGroupObserver = useMemo(() => {
     if (isOwner) return false;
     const roles = securityContext?.roles ?? [];
@@ -46,8 +62,22 @@ export function useIdentityHoldingAccess() {
     !isOwner && operateCompanyIds.length === 0 && list.length <= 1;
 
   /**
+   * Branch-only Identity admin: has BRANCH scopes, not owner, not soft SME,
+   * and not primarily a multi-company group actor.
+   */
+  const isBranchOperator =
+    !isOwner &&
+    !isSoftSme &&
+    !isGroupObserver &&
+    operateBranchIds.length > 0;
+
+  /** True when actor is constrained to branch membership (no company-wide Identity). */
+  const isBranchScopedOnly =
+    isBranchOperator && operateCompanyIds.length === 0;
+
+  /**
    * Identity member mutate (create/update/delete/assign roles&scopes).
-   * Observer is always read-only. Owner and soft SME may mutate; company ops use perms + BE scope.
+   * Observer is always read-only. Owner, soft SME, company/branch ops use perms + BE scope.
    */
   const canMutateMembers = !isGroupObserver;
 
@@ -58,8 +88,11 @@ export function useIdentityHoldingAccess() {
     isOwner,
     isGroupObserver,
     isSoftSme,
+    isBranchOperator,
+    isBranchScopedOnly,
     multiCompany,
     operateCompanyIds,
+    operateBranchIds,
     canMutateMembers,
     canMutateRoleCatalog,
   };
