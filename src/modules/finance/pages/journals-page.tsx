@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -81,9 +81,9 @@ import {
 } from "@/shared/lib/utils";
 
 const statusLabel: Record<string, string> = {
-  DRAFT: "┘╛█î╪┤ظî┘┘ê█î╪│",
-  POSTED: "╪س╪ذ╪زظî╪┤╪»┘ç",
-  REVERSED: "╪ذ╪▒┌»╪┤╪زظî╪«┘ê╪▒╪»┘ç",
+  DRAFT: "پیش‌نویس",
+  POSTED: "ثبت‌شده",
+  REVERSED: "برگشت‌خورده",
 };
 
 const statusChip: Record<string, string> = {
@@ -101,13 +101,13 @@ type LineForm = {
   description: string;
   cost_center_id: string;
   business_unit_id: string;
-  /** ╪│╪╖╪▒ ╪ز╪▒╪د╪▓ ╪│╪د╪«╪ز┘çظî╪┤╪»┘ç ╪ز┘ê╪│╪╖ ╪│█î╪│╪ز┘à */
+  /** سطر تراز ساخته‌شده توسط سیستم */
   is_system_balance?: boolean;
 };
 
 const JOURNAL_DRAFT_KEY = "finance.journal.form-draft.v1";
-/** ┘╪┤╪د┘┌»╪▒ ┘╛╪د█î╪»╪د╪▒ ╪│╪╖╪▒ ╪ز╪▒╪د╪▓ ╪│█î╪│╪ز┘à ╪»╪▒ ╪┤╪▒╪ص (╪ذ╪»┘ê┘ ╪│╪ز┘ê┘ BE) */
-const SYSTEM_BALANCE_MARK = "╪ز╪▒╪د╪▓ ╪│█î╪│╪ز┘à";
+/** نشانگر پایدار سطر تراز سیستم در شرح (بدون ستون BE) */
+const SYSTEM_BALANCE_MARK = "تراز سیستم";
 
 function isSystemBalanceDescription(desc: string): boolean {
   return (desc || "").includes(SYSTEM_BALANCE_MARK);
@@ -127,8 +127,8 @@ function emptyLine(desc = "", system = false): LineForm {
 }
 
 function periodLabel(id?: string | null): string {
-  if (!id) return "ظ¤";
-  if (id === DEMO_PERIOD_ID) return "╪»┘ê╪▒┘ç ╪ش╪د╪▒█î (╪»┘à┘ê)";
+  if (!id) return "—";
+  if (id === DEMO_PERIOD_ID) return "دوره جاری (دمو)";
   return toFaDigits(id.slice(0, 8));
 }
 
@@ -146,7 +146,7 @@ function formatMoney(n: number): string {
   );
 }
 
-/** ┘┘à╪د█î╪┤ ┘à╪ذ┘╪║ ╪»╪▒ ┘ê╪▒┘ê╪»█î ╪ذ╪د ╪ش╪»╪د┌ر┘┘╪»┘ç ┘ç╪▓╪د╪▒┌»╪د┘ (╪د╪▒┘é╪د┘à ┘╪د╪▒╪│█î) */
+/** نمایش مبلغ در ورودی با جداکننده هزارگان (ارقام فارسی) */
 function formatAmountDisplay(raw: string): string {
   const ascii = toAsciiDigits(raw).replace(/,/g, "").trim();
   if (!ascii) return "";
@@ -205,6 +205,14 @@ export function JournalsPage() {
   const canPost = usePermission(FinancePermissions.journalPost);
   const canReverse = usePermission(FinancePermissions.journalReverse);
 
+  const {
+    canOperateCompany,
+    isTechnicalOwnerReadOnly,
+    isGroupObserver,
+  } = useFinanceCompanyScope();
+  const canOperateOn = (companyId?: string | null) =>
+    Boolean(companyId && canOperateCompany(companyId));
+
   const { data: companies } = useCompanies();
   const primaryCompanyId = useMemo(() => {
     const list = companies ?? [];
@@ -212,7 +220,7 @@ export function JournalsPage() {
     return p?.company_id ?? "";
   }, [companies]);
 
-  /** FIN-CSN-F1: list company filter ظ¤ "" = all allowed (parent multi); single company forced when only one */
+  /** FIN-CSN-F1: list company filter — "" = all allowed (parent multi); single company forced when only one */
   const companyOptions = companies ?? [];
   const multiCompany = companyOptions.length > 1;
   const [listCompanyId, setListCompanyId] = useState<string>("");
@@ -316,8 +324,8 @@ export function JournalsPage() {
   const accountLabel = useCallback(
     (id: string) => {
       const a = postableAccounts.find((x) => x.account_id === id);
-      if (!a) return id ? id.slice(0, 8) : "ظ¤";
-      return `${toFaDigits(a.account_code)} ظ¤ ${a.name}`;
+      if (!a) return id ? id.slice(0, 8) : "—";
+      return `${toFaDigits(a.account_code)} — ${a.name}`;
     },
     [postableAccounts]
   );
@@ -338,7 +346,7 @@ export function JournalsPage() {
   const [pendingNavHref, setPendingNavHref] = useState<string | null>(null);
   const [draftRestoredAt, setDraftRestoredAt] = useState<string | null>(null);
   const router = useRouter();
-  /** typeahead ╪ص╪│╪د╪ذ ╪▒┘ê█î ┘ç╪▒ ╪│╪╖╪▒ */
+  /** typeahead حساب روی هر سطر */
   const [accountFocusKey, setAccountFocusKey] = useState<string | null>(null);
   const [accountTypeQuery, setAccountTypeQuery] = useState("");
   const [accountHighlightIdx, setAccountHighlightIdx] = useState(0);
@@ -448,7 +456,7 @@ export function JournalsPage() {
     };
   }, [statusSummary, activeForCounts]);
 
-  /** ┘┌»╪د╪┤╪ز id ظْ ╪┤┘à╪د╪▒┘ç ┘┘à╪د█î╪┤█î ╪ذ╪▒╪د█î ┘╪┤╪د┘┌»╪▒ ╪د╪▒╪ز╪ذ╪د╪╖ ╪ذ╪▒┌»╪┤╪ز */
+  /** نگاشت id → شماره نمایشی برای نشانگر ارتباط برگشت */
   const numberById = useMemo(() => {
     const m = new Map<string, string>();
     for (const j of [...(activeForCounts ?? []), ...(data ?? [])]) {
@@ -591,7 +599,7 @@ export function JournalsPage() {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const a = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
       if (!a) return;
-      // ┘█î┘┌ر ╪»╪د┘┘┘ê╪» / blob ┘╪ذ╪د█î╪» ╪ذ┘çظî╪╣┘┘ê╪د┘ ┘╪د┘ê╪ذ╪▒█î ┌»╪▒┘╪ز┘ç ╪┤┘ê╪»
+      // لینک دانلود / blob نباید به‌عنوان ناوبری گرفته شود
       if (a.hasAttribute("download") || a.dataset.download === "1") return;
       const href = a.getAttribute("href");
       if (!href || href.startsWith("#") || href.startsWith("blob:") || href.startsWith("data:")) return;
@@ -681,7 +689,7 @@ export function JournalsPage() {
         );
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "╪«╪╖╪د ╪»╪▒ ╪ذ╪د╪▒┌»╪░╪د╪▒█î ╪│┘╪»");
+      toast.error(e instanceof Error ? e.message : "خطا در بارگذاری سند");
       setFormMode(null);
     }
   }
@@ -693,7 +701,7 @@ export function JournalsPage() {
         setFormMode("new");
         setViewOnly(false);
         setDocumentDate(todayIso());
-        setDescription(full.description ? `┌ر┘╛█î: ${full.description}` : "┌ر┘╛█î ╪│┘╪»");
+        setDescription(full.description ? `کپی: ${full.description}` : "کپی سند");
         setEntryNumber(null);
         const items = full.items ?? [];
         setPeriodId(full.period_id || DEMO_PERIOD_ID);
@@ -718,7 +726,7 @@ export function JournalsPage() {
         );
         setFormError(null);
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "┌ر┘╛█î ┘à┘à┌ر┘ ┘╪┤╪»");
+        toast.error(e instanceof Error ? e.message : "کپی ممکن نشد");
       }
     })();
   }
@@ -749,7 +757,7 @@ export function JournalsPage() {
       business_unit_id: "",
     };
     setLines((prev) => {
-      // ╪│╪╖╪▒┘ç╪د█î ╪ش╪»█î╪» ┘ç┘à█î╪┤┘ç ┘é╪ذ┘ ╪د╪▓ ╪│╪╖╪▒ ╪ز╪▒╪د╪▓ ╪│█î╪│╪ز┘à ┘é╪▒╪د╪▒ ┘à█îظî┌»█î╪▒┘╪»
+      // سطرهای جدید همیشه قبل از سطر تراز سیستم قرار می‌گیرند
       const balIdx = prev.findIndex((l) => l.is_system_balance);
       if (balIdx >= 0) {
         const next = [...prev];
@@ -783,7 +791,7 @@ export function JournalsPage() {
   }
 
   function fillBalanceOnLast() {
-    // ┘┘é╪╖ ╪│╪╖╪▒┘ç╪د█î ╪╣╪د╪»█î (╪║█î╪▒╪│█î╪│╪ز┘à█î) ╪»╪▒ ╪ش┘à╪╣ ┘╪ص╪د╪╕ ┘à█îظî╪┤┘ê┘╪»
+    // فقط سطرهای عادی (غیرسیستمی) در جمع لحاظ می‌شوند
     const normal = lines.filter((l) => !l.is_system_balance);
     let d = 0;
     let c = 0;
@@ -793,10 +801,10 @@ export function JournalsPage() {
     }
     const diff = Math.round((d - c) * 100) / 100;
     if (diff === 0) {
-      // ╪د┌»╪▒ ╪ز╪▒╪د╪▓ ╪د╪│╪ز╪î ╪│╪╖╪▒ ╪ز╪▒╪د╪▓ ╪│█î╪│╪ز┘à ╪▒╪د ╪ص╪░┘ ┌ر┘
+      // اگر تراز است، سطر تراز سیستم را حذف کن
       markDirty();
       setLines((prev) => prev.filter((l) => !l.is_system_balance));
-      toast.message("╪│┘╪» ╪ز╪▒╪د╪▓ ╪د╪│╪ز╪ؤ ╪│╪╖╪▒ ╪ز╪▒╪د╪▓ ╪│█î╪│╪ز┘à ╪ص╪░┘ ╪┤╪».");
+      toast.message("سند تراز است؛ سطر تراز سیستم حذف شد.");
       return;
     }
     markDirty();
@@ -808,11 +816,11 @@ export function JournalsPage() {
     const balDesc =
       description.trim() ||
       (diff > 0
-        ? `╪ذ╪│╪ز╪د┘┌ر╪د╪▒ ${SYSTEM_BALANCE_MARK}`
-        : `╪ذ╪»┘ç┌ر╪د╪▒ ${SYSTEM_BALANCE_MARK}`);
+        ? `بستانکار ${SYSTEM_BALANCE_MARK}`
+        : `بدهکار ${SYSTEM_BALANCE_MARK}`);
 
     setLines((prev) => {
-      // ┘ç┘à┘ç ╪│╪╖╪▒┘ç╪د█î ╪ز╪▒╪د╪▓ ┘é╪ذ┘█î ╪ص╪░┘╪ؤ █î┌ر█î ╪»╪▒ ╪د┘╪ز┘ç╪د ╪│╪د╪«╪ز┘ç/╪ذ┘çظî╪▒┘ê╪▓ ┘à█îظî╪┤┘ê╪»
+      // همه سطرهای تراز قبلی حذف؛ یکی در انتها ساخته/به‌روز می‌شود
       const normals = prev.filter((l) => !l.is_system_balance);
       const balanceRow: LineForm = {
         key: prev.find((l) => l.is_system_balance)?.key ?? Math.random().toString(36).slice(2),
@@ -834,24 +842,24 @@ export function JournalsPage() {
     const companyName =
       (companies ?? []).find((c) => c.company_id === primaryCompanyId)?.name ??
       authOrg?.tenant_name ??
-      "ظ¤";
+      "—";
     const userLabel = authUser
       ? `${authUser.first_name ?? ""} ${authUser.last_name ?? ""}`.trim() ||
         authUser.email ||
         authUser.mobile ||
-        "ظ¤"
-      : "ظ¤";
+        "—"
+      : "—";
     const now = new Date().toLocaleString("fa-IR");
     return [
-      ["┌»╪▓╪د╪▒╪┤ ╪│┘╪» ╪ص╪│╪د╪ذ╪»╪د╪▒█î"],
-      ["╪┤╪▒┌ر╪ز", companyName],
-      ["╪│╪د╪▓┘à╪د┘", authOrg?.tenant_name ?? "ظ¤"],
-      ["┌ر╪د╪▒╪ذ╪▒", String(userLabel)],
-      ["╪▓┘à╪د┘ ╪«╪▒┘ê╪ش█î", now],
-      ["╪┤┘à╪د╪▒┘ç ╪│┘╪»", entryNumber ? toFaDigits(entryNumber) : "┘╛█î╪┤ظî┘┘ê█î╪│"],
-      ["╪ز╪د╪▒█î╪« ╪│┘╪»", documentDate ? formatJalaliDate(documentDate) : "ظ¤"],
-      ["╪»┘ê╪▒┘ç", periodLabel(periodId)],
-      ["╪┤╪▒╪ص", description || "ظ¤"],
+      ["گزارش سند حسابداری"],
+      ["شرکت", companyName],
+      ["سازمان", authOrg?.tenant_name ?? "—"],
+      ["کاربر", String(userLabel)],
+      ["زمان خروجی", now],
+      ["شماره سند", entryNumber ? toFaDigits(entryNumber) : "پیش‌نویس"],
+      ["تاریخ سند", documentDate ? formatJalaliDate(documentDate) : "—"],
+      ["دوره", periodLabel(periodId)],
+      ["شرح", description || "—"],
       [],
     ];
   }
@@ -869,7 +877,7 @@ export function JournalsPage() {
     a.rel = "noopener";
     a.style.display = "none";
     document.body.appendChild(a);
-    // ╪ش┘┘ê┌»█î╪▒█î ╪د╪▓ navigation ┘ê ╪ز╪»╪د╪«┘ ╪ذ╪د ┌»╪د╪▒╪» ╪«╪▒┘ê╪ش
+    // جلوگیری از navigation و تداخل با گارد خروج
     a.addEventListener(
       "click",
       (ev) => {
@@ -878,7 +886,7 @@ export function JournalsPage() {
       true
     );
     a.click();
-    // revoke ╪▒╪د ┌ر┘à█î ╪»█î╪▒╪ز╪▒ ╪ز╪د ╪»╪د┘┘┘ê╪» ╪»╪▒ ┌ر╪▒┘ê┘à/╪د╪ش ╪┤╪▒┘ê╪╣ ╪┤┘ê╪»
+    // revoke را کمی دیرتر تا دانلود در کروم/اج شروع شود
     window.setTimeout(() => {
       a.remove();
       URL.revokeObjectURL(url);
@@ -892,7 +900,7 @@ export function JournalsPage() {
     );
     const w = window.open("", "_blank");
     if (!w) {
-      toast.error("┘à╪▒┘ê╪▒┌»╪▒ ┘╛┘╪ش╪▒┘ç ┌╪د┘╛ ╪▒╪د ┘à╪│╪»┘ê╪» ┌ر╪▒╪».");
+      toast.error("مرورگر پنجره چاپ را مسدود کرد.");
       return;
     }
     w.document.write(html);
@@ -902,13 +910,13 @@ export function JournalsPage() {
   function buildReportMeta() {
     const meta = journalMetaRows();
     return {
-      companyName: meta.find((r) => r[0] === "╪┤╪▒┌ر╪ز")?.[1] ?? "ظ¤",
-      orgName: meta.find((r) => r[0] === "╪│╪د╪▓┘à╪د┘")?.[1] ?? "ظ¤",
+      companyName: meta.find((r) => r[0] === "شرکت")?.[1] ?? "—",
+      orgName: meta.find((r) => r[0] === "سازمان")?.[1] ?? "—",
       entryNumber,
-      documentDate: documentDate ? formatJalaliDate(documentDate) : "ظ¤",
+      documentDate: documentDate ? formatJalaliDate(documentDate) : "—",
       periodLabel: periodLabel(periodId),
-      userLabel: meta.find((r) => r[0] === "┌ر╪د╪▒╪ذ╪▒")?.[1] ?? "ظ¤",
-      exportedAt: meta.find((r) => r[0] === "╪▓┘à╪د┘ ╪«╪▒┘ê╪ش█î")?.[1] ?? "ظ¤",
+      userLabel: meta.find((r) => r[0] === "کاربر")?.[1] ?? "—",
+      exportedAt: meta.find((r) => r[0] === "زمان خروجی")?.[1] ?? "—",
       description,
       isBalanced,
       totalDebit: lineTotals.debit,
@@ -926,8 +934,8 @@ export function JournalsPage() {
         description: l.description || "",
         debit: parseAmount(l.debit),
         credit: parseAmount(l.credit),
-        costCenterLabel: cc ? `${toFaDigits(cc.code)} ظ¤ ${cc.name}` : "",
-        businessUnitLabel: bu ? `${toFaDigits(bu.code)} ظ¤ ${bu.name}` : "",
+        costCenterLabel: cc ? `${toFaDigits(cc.code)} — ${cc.name}` : "",
+        businessUnitLabel: bu ? `${toFaDigits(bu.code)} — ${bu.name}` : "",
         isSystemBalance: !!l.is_system_balance || isSystemBalanceDescription(l.description || ""),
       };
     });
@@ -936,22 +944,22 @@ export function JournalsPage() {
   async function doSave(andPost: boolean) {
     setFormError(null);
     if (!primaryCompanyId) {
-      setFormError("╪┤╪▒┌ر╪ز ╪د╪╡┘█î █î╪د┘╪ز ┘╪┤╪».");
+      setFormError("شرکت اصلی یافت نشد.");
       return;
     }
     if (!documentDate) {
-      setFormError("╪ز╪د╪▒█î╪« ╪│┘╪» ╪د┘╪▓╪د┘à█î ╪د╪│╪ز.");
+      setFormError("تاریخ سند الزامی است.");
       return;
     }
     if (!periodId) {
-      setFormError("╪»┘ê╪▒┘ç ┘à╪د┘█î ╪د┘╪▓╪د┘à█î ╪د╪│╪ز.");
+      setFormError("دوره مالی الزامی است.");
       return;
     }
     const built = lines
       .map((l) => {
         let desc = (l.description || "").trim() || description.trim() || "";
         if (l.is_system_balance && desc && !isSystemBalanceDescription(desc)) {
-          desc = `${desc} ظ¤ ${SYSTEM_BALANCE_MARK}`;
+          desc = `${desc} — ${SYSTEM_BALANCE_MARK}`;
         } else if (l.is_system_balance && !desc) {
           desc = SYSTEM_BALANCE_MARK;
         }
@@ -967,14 +975,14 @@ export function JournalsPage() {
       .filter((l) => l.account_id && (l.debit_amount || l.credit_amount));
 
     if (built.length < 2) {
-      setFormError("╪ص╪»╪د┘é┘ ╪»┘ê ╪│╪╖╪▒ ╪ذ╪د ╪ص╪│╪د╪ذ ┘ê ┘à╪ذ┘╪║ ┘╪د╪▓┘à ╪د╪│╪ز.");
+      setFormError("حداقل دو سطر با حساب و مبلغ لازم است.");
       return;
     }
     if (andPost) {
       const d = built.reduce((s, x) => s + (x.debit_amount || 0), 0);
       const c = built.reduce((s, x) => s + (x.credit_amount || 0), 0);
       if (Math.round((d - c) * 100) / 100 !== 0 || d <= 0) {
-        setFormError("╪ذ╪▒╪د█î ╪س╪ذ╪ز ┘é╪╖╪╣█î╪î ╪│┘╪» ╪ذ╪د█î╪» ╪ز╪▒╪د╪▓ ┘ê ┘à╪ذ┘╪║ظî╪»╪د╪▒ ╪ذ╪د╪┤╪».");
+        setFormError("برای ثبت قطعی، سند باید تراز و مبلغ‌دار باشد.");
         return;
       }
     }
@@ -991,9 +999,9 @@ export function JournalsPage() {
         } as Parameters<typeof journalService.createDraft>[0]);
         if (andPost) {
           await journalService.post(created.journal_entry_id);
-          toast.success("╪│┘╪» ╪░╪«█î╪▒┘ç ┘ê ╪س╪ذ╪ز ┘é╪╖╪╣█î ╪┤╪».");
+          toast.success("سند ذخیره و ثبت قطعی شد.");
         } else {
-          toast.success("┘╛█î╪┤ظî┘┘ê█î╪│ ╪░╪«█î╪▒┘ç ╪┤╪».");
+          toast.success("پیش‌نویس ذخیره شد.");
         }
       } else if (typeof formMode === "string") {
         await journalService.updateDraft(formMode, {
@@ -1004,9 +1012,9 @@ export function JournalsPage() {
         });
         if (andPost) {
           await journalService.post(formMode);
-          toast.success("╪│┘╪» ╪ذ┘çظî╪▒┘ê╪▓ ┘ê ╪س╪ذ╪ز ┘é╪╖╪╣█î ╪┤╪».");
+          toast.success("سند به‌روز و ثبت قطعی شد.");
         } else {
-          toast.success("┘╛█î╪┤ظî┘┘ê█î╪│ ╪ذ┘çظî╪▒┘ê╪▓ ╪┤╪».");
+          toast.success("پیش‌نویس به‌روز شد.");
         }
       }
       setDirty(false);
@@ -1018,7 +1026,7 @@ export function JournalsPage() {
           ? e.message
           : e instanceof Error
             ? e.message
-            : "╪░╪«█î╪▒┘ç ┘╪د┘à┘ê┘┘é ╪ذ┘ê╪»"
+            : "ذخیره ناموفق بود"
       );
     } finally {
       setSaving(false);
@@ -1028,7 +1036,7 @@ export function JournalsPage() {
   useEffect(() => {
     if (formMode === null || viewOnly) return;
     function onKey(e: KeyboardEvent) {
-      // F-keys ╪»╪▒ ┘ê╪ذ ┘╛╪د█î╪»╪د╪▒╪ز╪▒ ╪د╪▓ Alt/Ctrl ┘ç╪│╪ز┘╪» (Alt ╪د╪║┘╪ذ ┘à┘┘ê█î ┘à╪▒┘ê╪▒┌»╪▒ ╪▒╪د ┘à█îظî┌»█î╪▒╪»)
+      // F-keys در وب پایدارتر از Alt/Ctrl هستند (Alt اغلب منوی مرورگر را می‌گیرد)
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const code = e.code;
       if (code === "F2") {
@@ -1051,21 +1059,21 @@ export function JournalsPage() {
 
   if (!canView) {
     return (
-      <div className="p-6 text-sm text-amber-700">┘à╪ش┘ê╪▓ ┘à╪┤╪د┘ç╪»┘ç ╪د╪│┘╪د╪» ╪▒╪د ┘╪»╪د╪▒█î╪».</div>
+      <div className="p-6 text-sm text-amber-700">مجوز مشاهده اسناد را ندارید.</div>
     );
   }
 
 
   function buildListFilterSummary(): string {
     const parts: string[] = [];
-    if (statusFilter) parts.push(`┘ê╪╢╪╣█î╪ز: ${statusLabel[statusFilter] ?? statusFilter}`);
-    else parts.push("┘ê╪╢╪╣█î╪ز: ┘ç┘à┘ç");
-    if (periodFilter) parts.push(`╪»┘ê╪▒┘ç: ${periodLabel(periodFilter)}`);
-    else parts.push("╪»┘ê╪▒┘ç: ┘ç┘à┘ç");
-    if (dateFrom) parts.push(`╪د╪▓ ╪ز╪د╪▒█î╪«: ${formatJalaliDate(dateFrom)}`);
-    if (dateTo) parts.push(`╪ز╪د ╪ز╪د╪▒█î╪«: ${formatJalaliDate(dateTo)}`);
-    if (search.trim()) parts.push(`╪ش╪│╪ز╪ش┘ê: ${search.trim()}`);
-    parts.push(`╪ز╪╣╪»╪د╪» ╪▒╪»█î┘: ${toFaDigits(filtered.length)}`);
+    if (statusFilter) parts.push(`وضعیت: ${statusLabel[statusFilter] ?? statusFilter}`);
+    else parts.push("وضعیت: همه");
+    if (periodFilter) parts.push(`دوره: ${periodLabel(periodFilter)}`);
+    else parts.push("دوره: همه");
+    if (dateFrom) parts.push(`از تاریخ: ${formatJalaliDate(dateFrom)}`);
+    if (dateTo) parts.push(`تا تاریخ: ${formatJalaliDate(dateTo)}`);
+    if (search.trim()) parts.push(`جستجو: ${search.trim()}`);
+    parts.push(`تعداد ردیف: ${toFaDigits(filtered.length)}`);
     return parts.join(" | ");
   }
 
@@ -1074,7 +1082,7 @@ export function JournalsPage() {
       ? filtered.filter((j) => selectedIds.includes(j.journal_entry_id))
       : filtered;
     const filterLine = buildListFilterSummary();
-    const head = ["╪┤┘à╪د╪▒┘ç", "╪ز╪د╪▒█î╪«", "╪»┘ê╪▒┘ç", "┘ê╪╢╪╣█î╪ز", "╪┤╪▒╪ص", "╪ذ╪»┘ç┌ر╪د╪▒", "╪ذ╪│╪ز╪د┘┌ر╪د╪▒"];
+    const head = ["شماره", "تاریخ", "دوره", "وضعیت", "شرح", "بدهکار", "بستانکار"];
     const body = rows.map((j) => {
       const t = journalTotals(j);
       return [
@@ -1089,9 +1097,9 @@ export function JournalsPage() {
     });
     const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
     const meta = [
-      ["┌»╪▓╪د╪▒╪┤ ┘┘ç╪▒╪│╪ز ╪د╪│┘╪د╪» ╪ص╪│╪د╪ذ╪»╪د╪▒█î"],
-      ["┘█î┘╪ز╪▒┘ç╪د", filterLine],
-      ["╪▓┘à╪د┘ ╪«╪▒┘ê╪ش█î", new Date().toLocaleString("fa-IR")],
+      ["گزارش فهرست اسناد حسابداری"],
+      ["فیلترها", filterLine],
+      ["زمان خروجی", new Date().toLocaleString("fa-IR")],
       [],
     ];
     const csv =
@@ -1126,14 +1134,14 @@ export function JournalsPage() {
           <td>${formatJalaliDate(j.document_date)}</td>
           <td>${periodLabel(j.period_id)}</td>
           <td>${statusLabel[j.status] ?? j.status}</td>
-          <td>${(j.description ?? "ظ¤").replace(/</g, "<")}</td>
-          <td>${t.debit ? formatMoney(t.debit) : "ظ¤"}</td>
-          <td>${t.credit ? formatMoney(t.credit) : "ظ¤"}</td>
+          <td>${(j.description ?? "—").replace(/</g, "<")}</td>
+          <td>${t.debit ? formatMoney(t.debit) : "—"}</td>
+          <td>${t.credit ? formatMoney(t.credit) : "—"}</td>
         </tr>`;
       })
       .join("");
     const html = `<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/>
-      <title>╪د╪│┘╪د╪» ╪ص╪│╪د╪ذ╪»╪د╪▒█î</title>
+      <title>اسناد حسابداری</title>
       <style>
         body{font-family:Tahoma,Arial,sans-serif;font-size:11px;padding:16px}
         h1{font-size:16px;margin:0 0 8px}
@@ -1142,16 +1150,16 @@ export function JournalsPage() {
         th{background:#f1f5f9}
         .meta{color:#64748b;margin-bottom:8px;line-height:1.6}
       </style></head><body>
-      <h1>┘┘ç╪▒╪│╪ز ╪د╪│┘╪د╪» ╪ص╪│╪د╪ذ╪»╪د╪▒█î</h1>
-      <div class="meta">┘█î┘╪ز╪▒┘ç╪د: ${filterLine.replace(/</g, "<")}</div>
-      <div class="meta">╪▓┘à╪د┘ ╪«╪▒┘ê╪ش█î: ${toFaDigits(new Date().toLocaleString("fa-IR"))}</div>
+      <h1>فهرست اسناد حسابداری</h1>
+      <div class="meta">فیلترها: ${filterLine.replace(/</g, "<")}</div>
+      <div class="meta">زمان خروجی: ${toFaDigits(new Date().toLocaleString("fa-IR"))}</div>
       <table><thead><tr>
-        <th>╪┤┘à╪د╪▒┘ç</th><th>╪ز╪د╪▒█î╪«</th><th>╪»┘ê╪▒┘ç</th><th>┘ê╪╢╪╣█î╪ز</th><th>╪┤╪▒╪ص</th><th>╪ذ╪»┘ç┌ر╪د╪▒</th><th>╪ذ╪│╪ز╪د┘┌ر╪د╪▒</th>
+        <th>شماره</th><th>تاریخ</th><th>دوره</th><th>وضعیت</th><th>شرح</th><th>بدهکار</th><th>بستانکار</th>
       </tr></thead><tbody>${trs}</tbody></table>
       </body></html>`;
     const w = window.open("", "_blank");
     if (!w) {
-      toast.error("┘à╪▒┘ê╪▒┌»╪▒ ┘╛┘╪ش╪▒┘ç ┌╪د┘╛ ╪▒╪د ┘à╪│╪»┘ê╪» ┌ر╪▒╪». ╪د╪ش╪د╪▓┘ç ┘╛╪د┘╛ظî╪ت┘╛ ╪▒╪د ┘╪╣╪د┘ ┌ر┘█î╪».");
+      toast.error("مرورگر پنجره چاپ را مسدود کرد. اجازه پاپ‌آپ را فعال کنید.");
       return;
     }
     w.document.write(html);
@@ -1163,7 +1171,7 @@ export function JournalsPage() {
   async function bulkPostSelected() {
     const drafts = (data ?? []).filter((j) => selectedIds.includes(j.journal_entry_id) && j.status === "DRAFT");
     if (!drafts.length) {
-      toast.error("┘╛█î╪┤ظî┘┘ê█î╪│█î ╪»╪▒ ╪د┘╪ز╪«╪د╪ذظî┘ç╪د ┘█î╪│╪ز.");
+      toast.error("پیش‌نویسی در انتخاب‌ها نیست.");
       return;
     }
     let ok = 0;
@@ -1176,14 +1184,14 @@ export function JournalsPage() {
       }
     }
     setSelectedIds([]);
-    toast.success(`${toFaDigits(ok)} ╪│┘╪» ╪س╪ذ╪ز ┘é╪╖╪╣█î ╪┤╪».`);
+    toast.success(`${toFaDigits(ok)} سند ثبت قطعی شد.`);
     void refetch();
   }
 
   function requestBulkDelete() {
     const drafts = (data ?? []).filter((j) => selectedIds.includes(j.journal_entry_id) && j.status === "DRAFT");
     if (!drafts.length) {
-      toast.error("┘┘é╪╖ ┘╛█î╪┤ظî┘┘ê█î╪│ ┘é╪د╪ذ┘ ╪ص╪░┘ ┌»╪▒┘ê┘ç█î ╪د╪│╪ز.");
+      toast.error("فقط پیش‌نویس قابل حذف گروهی است.");
       return;
     }
     setBulkDeleteConfirmOpen(true);
@@ -1203,14 +1211,14 @@ export function JournalsPage() {
       }
     }
     setSelectedIds([]);
-    toast.success(`${toFaDigits(ok)} ┘╛█î╪┤ظî┘┘ê█î╪│ ╪ص╪░┘ ╪┤╪».`);
+    toast.success(`${toFaDigits(ok)} پیش‌نویس حذف شد.`);
     void refetch();
   }
 
   async function bulkRestoreSelected() {
     const rows = (data ?? []).filter((j) => selectedIds.includes(j.journal_entry_id));
     if (!rows.length) {
-      toast.error("┘à┘ê╪▒╪»█î ╪د┘╪ز╪«╪د╪ذ ┘╪┤╪»┘ç ╪د╪│╪ز.");
+      toast.error("موردی انتخاب نشده است.");
       return;
     }
     let ok = 0;
@@ -1223,27 +1231,27 @@ export function JournalsPage() {
       }
     }
     setSelectedIds([]);
-    toast.success(`${toFaDigits(ok)} ╪│┘╪» ╪د╪▓ ╪│╪╖┘ ╪ص╪░┘ ╪ذ╪د╪▓█î╪د╪ذ█î ╪┤╪».`);
+    toast.success(`${toFaDigits(ok)} سند از سطل حذف بازیابی شد.`);
     void refetch();
   }
 
   if (formMode !== null) {
     const title =
       formMode === "new"
-        ? "╪│┘╪» ╪ص╪│╪د╪ذ╪»╪د╪▒█î ╪ش╪»█î╪»"
+        ? "سند حسابداری جدید"
         : viewOnly
-          ? "┘à╪┤╪د┘ç╪»┘ç ╪│┘╪»"
-          : "┘ê█î╪▒╪د█î╪┤ ┘╛█î╪┤ظî┘┘ê█î╪│";
+          ? "مشاهده سند"
+          : "ویرایش پیش‌نویس";
 
     return (
       <div className="flex flex-col gap-2" style={{ ...FORM_FONT, minHeight: "calc(100dvh - 5.75rem)" }}>
         <div className="space-y-1 pb-0">
           <nav className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
-            <a href="/dashboard/finance" className="hover:text-foreground transition">╪ص╪│╪د╪ذ╪»╪د╪▒█î</a>
+            <a href="/dashboard/finance" className="hover:text-foreground transition">حسابداری</a>
             <span>/</span>
-            <span>╪د╪│┘╪د╪»</span>
+            <span>اسناد</span>
             <span>/</span>
-            <span className="text-foreground">{formMode === "new" ? "╪ش╪»█î╪»" : "╪ش╪▓╪خ█î╪د╪ز"}</span>
+            <span className="text-foreground">{formMode === "new" ? "جدید" : "جزئیات"}</span>
           </nav>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
@@ -1251,26 +1259,26 @@ export function JournalsPage() {
                 type="button"
                 onClick={closeForm}
                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground"
-                aria-label="╪ذ╪د╪▓┌»╪┤╪ز"
-                title="╪ذ╪د╪▓┌»╪┤╪ز ╪ذ┘ç ┘█î╪│╪ز"
+                aria-label="بازگشت"
+                title="بازگشت به لیست"
               >
                 <ArrowRight className="h-4 w-4" />
               </button>
               <h1 className="text-xl font-semibold tracking-tight truncate">{title}</h1>
             </div>
             <div className="flex items-center gap-1.5 flex-nowrap shrink-0">
-              <Button type="button" variant="outline" size="sm" className="h-8 shrink-0" onClick={() => exportJournalExcel()} title="╪«╪▒┘ê╪ش█î ╪د┌ر╪│┘">
+              <Button type="button" variant="outline" size="sm" className="h-8 shrink-0" onClick={() => exportJournalExcel()} title="خروجی اکسل">
                 <FileSpreadsheet className="h-3.5 w-3.5 ml-1" />
-                ╪د┌ر╪│┘
+                اکسل
               </Button>
-              <Button type="button" variant="outline" size="sm" className="h-8 shrink-0" onClick={() => exportJournalPdf()} title="╪«╪▒┘ê╪ش█î PDF">
+              <Button type="button" variant="outline" size="sm" className="h-8 shrink-0" onClick={() => exportJournalPdf()} title="خروجی PDF">
                 <FileDown className="h-3.5 w-3.5 ml-1" />
                 PDF
               </Button>
               <div className="w-px h-5 bg-border mx-0.5 shrink-0" aria-hidden />
               <Button type="button" variant="ghost" size="sm" className="h-8 shrink-0" onClick={closeForm}>
                 <X className="h-3.5 w-3.5 ml-1" />
-                ╪ذ╪│╪ز┘
+                بستن
               </Button>
             </div>
           </div>
@@ -1279,7 +1287,7 @@ export function JournalsPage() {
         {draftRestoredAt ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex flex-wrap items-center justify-between gap-2">
             <span>
-              ┘╛█î╪┤ظî┘┘ê█î╪│ ╪░╪«█î╪▒┘çظî┘╪┤╪»┘ç ╪د╪▓ ╪ش┘╪│┘ç ┘é╪ذ┘ ╪ذ╪د╪▓█î╪د╪ذ█î ╪┤╪»
+              پیش‌نویس ذخیره‌نشده از جلسه قبل بازیابی شد
               {draftRestoredAt ? ` (${toFaDigits(draftRestoredAt.replace("T", " ").slice(0, 19))})` : ""}.
             </span>
             <Button
@@ -1295,7 +1303,7 @@ export function JournalsPage() {
                 setDraftRestoredAt(null);
               }}
             >
-              ╪┤╪▒┘ê╪╣ ╪د╪▓ ╪╡┘╪▒
+              شروع از صفر
             </Button>
           </div>
         ) : null}
@@ -1304,7 +1312,7 @@ export function JournalsPage() {
 
           {multiCompany && formMode === "new" && !viewOnly ? (
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">╪┤╪▒┌ر╪ز</label>
+              <label className="text-xs text-muted-foreground">شرکت</label>
               <select
                 className="h-9 w-48 rounded-md border bg-background px-2 text-xs"
                 value={formCompanyId || primaryCompanyId}
@@ -1323,18 +1331,18 @@ export function JournalsPage() {
             </div>
           ) : multiCompany && formMode && formMode !== "new" ? (
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">╪┤╪▒┌ر╪ز</label>
+              <label className="text-xs text-muted-foreground">شرکت</label>
               <div className="flex h-9 items-center text-xs text-muted-foreground px-1">
                 {(() => {
                   const id = formCompanyId || primaryCompanyId;
                   const c = companyOptions.find((x) => x.company_id === id) as { name?: string; legal_name?: string } | undefined;
-                  return c?.name || c?.legal_name || "ظ¤";
+                  return c?.name || c?.legal_name || "—";
                 })()}
               </div>
             </div>
           ) : null}
           <div className="space-y-1 min-w-[160px]">
-            <label className="text-xs text-muted-foreground">╪╖┬┤╪╖┬╣╪╖┬ذ╪╕ظة (╪╖┬د╪╖┬«╪╖┌╛╪║┼ْ╪╖┬د╪╖┬▒╪║┼ْ)</label>
+            <label className="text-xs text-muted-foreground">ط´ط¹ط¨ظ‡ (ط§ط®طھغŒط§ط±غŒ)</label>
             {formMode === "new" && !viewOnly ? (
               <select
                 className="h-9 w-full min-w-[160px] rounded-md border bg-background px-2 text-sm"
@@ -1344,7 +1352,7 @@ export function JournalsPage() {
                   setFormBranchId(e.target.value);
                 }}
               >
-                <option value="">╪╖┬ذ╪╖┬»╪╕╦╪╕ظب ╪╖┬┤╪╖┬╣╪╖┬ذ╪╕ظة - ╪╖┬│╪╖┬▒╪║┼ْ ╪╖┬┤╪╖┬▒╪╣┬ر╪╖┌╛</option>
+                <option value="">ط¨ط¯ظˆظ† ط´ط¹ط¨ظ‡ - ط³ط±غŒ ط´ط±ع©طھ</option>
                 {branchOptions.map((b) => (
                   <option key={b.branch_id} value={b.branch_id}>
                     {b.name || b.branch_id.slice(0, 8)}
@@ -1361,7 +1369,7 @@ export function JournalsPage() {
             )}
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">╪╖┌╛╪╖┬د╪╖┬▒╪║┼ْ╪╖┬« ╪╖┬│╪╕ظب╪╖┬»</label>
+            <label className="text-xs text-muted-foreground">طھط§ط±غŒط® ط³ظ†ط¯</label>
             <ShamsiDatePicker
               value={documentDate}
               onChange={(v) => {
@@ -1370,18 +1378,18 @@ export function JournalsPage() {
               }}
               disabled={viewOnly}
               className="h-9 w-44"
-              placeholder="╪د┘╪ز╪«╪د╪ذ ╪ز╪د╪▒█î╪«"
+              placeholder="انتخاب تاریخ"
             />
           </div>
           <div className="space-y-1 min-w-[180px]">
-            <label className="text-xs text-muted-foreground">╪»┘ê╪▒┘ç ┘à╪د┘█î</label>
+            <label className="text-xs text-muted-foreground">دوره مالی</label>
             <OptionTypeahead
               valueId={periodId}
-              displayLabel={periodId === DEMO_PERIOD_ID ? "╪»┘ê╪▒┘ç ╪ش╪د╪▒█î (╪»┘à┘ê)" : periodLabel(periodId)}
+              displayLabel={periodId === DEMO_PERIOD_ID ? "دوره جاری (دمو)" : periodLabel(periodId)}
               options={[
-                { id: DEMO_PERIOD_ID, label: "╪»┘ê╪▒┘ç ╪ش╪د╪▒█î (╪»┘à┘ê)", searchText: "╪»┘ê╪▒┘ç ╪ش╪د╪▒█î ╪»┘à┘ê" },
+                { id: DEMO_PERIOD_ID, label: "دوره جاری (دمو)", searchText: "دوره جاری دمو" },
               ]}
-              placeholder="╪ش╪│╪ز╪ش┘ê█î ╪»┘ê╪▒┘çظخ"
+              placeholder="جستجوی دوره…"
               disabled={viewOnly}
               className="h-9 w-full rounded-md border bg-background px-2 text-sm"
               onSelect={(id) => {
@@ -1391,11 +1399,11 @@ export function JournalsPage() {
             />
           </div>
           <div className="space-y-1 flex-1 min-w-[200px]">
-            <label className="text-xs text-muted-foreground">╪┤╪▒╪ص ╪│┘╪»</label>
+            <label className="text-xs text-muted-foreground">شرح سند</label>
             <div className="relative">
               <Input
                 className="h-9 pe-8"
-                placeholder="╪┤╪▒╪ص ┌ر┘█î ╪│┘╪» (╪«┘ê╪»┌ر╪د╪▒ ╪▒┘ê█î ╪│╪╖╪▒┘ç╪د█î ╪«╪د┘█î)"
+                placeholder="شرح کلی سند (خودکار روی سطرهای خالی)"
                 value={description}
                 disabled={viewOnly}
                 onChange={(e) => {
@@ -1417,7 +1425,7 @@ export function JournalsPage() {
                 <button
                   type="button"
                   className="absolute left-1.5 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground"
-                  title="┘╛╪د┌ر ┌ر╪▒╪»┘ ╪┤╪▒╪ص"
+                  title="پاک کردن شرح"
                   onClick={() => {
                     markDirty();
                     setDescription((prevDesc) => {
@@ -1438,9 +1446,9 @@ export function JournalsPage() {
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">╪┤┘à╪د╪▒┘ç</label>
+            <label className="text-xs text-muted-foreground">شماره</label>
             <div className="h-9 px-3 flex items-center rounded-md border bg-muted/40 text-xs text-muted-foreground tabular-nums">
-              {entryNumber ? toFaDigits(entryNumber) : "┘╛╪│ ╪د╪▓ ╪س╪ذ╪ز ┘é╪╖╪╣█î"}
+              {entryNumber ? toFaDigits(entryNumber) : "پس از ثبت قطعی"}
             </div>
           </div>
         </div>
@@ -1448,8 +1456,8 @@ export function JournalsPage() {
         {(meta.reverses_entry_id || meta.reversed_by_entry_id) && (
           <div className="rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground flex flex-wrap gap-3 items-center">
             <Link2 className="h-3.5 w-3.5" />
-            {meta.reverses_entry_id ? <span>╪د█î┘ ╪│┘╪» ╪ذ╪▒┌»╪┤╪ز ╪د╪│╪ز (╪د╪▓ ╪│┘╪» ┘à╪ذ╪»╪ث)</span> : null}
-            {meta.reversed_by_entry_id ? <span>╪د█î┘ ╪│┘╪» ╪ذ╪▒┌»╪┤╪ز ╪«┘ê╪▒╪»┘ç ╪د╪│╪ز</span> : null}
+            {meta.reverses_entry_id ? <span>این سند برگشت است (از سند مبدأ)</span> : null}
+            {meta.reversed_by_entry_id ? <span>این سند برگشت خورده است</span> : null}
           </div>
         )}
 
@@ -1459,15 +1467,15 @@ export function JournalsPage() {
             <thead>
               <tr className="border-b text-right text-xs text-muted-foreground bg-muted/30">
                 <th className="px-2 py-1 w-10">#</th>
-                <th className="px-2 py-1 min-w-[200px]">╪ص╪│╪د╪ذ</th>
-                <th className="px-2 py-1 min-w-[120px]">╪┤╪▒╪ص ╪│╪╖╪▒</th>
-                <th className="px-2 py-1 min-w-[8rem] w-32 text-sky-800 bg-sky-50/70">╪ذ╪»┘ç┌ر╪د╪▒</th>
-                <th className="px-2 py-1 min-w-[8rem] w-32 text-emerald-800 bg-emerald-50/70">╪ذ╪│╪ز╪د┘┌ر╪د╪▒</th>
+                <th className="px-2 py-1 min-w-[200px]">حساب</th>
+                <th className="px-2 py-1 min-w-[120px]">شرح سطر</th>
+                <th className="px-2 py-1 min-w-[8rem] w-32 text-sky-800 bg-sky-50/70">بدهکار</th>
+                <th className="px-2 py-1 min-w-[8rem] w-32 text-emerald-800 bg-emerald-50/70">بستانکار</th>
                 {costCenters.length > 0 ? (
-                  <th className="px-2 py-1 min-w-[120px]">┘à╪▒┌ر╪▓ ┘ç╪▓█î┘┘ç</th>
+                  <th className="px-2 py-1 min-w-[120px]">مرکز هزینه</th>
                 ) : null}
                 {businessUnits.length > 0 ? (
-                  <th className="px-2 py-1 min-w-[120px]">┘ê╪د╪ص╪» ┌ر╪│╪ذظî┘ê┌ر╪د╪▒</th>
+                  <th className="px-2 py-1 min-w-[120px]">واحد کسب‌وکار</th>
                 ) : null}
                 {!viewOnly ? <th className="px-2 py-1 w-10" /> : null}
               </tr>
@@ -1488,13 +1496,13 @@ export function JournalsPage() {
                         : "bg-white dark:bg-background",
                     lineComplete && !l.is_system_balance && "border-s-[3px] border-s-emerald-500"
                   )}
-                  title={l.is_system_balance ? "╪│╪╖╪▒ ╪ز╪▒╪د╪▓ ╪│╪د╪«╪ز┘çظî╪┤╪»┘ç ╪ز┘ê╪│╪╖ ╪│█î╪│╪ز┘à" : undefined}
+                  title={l.is_system_balance ? "سطر تراز ساخته‌شده توسط سیستم" : undefined}
                 >
                   <td className="px-2 py-1.5 text-xs text-muted-foreground tabular-nums">
                     <span className="inline-flex flex-col items-center gap-0.5">
                       {toFaDigits(idx + 1)}
                       {l.is_system_balance ? (
-                        <span className="text-[9px] text-amber-700 font-medium">╪ز╪▒╪د╪▓</span>
+                        <span className="text-[9px] text-amber-700 font-medium">تراز</span>
                       ) : null}
                     </span>
                   </td>
@@ -1540,7 +1548,7 @@ export function JournalsPage() {
                       className="h-8 text-xs"
                       value={l.description}
                       disabled={viewOnly}
-                      placeholder={description || "╪┤╪▒╪ص"}
+                      placeholder={description || "شرح"}
                       onChange={(e) => updateLine(l.key, { description: e.target.value })}
                     />
                   </td>
@@ -1576,7 +1584,7 @@ export function JournalsPage() {
                     <td className="px-2 py-1.5">
                       {viewOnly ? (
                         <span className="text-xs">
-                          {costCenters.find((c) => c.cost_center_id === l.cost_center_id)?.name ?? "ظ¤"}
+                          {costCenters.find((c) => c.cost_center_id === l.cost_center_id)?.name ?? "—"}
                         </span>
                       ) : (
                         <OptionTypeahead
@@ -1585,19 +1593,19 @@ export function JournalsPage() {
                             l.cost_center_id
                               ? (() => {
                                   const c = costCenters.find((x) => x.cost_center_id === l.cost_center_id);
-                                  return c ? `${toFaDigits(c.code)} ظ¤ ${c.name}` : "";
+                                  return c ? `${toFaDigits(c.code)} — ${c.name}` : "";
                                 })()
                               : ""
                           }
                           options={[
-                            { id: "", label: "ظ¤", searchText: "" },
+                            { id: "", label: "—", searchText: "" },
                             ...costCenters.map((c) => ({
                               id: c.cost_center_id,
-                              label: `${toFaDigits(c.code)} ظ¤ ${c.name}`,
+                              label: `${toFaDigits(c.code)} — ${c.name}`,
                               searchText: `${c.code} ${c.name}`,
                             })),
                           ]}
-                          placeholder="┘à╪▒┌ر╪▓ ┘ç╪▓█î┘┘çظخ"
+                          placeholder="مرکز هزینه…"
                           onSelect={(id) => updateLine(l.key, { cost_center_id: id })}
                         />
                       )}
@@ -1607,7 +1615,7 @@ export function JournalsPage() {
                     <td className="px-2 py-1.5">
                       {viewOnly ? (
                         <span className="text-xs">
-                          {businessUnits.find((b) => b.business_unit_id === l.business_unit_id)?.name ?? "ظ¤"}
+                          {businessUnits.find((b) => b.business_unit_id === l.business_unit_id)?.name ?? "—"}
                         </span>
                       ) : (
                         <OptionTypeahead
@@ -1616,19 +1624,19 @@ export function JournalsPage() {
                             l.business_unit_id
                               ? (() => {
                                   const b = businessUnits.find((x) => x.business_unit_id === l.business_unit_id);
-                                  return b ? `${toFaDigits(b.code)} ظ¤ ${b.name}` : "";
+                                  return b ? `${toFaDigits(b.code)} — ${b.name}` : "";
                                 })()
                               : ""
                           }
                           options={[
-                            { id: "", label: "ظ¤", searchText: "" },
+                            { id: "", label: "—", searchText: "" },
                             ...businessUnits.map((b) => ({
                               id: b.business_unit_id,
-                              label: `${toFaDigits(b.code)} ظ¤ ${b.name}`,
+                              label: `${toFaDigits(b.code)} — ${b.name}`,
                               searchText: `${b.code} ${b.name}`,
                             })),
                           ]}
-                          placeholder="┘ê╪د╪ص╪» ┌ر╪│╪ذظî┘ê┌ر╪د╪▒ظخ"
+                          placeholder="واحد کسب‌وکار…"
                           onSelect={(id) => updateLine(l.key, { business_unit_id: id })}
                         />
                       )}
@@ -1657,11 +1665,11 @@ export function JournalsPage() {
             <div className="flex flex-wrap gap-2 p-2 border-t">
               <Button type="button" size="sm" variant="outline" onClick={addLine}>
                 <Plus className="h-3.5 w-3.5 ml-1" />
-                ╪د┘╪▓┘ê╪»┘ ╪│╪╖╪▒
+                افزودن سطر
                 <span className="mr-1 text-[10px] text-muted-foreground">F7</span>
               </Button>
               <Button type="button" size="sm" variant="secondary" onClick={fillBalanceOnLast}>
-                ╪ز╪▒╪د╪▓ ╪│┘╪»
+                تراز سند
                 <span className="mr-1 text-[10px] text-muted-foreground">F4</span>
               </Button>
             </div>
@@ -1674,13 +1682,13 @@ export function JournalsPage() {
           <div className="flex items-center gap-3 flex-nowrap min-h-8">
             <div className="flex items-center gap-x-2 gap-y-0 min-w-0 flex-1 overflow-hidden text-[11px] leading-tight whitespace-nowrap">
               <span className="text-sky-800 tabular-nums shrink min-w-0 truncate" title={formatMoney(lineTotals.debit)}>
-                ╪ذ╪»┘ç┌ر╪د╪▒: <strong>{formatMoney(lineTotals.debit)}</strong>
+                بدهکار: <strong>{formatMoney(lineTotals.debit)}</strong>
               </span>
-              <span className="text-muted-foreground/40 shrink-0">ظ¤é</span>
+              <span className="text-muted-foreground/40 shrink-0">│</span>
               <span className="text-emerald-800 tabular-nums shrink min-w-0 truncate" title={formatMoney(lineTotals.credit)}>
-                ╪ذ╪│╪ز╪د┘┌ر╪د╪▒: <strong>{formatMoney(lineTotals.credit)}</strong>
+                بستانکار: <strong>{formatMoney(lineTotals.credit)}</strong>
               </span>
-              <span className="text-muted-foreground/40 shrink-0">ظ¤é</span>
+              <span className="text-muted-foreground/40 shrink-0">│</span>
               <span
                 className={cn(
                   "tabular-nums font-medium shrink min-w-0 truncate",
@@ -1688,29 +1696,29 @@ export function JournalsPage() {
                 )}
                 title={
                   isBalanced
-                    ? "╪ز╪▒╪د╪▓"
+                    ? "تراز"
                     : lineTotals.diff > 0
-                      ? `╪ذ╪»┘ç┌ر╪د╪▒ ╪ذ█î╪┤╪ز╪▒: ${formatMoney(lineTotals.diff)}`
-                      : `╪ذ╪│╪ز╪د┘┌ر╪د╪▒ ╪ذ█î╪┤╪ز╪▒: ${formatMoney(Math.abs(lineTotals.diff))}`
+                      ? `بدهکار بیشتر: ${formatMoney(lineTotals.diff)}`
+                      : `بستانکار بیشتر: ${formatMoney(Math.abs(lineTotals.diff))}`
                 }
               >
                 {isBalanced
-                  ? "╪ز╪▒╪د╪▓ ظ£ô"
+                  ? "تراز ✓"
                   : lineTotals.diff > 0
-                    ? `╪ذ╪»┘ç┌ر╪د╪▒+: ${formatMoney(lineTotals.diff)}`
-                    : `╪ذ╪│╪ز╪د┘┌ر╪د╪▒+: ${formatMoney(Math.abs(lineTotals.diff))}`}
+                    ? `بدهکار+: ${formatMoney(lineTotals.diff)}`
+                    : `بستانکار+: ${formatMoney(Math.abs(lineTotals.diff))}`}
               </span>
             </div>
             {!viewOnly ? (
               <div className="flex items-center gap-1.5 shrink-0">
                 <Button type="button" variant="outline" size="sm" className="h-8" disabled={saving} onClick={() => void doSave(false)} title="F2">
-                  ┘╛█î╪┤ظî┘┘ê█î╪│
+                  پیش‌نویس
                   <span className="mr-1 text-[10px] text-muted-foreground">F2</span>
                 </Button>
                 {canPost ? (
                   <Button type="button" size="sm" className="h-8" disabled={saving || !isBalanced} onClick={() => void doSave(true)} title="F9">
                     {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin ml-1" /> : <CheckCircle2 className="h-3.5 w-3.5 ml-1" />}
-                    ╪س╪ذ╪ز ┘é╪╖╪╣█î
+                    ثبت قطعی
                     <span className="mr-1 text-[10px] opacity-80">F9</span>
                   </Button>
                 ) : null}
@@ -1722,18 +1730,18 @@ export function JournalsPage() {
         <Dialog open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>╪«╪▒┘ê╪ش ╪د╪▓ ┘╪▒┘à</DialogTitle>
+              <DialogTitle>خروج از فرم</DialogTitle>
               <DialogDescription>
-                ╪ز╪║█î█î╪▒╪د╪ز ╪░╪«█î╪▒┘çظî┘╪┤╪»┘ç ╪»╪د╪▒█î╪». ╪ذ╪د ╪«╪▒┘ê╪ش ╪د╪▓ ╪د█î┘ ╪╡┘╪ص┘ç ╪د█î┘ ╪ز╪║█î█î╪▒╪د╪ز ╪د╪▓ ╪ذ█î┘ ┘à█îظî╪▒┘ê╪»
-                (┘╛█î╪┤ظî┘┘ê█î╪│ ┘à╪ص┘█î ╪ز╪د ┘ê┘é╪ز█î ┘à╪▒┘ê╪▒┌»╪▒ ╪▒╪د ┘╪ذ┘╪»█î╪» █î╪د ┬س╪┤╪▒┘ê╪╣ ╪د╪▓ ╪╡┘╪▒┬╗ ┘╪▓┘█î╪» ┘┌»┘ç ╪»╪د╪┤╪ز┘ç ┘à█îظî╪┤┘ê╪»).
+                تغییرات ذخیره‌نشده دارید. با خروج از این صفحه این تغییرات از بین می‌رود
+                (پیش‌نویس محلی تا وقتی مرورگر را نبندید یا «شروع از صفر» نزنید نگه داشته می‌شود).
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
               <Button variant="outline" onClick={() => setLeaveConfirmOpen(false)}>
-                ┘à╪د┘╪»┘
+                ماندن
               </Button>
               <Button variant="destructive" onClick={confirmLeaveForm}>
-                ╪«╪▒┘ê╪ش ╪ذ╪»┘ê┘ ╪░╪«█î╪▒┘ç
+                خروج بدون ذخیره
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1745,20 +1753,20 @@ export function JournalsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="╪د╪│┘╪د╪» ╪ص╪│╪د╪ذ╪»╪د╪▒█î"
-        description="┘╛█î╪┤ظî┘┘ê█î╪│╪î ╪س╪ذ╪ز ┘é╪╖╪╣█î ┘ê ╪ذ╪▒┌»╪┤╪ز ظ¤ ╪ذ╪د ┌ر┘╪ز╪▒┘ ╪ز╪▒╪د╪▓"
+        title="اسناد حسابداری"
+        description="پیش‌نویس، ثبت قطعی و برگشت — با کنترل تراز"
         icon={<FileText className="h-4 w-4" />}
         breadcrumbs={[
-          { label: "╪»╪د╪┤╪ذ┘ê╪▒╪»", href: "/dashboard" },
-          { label: "╪ص╪│╪د╪ذ╪»╪د╪▒█î", href: "/dashboard/finance" },
-          { label: "╪د╪│┘╪د╪»" },
+          { label: "داشبورد", href: "/dashboard" },
+          { label: "حسابداری", href: "/dashboard/finance" },
+          { label: "اسناد" },
         ]}
         actions={
           <div className="flex items-center gap-1.5 flex-wrap">
             {canCreate ? (
               <Button type="button" size="sm" className="h-8" onClick={openNew}>
                 <Plus className="h-4 w-4 ml-1" />
-                ╪│┘╪» ╪ش╪»█î╪»
+                سند جدید
               </Button>
             ) : null}
           </div>
@@ -1769,12 +1777,12 @@ export function JournalsPage() {
 
       {(isTechnicalOwnerReadOnly || isGroupObserver) && (
         <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
-          ╪»╪│╪ز╪▒╪│█î ╪┤┘à╪د ╪»╪▒ ╪د█î┘ ╪│╪╖╪ص ┘┘é╪╖ ┘à╪┤╪د┘ç╪»┘ç ┘ê ┌»╪▓╪د╪▒╪┤ ╪د╪│╪ز╪ؤ ╪س╪ذ╪ز █î╪د ┘ê█î╪▒╪د█î╪┤ ╪│┘╪» ╪▒┘ê█î ╪┤╪▒┌ر╪زظî┘ç╪د█î ╪▓█î╪▒┘à╪ش┘à┘ê╪╣┘ç ┘à╪ش╪د╪▓ ┘█î╪│╪ز.
+          دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش سند روی شرکت‌های زیرمجموعه مجاز نیست.
         </div>
       )}
       {selectedIds.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50/60 px-2 py-1.5 text-xs">
-          <span className="text-sky-900">{toFaDigits(selectedIds.length)} ┘à┘ê╪▒╪» ╪د┘╪ز╪«╪د╪ذ ╪┤╪»┘ç</span>
+          <span className="text-sky-900">{toFaDigits(selectedIds.length)} مورد انتخاب شده</span>
           {showDeleted ? (
             canDelete ? (
               <Button
@@ -1785,25 +1793,25 @@ export function JournalsPage() {
                 disabled={restoreMut.isPending}
                 onClick={() => void bulkRestoreSelected()}
               >
-                ╪ذ╪د╪▓█î╪د╪ذ█î ┌»╪▒┘ê┘ç█î
+                بازیابی گروهی
               </Button>
             ) : null
           ) : (
             <>
               {canPost ? (
                 <Button type="button" size="sm" className="h-7" variant="secondary" onClick={() => void bulkPostSelected()}>
-                  ╪س╪ذ╪ز ┘é╪╖╪╣█î ┌»╪▒┘ê┘ç█î
+                  ثبت قطعی گروهی
                 </Button>
               ) : null}
               {canDelete ? (
                 <Button type="button" size="sm" className="h-7" variant="destructive" onClick={requestBulkDelete}>
-                  ╪ص╪░┘ ┘╛█î╪┤ظî┘┘ê█î╪│ظî┘ç╪د
+                  حذف پیش‌نویس‌ها
                 </Button>
               ) : null}
             </>
           )}
           <Button type="button" size="sm" className="h-7" variant="ghost" onClick={() => setSelectedIds([])}>
-            ┘╪║┘ê ╪د┘╪ز╪«╪د╪ذ
+            لغو انتخاب
           </Button>
         </div>
       ) : null}
@@ -1812,7 +1820,7 @@ export function JournalsPage() {
       <div className="flex flex-wrap items-end gap-1.5 rounded-lg border bg-card px-2 py-1.5">
         {multiCompany ? (
           <div className="space-y-1 min-w-[180px]">
-            <label className="text-xs text-muted-foreground">╪┤╪▒┌ر╪ز</label>
+            <label className="text-xs text-muted-foreground">شرکت</label>
             <select
               className="h-8 w-full rounded-md border bg-background px-2 text-xs"
               value={listCompanyId}
@@ -1822,7 +1830,7 @@ export function JournalsPage() {
                 setListPage(1);
               }}
             >
-              <option value="">┘ç┘à┘ç ╪┤╪▒┌ر╪زظî┘ç╪د█î ┘à╪ش╪د╪▓</option>
+              <option value="">همه شرکت‌های مجاز</option>
               {companyOptions.map((c) => (
                 <option key={c.company_id} value={c.company_id}>
                   {(c as { name?: string; legal_name?: string }).name || (c as { legal_name?: string }).legal_name || c.company_id.slice(0, 8)}
@@ -1832,72 +1840,72 @@ export function JournalsPage() {
           </div>
         ) : null}
         <div className="space-y-1 min-w-[160px]">
-          <label className="text-xs text-muted-foreground">┘ê╪╢╪╣█î╪ز</label>
+          <label className="text-xs text-muted-foreground">وضعیت</label>
           <OptionTypeahead
             valueId={statusFilter}
             displayLabel={
               !statusFilter
-                ? `┘ç┘à┘ç (${toFaDigits(statusCounts.all)})`
+                ? `همه (${toFaDigits(statusCounts.all)})`
                 : statusFilter === "DRAFT"
-                  ? `┘╛█î╪┤ظî┘┘ê█î╪│ (${toFaDigits(statusCounts.DRAFT)})`
+                  ? `پیش‌نویس (${toFaDigits(statusCounts.DRAFT)})`
                   : statusFilter === "POSTED"
-                    ? `╪س╪ذ╪زظî╪┤╪»┘ç (${toFaDigits(statusCounts.POSTED)})`
+                    ? `ثبت‌شده (${toFaDigits(statusCounts.POSTED)})`
                     : statusFilter === "REVERSED"
-                      ? `╪ذ╪▒┌»╪┤╪زظî╪«┘ê╪▒╪»┘ç (${toFaDigits(statusCounts.REVERSED)})`
+                      ? `برگشت‌خورده (${toFaDigits(statusCounts.REVERSED)})`
                       : statusFilter === "__DELETED__"
-                        ? `╪ص╪░┘ظî╪┤╪»┘çظî┘ç╪د (${toFaDigits(statusCounts.DELETED)})`
+                        ? `حذف‌شده‌ها (${toFaDigits(statusCounts.DELETED)})`
                         : statusFilter
             }
             options={[
-              { id: "", label: `┘ç┘à┘ç (${toFaDigits(statusCounts.all)})`, searchText: "┘ç┘à┘ç" },
-              { id: "DRAFT", label: `┘╛█î╪┤ظî┘┘ê█î╪│ (${toFaDigits(statusCounts.DRAFT)})`, searchText: "┘╛█î╪┤ظî┘┘ê█î╪│" },
-              { id: "POSTED", label: `╪س╪ذ╪زظî╪┤╪»┘ç (${toFaDigits(statusCounts.POSTED)})`, searchText: "╪س╪ذ╪زظî╪┤╪»┘ç" },
-              { id: "REVERSED", label: `╪ذ╪▒┌»╪┤╪زظî╪«┘ê╪▒╪»┘ç (${toFaDigits(statusCounts.REVERSED)})`, searchText: "╪ذ╪▒┌»╪┤╪ز" },
+              { id: "", label: `همه (${toFaDigits(statusCounts.all)})`, searchText: "همه" },
+              { id: "DRAFT", label: `پیش‌نویس (${toFaDigits(statusCounts.DRAFT)})`, searchText: "پیش‌نویس" },
+              { id: "POSTED", label: `ثبت‌شده (${toFaDigits(statusCounts.POSTED)})`, searchText: "ثبت‌شده" },
+              { id: "REVERSED", label: `برگشت‌خورده (${toFaDigits(statusCounts.REVERSED)})`, searchText: "برگشت" },
               {
                 id: "__DELETED__",
-                label: `╪ص╪░┘ظî╪┤╪»┘çظî┘ç╪د (${toFaDigits(statusCounts.DELETED)})`,
-                searchText: "╪ص╪░┘ ╪┤╪»┘ç ╪│╪╖┘ ╪ذ╪د╪▓█î╪د┘╪ز",
+                label: `حذف‌شده‌ها (${toFaDigits(statusCounts.DELETED)})`,
+                searchText: "حذف شده سطل بازیافت",
               },
             ]}
-            placeholder="┘ê╪╢╪╣█î╪زظخ"
+            placeholder="وضعیت…"
             className="h-8 w-full rounded-md border bg-background px-2 text-xs"
             onSelect={setStatusFilter}
           />
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">╪»┘ê╪▒┘ç</label>
+          <label className="text-xs text-muted-foreground">دوره</label>
           <OptionTypeahead
             valueId={periodFilter}
             displayLabel={
               !periodFilter
-                ? "┘ç┘à┘ç ╪»┘ê╪▒┘çظî┘ç╪د"
+                ? "همه دوره‌ها"
                 : periodFilter === DEMO_PERIOD_ID
-                  ? "╪»┘ê╪▒┘ç ╪ش╪د╪▒█î (╪»┘à┘ê)"
+                  ? "دوره جاری (دمو)"
                   : periodLabel(periodFilter)
             }
             options={[
-              { id: "", label: "┘ç┘à┘ç ╪»┘ê╪▒┘çظî┘ç╪د", searchText: "┘ç┘à┘ç" },
-              { id: DEMO_PERIOD_ID, label: "╪»┘ê╪▒┘ç ╪ش╪د╪▒█î (╪»┘à┘ê)", searchText: "╪»┘ê╪▒┘ç ╪ش╪د╪▒█î ╪»┘à┘ê" },
+              { id: "", label: "همه دوره‌ها", searchText: "همه" },
+              { id: DEMO_PERIOD_ID, label: "دوره جاری (دمو)", searchText: "دوره جاری دمو" },
             ]}
-            placeholder="╪»┘ê╪▒┘çظخ"
+            placeholder="دوره…"
             className="h-8 w-full rounded-md border bg-background px-2 text-xs min-w-[120px]"
             onSelect={setPeriodFilter}
           />
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">╪د╪▓ ╪ز╪د╪▒█î╪«</label>
-          <ShamsiDatePicker value={dateFrom} onChange={setDateFrom} className="h-8 w-36" placeholder="╪د╪▓" />
+          <label className="text-xs text-muted-foreground">از تاریخ</label>
+          <ShamsiDatePicker value={dateFrom} onChange={setDateFrom} className="h-8 w-36" placeholder="از" />
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">╪ز╪د ╪ز╪د╪▒█î╪«</label>
-          <ShamsiDatePicker value={dateTo} onChange={setDateTo} className="h-8 w-36" placeholder="╪ز╪د" />
+          <label className="text-xs text-muted-foreground">تا تاریخ</label>
+          <ShamsiDatePicker value={dateTo} onChange={setDateTo} className="h-8 w-36" placeholder="تا" />
         </div>
         <div className="space-y-1 flex-1 min-w-[160px]">
-          <label className="text-xs text-muted-foreground">╪ش╪│╪ز╪ش┘ê</label>
+          <label className="text-xs text-muted-foreground">جستجو</label>
           <div className="relative">
             <Input
               className="h-8 pe-7 text-xs"
-              placeholder="╪┤┘à╪د╪▒┘ç █î╪د ╪┤╪▒╪صظخ"
+              placeholder="شماره یا شرح…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -1906,7 +1914,7 @@ export function JournalsPage() {
                 type="button"
                 className="absolute left-1 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center text-muted-foreground"
                 onClick={() => setSearch("")}
-                title="┘╛╪د┌ر ┌ر╪▒╪»┘"
+                title="پاک کردن"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -1915,21 +1923,21 @@ export function JournalsPage() {
         </div>
       </div>
 
-      {/* ┘┘ê╪د╪▒ ╪د╪ذ╪▓╪د╪▒ ╪ش╪»┘ê┘: ╪│╪ز┘ê┘ظî┘ç╪د + ╪«╪▒┘ê╪ش█î */}
+      {/* نوار ابزار جدول: ستون‌ها + خروجی */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="text-xs text-muted-foreground">
           {filtered.length ? (
             <span>
-              {toFaDigits(filtered.length)} ╪│┘╪»
+              {toFaDigits(filtered.length)} سند
         
       {(isTechnicalOwnerReadOnly || isGroupObserver) && (
         <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
-          ╪»╪│╪ز╪▒╪│█î ╪┤┘à╪د ╪»╪▒ ╪د█î┘ ╪│╪╖╪ص ┘┘é╪╖ ┘à╪┤╪د┘ç╪»┘ç ┘ê ┌»╪▓╪د╪▒╪┤ ╪د╪│╪ز╪ؤ ╪س╪ذ╪ز █î╪د ┘ê█î╪▒╪د█î╪┤ ╪│┘╪» ╪▒┘ê█î ╪┤╪▒┌ر╪زظî┘ç╪د█î ╪▓█î╪▒┘à╪ش┘à┘ê╪╣┘ç ┘à╪ش╪د╪▓ ┘█î╪│╪ز.
+          دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش سند روی شرکت‌های زیرمجموعه مجاز نیست.
         </div>
       )}
       {selectedIds.length > 0 ? (
                 <span className="ms-2 text-foreground font-medium">
-                  ({toFaDigits(selectedIds.length)} ╪د┘╪ز╪«╪د╪ذظî╪┤╪»┘ç)
+                  ({toFaDigits(selectedIds.length)} انتخاب‌شده)
                 </span>
               ) : null}
             </span>
@@ -1940,21 +1948,21 @@ export function JournalsPage() {
             <DropdownMenuTrigger asChild>
               <Button type="button" size="sm" variant="outline" className="h-8 text-xs">
                 <Columns3 className="h-3.5 w-3.5 ml-1" />
-                ╪│╪ز┘ê┘ظî┘ç╪د
+                ستون‌ها
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel className="text-xs">┘┘à╪د█î╪┤ ╪│╪ز┘ê┘ظî┘ç╪د</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-xs">نمایش ستون‌ها</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {(
                 [
-                  ["number", "╪┤┘à╪د╪▒┘ç"],
-                  ["date", "╪ز╪د╪▒█î╪«"],
-                  ["period", "╪»┘ê╪▒┘ç"],
-                  ["status", "┘ê╪╢╪╣█î╪ز"],
-                  ["desc", "╪┤╪▒╪ص"],
-                  ["debit", "╪ذ╪»┘ç┌ر╪د╪▒"],
-                  ["credit", "╪ذ╪│╪ز╪د┘┌ر╪د╪▒"],
+                  ["number", "شماره"],
+                  ["date", "تاریخ"],
+                  ["period", "دوره"],
+                  ["status", "وضعیت"],
+                  ["desc", "شرح"],
+                  ["debit", "بدهکار"],
+                  ["credit", "بستانکار"],
                 ] as const
               ).map(([k, lab]) => (
                 <DropdownMenuItem
@@ -1980,11 +1988,11 @@ export function JournalsPage() {
             <DropdownMenuTrigger asChild>
               <Button type="button" size="sm" variant="outline" className="h-8 text-xs">
                 <FileDown className="h-3.5 w-3.5 ml-1" />
-                ╪«╪▒┘ê╪ش█î
+                خروجی
           
       {(isTechnicalOwnerReadOnly || isGroupObserver) && (
         <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
-          ╪»╪│╪ز╪▒╪│█î ╪┤┘à╪د ╪»╪▒ ╪د█î┘ ╪│╪╖╪ص ┘┘é╪╖ ┘à╪┤╪د┘ç╪»┘ç ┘ê ┌»╪▓╪د╪▒╪┤ ╪د╪│╪ز╪ؤ ╪س╪ذ╪ز █î╪د ┘ê█î╪▒╪د█î╪┤ ╪│┘╪» ╪▒┘ê█î ╪┤╪▒┌ر╪زظî┘ç╪د█î ╪▓█î╪▒┘à╪ش┘à┘ê╪╣┘ç ┘à╪ش╪د╪▓ ┘█î╪│╪ز.
+          دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش سند روی شرکت‌های زیرمجموعه مجاز نیست.
         </div>
       )}
       {selectedIds.length > 0 ? (
@@ -1998,13 +2006,13 @@ export function JournalsPage() {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel className="text-xs">
                 {selectedIds.length > 0
-                  ? `╪«╪▒┘ê╪ش█î ${toFaDigits(selectedIds.length)} ┘à┘ê╪▒╪» ╪د┘╪ز╪«╪د╪ذظî╪┤╪»┘ç`
-                  : `╪«╪▒┘ê╪ش█î ┘ç┘à┘ç (${toFaDigits(filtered.length)})`}
+                  ? `خروجی ${toFaDigits(selectedIds.length)} مورد انتخاب‌شده`
+                  : `خروجی همه (${toFaDigits(filtered.length)})`}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="gap-2 text-xs" onSelect={() => exportListExcel()}>
                 <FileSpreadsheet className="h-3.5 w-3.5" />
-                ╪د┌ر╪│┘ (Excel)
+                اکسل (Excel)
               </DropdownMenuItem>
               <DropdownMenuItem className="gap-2 text-xs" onSelect={() => exportListPdf()}>
                 <FileDown className="h-3.5 w-3.5" />
@@ -2018,23 +2026,23 @@ export function JournalsPage() {
       <div className="rounded-xl border bg-card overflow-x-auto">
         {isLoading ? (
           <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> ╪ذ╪د╪▒┌»╪░╪د╪▒█îظخ
+            <Loader2 className="h-4 w-4 animate-spin" /> بارگذاری…
           </div>
         ) : error ? (
           <div className="p-4 text-sm text-destructive">
-            ╪«╪╖╪د.{" "}
+            خطا.{" "}
             <button type="button" className="underline" onClick={() => void refetch()}>
-              ╪ز┘╪د╪┤ ┘à╪ش╪»╪»
+              تلاش مجدد
             </button>
           </div>
         ) : !filtered.length ? (
           <div className="p-6 text-center space-y-3">
             <FileText className="h-8 w-8 mx-auto text-muted-foreground/50" />
-            <p className="text-sm text-muted-foreground">╪│┘╪»█î ╪س╪ذ╪ز ┘╪┤╪»┘ç ╪د╪│╪ز.</p>
+            <p className="text-sm text-muted-foreground">سندی ثبت نشده است.</p>
             {!showDeleted && canCreate && canOperateOn(formCompanyId || primaryCompanyId) ? (
               <Button size="sm" onClick={openNew}>
                 <Plus className="h-4 w-4 ml-1" />
-                ╪س╪ذ╪ز ╪د┘ê┘█î┘ ╪│┘╪»
+                ثبت اولین سند
               </Button>
             ) : null}
           </div>
@@ -2047,17 +2055,17 @@ export function JournalsPage() {
                     type="checkbox"
                     checked={paged.length > 0 && paged.every((j) => selectedIds.includes(j.journal_entry_id))}
                     onChange={toggleSelectAllPage}
-                    aria-label="╪د┘╪ز╪«╪د╪ذ ┘ç┘à┘ç ╪╡┘╪ص┘ç"
+                    aria-label="انتخاب همه صفحه"
                   />
                 </th>
-                {visibleCols.number !== false ? <th className="px-2 py-1 font-medium">╪┤┘à╪د╪▒┘ç</th> : null}
-                {visibleCols.date !== false ? <th className="px-2 py-1 font-medium">╪ز╪د╪▒█î╪«</th> : null}
-                {visibleCols.period !== false ? <th className="px-2 py-1 font-medium">╪»┘ê╪▒┘ç</th> : null}
-                {visibleCols.status !== false ? <th className="px-2 py-1 font-medium">┘ê╪╢╪╣█î╪ز</th> : null}
-                {visibleCols.desc !== false ? <th className="px-2 py-1 font-medium">╪┤╪▒╪ص</th> : null}
-                {visibleCols.debit !== false ? <th className="px-2 py-1 font-medium min-w-[7rem] text-sky-800">╪ذ╪»┘ç┌ر╪د╪▒</th> : null}
-                {visibleCols.credit !== false ? <th className="px-2 py-1 font-medium text-emerald-800">╪ذ╪│╪ز╪د┘┌ر╪د╪▒</th> : null}
-                {visibleCols.actions !== false ? <th className="px-2 py-1 font-medium">╪╣┘à┘█î╪د╪ز</th> : null}
+                {visibleCols.number !== false ? <th className="px-2 py-1 font-medium">شماره</th> : null}
+                {visibleCols.date !== false ? <th className="px-2 py-1 font-medium">تاریخ</th> : null}
+                {visibleCols.period !== false ? <th className="px-2 py-1 font-medium">دوره</th> : null}
+                {visibleCols.status !== false ? <th className="px-2 py-1 font-medium">وضعیت</th> : null}
+                {visibleCols.desc !== false ? <th className="px-2 py-1 font-medium">شرح</th> : null}
+                {visibleCols.debit !== false ? <th className="px-2 py-1 font-medium min-w-[7rem] text-sky-800">بدهکار</th> : null}
+                {visibleCols.credit !== false ? <th className="px-2 py-1 font-medium text-emerald-800">بستانکار</th> : null}
+                {visibleCols.actions !== false ? <th className="px-2 py-1 font-medium">عملیات</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -2073,7 +2081,7 @@ export function JournalsPage() {
                         type="checkbox"
                         checked={selectedIds.includes(j.journal_entry_id)}
                         onChange={() => toggleSelect(j.journal_entry_id)}
-                        aria-label="╪د┘╪ز╪«╪د╪ذ"
+                        aria-label="انتخاب"
                       />
                     </td>
                     {visibleCols.number !== false ? (
@@ -2083,15 +2091,15 @@ export function JournalsPage() {
                           {(j as JournalEntryDto).reverses_entry_id ? (
                             <span className="inline-flex items-center gap-0.5 text-[10px] font-normal text-muted-foreground">
                               <Undo2 className="h-2.5 w-2.5 shrink-0" />
-                              ╪ذ╪▒┌»╪┤╪ز ╪د╪▓{" "}
-                              {numberById.get((j as JournalEntryDto).reverses_entry_id!) || "ظ¤"}
+                              برگشت از{" "}
+                              {numberById.get((j as JournalEntryDto).reverses_entry_id!) || "—"}
                             </span>
                           ) : null}
                           {(j as JournalEntryDto).reversed_by_entry_id ? (
                             <span className="inline-flex items-center gap-0.5 text-[10px] font-normal text-muted-foreground">
                               <Link2 className="h-2.5 w-2.5 shrink-0" />
-                              ╪ذ╪▒┌»╪┤╪زظî╪«┘ê╪▒╪»┘ç ╪ذ╪د{" "}
-                              {numberById.get((j as JournalEntryDto).reversed_by_entry_id!) || "ظ¤"}
+                              برگشت‌خورده با{" "}
+                              {numberById.get((j as JournalEntryDto).reversed_by_entry_id!) || "—"}
                             </span>
                           ) : null}
                         </div>
@@ -2116,13 +2124,13 @@ export function JournalsPage() {
                       </td>
                     ) : null}
                     {visibleCols.desc !== false ? (
-                      <td className="px-2 py-1 max-w-[180px] truncate text-xs">{j.description ?? "ظ¤"}</td>
+                      <td className="px-2 py-1 max-w-[180px] truncate text-xs">{j.description ?? "—"}</td>
                     ) : null}
                     {visibleCols.debit !== false ? (
-                      <td className="px-2 py-1 tabular-nums text-xs">{t.debit ? formatMoney(t.debit) : "ظ¤"}</td>
+                      <td className="px-2 py-1 tabular-nums text-xs">{t.debit ? formatMoney(t.debit) : "—"}</td>
                     ) : null}
                     {visibleCols.credit !== false ? (
-                      <td className="px-2 py-1 tabular-nums text-xs">{t.credit ? formatMoney(t.credit) : "ظ¤"}</td>
+                      <td className="px-2 py-1 tabular-nums text-xs">{t.credit ? formatMoney(t.credit) : "—"}</td>
                     ) : null}
                     {visibleCols.actions !== false ? (
                     <td className="px-2 py-1">
@@ -2136,7 +2144,7 @@ export function JournalsPage() {
                           {j.status === "DRAFT" && canUpdate && canOperateOn(j.company_id) ? (
                             <Pencil className="h-3.5 w-3.5" />
                           ) : (
-                            "┘à╪┤╪د┘ç╪»┘ç"
+                            "مشاهده"
                           )}
                         </Button>
                         {!showDeleted && canCreate && canOperateOn(formCompanyId || primaryCompanyId) ? (
@@ -2144,7 +2152,7 @@ export function JournalsPage() {
                             size="sm"
                             variant="ghost"
                             className="h-8 px-2"
-                            title="┌ر┘╛█î"
+                            title="کپی"
                             onClick={() => openCopy(j)}
                           >
                             <Copy className="h-3.5 w-3.5" />
@@ -2159,11 +2167,11 @@ export function JournalsPage() {
                             onClick={() =>
                               void postMut
                                 .mutateAsync(j.journal_entry_id)
-                                .then(() => toast.success("╪│┘╪» ╪س╪ذ╪ز ┘é╪╖╪╣█î ╪┤╪»."))
+                                .then(() => toast.success("سند ثبت قطعی شد."))
                                 .catch((e: Error) => toast.error(e.message))
                             }
                           >
-                            ╪س╪ذ╪ز ┘é╪╖╪╣█î
+                            ثبت قطعی
                           </Button>
                         ) : null}
                         {!showDeleted && j.status === "POSTED" && !j.reverses_entry_id && canReverse && canOperateOn(j.company_id) ? (
@@ -2174,7 +2182,7 @@ export function JournalsPage() {
                             onClick={() => setReverseTarget(j)}
                           >
                             <Undo2 className="h-3.5 w-3.5 ml-1" />
-                            ╪ذ╪▒┌»╪┤╪ز
+                            برگشت
                           </Button>
                         ) : null}
                         {showDeleted ? (
@@ -2187,11 +2195,11 @@ export function JournalsPage() {
                               onClick={() => {
                                 void restoreMut
                                   .mutateAsync(j.journal_entry_id)
-                                  .then(() => toast.success("╪د╪▓ ╪│╪╖┘ ╪ص╪░┘ ╪ذ╪د╪▓█î╪د╪ذ█î ╪┤╪»."))
+                                  .then(() => toast.success("از سطل حذف بازیابی شد."))
                                   .catch((e: Error) => toast.error(e.message));
                               }}
                             >
-                              ╪ذ╪د╪▓█î╪د╪ذ█î
+                              بازیابی
                             </Button>
                           ) : null
                         ) : j.status === "DRAFT" && canDelete ? (
@@ -2200,7 +2208,7 @@ export function JournalsPage() {
                             variant="ghost"
                             className="h-7 px-2 text-destructive"
                             onClick={() => setDeleteTarget(j)}
-                            title="╪ص╪░┘ (┘┘é╪╖ ╪د█î╪ش╪د╪»┌ر┘┘╪»┘ç █î╪د ┘à╪»█î╪▒)"
+                            title="حذف (فقط ایجادکننده یا مدیر)"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
@@ -2220,11 +2228,11 @@ export function JournalsPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground px-1">
           <div className="flex items-center gap-2">
             <span>
-              {toFaDigits((listPage - 1) * pageSize + 1)}ظô
-              {toFaDigits(Math.min(listPage * pageSize, filtered.length))} ╪د╪▓ {toFaDigits(filtered.length)}
+              {toFaDigits((listPage - 1) * pageSize + 1)}–
+              {toFaDigits(Math.min(listPage * pageSize, filtered.length))} از {toFaDigits(filtered.length)}
             </span>
             <label className="flex items-center gap-1">
-              <span className="text-muted-foreground">╪»╪▒ ╪╡┘╪ص┘ç</span>
+              <span className="text-muted-foreground">در صفحه</span>
               <select
                 className="h-7 rounded-md border bg-background px-1.5 text-xs"
                 value={String(pageSize)}
@@ -2250,7 +2258,7 @@ export function JournalsPage() {
               disabled={listPage <= 1}
               onClick={() => setListPage((pg) => Math.max(1, pg - 1))}
             >
-              ┘é╪ذ┘█î
+              قبلی
             </Button>
             <span className="px-2 tabular-nums">
               {toFaDigits(listPage)} / {toFaDigits(totalPages)}
@@ -2263,7 +2271,7 @@ export function JournalsPage() {
               disabled={listPage >= totalPages}
               onClick={() => setListPage((pg) => Math.min(totalPages, pg + 1))}
             >
-              ╪ذ╪╣╪»█î
+              بعدی
             </Button>
           </div>
         </div>
@@ -2272,20 +2280,20 @@ export function JournalsPage() {
       <Dialog open={bulkDeleteConfirmOpen} onOpenChange={setBulkDeleteConfirmOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>╪ص╪░┘ ┌»╪▒┘ê┘ç█î ┘╛█î╪┤ظî┘┘ê█î╪│</DialogTitle>
+            <DialogTitle>حذف گروهی پیش‌نویس</DialogTitle>
             <DialogDescription>
               {toFaDigits(
                 (data ?? []).filter((j) => selectedIds.includes(j.journal_entry_id) && j.status === "DRAFT").length
               )}{" "}
-              ┘╛█î╪┤ظî┘┘ê█î╪│ ╪د┘╪ز╪«╪د╪ذظî╪┤╪»┘ç ╪ص╪░┘ ┘╪▒┘à ┘à█îظî╪┤┘ê╪». ╪د╪»╪د┘à┘ç ┘à█îظî╪»┘ç█î╪»╪ا
+              پیش‌نویس انتخاب‌شده حذف نرم می‌شود. ادامه می‌دهید؟
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setBulkDeleteConfirmOpen(false)}>
-              ╪د┘╪╡╪▒╪د┘
+              انصراف
             </Button>
             <Button type="button" variant="destructive" onClick={() => void confirmBulkDelete()}>
-              ╪ص╪░┘
+              حذف
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2294,17 +2302,17 @@ export function JournalsPage() {
       <Dialog open={!!reverseTarget} onOpenChange={(o) => !o && setReverseTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>╪ذ╪▒┌»╪┤╪ز ╪│┘╪»</DialogTitle>
+            <DialogTitle>برگشت سند</DialogTitle>
             <DialogDescription>
-              ╪│┘╪» ┘à╪╣┌ر┘ê╪│ ╪╡╪د╪»╪▒ ┘ê ╪س╪ذ╪ز ┘é╪╖╪╣█î ┘à█îظî╪┤┘ê╪»╪ؤ ╪│┘╪» ╪د╪╡┘█î ╪ذ╪▒┌»╪┤╪زظî╪«┘ê╪▒╪»┘ç ┘à█îظî╪┤┘ê╪». ╪│┘╪» ╪ذ╪▒┌»╪┤╪ز ╪»█î┌»╪▒ ┘é╪د╪ذ┘ ╪ذ╪▒┌»╪┤╪ز ┘█î╪│╪ز.
+              سند معکوس صادر و ثبت قطعی می‌شود؛ سند اصلی برگشت‌خورده می‌شود. سند برگشت دیگر قابل برگشت نیست.
               {reverseTarget?.entry_number
-                ? ` ╪┤┘à╪د╪▒┘ç: ${toFaDigits(reverseTarget.entry_number)}`
+                ? ` شماره: ${toFaDigits(reverseTarget.entry_number)}`
                 : ""}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setReverseTarget(null)}>
-              ╪د┘╪╡╪▒╪د┘
+              انصراف
             </Button>
             <Button
               disabled={reverseMut.isPending}
@@ -2313,13 +2321,13 @@ export function JournalsPage() {
                 void reverseMut
                   .mutateAsync(reverseTarget.journal_entry_id)
                   .then(() => {
-                    toast.success("╪│┘╪» ╪ذ╪▒┌»╪┤╪ز ╪╡╪د╪»╪▒ ╪┤╪».");
+                    toast.success("سند برگشت صادر شد.");
                     setReverseTarget(null);
                   })
                   .catch((e: Error) => toast.error(e.message));
               }}
             >
-              ╪ز╪ث█î█î╪» ╪ذ╪▒┌»╪┤╪ز
+              تأیید برگشت
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2328,12 +2336,12 @@ export function JournalsPage() {
       <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>╪ص╪░┘ ┘╛█î╪┤ظî┘┘ê█î╪│</DialogTitle>
-            <DialogDescription>┘┘é╪╖ ┘╛█î╪┤ظî┘┘ê█î╪│ ╪ذ╪»┘ê┘ ╪س╪ذ╪ز ┘é╪╖╪╣█î ╪ص╪░┘ ┘à█îظî╪┤┘ê╪».</DialogDescription>
+            <DialogTitle>حذف پیش‌نویس</DialogTitle>
+            <DialogDescription>فقط پیش‌نویس بدون ثبت قطعی حذف می‌شود.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>
-              ╪د┘╪╡╪▒╪د┘
+              انصراف
             </Button>
             <Button
               variant="destructive"
@@ -2343,13 +2351,13 @@ export function JournalsPage() {
                 void deleteMut
                   .mutateAsync(deleteTarget.journal_entry_id)
                   .then(() => {
-                    toast.success("┘╛█î╪┤ظî┘┘ê█î╪│ ╪ص╪░┘ ╪┤╪».");
+                    toast.success("پیش‌نویس حذف شد.");
                     setDeleteTarget(null);
                   })
                   .catch((e: Error) => toast.error(e.message));
               }}
             >
-              ╪ص╪░┘
+              حذف
             </Button>
           </DialogFooter>
         </DialogContent>
