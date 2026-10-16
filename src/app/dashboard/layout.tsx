@@ -3,6 +3,7 @@ import { AppHeader } from "@/shared/components/layout/app-header";
 import { AppSidebar } from "@/shared/components/layout/app-sidebar";
 import { SidebarProvider } from "@/shared/components/layout/sidebar-context";
 import { AppErrorBoundary } from "@/shared/components/feedback/app-error-boundary";
+import { InactiveCompanyBanner } from "@/shared/components/feedback/inactive-company-banner";
 
 export default function DashboardLayout({
   children,
@@ -17,6 +18,7 @@ export default function DashboardLayout({
           <div className="flex min-w-0 flex-1 flex-col">
             <AppHeader />
             <main className="flex-1 p-3 md:p-4">
+              <InactiveCompanyBanner />
               <AppErrorBoundary>{children}</AppErrorBoundary>
             </main>
           </div>
