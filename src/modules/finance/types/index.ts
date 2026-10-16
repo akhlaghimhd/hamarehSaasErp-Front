@@ -49,6 +49,7 @@ export type AccountType = 1 | 2 | 3 | 4 | 5;
 export interface AccountDto {
   account_id: string;
   tenant_id?: string;
+  company_id?: string | null;
   parent_account_id?: string | null;
   account_code: string;
   name: string;
@@ -66,6 +67,8 @@ export interface AccountDto {
 export type AccountTreeNode = AccountDto & { children?: AccountTreeNode[] };
 
 export interface CreateAccountPayload {
+  /** FIN-HOLD-W4 — required for per-company CoA; BE falls back to primary if omitted */
+  company_id?: string;
   account_code: string;
   name: string;
   account_type: number;
@@ -93,11 +96,9 @@ export interface JournalEntryDto {
   journal_entry_id: string;
   ledger_id: string;
   company_id: string;
-  /** FIN-HOLD-W3 optional branch series key */
   branch_id?: string | null;
   period_id: string;
   entry_number?: string | null;
-  /** ADR-FIN-002 — retained after post (DR-… series) */
   draft_number?: string | null;
   items_debit_sum?: number | string | null;
   items_credit_sum?: number | string | null;
@@ -113,10 +114,8 @@ export interface JournalEntryDto {
 }
 
 export interface CreateJournalPayload {
-  /** Optional: backend resolves leading ledger for company when omitted */
   ledger_id?: string;
   company_id: string;
-  /** Optional branch; empty/omit = company series (FIN-HOLD-W3 L07) */
   branch_id?: string | null;
   period_id: string;
   document_date: string;

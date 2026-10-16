@@ -28,6 +28,7 @@ import {
   DialogTitle,
 } from "@/shared/components/ui/dialog";
 import { usePermission } from "@/auth";
+import { useFinanceCompanyScope } from "../hooks/use-finance-company-scope";
 import {
   useAccountTree,
   useCreateAccount,
@@ -271,7 +272,20 @@ export function AccountsPage() {
   const canCreate = usePermission(FinancePermissions.coaCreate);
   const canDelete = usePermission(FinancePermissions.coaDelete);
   const canEdit = usePermission(FinancePermissions.coaUpdate);
-  const { data, isLoading, error, refetch } = useAccountTree();
+
+  const {
+    companies,
+    multiCompany,
+    companyId,
+    setCompanyId,
+    primaryCompanyId,
+    canOperateSelected,
+    isTechnicalOwnerReadOnly,
+    isGroupObserver,
+  } = useFinanceCompanyScope();
+  const effectiveCompanyId = companyId || primaryCompanyId;
+
+  const { data, isLoading, error, refetch } = useAccountTree(effectiveCompanyId || undefined);
   const createMut = useCreateAccount();
   const deleteMut = useDeleteAccount();
   const qc = useQueryClient();
@@ -376,6 +390,7 @@ export function AccountsPage() {
         const nextLevel = parentLevel + 1;
         const postable = nextLevel >= MAX_DEPTH;
         await createMut.mutateAsync({
+          company_id: effectiveCompanyId || undefined,
           account_code: finalCode,
           name: finalName,
           account_type: t,
@@ -389,6 +404,7 @@ export function AccountsPage() {
       } else {
         const t = form.type;
         await createMut.mutateAsync({
+          company_id: effectiveCompanyId || undefined,
           account_code: finalCode,
           name: finalName,
           account_type: t,
@@ -428,6 +444,9 @@ export function AccountsPage() {
     return <div className="p-6 text-sm text-amber-700">مجوز مشاهده کدینگ را ندارید.</div>;
   }
 
+  const canMutateCoa = canCreate && canOperateSelected;
+  const canEditCoa = canEdit && canOperateSelected;
+  const canDeleteCoa = canDelete && canOperateSelected;
   const busy = createMut.isPending || updateMut.isPending;
 
   function formTitle(): string {
@@ -460,6 +479,27 @@ export function AccountsPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="کدینگ حساب‌ها" description="کل · معین · تفصیلی" breadcrumbs={[{ label: "داشبورد", href: "/dashboard" }, { label: "حسابداری", href: "/dashboard/finance" }, { label: "کدینگ" }]} />
+      {(isTechnicalOwnerReadOnly || isGroupObserver) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+          دسترسی شما در این سطح فقط مشاهده است؛ ویرایش کدینگ شرکت‌های زیرمجموعه مجاز نیست.
+        </div>
+      )}
+      {multiCompany ? (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <label className="text-muted-foreground">شرکت</label>
+          <select
+            className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+            value={effectiveCompanyId}
+            onChange={(e) => setCompanyId(e.target.value)}
+          >
+            {companies.map((c) => (
+              <option key={c.company_id} value={c.company_id}>
+                {c.name || c.company_id.slice(0, 8)}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
       {isLoading ? (
         <div className="flex items-center gap-2 rounded-xl border bg-card p-4 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> بارگذاری…
@@ -471,50 +511,57 @@ export function AccountsPage() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border bg-card">
-          {canCreate && missingTypes.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2 border-b border-border/40 px-3 py-2">
-              <span className="text-xs text-muted-foreground">افزودن حساب کل:</span>
-              {missingTypes.map((t) => {
-                const vis = TYPE_VISUAL[t];
-                const Icon = vis?.icon;
-                return (
-                  <Button key={t} variant="outline" size="sm" className="h-7 text-xs" onClick={() => startAddRoot(t)}>
-                    {Icon ? <Icon className={cn("me-1 h-3 w-3", vis.iconClass)} /> : <Plus className="me-1 h-3 w-3" />}
-                    {ACCOUNT_TYPE_LABELS[t] ?? t}
-                  </Button>
-                );
-              })}
+          {canMutateCoa && missingTypes.length > 0 ? (
+            <div className="flex flex-wrap gap-2 border-b border-border/50 bg-muted/20 px-3 py-2">
+              {missingTypes.map((t) => (
+                <Button key={t} size="sm" variant="outline" className="h-8" onClick={() => startAddRoot(t)}>
+                  <Plus className="h-3.5 w-3.5" />
+                  <span className="ms-1">کل {ACCOUNT_TYPE_LABELS[t]}</span>
+                </Button>
+              ))}
             </div>
           ) : null}
           {form?.kind === "create-root" ? inlineForm : null}
-          {roots.length === 0 && form?.kind !== "create-root" ? (
-            <p className="px-3 py-4 text-sm text-muted-foreground">هنوز حساب کلی تعریف نشده است.</p>
+          {roots.length === 0 && !form ? (
+            <div className="p-6 text-sm text-muted-foreground">هنوز حسابی ثبت نشده است.</div>
           ) : (
             roots.map((n) => (
-              <TreeRow key={n.account_id} node={n} depth={0} roots={roots} canCreate={canCreate} canDelete={canDelete} canEdit={canEdit} openIds={openIds} toggle={toggleNode} form={form} onAddChild={startAddChild} onEdit={startEdit} onDelete={requestDelete} formSlot={inlineForm} />
+              <TreeRow
+                key={n.account_id}
+                node={n}
+                depth={0}
+                roots={roots}
+                canCreate={canMutateCoa}
+                canDelete={canDeleteCoa}
+                canEdit={canEditCoa}
+                openIds={openIds}
+                toggle={toggleNode}
+                form={form}
+                onAddChild={startAddChild}
+                onEdit={startEdit}
+                onDelete={requestDelete}
+                formSlot={inlineForm}
+              />
             ))
           )}
         </div>
       )}
-      <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setDeleteError(null); } }}>
-        <DialogContent className="max-w-md">
+
+      <Dialog open={Boolean(deleteTarget)} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>حذف حساب</DialogTitle>
             <DialogDescription>
-              {deleteTarget ? (
-                <>
-                  حساب «{deleteTarget.name}» با کد{" "}
-                  <span className="font-mono">{toFaDigits(deleteTarget.account_code)}</span>{" "}
-                  حذف شود؟ حساب‌هایی که زیرمجموعه یا گردش سند دارند قابل حذف نیستند.
-                </>
-              ) : null}
+              {deleteTarget
+                ? `حساب «${deleteTarget.name}» (${toFaDigits(deleteTarget.account_code)}) حذف شود؟`
+                : ""}
             </DialogDescription>
           </DialogHeader>
           {deleteError ? <p className="text-sm text-destructive">{deleteError}</p> : null}
           <DialogFooter>
-            <Button variant="outline" disabled={deleteMut.isPending} onClick={() => { setDeleteTarget(null); setDeleteError(null); }}>انصراف</Button>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>انصراف</Button>
             <Button variant="destructive" disabled={deleteMut.isPending} onClick={() => void confirmDelete()}>
-              {deleteMut.isPending ? <Loader2 className="me-1 h-4 w-4 animate-spin" /> : null}
+              {deleteMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               حذف
             </Button>
           </DialogFooter>

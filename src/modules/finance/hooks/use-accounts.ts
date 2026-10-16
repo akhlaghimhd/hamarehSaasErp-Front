@@ -6,21 +6,28 @@ import type { CreateAccountPayload } from "../types";
 
 export const financeAccountKeys = {
   all: ["finance", "accounts"] as const,
-  tree: ["finance", "accounts", "tree"] as const,
-  flat: ["finance", "accounts", "flat"] as const,
+  tree: (companyId?: string | null) =>
+    ["finance", "accounts", "tree", companyId ?? ""] as const,
+  flat: (companyId?: string | null) =>
+    ["finance", "accounts", "flat", companyId ?? ""] as const,
 };
 
-export function useAccountTree() {
+export function useAccountTree(companyId?: string | null) {
   return useQuery({
-    queryKey: financeAccountKeys.tree,
-    queryFn: () => accountService.listTree(),
+    queryKey: financeAccountKeys.tree(companyId),
+    queryFn: () => accountService.listTree(companyId),
+    enabled: true,
   });
 }
 
-export function useAccountFlat(options?: { enabled?: boolean }) {
+export function useAccountFlat(options?: {
+  enabled?: boolean;
+  companyId?: string | null;
+}) {
+  const companyId = options?.companyId;
   return useQuery({
-    queryKey: financeAccountKeys.flat,
-    queryFn: () => accountService.listFlat(),
+    queryKey: financeAccountKeys.flat(companyId),
+    queryFn: () => accountService.listFlat(companyId),
     staleTime: 60_000,
     enabled: options?.enabled ?? true,
   });
