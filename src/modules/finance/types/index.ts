@@ -93,6 +93,8 @@ export interface JournalEntryDto {
   journal_entry_id: string;
   ledger_id: string;
   company_id: string;
+  /** FIN-HOLD-W3 optional branch series key */
+  branch_id?: string | null;
   period_id: string;
   entry_number?: string | null;
   /** ADR-FIN-002 — retained after post (DR-… series) */
@@ -114,6 +116,8 @@ export interface CreateJournalPayload {
   /** Optional: backend resolves leading ledger for company when omitted */
   ledger_id?: string;
   company_id: string;
+  /** Optional branch; empty/omit = company series (FIN-HOLD-W3 L07) */
+  branch_id?: string | null;
   period_id: string;
   document_date: string;
   description?: string;
@@ -138,90 +142,77 @@ export interface TrialBalanceRow {
 }
 
 export interface ProfitAndLossDto {
-  revenue: Array<TrialBalanceRow & { amount: string }>;
-  expense: Array<TrialBalanceRow & { amount: string }>;
-  total_revenue: string;
-  total_expense: string;
-  net_income: string;
+  revenue: string;
+  expense: string;
+  net: string;
 }
 
 export interface BalanceSheetDto {
-  assets: Array<{ amount: string; account_code?: string; name?: string }>;
-  liabilities: Array<{ amount: string; account_code?: string; name?: string }>;
-  equity: Array<{ amount: string; account_code?: string; name?: string }>;
-  total_assets: string;
-  total_liabilities_equity: string;
+  assets: string;
+  liabilities: string;
+  equity: string;
+}
+
+export interface CashAccountDto {
+  cash_account_id: string;
+  company_id: string;
+  name: string;
+  account_id?: string | null;
+  currency_code?: string;
+  is_active?: boolean;
 }
 
 export interface TreasuryDocumentDto {
   treasury_document_id: string;
   company_id: string;
-  period_id: string;
-  cash_account_id: string;
-  document_type: "RECEIPT" | "PAYMENT" | string;
-  document_number?: string | null;
+  document_type: string;
   document_date: string;
-  status: string;
   amount: number | string;
-  counterparty_name?: string | null;
+  status: string;
   description?: string | null;
-  journal_entry_id?: string | null;
 }
 
 export interface ChequeDto {
   cheque_id: string;
   company_id: string;
-  direction: string;
   cheque_number: string;
-  bank_name?: string | null;
-  due_date: string;
   amount: number | string;
   status: string;
-  payee_name?: string | null;
-  payer_name?: string | null;
+  due_date?: string | null;
+  bank_name?: string | null;
 }
 
 export interface OpenItemDto {
   open_item_id: string;
   company_id: string;
-  /** AR | AP — بک‌اند */
-  side?: string;
-  /** سازگاری قدیمی */
-  party_type?: string;
-  party_id?: string;
-  party_name?: string | null;
-  counterparty_name?: string | null;
-  document_type?: string;
-  document_id?: string;
-  document_number?: string | null;
-  document_date: string;
-  due_date?: string | null;
+  partner_type: string;
+  partner_id: string;
   original_amount: number | string;
   open_amount: number | string;
-  currency_code?: string;
-  description?: string | null;
-  status: string;
+  document_date: string;
+  due_date?: string | null;
 }
 
-export interface AgingBucketDto {
-  bucket: string;
-  amount: number | string;
-  count: number;
+export interface BankStatementDto {
+  bank_statement_id: string;
+  company_id: string;
+  statement_date: string;
+  status?: string;
 }
 
-export interface TaxRateDto {
+export interface TaxRateConfigDto {
   tax_rate_id: string;
-  code: string;
-  name: string;
+  tax_code: string;
   rate_percent: number | string;
-  is_active?: boolean;
+  valid_from: string;
+  valid_to?: string | null;
 }
 
 export interface TaxTransactionDto {
   tax_transaction_id: string;
   company_id: string;
-  tax_rate_id: string;
-  base_amount: number | string;
+  tax_code: string;
+  taxable_amount: number | string;
   tax_amount: number | string;
   transaction_date: string;
   direction: string;
