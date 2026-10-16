@@ -59,4 +59,7 @@ export const financePaths = {
   smartSuggestAccounts: `${FINANCE_BASE}/smart/suggest-accounts`,
   smartAccountDecision: `${FINANCE_BASE}/smart/account-decision`,
   smartNlDraft: `${FINANCE_BASE}/smart/nl-draft`,
+  companyNumbering: `${FINANCE_BASE}/company-numbering`,
+  companyNumberingEnableBranch: `${FINANCE_BASE}/company-numbering/enable-branch-series`,
+  companyNumberingDisableBranch: `${FINANCE_BASE}/company-numbering/disable-branch-series`,
 } as const;
