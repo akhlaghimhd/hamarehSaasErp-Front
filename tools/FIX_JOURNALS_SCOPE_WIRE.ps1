@@ -1,74 +1,49 @@
-# FIX_JOURNALS_SCOPE_WIRE.ps1
-# Wire useFinanceCompanyScope + fix broken read-only banners
+# FIX_JOURNALS_SCOPE_WIRE.ps1 - ASCII only, wires useFinanceCompanyScope
 $ErrorActionPreference = "Stop"
 $path = "src\modules\finance\pages\journals-page.tsx"
-if (-not (Test-Path $path)) { throw "Run from Front repo root" }
+if (-not (Test-Path $path)) { throw "Run from hamarehSaasErp-Front root" }
 
-$t = [System.IO.File]::ReadAllText((Resolve-Path $path).Path)
-$t = $t -replace "`r`n", "`n"
+$full = (Resolve-Path $path).Path
+$t = [System.IO.File]::ReadAllText($full)
+$t = $t.Replace("`r`n", "`n")
 
-if ($t -match "<<<<<<|>>>>>>|SEE_ARTIFACTS|PLACEHOLDER") {
-  throw "File still has conflict markers or PLACEHOLDER - restore clean file first"
+if ($t.Contains("<<<<<<") -or $t.Contains(">>>>>>>") -or $t.Contains("SEE_ARTIFACTS") -or $t.Contains("PLACEHOLDER")) {
+  throw "Conflict markers or PLACEHOLDER still present - restore clean journals-page first"
 }
 
-# --- A) Wire hook if missing ---
-$hasWire = $t -match 'isTechnicalOwnerReadOnly,\s*\n\s*isGroupObserver'
-$hasCall = $t.Contains('= useFinanceCompanyScope()')
-if (-not $hasWire -or -not $hasCall) {
-  $t = [regex]::Replace($t, '(?s)\n  const \{\n    canOperateCompany,\n    isTechnicalOwnerReadOnly,\n    isGroupObserver,\n  \} = useFinanceCompanyScope\(\);\n  const canOperateOn = \(companyId\?: string \| null\) =>\n    Boolean\(companyId && canOperateCompany\(companyId\)\);\n', "`n")
+if ($t.Contains("= useFinanceCompanyScope()") -and $t.Contains("isTechnicalOwnerReadOnly,")) {
+  Write-Host "Already wired - nothing to do"
+  exit 0
+}
 
-  $needle = $null
-  foreach ($cand in @(
-    '  const canReverse = usePermission(FinancePermissions.journalReverse);'
-  )) {
-    if ($t.Contains($cand)) { $needle = $cand; break }
+$needle = "  const canReverse = usePermission(FinancePermissions.journalReverse);"
+if (-not $t.Contains($needle)) {
+  $needle = "  const canPost = usePermission(FinancePermissions.journalPost);"
+  if (-not $t.Contains($needle)) {
+    throw "Permission lines not found"
   }
-  if (-not $needle) {
-    if ($t -match 'const canPost = usePermission\(FinancePermissions\.journalPost\);') {
-      $needle = $Matches[0]
-      if (-not $needle.StartsWith('  ')) { $needle = '  ' + $needle.TrimStart() }
-    } else {
-      throw "Cannot find permission lines to insert after"
-    }
-  }
-
-  $block = @"
-$needle
-
-  const {
-    canOperateCompany,
-    isTechnicalOwnerReadOnly,
-    isGroupObserver,
-  } = useFinanceCompanyScope();
-  const canOperateOn = (companyId?: string | null) =>
-    Boolean(companyId && canOperateCompany(companyId));
-"@
-  $block = $block -replace "`r`n", "`n"
-  $t = $t.Replace($needle, $block, 1)
-  Write-Host "WIRED hook after permission block"
-} else {
-  Write-Host "Hook already wired"
 }
 
-if ($t -notmatch 'useFinanceCompanyScope') {
-  throw "Missing import useFinanceCompanyScope"
-}
+$block = $needle + "`n`n" +
+"  const {`n" +
+"    canOperateCompany,`n" +
+"    isTechnicalOwnerReadOnly,`n" +
+"    isGroupObserver,`n" +
+"  } = useFinanceCompanyScope();`n" +
+"  const canOperateOn = (companyId?: string | null) =>`n" +
+"    Boolean(companyId && canOperateCompany(companyId));"
 
-$goodFa = 'دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش سند روی شرکت‌های زیرمجموعه مجاز نیست.'
-$t = [regex]::Replace(
-  $t,
-  '(?s)(\{\(isTechnicalOwnerReadOnly \|\| isGroupObserver\) && \(\s*<div className="rounded-lg border border-amber-200[^"]*"[^>]*>\s*)([^<]+)(\s*</div>)',
-  { param($m) $m.Groups[1].Value + $goodFa + $m.Groups[3].Value }
-)
+$idx = $t.IndexOf($needle)
+if ($idx -lt 0) { throw "needle not found" }
+$t = $t.Substring(0, $idx) + $block + $t.Substring($idx + $needle.Length)
+
+if (-not $t.Contains("useFinanceCompanyScope")) {
+  throw "Missing import of useFinanceCompanyScope"
+}
 
 $utf8 = New-Object System.Text.UTF8Encoding $false
-[System.IO.File]::WriteAllText((Resolve-Path $path).Path, $t, $utf8)
+[System.IO.File]::WriteAllText($full, $t, $utf8)
 
-Write-Host "--- verify ---"
-Select-String -Path $path -Pattern "useFinanceCompanyScope\(\)|isTechnicalOwnerReadOnly|canOperateOn =" |
-  ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim().Substring(0, [Math]::Min(100, $_.Line.Trim().Length)) }
-
-if ($t -notmatch 'isTechnicalOwnerReadOnly,\s*\n\s*isGroupObserver') {
-  throw "FAILED: isTechnicalOwnerReadOnly still not destructured"
-}
-Write-Host "OK - refresh browser"
+Write-Host "WIRED OK"
+Select-String -Path $path -Pattern "useFinanceCompanyScope\(\)|isTechnicalOwnerReadOnly," |
+  ForEach-Object { "$($_.LineNumber): $($_.Line.Trim())" }
