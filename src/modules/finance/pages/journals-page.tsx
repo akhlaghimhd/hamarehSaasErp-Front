@@ -43,7 +43,7 @@ import {
 } from "@/shared/components/ui/dialog";
 import { usePermission, useAuthStore } from "@/auth";
 import { useCompanies } from "@/modules/organization/hooks/use-companies";
-import { useBranches } from "@/modules/organization/hooks/use-branches";
+import { useBranches, useAllBranches } from "@/modules/organization/hooks/use-branches";
 import { useFinanceCompanyScope } from "../hooks/use-finance-company-scope";
 import {
   costCenterService,
@@ -223,6 +223,13 @@ export function JournalsPage() {
   /** FIN-CSN-F1: list company filter — "" = all allowed (parent multi); single company forced when only one */
   const companyOptions = companies ?? [];
   const multiCompany = companyOptions.length > 1;
+  /** Create form: only companies actor can OPERATE (FIN-HOLD). List filter stays all readable. */
+  const operableCompanyOptions = useMemo(
+    () => companyOptions.filter((c) => canOperateCompany(c.company_id)),
+    [companyOptions, canOperateCompany]
+  );
+  const defaultOperateCompanyId = operableCompanyOptions[0]?.company_id ?? "";
+  const canCreateOnAny = operableCompanyOptions.length > 0;
   const [listCompanyId, setListCompanyId] = useState<string>("");
   const [formCompanyId, setFormCompanyId] = useState<string>("");
   /** FIN-HOLD-W3: optional branch for branch-series numbering; empty = company series */
@@ -233,12 +240,18 @@ export function JournalsPage() {
     if (!multiCompany) {
       const only = companyOptions[0]?.company_id ?? primaryCompanyId;
       setListCompanyId(only);
-      setFormCompanyId((prev) => prev || only);
+      if (canOperateCompany(only)) {
+        setFormCompanyId((prev) => prev || only);
+      } else {
+        setFormCompanyId(defaultOperateCompanyId);
+      }
       return;
     }
-    // parent: default list = all (""); form default = primary
-    setFormCompanyId((prev) => prev || primaryCompanyId || companyOptions[0]?.company_id || "");
-  }, [companies, multiCompany, primaryCompanyId]);
+    setFormCompanyId((prev) => {
+      if (prev && canOperateCompany(prev)) return prev;
+      return defaultOperateCompanyId;
+    });
+  }, [companies, multiCompany, primaryCompanyId, defaultOperateCompanyId, canOperateCompany]);
 
   const effectiveListCompanyId = multiCompany
     ? listCompanyId || undefined
@@ -257,9 +270,9 @@ export function JournalsPage() {
   const [visibleCols, setVisibleCols] = useState<Record<string, boolean>>(() => {
     try {
       const raw = localStorage.getItem("finance.journals.list-cols.v1");
-      if (raw) return { ...{ number: true, date: true, period: true, status: true, desc: true, debit: true, credit: true, actions: true }, ...JSON.parse(raw) };
+      if (raw) return { ...{ number: true, date: true, period: true, status: true, branch: true, desc: true, debit: true, credit: true, actions: true }, ...JSON.parse(raw) };
     } catch { /* ignore */ }
-    return { number: true, date: true, period: true, status: true, desc: true, debit: true, credit: true, actions: true };
+    return { number: true, date: true, period: true, status: true, branch: true, desc: true, debit: true, credit: true, actions: true };
   });
 
 
@@ -302,6 +315,15 @@ export function JournalsPage() {
   const activeFormCompanyId = formCompanyId || primaryCompanyId;
   const { data: formBranches } = useBranches(activeFormCompanyId || null, "active");
   const branchOptions = formBranches ?? [];
+  const { data: allBranches } = useAllBranches("active");
+  const branchNameById = useMemo(() => {
+    const m = new Map();
+    for (const b of allBranches ?? []) {
+      const label = b.ref_code || b.name || b.code || b.branch_id.slice(0, 8);
+      m.set(b.branch_id, label);
+    }
+    return m;
+  }, [allBranches]);
 
   const postMut = usePostJournal();
   const reverseMut = useReverseJournal();
@@ -314,7 +336,10 @@ export function JournalsPage() {
     void costCenterService.list(activeFormCompanyId).then(setCostCenters).catch(() => setCostCenters([]));
     void businessUnitService.list().then(setBusinessUnits).catch(() => setBusinessUnits([]));
   }, [formMode, activeFormCompanyId]);
-  const { data: accountsFlat } = useAccountFlat({ enabled: formMode !== null });
+  const { data: accountsFlat } = useAccountFlat({
+    enabled: formMode !== null && Boolean(formCompanyId || primaryCompanyId),
+    companyId: formCompanyId || primaryCompanyId || undefined,
+  });
 
   const postableAccounts = useMemo(
     () => (accountsFlat ?? []).filter((a) => a.is_postable !== false),
@@ -478,6 +503,10 @@ export function JournalsPage() {
   const isBalanced = lineTotals.debit > 0 && lineTotals.diff === 0;
 
   function openNew() {
+    if (!canCreateOnAny) {
+      setFormError("شما برای هیچ شرکتی مجوز ثبت سند ندارید. فقط مشاهده مجاز است.");
+      return;
+    }
     setViewOnly(false);
     setFormError(null);
     setAccountQuery("");
@@ -1315,18 +1344,23 @@ export function JournalsPage() {
               <label className="text-xs text-muted-foreground">شرکت</label>
               <select
                 className="h-9 w-48 rounded-md border bg-background px-2 text-xs"
-                value={formCompanyId || primaryCompanyId}
+                value={formCompanyId || defaultOperateCompanyId}
+                disabled={viewOnly || operableCompanyOptions.length <= 1}
                 onChange={(e) => {
                   markDirty();
                   setFormCompanyId(e.target.value);
                   setFormBranchId("");
                 }}
               >
-                {companyOptions.map((c) => (
-                  <option key={c.company_id} value={c.company_id}>
-                    {(c as { name?: string; legal_name?: string }).name || (c as { legal_name?: string }).legal_name || c.company_id.slice(0, 8)}
-                  </option>
-                ))}
+                {operableCompanyOptions.length === 0 ? (
+                  <option value="">--</option>
+                ) : (
+                  operableCompanyOptions.map((c) => (
+                    <option key={c.company_id} value={c.company_id}>
+                      {(c as { name?: string; legal_name?: string }).name || (c as { legal_name?: string }).legal_name || c.company_id.slice(0, 8)}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
           ) : multiCompany && formMode && formMode !== "new" ? (
@@ -1763,7 +1797,7 @@ export function JournalsPage() {
         ]}
         actions={
           <div className="flex items-center gap-1.5 flex-wrap">
-            {canCreate ? (
+            {canCreate && canCreateOnAny ? (
               <Button type="button" size="sm" className="h-8" onClick={openNew}>
                 <Plus className="h-4 w-4 ml-1" />
                 سند جدید
@@ -1775,7 +1809,7 @@ export function JournalsPage() {
 
 
 
-      {(isTechnicalOwnerReadOnly || isGroupObserver) && (
+      {(isTechnicalOwnerReadOnly || isGroupObserver || !canCreateOnAny) && (
         <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
           دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش سند روی شرکت‌های زیرمجموعه مجاز نیست.
         </div>
@@ -1930,7 +1964,7 @@ export function JournalsPage() {
             <span>
               {toFaDigits(filtered.length)} سند
         
-      {(isTechnicalOwnerReadOnly || isGroupObserver) && (
+      {(isTechnicalOwnerReadOnly || isGroupObserver || !canCreateOnAny) && (
         <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
           دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش سند روی شرکت‌های زیرمجموعه مجاز نیست.
         </div>
@@ -1960,6 +1994,7 @@ export function JournalsPage() {
                   ["date", "تاریخ"],
                   ["period", "دوره"],
                   ["status", "وضعیت"],
+                  ["branch", "شعبه"],
                   ["desc", "شرح"],
                   ["debit", "بدهکار"],
                   ["credit", "بستانکار"],
@@ -1990,7 +2025,7 @@ export function JournalsPage() {
                 <FileDown className="h-3.5 w-3.5 ml-1" />
                 خروجی
           
-      {(isTechnicalOwnerReadOnly || isGroupObserver) && (
+      {(isTechnicalOwnerReadOnly || isGroupObserver || !canCreateOnAny) && (
         <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
           دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش سند روی شرکت‌های زیرمجموعه مجاز نیست.
         </div>
@@ -2062,6 +2097,7 @@ export function JournalsPage() {
                 {visibleCols.date !== false ? <th className="px-2 py-1 font-medium">تاریخ</th> : null}
                 {visibleCols.period !== false ? <th className="px-2 py-1 font-medium">دوره</th> : null}
                 {visibleCols.status !== false ? <th className="px-2 py-1 font-medium">وضعیت</th> : null}
+                {visibleCols.branch !== false ? <th className="px-2 py-1 font-medium">شعبه</th> : null}
                 {visibleCols.desc !== false ? <th className="px-2 py-1 font-medium">شرح</th> : null}
                 {visibleCols.debit !== false ? <th className="px-2 py-1 font-medium min-w-[7rem] text-sky-800">بدهکار</th> : null}
                 {visibleCols.credit !== false ? <th className="px-2 py-1 font-medium text-emerald-800">بستانکار</th> : null}
@@ -2121,6 +2157,13 @@ export function JournalsPage() {
                         >
                           {statusLabel[j.status] ?? j.status}
                         </span>
+                      </td>
+                    ) : null}
+                    {visibleCols.branch !== false ? (
+                      <td className="px-2 py-1 text-xs max-w-[120px] truncate">
+                        {(j as { branch_id?: string | null }).branch_id
+                          ? (branchNameById.get((j as { branch_id: string }).branch_id) ?? "شعبه")
+                          : "بدون شعبه"}
                       </td>
                     ) : null}
                     {visibleCols.desc !== false ? (
