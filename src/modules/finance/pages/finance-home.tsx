@@ -20,6 +20,7 @@ import {
   ClipboardCheck,
   Share2,
   Boxes,
+  Hash,
 } from "lucide-react";
 import { PageHeader } from "@/shared/components/layout/page-header";
 import { usePermission } from "@/auth";
@@ -119,7 +120,6 @@ export function FinanceHomePage() {
   const canSmart = usePermission(FinancePermissions.smartView);
 
   const cards: HubCard[] = [
-    // —— عملیات روزانه
     {
       key: "journals",
       href: "/dashboard/finance/journals",
@@ -165,7 +165,6 @@ export function FinanceHomePage() {
       open: true,
       group: "daily_ops",
     },
-    // —— کنترل جاری
     {
       key: "bankRecon",
       href: "/dashboard/finance/bank-recon",
@@ -193,7 +192,6 @@ export function FinanceHomePage() {
       open: true,
       group: "ongoing_control",
     },
-    // —— مالیات و انطباق دوره‌ای
     {
       key: "tax",
       href: "/dashboard/finance/tax",
@@ -221,7 +219,6 @@ export function FinanceHomePage() {
       open: true,
       group: "tax_periodic",
     },
-    // —— گزارش‌ها و بستن دوره
     {
       key: "reports",
       href: "/dashboard/finance/reports",
@@ -240,7 +237,15 @@ export function FinanceHomePage() {
       open: true,
       group: "reports_close",
     },
-    // —— پایه و ساختار
+    {
+      key: "companyNumbering",
+      href: "/dashboard/finance/company-numbering",
+      title: "شماره‌گذاری اسناد",
+      description: "سری شرکت و سری اختیاری شعبه از سال مالی",
+      icon: Hash,
+      open: true,
+      group: "setup_structure",
+    },
     {
       key: "accounts",
       href: "/dashboard/finance/accounts",
@@ -250,7 +255,6 @@ export function FinanceHomePage() {
       open: true,
       group: "setup_structure",
     },
-    // —— دارایی و گروه
     {
       key: "fixedAssets",
       href: "/dashboard/finance/fixed-assets",
@@ -296,6 +300,7 @@ export function FinanceHomePage() {
     alerts: canCompliance,
     fixedAssets: canFa,
     periodClose: canPeriod,
+    companyNumbering: canPeriod,
     intercompany: canIc,
     consolTb: canIc,
   };
@@ -322,8 +327,7 @@ export function FinanceHomePage() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {groupCards.map((card) => {
                 const active =
-                  pathname === card.href ||
-                  pathname.startsWith(card.href + "/");
+                  pathname === card.href || pathname.startsWith(card.href + "/");
                 return (
                   <HubCardView
                     key={card.key}
