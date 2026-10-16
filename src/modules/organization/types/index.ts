@@ -52,6 +52,8 @@ export type CompanyDto = {
   company_id: string;
   tenant_id: string;
   code: string;
+  /** 3-char stable code for journal numbers: DR-{ref_code}-YY-##### */
+  ref_code?: string | null;
   name: string;
   legal_name?: string | null;
   trade_name?: string | null;
@@ -85,6 +87,8 @@ export type BranchDto = {
   branch_id: string;
   company_id: string;
   code: string;
+  /** 3-char stable code for journal numbers when branch is set */
+  ref_code?: string | null;
   name: string;
   address?: string | null;
   is_active?: boolean;
@@ -114,6 +118,7 @@ export type DepartmentDto = {
 
 export type CreateCompanyPayload = {
   code: string;
+  ref_code?: string | null;
   name: string;
   legal_name?: string | null;
   trade_name?: string | null;
@@ -134,6 +139,7 @@ export type UpdateCompanyPayload = CreateCompanyPayload & {
 export type CreateBranchPayload = {
   company_id: string;
   code: string;
+  ref_code?: string | null;
   name: string;
   address?: string | null;
   is_active?: boolean;
@@ -147,6 +153,7 @@ export type CreateBranchPayload = {
 
 export type UpdateBranchPayload = {
   code: string;
+  ref_code?: string | null;
   name: string;
   address?: string | null;
   is_active?: boolean;
@@ -157,24 +164,6 @@ export type UpdateBranchPayload = {
   supports_receiving?: boolean;
   is_manufacturing_site?: boolean;
   company_id?: string | null;
-};
-
-export type CreateDepartmentPayload = {
-  branch_id: string;
-  code: string;
-  name: string;
-  parent_department_id?: string | null;
-  manager_user_id?: string | null;
-  is_active?: boolean;
-};
-
-export type UpdateDepartmentPayload = {
-  code: string;
-  name: string;
-  parent_department_id?: string | null;
-  manager_user_id?: string | null;
-  is_active?: boolean;
-  branch_id?: string | null;
 };
 
 /** نقش شرکت در گروه — برچسب‌های کاربرپسند (SME + هلدینگ) */
