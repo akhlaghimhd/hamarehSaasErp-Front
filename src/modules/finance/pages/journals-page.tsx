@@ -43,6 +43,7 @@ import {
 } from "@/shared/components/ui/dialog";
 import { usePermission, useAuthStore } from "@/auth";
 import { useCompanies } from "@/modules/organization/hooks/use-companies";
+import { useBranches } from "@/modules/organization/hooks/use-branches";
 import { useFinanceCompanyScope } from "../hooks/use-finance-company-scope";
 import {
   costCenterService,
@@ -216,6 +217,8 @@ export function JournalsPage() {
   const multiCompany = companyOptions.length > 1;
   const [listCompanyId, setListCompanyId] = useState<string>("");
   const [formCompanyId, setFormCompanyId] = useState<string>("");
+  /** FIN-HOLD-W3: optional branch for branch-series numbering; empty = company series */
+  const [formBranchId, setFormBranchId] = useState<string>("");
 
   useEffect(() => {
     if (!companyOptions.length) return;
@@ -289,6 +292,8 @@ export function JournalsPage() {
   const [costCenters, setCostCenters] = useState<CostCenterDto[]>([]);
   const [businessUnits, setBusinessUnits] = useState<BusinessUnitDto[]>([]);
   const activeFormCompanyId = formCompanyId || primaryCompanyId;
+  const { data: formBranches } = useBranches(activeFormCompanyId || null, "active");
+  const branchOptions = formBranches ?? [];
 
   const postMut = usePostJournal();
   const reverseMut = useReverseJournal();
@@ -483,6 +488,7 @@ export function JournalsPage() {
           entryNumber?: string | null;
           primaryCompanyId?: string;
           formCompanyId?: string;
+          formBranchId?: string;
           savedAt?: string;
         };
         if (d.lines && Array.isArray(d.lines) && d.lines.length > 0) {
@@ -491,6 +497,7 @@ export function JournalsPage() {
           setPeriodId(d.periodId || DEMO_PERIOD_ID);
           setDescription(d.description || "");
           if (d.formCompanyId) setFormCompanyId(d.formCompanyId);
+          if (d.formBranchId !== undefined) setFormBranchId(d.formBranchId || "");
           setLines(
             d.lines.map((l) => ({
               ...emptyLine(),
@@ -513,6 +520,7 @@ export function JournalsPage() {
     setDocumentDate(todayIso());
     setPeriodId(DEMO_PERIOD_ID);
     setDescription("");
+    setFormBranchId("");
     setLines([emptyLine(), emptyLine()]);
     setEntryNumber(null);
     setDirty(false);
@@ -543,6 +551,7 @@ export function JournalsPage() {
             entryNumber,
             primaryCompanyId,
             formCompanyId: formCompanyId || primaryCompanyId,
+            formBranchId: formBranchId || "",
             savedAt: new Date().toISOString(),
           })
         );
@@ -562,6 +571,7 @@ export function JournalsPage() {
     entryNumber,
     primaryCompanyId,
     formCompanyId,
+    formBranchId,
   ]);
 
   useEffect(() => {
@@ -636,12 +646,14 @@ export function JournalsPage() {
     setFormMode(j.journal_entry_id);
     setEntryNumber(j.entry_number ?? j.draft_number ?? null);
     if (j.company_id) setFormCompanyId(j.company_id);
+    setFormBranchId((j as { branch_id?: string | null }).branch_id || "");
     try {
       const full = await journalService.getById(j.journal_entry_id);
       setDocumentDate(full.document_date?.slice(0, 10) || todayIso());
       setPeriodId(full.period_id || DEMO_PERIOD_ID);
       setDescription(full.description ?? "");
       setEntryNumber(full.entry_number ?? null);
+      setFormBranchId((full as { branch_id?: string | null }).branch_id || "");
       setDirty(false);
       setMeta({
         reverses_entry_id: full.reverses_entry_id,
@@ -971,6 +983,7 @@ export function JournalsPage() {
       if (formMode === "new") {
         const created = await journalService.createDraft({
           company_id: formCompanyId || primaryCompanyId,
+          branch_id: formBranchId || undefined,
           period_id: periodId,
           document_date: documentDate,
           description: description.trim() || undefined,
@@ -1298,6 +1311,7 @@ export function JournalsPage() {
                 onChange={(e) => {
                   markDirty();
                   setFormCompanyId(e.target.value);
+                  setFormBranchId("");
                 }}
               >
                 {companyOptions.map((c) => (
@@ -1319,8 +1333,35 @@ export function JournalsPage() {
               </div>
             </div>
           ) : null}
+          <div className="space-y-1 min-w-[160px]">
+            <label className="text-xs text-muted-foreground">ط´ط¹ط¨ظ‡ (ط§ط®طھغŒط§ط±غŒ)</label>
+            {formMode === "new" && !viewOnly ? (
+              <select
+                className="h-9 w-full min-w-[160px] rounded-md border bg-background px-2 text-sm"
+                value={formBranchId}
+                onChange={(e) => {
+                  markDirty();
+                  setFormBranchId(e.target.value);
+                }}
+              >
+                <option value="">ط¨ط¯ظˆظ† ط´ط¹ط¨ظ‡ - ط³ط±غŒ ط´ط±ع©طھ</option>
+                {branchOptions.map((b) => (
+                  <option key={b.branch_id} value={b.branch_id}>
+                    {b.name || b.branch_id.slice(0, 8)}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="flex h-9 items-center px-1 text-xs text-muted-foreground">
+                {formBranchId
+                  ? branchOptions.find((b) => b.branch_id === formBranchId)?.name ||
+                    formBranchId.slice(0, 8)
+                  : "-"}
+              </div>
+            )}
+          </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">تاریخ سند</label>
+            <label className="text-xs text-muted-foreground">طھط§ط±غŒط® ط³ظ†ط¯</label>
             <ShamsiDatePicker
               value={documentDate}
               onChange={(v) => {
