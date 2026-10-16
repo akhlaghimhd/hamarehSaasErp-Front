@@ -1,1 +1,1 @@
-PLACEHOLDER_READ_FROM_/tmp/journals-page.tsx
+file:///tmp/journals-final.tsx
