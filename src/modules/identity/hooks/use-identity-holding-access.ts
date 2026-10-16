@@ -10,10 +10,11 @@ import { useCompanies } from "@/modules/organization/hooks/use-companies";
  * - technical owner: may mutate Identity even without COMPANY scopes
  * - company operator: backend enforces COMPANY scope
  * - branch operator (T17): backend enforces BRANCH scope; FE shows scoped banner
+ * - product B: inactive scoped company → operate blocked (BE); FE can show banner
  */
 export function useIdentityHoldingAccess() {
   const securityContext = useAuthStore((s) => s.securityContext);
-  const { data: companies } = useCompanies("active");
+  const { data: companies, isSuccess: companiesLoaded } = useCompanies("active");
   const list = companies ?? [];
   const multiCompany = list.length > 1;
 
@@ -84,6 +85,22 @@ export function useIdentityHoldingAccess() {
   /** Role catalog create/update — owner / soft SME only (IDORG-T04/T12). */
   const canMutateRoleCatalog = isOwner || isSoftSme;
 
+  /**
+   * Product B: scoped COMPANY ids that are not in the active companies list.
+   * Only meaningful after companies query succeeded (avoids false positive while loading).
+   */
+  const inactiveOperateCompanyIds = useMemo(() => {
+    if (!companiesLoaded || isOwner || operateCompanyIds.length === 0) return [];
+    const activeIds = new Set(list.map((c) => String(c.company_id)));
+    return operateCompanyIds.filter((id) => !activeIds.has(id));
+  }, [companiesLoaded, isOwner, operateCompanyIds, list]);
+
+  const hasInactiveOperateCompany = inactiveOperateCompanyIds.length > 0;
+
+  /** Operate gates should treat inactive scoped company as non-writable. */
+  const canOperateCompanies =
+    !isGroupObserver && !hasInactiveOperateCompany;
+
   return {
     isOwner,
     isGroupObserver,
@@ -95,5 +112,8 @@ export function useIdentityHoldingAccess() {
     operateBranchIds,
     canMutateMembers,
     canMutateRoleCatalog,
+    inactiveOperateCompanyIds,
+    hasInactiveOperateCompany,
+    canOperateCompanies,
   };
 }
