@@ -1963,12 +1963,6 @@ export function JournalsPage() {
           {filtered.length ? (
             <span>
               {toFaDigits(filtered.length)} سند
-        
-      {(isTechnicalOwnerReadOnly || isGroupObserver || !canCreateOnAny) && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
-          دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش سند روی شرکت‌های زیرمجموعه مجاز نیست.
-        </div>
-      )}
       {selectedIds.length > 0 ? (
                 <span className="ms-2 text-foreground font-medium">
                   ({toFaDigits(selectedIds.length)} انتخاب‌شده)
@@ -2024,12 +2018,6 @@ export function JournalsPage() {
               <Button type="button" size="sm" variant="outline" className="h-8 text-xs">
                 <FileDown className="h-3.5 w-3.5 ml-1" />
                 خروجی
-          
-      {(isTechnicalOwnerReadOnly || isGroupObserver || !canCreateOnAny) && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
-          دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش سند روی شرکت‌های زیرمجموعه مجاز نیست.
-        </div>
-      )}
       {selectedIds.length > 0 ? (
                   <span className="ms-1 tabular-nums">({toFaDigits(selectedIds.length)})</span>
                 ) : filtered.length > 0 ? (
