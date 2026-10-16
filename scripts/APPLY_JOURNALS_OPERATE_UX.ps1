@@ -1,16 +1,26 @@
-# APPLY_JOURNALS_OPERATE_UX.ps1
-# Run from hamarehSaasErp-Front root:
-#   powershell -ExecutionPolicy Bypass -File scripts/APPLY_JOURNALS_OPERATE_UX.ps1
+# APPLY_JOURNALS_OPERATE_UX.ps1  (ASCII-safe)
+# From repo root:
+#   powershell -ExecutionPolicy Bypass -File scripts\APPLY_JOURNALS_OPERATE_UX.ps1
 $ErrorActionPreference = "Stop"
-$path = "src\modules\finance\pages\journals-page.tsx"
+$path = Join-Path $PSScriptRoot "..\src\modules\finance\pages\journals-page.tsx"
+$path = [System.IO.Path]::GetFullPath($path)
 if (-not (Test-Path $path)) { throw "File not found: $path" }
 $len = (Get-Item $path).Length
-if ($len -lt 80000) { throw "journals-page.tsx is too small ($len). Restore full file first." }
+if ($len -lt 80000) { throw "journals-page.tsx too small ($len). Restore full file first." }
 
 $utf8 = New-Object System.Text.UTF8Encoding $false
-$c = [System.IO.File]::ReadAllText((Resolve-Path $path), $utf8)
+$c = [System.IO.File]::ReadAllText($path, $utf8)
 
-$old1 = @'
+function Replace-Once([string]$hay, [string]$old, [string]$new, [string]$label) {
+  if ($hay.Contains($old)) {
+    $idx = $hay.IndexOf($old)
+    return $hay.Substring(0, $idx) + $new + $hay.Substring($idx + $old.Length), $true
+  }
+  Write-Host "MISS $label"
+  return $hay, $false
+}
+
+$old1 = @"
   const companyOptions = companies ?? [];
   const multiCompany = companyOptions.length > 1;
   const [listCompanyId, setListCompanyId] = useState<string>("");
@@ -29,9 +39,9 @@ $old1 = @'
     // parent: default list = all (""); form default = primary
     setFormCompanyId((prev) => prev || primaryCompanyId || companyOptions[0]?.company_id || "");
   }, [companies, multiCompany, primaryCompanyId]);
-'@
+"@
 
-$new1 = @'
+$new1 = @"
   const companyOptions = companies ?? [];
   const multiCompany = companyOptions.length > 1;
   /** Create form: only companies actor can OPERATE (FIN-HOLD). List filter stays all readable. */
@@ -63,21 +73,18 @@ $new1 = @'
       return defaultOperateCompanyId;
     });
   }, [companies, multiCompany, primaryCompanyId, defaultOperateCompanyId, canOperateCompany]);
-'@
+"@
 
-if ($c.Contains($old1)) {
-  $c = $c.Replace($old1, $new1)
-  Write-Host "OK 1: operableCompanyOptions"
-} elseif ($c.Contains("operableCompanyOptions")) {
+if ($c.Contains("operableCompanyOptions")) {
   Write-Host "SKIP 1: already applied"
 } else {
-  throw "BLOCK1 not found"
+  $pair = Replace-Once $c $old1 $new1 "BLOCK1"
+  $c = $pair[0]
+  if (-not $pair[1]) { throw "BLOCK1 not found" }
+  Write-Host "OK 1"
 }
 
-if ($c -match 'operableCompanyOptions\.map') {
-  Write-Host "SKIP 2: form select already operable"
-} else {
-  $old2 = @'
+$old2 = @"
 value={formCompanyId || primaryCompanyId}
                 onChange={(e) => {
                   markDirty();
@@ -91,8 +98,9 @@ value={formCompanyId || primaryCompanyId}
                   </option>
                 ))}
               </select>
-'@
-  $new2 = @'
+"@
+
+$new2 = @"
 value={formCompanyId || defaultOperateCompanyId}
                 disabled={viewOnly || operableCompanyOptions.length <= 1}
                 onChange={(e) => {
@@ -102,7 +110,7 @@ value={formCompanyId || defaultOperateCompanyId}
                 }}
               >
                 {operableCompanyOptions.length === 0 ? (
-                  <option value="">شرکت قابل ثبت ندارید</option>
+                  <option value="">--</option>
                 ) : (
                   operableCompanyOptions.map((c) => (
                     <option key={c.company_id} value={c.company_id}>
@@ -111,56 +119,92 @@ value={formCompanyId || defaultOperateCompanyId}
                   ))
                 )}
               </select>
+"@
+
+if ($c.Contains("operableCompanyOptions.map")) {
+  Write-Host "SKIP 2"
+} else {
+  $pair = Replace-Once $c $old2 $new2 "BLOCK2"
+  $c = $pair[0]
+  if (-not $pair[1]) { throw "BLOCK2 not found" }
+  Write-Host "OK 2"
+}
+
+if ($c.Contains("if (!canCreateOnAny)")) {
+  Write-Host "SKIP 3"
+} else {
+  $old3 = "function openNew() {`n    setViewOnly(false);"
+  $new3 = "function openNew() {`n    if (!canCreateOnAny) {`n      setFormError(`"NO_OPERATE_COMPANY`");`n      return;`n    }`n    setViewOnly(false);"
+  if (-not $c.Contains($old3)) {
+    $old3 = "function openNew() {`r`n    setViewOnly(false);"
+    $new3 = "function openNew() {`r`n    if (!canCreateOnAny) {`r`n      setFormError(`"NO_OPERATE_COMPANY`");`r`n      return;`r`n    }`r`n    setViewOnly(false);"
+  }
+  $pair = Replace-Once $c $old3 $new3 "BLOCK3"
+  $c = $pair[0]
+  if ($pair[1]) { Write-Host "OK 3" } else { Write-Host "WARN 3 skipped" }
+}
+
+$old4 = @'
+            {canCreate ? (
+              <Button type="button" size="sm" className="h-8" onClick={openNew}>
+                <Plus className="h-4 w-4 ml-1" />
 '@
-  if ($c.Contains($old2)) {
-    $c = $c.Replace($old2, $new2)
-    Write-Host "OK 2: form select"
-  } else {
-    throw "BLOCK2 form select not found"
-  }
-}
-
-if ($c.Contains('if (!canCreateOnAny)')) {
-  Write-Host "SKIP 3: openNew guard exists"
-} else {
-  $old3 = "  function openNew() {`n    setViewOnly(false);"
-  $new3 = "  function openNew() {`n    if (!canCreateOnAny) {`n      setFormError(\"شما برای هیچ شرکتی مجوز ثبت سند ندارید. فقط مشاهده مجاز است.\");`n      return;`n    }`n    setViewOnly(false);"
-  if ($c.Contains($old3)) {
-    $c = $c.Replace($old3, $new3)
-    Write-Host "OK 3: openNew guard"
-  } else {
-    Write-Host "WARN 3: openNew pattern not found"
-  }
-}
-
-# gate first canCreate button near header
-if (-not $c.Contains('canCreate && canCreateOnAny')) {
-  $c = $c.Replace('{canCreate ? (', '{canCreate && canCreateOnAny ? (', 1)
-  Write-Host "OK 4: create button gated"
-} else {
+$new4 = @'
+            {canCreate && canCreateOnAny ? (
+              <Button type="button" size="sm" className="h-8" onClick={openNew}>
+                <Plus className="h-4 w-4 ml-1" />
+'@
+if ($c.Contains("canCreate && canCreateOnAny ? (")) {
   Write-Host "SKIP 4"
-}
-
-$oldBannerMsg = 'دسترسی شما در این سطح فقط مشاهده و گزارش است؛ ثبت یا ویرایش سند روی شرکت‌های زیرمجموعه مجاز نیست.'
-$newBannerMsg = 'دسترسی شما فقط مشاهده و گزارش است. برای ثبت سند باید نقش اپراتور شرکت با Scope همان شرکت داشته باشید.'
-if ($c.Contains($oldBannerMsg)) {
-  $c = $c.Replace($oldBannerMsg, $newBannerMsg)
-  Write-Host "OK 5: banner text"
-}
-$c = $c.Replace(
-  '{(isTechnicalOwnerReadOnly || isGroupObserver) && (',
-  '{(isTechnicalOwnerReadOnly || isGroupObserver || !canCreateOnAny) && ('
-)
-
-$oldAcc = 'const { data: accountsFlat } = useAccountFlat({ enabled: formMode !== null });'
-$newAcc = "const { data: accountsFlat } = useAccountFlat({\n    enabled: formMode !== null && Boolean(formCompanyId || primaryCompanyId),\n    companyId: formCompanyId || primaryCompanyId || undefined,\n  });"
-if ($c.Contains($oldAcc)) {
-  $c = $c.Replace($oldAcc, $newAcc)
-  Write-Host "OK 6: useAccountFlat companyId"
 } else {
-  Write-Host "SKIP 6"
+  $pair = Replace-Once $c $old4 $new4 "BLOCK4"
+  $c = $pair[0]
+  if ($pair[1]) { Write-Host "OK 4" } else { Write-Host "WARN 4 skipped" }
 }
 
-[System.IO.File]::WriteAllText((Resolve-Path $path), $c, $utf8)
+$old5 = "{(isTechnicalOwnerReadOnly || isGroupObserver) && ("
+$new5 = "{(isTechnicalOwnerReadOnly || isGroupObserver || !canCreateOnAny) && ("
+$count5 = 0
+while ($c.Contains($old5)) {
+  $pair = Replace-Once $c $old5 $new5 "BLOCK5"
+  $c = $pair[0]
+  if (-not $pair[1]) { break }
+  $count5++
+}
+Write-Host "OK 5: banner conditions updated x$count5"
+
+$old6 = "const { data: accountsFlat } = useAccountFlat({ enabled: formMode !== null });"
+$new6 = @"
+const { data: accountsFlat } = useAccountFlat({
+    enabled: formMode !== null && Boolean(formCompanyId || primaryCompanyId),
+    companyId: formCompanyId || primaryCompanyId || undefined,
+  });
+"@
+if ($c.Contains("companyId: formCompanyId || primaryCompanyId")) {
+  Write-Host "SKIP 6"
+} else {
+  $pair = Replace-Once $c $old6 $new6 "BLOCK6"
+  $c = $pair[0]
+  if ($pair[1]) { Write-Host "OK 6" } else { Write-Host "WARN 6 skipped" }
+}
+
+$fa = [string]::Concat(
+  [char]0x0634,[char]0x0645,[char]0x0627,[char]0x0020,
+  [char]0x0628,[char]0x0631,[char]0x0627,[char]0x06CC,[char]0x0020,
+  [char]0x0647,[char]0x06CC,[char]0x0686,[char]0x0020,
+  [char]0x0634,[char]0x0631,[char]0x06A9,[char]0x062A,[char]0x06CC,[char]0x0020,
+  [char]0x0645,[char]0x062C,[char]0x0648,[char]0x0632,[char]0x0020,
+  [char]0x062B,[char]0x0628,[char]0x062A,[char]0x0020,
+  [char]0x0633,[char]0x0646,[char]0x062F,[char]0x0020,
+  [char]0x0646,[char]0x062F,[char]0x0627,[char]0x0631,[char]0x06CC,[char]0x062F,[char]0x002E,[char]0x0020,
+  [char]0x0641,[char]0x0642,[char]0x0637,[char]0x0020,
+  [char]0x0645,[char]0x0634,[char]0x0627,[char]0x0647,[char]0x062F,[char]0x0647,[char]0x0020,
+  [char]0x0645,[char]0x062C,[char]0x0627,[char]0x0632,[char]0x0020,
+  [char]0x0627,[char]0x0633,[char]0x062A,[char]0x002E
+)
+$c = $c.Replace("NO_OPERATE_COMPANY", $fa)
+
+[System.IO.File]::WriteAllText($path, $c, $utf8)
+Write-Host ""
 Write-Host "Done. Size=$((Get-Item $path).Length)"
-Write-Host "Restart npm run dev + Ctrl+Shift+R"
+Write-Host "Restart: npm run dev  then  Ctrl+Shift+R"
