@@ -17,6 +17,7 @@ import {
 import { cn, toFaDigits } from "@/shared/lib/utils";
 import {
   displayPermissionName,
+  displayPermissionDescription,
   moduleIcon,
   permissionUseCaseGroup,
   sortUseCaseGroups,
@@ -87,7 +88,6 @@ export function PermissionModuleGroup({
     }));
   }, [permissions, moduleName]);
 
-  // Sync open state when parent forces open (search) or defaultOpen changes
   useEffect(() => {
     setOpen(defaultOpen || forceOpenSubgroups);
   }, [defaultOpen, forceOpenSubgroups]);
@@ -101,7 +101,6 @@ export function PermissionModuleGroup({
       setOpenSub(new Set(subgroups.map((s) => s.name)));
       return;
     }
-    // Comfort default: only first use-case open when module expands
     setOpenSub(new Set([subgroups[0].name]));
   }, [subgroups, forceOpenSubgroups, moduleName]);
 
@@ -116,7 +115,6 @@ export function PermissionModuleGroup({
 
   return (
     <div className="overflow-hidden rounded-lg border border-border/60">
-      {/* —— Module header —— */}
       <div className="flex w-full items-center gap-2 bg-muted/30 px-3 py-2">
         <Checkbox
           checked={allSelected ? true : someSelected ? "indeterminate" : false}
@@ -167,7 +165,6 @@ export function PermissionModuleGroup({
                 key={sub.name}
                 className="overflow-hidden rounded-md border border-border/50"
               >
-                {/* —— Use-case header —— */}
                 <div className="flex items-center gap-2 bg-muted/15 px-2.5 py-1.5">
                   <Checkbox
                     checked={
@@ -205,9 +202,11 @@ export function PermissionModuleGroup({
                     {sub.perms.map((p) => {
                       const checked = draftPerms.has(p.tenant_permission_id);
                       const title = displayPermissionName(p.name, p.code);
-                      const description =
-                        p.description?.trim() ||
-                        `مجوز «${title}» — دسترسی به این عملیات در سیستم.`;
+                      const description = displayPermissionDescription(
+                        p.description,
+                        p.name,
+                        p.code
+                      );
                       return (
                         <Tooltip key={p.tenant_permission_id}>
                           <TooltipTrigger asChild>
