@@ -197,8 +197,10 @@ export function useBranchesListPage() {
   const onCreate = form.handleSubmit(async (values) => {
     if (!values.company_id) { toast.error("شرکت را انتخاب کنید."); return; }
     try {
+      const ref = (values.ref_code || "").trim().toUpperCase();
       await createMutation.mutateAsync({
         company_id: values.company_id, code: values.code.trim(), name: values.name.trim(),
+        ref_code: ref.length === 3 ? ref : null,
         address: values.address.trim() || null, branch_kind: values.branch_kind || "OFFICE",
         parent_branch_id: values.parent_branch_id?.trim() || null,
         default_warehouse_id: values.default_warehouse_id?.trim() || null,
@@ -216,6 +218,7 @@ export function useBranchesListPage() {
         branchId: editing.branch_id,
         payload: {
           code: values.code.trim(), name: values.name.trim(), address: values.address.trim() || null,
+          ref_code: (() => { const r = (values.ref_code || "").trim().toUpperCase(); return r.length === 3 ? r : null; })(),
           branch_kind: values.branch_kind || "OFFICE",
           parent_branch_id: values.parent_branch_id?.trim() || null,
           default_warehouse_id: values.default_warehouse_id?.trim() || null,
