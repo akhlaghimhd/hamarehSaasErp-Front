@@ -16,7 +16,7 @@ import {
 } from "@/shared/components/ui/dialog";
 import { BRANCH_KIND_LABELS } from "../types";
 import type { useBranchesListPage } from "./use-branches-list-page";
-import { toFaDigits } from "@/shared/lib/utils";
+import { toAsciiDigits, toFaDigits } from "@/shared/lib/utils";
 
 type Ctx = ReturnType<typeof useBranchesListPage>;
 
@@ -50,6 +50,27 @@ function FormFields({ c }: { c: Ctx }) {
           <Label>نام *</Label>
           <Input className="h-9" {...form.register("name", { required: true })} />
         </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="branch-ref-code">کد ارجاع اسناد (۳ کاراکتر)</Label>
+        <Input
+          id="branch-ref-code"
+          className="h-9 font-mono uppercase tracking-wider"
+          dir="ltr"
+          maxLength={3}
+          placeholder="مثلاً ABR"
+          value={form.watch("ref_code") || ""}
+          onChange={(e) => {
+            const v = toAsciiDigits(e.target.value)
+              .toUpperCase()
+              .replace(/[^A-Z0-9]/g, "")
+              .slice(0, 3);
+            form.setValue("ref_code", v, { shouldDirty: true });
+          }}
+        />
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          در شماره سند استفاده می‌شود (مثال: DR-ABR-05-00001). اگر خالی بماند سیستم خودکار می‌سازد.
+        </p>
       </div>
       <div className="space-y-1.5">
         <Label>آدرس</Label>
