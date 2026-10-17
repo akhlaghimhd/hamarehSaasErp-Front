@@ -29,6 +29,8 @@ export type BranchRow = BranchDto & { company_name: string };
 export type BranchForm = {
   company_id: string;
   code: string;
+  /** 3-char code for document numbering (DR-XXX-YY-#####) */
+  ref_code: string;
   name: string;
   address: string;
   branch_kind: string;
@@ -54,6 +56,7 @@ export const COLS: { id: ColumnId; label: string; hideable?: boolean; sort?: Sor
 export const emptyForm = (): BranchForm => ({
   company_id: "",
   code: "",
+  ref_code: "",
   name: "",
   address: "",
   branch_kind: "OFFICE",
@@ -69,6 +72,7 @@ export function rowToForm(r: BranchRow): BranchForm {
   return {
     company_id: r.company_id,
     code: r.code ?? "",
+    ref_code: (r.ref_code ?? "").toString().toUpperCase(),
     name: r.name ?? "",
     address: r.address ?? "",
     branch_kind: (r.branch_kind as string) || "OFFICE",
