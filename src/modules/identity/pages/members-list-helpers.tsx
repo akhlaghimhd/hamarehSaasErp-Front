@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import Link from "next/link";
 import { Sparkles, UserCheck, UserMinus, Trash2, RotateCcw } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
@@ -269,7 +269,7 @@ export function IconAction({
     className
   );
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     if (typeof onClick === "function") onClick();
   };
