@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { Sparkles, UserCheck, UserMinus, Trash2, RotateCcw } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
@@ -237,17 +238,66 @@ export function mapImportRows(table: string[][]): ImportRow[] {
   return out;
 }
 
-export function IconAction({ label, onClick, disabled, variant = "ghost", className, children }: {
-  label: string; onClick: () => void; disabled?: boolean; variant?: "ghost" | "destructive"; className?: string; children: ReactNode;
+/**
+ * Row action icon button.
+ * Accepts both `label` (canonical) and legacy `title`.
+ * Supports either `onClick` or `href` (detail navigation).
+ */
+export function IconAction({
+  label,
+  title,
+  onClick,
+  href,
+  disabled,
+  variant = "ghost",
+  className,
+  children,
+}: {
+  label?: string;
+  title?: string;
+  onClick?: () => void;
+  href?: string;
+  disabled?: boolean;
+  variant?: "ghost" | "destructive";
+  className?: string;
+  children: ReactNode;
 }) {
+  const aria = label ?? title ?? "";
+  const btnClass = cn(
+    "h-7 w-7 shrink-0",
+    variant === "destructive" && "text-destructive hover:bg-destructive/10 hover:text-destructive",
+    className
+  );
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (typeof onClick === "function") onClick();
+  };
+
+  const control = href ? (
+    <Button type="button" variant="ghost" size="icon" className={btnClass} disabled={disabled} asChild aria-label={aria}>
+      <Link href={href} onClick={(e) => e.stopPropagation()}>
+        {children}
+      </Link>
+    </Button>
+  ) : (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className={btnClass}
+      disabled={disabled || typeof onClick !== "function"}
+      onClick={handleClick}
+      aria-label={aria}
+    >
+      {children}
+    </Button>
+  );
+
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <Button type="button" variant="ghost" size="icon" className={cn("h-7 w-7 shrink-0", variant === "destructive" && "text-destructive hover:bg-destructive/10 hover:text-destructive", className)} disabled={disabled} onClick={(e) => { e.stopPropagation(); onClick(); }} aria-label={label}>
-          {children}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="top">{label}</TooltipContent>
+      <TooltipTrigger asChild>{control}</TooltipTrigger>
+      <TooltipContent side="top">{aria}</TooltipContent>
     </Tooltip>
   );
 }
