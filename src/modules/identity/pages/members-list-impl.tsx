@@ -42,10 +42,10 @@ export function MembersListPage() {
   const canDelete = usePermission(IdentityPermissions.userDelete);
   const canRestore = usePermission(IdentityPermissions.userRestore);
   const { canMutateMembers, isGroupObserver, isBranchScopedOnly } = useIdentityHoldingAccess();
-  const canCreateOp = canCreateOp && canMutateMembers;
-  const canUpdateOp = canUpdateOp && canMutateMembers;
-  const canDeleteOp = canDeleteOp && canMutateMembers;
-  const canRestoreOp = canRestoreOp && canMutateMembers;
+    const canCreateOp = canCreate && canMutateMembers;
+  const canUpdateOp = canUpdate && canMutateMembers;
+  const canDeleteOp = canDelete && canMutateMembers;
+  const canRestoreOp = canRestore && canMutateMembers;
   const currentUserId = useAuthStore((s) => s.user?.user_id);
 
   const [membershipFilter, setMembershipFilter] = useState<MembershipListFilter>("active");
