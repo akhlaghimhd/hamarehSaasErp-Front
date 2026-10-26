@@ -42,11 +42,10 @@ export function MembersListPage() {
   const canDelete = usePermission(IdentityPermissions.userDelete);
   const canRestore = usePermission(IdentityPermissions.userRestore);
   const { canMutateMembers, isGroupObserver, isBranchScopedOnly } = useIdentityHoldingAccess();
-  /** IDORG-T14: permission AND holding mutate gate (observer/read-only cannot create) */
-  const canCreateOp = canCreate && canMutateMembers;
-  const canUpdateOp = canUpdate && canMutateMembers;
-  const canDeleteOp = canDelete && canMutateMembers;
-  const canRestoreOp = canRestore && canMutateMembers;
+  const canCreateOp = canCreateOp && canMutateMembers;
+  const canUpdateOp = canUpdateOp && canMutateMembers;
+  const canDeleteOp = canDeleteOp && canMutateMembers;
+  const canRestoreOp = canRestoreOp && canMutateMembers;
   const currentUserId = useAuthStore((s) => s.user?.user_id);
 
   const [membershipFilter, setMembershipFilter] = useState<MembershipListFilter>("active");
@@ -293,21 +292,6 @@ export function MembersListPage() {
           </div>
         ) : null}
 
-        {(isGroupObserver || isBranchScopedOnly) && (
-          <div className="space-y-2">
-            {isGroupObserver ? (
-              <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
-                دسترسی شما در این بخش فقط مشاهده است؛ ایجاد یا ویرایش عضو مجاز نیست.
-              </div>
-            ) : null}
-            {isBranchScopedOnly ? (
-              <div className="rounded-lg border border-sky-200 bg-sky-50/80 px-3 py-2 text-xs text-sky-900">
-                مدیریت شما محدود به اعضای شعبهٔ مجاز است؛ اعضای سایر شعب یا شرکت‌ها در این فهرست دیده نمی‌شوند.
-              </div>
-            ) : null}
-          </div>
-        )}
-
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[12rem] flex-1 sm:max-w-sm">
             <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -325,6 +309,18 @@ export function MembersListPage() {
               <SelectItem value="deleted">کاربران حذف‌شده</SelectItem>
             </SelectContent>
           </Select>
+          
+      {isGroupObserver && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+          دسترسی شما در این بخش فقط مشاهده است؛ ایجاد یا ویرایش عضو مجاز نیست.
+        </div>
+      )}
+          
+      {isBranchScopedOnly && (
+        <div className="rounded-lg border border-sky-200 bg-sky-50/80 px-3 py-2 text-xs text-sky-900">
+          مدیریت شما محدود به اعضای شعبهٔ مجاز است؛ اعضای سایر شعب یا شرکت‌ها در این فهرست دیده نمی‌شوند.
+        </div>
+      )}
           <MembersCompanyFilter value={companyFilter} onChange={(v) => { setCompanyFilter(v); setPage(1); }} />
           {!isDeletedView ? (
             <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as StatusFilter); setPage(1); }}>
@@ -343,192 +339,229 @@ export function MembersListPage() {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>نمایش ستون‌ها</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {COLS.map((c) => (
-                <DropdownMenuItem key={c.id} onSelect={(e) => e.preventDefault()} className="gap-2" onClick={() => setVisible((v) => ({ ...v, [c.id]: !v[c.id] }))}>
-                  <Checkbox checked={visible[c.id]} />
-                  {c.label}
+              {COLS.filter((c) => c.hideable !== false).map((c) => (
+                <DropdownMenuItem key={c.id} className="gap-2" onSelect={(e) => { e.preventDefault(); setVisible((p) => ({ ...p, [c.id]: !p[c.id] })); }}>
+                  <Checkbox checked={visible[c.id]} className="pointer-events-none" /><span>{c.label}</span>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5" disabled={!total}><Download className="h-3.5 w-3.5" />{exportLabel}</Button>
+              <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5"><Download className="h-3.5 w-3.5" />خروجی</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => exportMembersExcel(exportTarget)}><FileSpreadsheet className="me-2 h-3.5 w-3.5" />اکسل</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => exportMembersPdf(exportTarget)}><FileText className="me-2 h-3.5 w-3.5" />PDF</DropdownMenuItem>
+              <DropdownMenuLabel>{exportLabel}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="gap-2" onSelect={() => exportMembersExcel(exportTarget)}><FileSpreadsheet className="h-3.5 w-3.5" />اکسل</DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onSelect={() => exportMembersPdf(exportTarget)}><FileText className="h-3.5 w-3.5" />PDF / چاپ</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           {isFetching && !isLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
         </div>
 
-        {selected.size > 0 && !bulkBusy ? (
+        {selected.size > 0 || bulkBusy ? (
           <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm">
-            <span className="text-muted-foreground">{toFaDigits(selected.size)} انتخاب‌شده</span>
-            {canUpdateOp && !isDeletedView ? (
+            {bulkBusy ? (
               <>
-                <Button size="sm" variant="outline" className="h-7" onClick={() => setConfirm({ kind: "activate", count: selected.size, targets: selectedRowsOrdered })}>فعال‌سازی</Button>
-                <Button size="sm" variant="outline" className="h-7" onClick={() => setConfirm({ kind: "deactivate", count: selected.size, targets: selectedRowsOrdered })}>غیرفعال</Button>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>در حال انجام… {toFaDigits(bulkProgress.done)} از {toFaDigits(bulkProgress.total)}</span>
+                <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => { cancelRef.current = true; }}>توقف</Button>
               </>
-            ) : null}
-            {canDeleteOp && !isDeletedView ? (
-              <Button size="sm" variant="destructive" className="h-7" onClick={() => setConfirm({ kind: "delete", count: selected.size, targets: selectedRowsOrdered })}>حذف</Button>
-            ) : null}
-            {canRestoreOp && isDeletedView ? (
-              <Button size="sm" variant="outline" className="h-7" onClick={() => setConfirm({ kind: "restore", count: selected.size, targets: selectedRowsOrdered })}>بازگردانی</Button>
-            ) : null}
-            <Button size="sm" variant="ghost" className="h-7" onClick={() => setSelected(new Set())}>لغو انتخاب</Button>
+            ) : (
+              <>
+                <span className="text-muted-foreground">{toFaDigits(selected.size)} مورد انتخاب‌شده</span>
+                {!isDeletedView && canUpdate ? (
+                  <>
+                    <Button type="button" size="sm" variant="outline" className="h-7 gap-1" onClick={() => setConfirm({ kind: "activate", count: selected.size, targets: selectedRowsOrdered })}><UserCheck className="h-3.5 w-3.5" />فعال</Button>
+                    <Button type="button" size="sm" variant="outline" className="h-7 gap-1" onClick={() => setConfirm({ kind: "deactivate", count: selected.size, targets: selectedRowsOrdered })}><UserMinus className="h-3.5 w-3.5" />غیرفعال</Button>
+                  </>
+                ) : null}
+                {!isDeletedView && canDelete ? (
+                  <Button type="button" size="sm" variant="outline" className="h-7 gap-1 text-destructive" onClick={() => setConfirm({ kind: "delete", count: selected.size, targets: selectedRowsOrdered })}><Trash2 className="h-3.5 w-3.5" />حذف</Button>
+                ) : null}
+                {isDeletedView && canRestore ? (
+                  <Button type="button" size="sm" variant="outline" className="h-7 gap-1" onClick={() => setConfirm({ kind: "restore", count: selected.size, targets: selectedRowsOrdered })}><RotateCcw className="h-3.5 w-3.5" />بازگردانی</Button>
+                ) : null}
+                <Button type="button" size="sm" variant="ghost" className="h-7" onClick={() => setSelected(new Set())}>لغو انتخاب</Button>
+              </>
+            )}
           </div>
         ) : null}
 
-        {bulkBusy ? (
-          <div className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>در حال انجام… {toFaDigits(bulkProgress.done)} / {toFaDigits(bulkProgress.total)}</span>
-            <Button size="sm" variant="outline" className="h-7 ms-auto" onClick={() => { cancelRef.current = true; }}>توقف</Button>
-          </div>
-        ) : null}
-
-        {isLoading ? (
-          <div className="space-y-2 rounded-xl border p-4">
-            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
-          </div>
-        ) : total === 0 ? (
-          <EmptyState
-            icon={Users}
-            title={isFiltered ? "نتیجه‌ای یافت نشد" : isDeletedView ? "کاربر حذف‌شده‌ای نیست" : "هنوز عضوی ثبت نشده"}
-            description={isFiltered ? "فیلتر یا جستجو را تغییر دهید." : canCreateOp ? "اولین عضو را اضافه کنید." : undefined}
-            action={canCreateOp && !isFiltered && !isDeletedView ? { label: "افزودن کاربر", onClick: () => setCreateOpen(true) } : undefined}
-          />
-        ) : (
-          <div className="overflow-auto rounded-xl border">
-            <Table>
-              <TableHeader>
+        <div className="min-h-0 flex-1 overflow-auto rounded-xl border">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent border-b bg-card shadow-sm">
+                <TableHead className="sticky top-0 z-30 w-10 bg-card px-2">
+                  <Checkbox checked={allPageSelected ? true : somePageSelected ? "indeterminate" : false} onCheckedChange={(v) => {
+                    setSelected((prev) => {
+                      const next = new Set(prev);
+                      if (v) pageIds.forEach((id) => next.add(id));
+                      else pageIds.forEach((id) => next.delete(id));
+                      return next;
+                    });
+                  }} aria-label="انتخاب همه این صفحه" />
+                </TableHead>
+                <TableHead className="sticky top-0 z-30 w-12 bg-card px-2 text-center text-xs">ردیف</TableHead>
+                {COLS.map((c) => {
+                  if (c.id !== "name" && c.id !== "actions" && !visible[c.id]) return null;
+                  return (
+                    <TableHead key={c.id} className={cn("sticky top-0 z-30 whitespace-nowrap bg-card text-xs", c.id === "actions" && "w-[7.5rem] text-center")}>
+                      {c.sort ? (
+                        <button type="button" className="inline-flex items-center gap-1 font-medium hover:text-foreground" onClick={() => toggleSort(c.sort!)}>
+                          {c.label}<SortIcon k={c.sort} />
+                        </button>
+                      ) : c.label}
+                    </TableHead>
+                  );
+                })}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: 8 }).map((_, i) => (
+                  <TableRow key={i}><TableCell colSpan={12} className="py-2"><Skeleton className="h-7 w-full" /></TableCell></TableRow>
+                ))
+              ) : pageRows.length === 0 ? (
                 <TableRow>
-                  <TableHead className="w-10">
-                    <Checkbox checked={allPageSelected} onCheckedChange={() => {
-                      setSelected((prev) => {
-                        const next = new Set(prev);
-                        if (allPageSelected) pageIds.forEach((id) => next.delete(id));
-                        else pageIds.forEach((id) => next.add(id));
-                        return next;
-                      });
-                    }} />
-                  </TableHead>
-                  {visible.name ? (
-                    <TableHead className="cursor-pointer" onClick={() => toggleSort("name")}>
-                      <span className="inline-flex items-center gap-1">نام <SortIcon k="name" /></span>
-                    </TableHead>
-                  ) : null}
-                  {visible.email ? <TableHead>ایمیل</TableHead> : null}
-                  {visible.mobile ? <TableHead>موبایل</TableHead> : null}
-                  {visible.status ? <TableHead>وضعیت</TableHead> : null}
-                  {visible.roles ? <TableHead>نقش</TableHead> : null}
-                  {visible.scopes ? <TableHead>محدوده</TableHead> : null}
-                  {visible.joined ? (
-                    <TableHead className="cursor-pointer" onClick={() => toggleSort("joined")}>
-                      <span className="inline-flex items-center gap-1">عضویت <SortIcon k="joined" /></span>
-                    </TableHead>
-                  ) : null}
-                  {visible.actions ? <TableHead className="text-end">عملیات</TableHead> : null}
+                  <TableCell colSpan={12} className="p-0">
+                    <EmptyState
+                      icon={Users}
+                      title={isFiltered ? "نتیجه‌ای پیدا نشد" : isDeletedView ? "کاربر حذف‌شده‌ای نیست" : "هنوز عضوی ثبت نشده"}
+                      description={isFiltered ? "عبارت جستجو یا فیلتر را تغییر دهید." : isDeletedView ? "در صورت حذف اشتباه، می‌توانید کاربر را از اینجا بازگردانید." : "برای شروع، کاربر جدید اضافه کنید یا از فایل اکسل وارد کنید."}
+                    />
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pageRows.map((row) => {
-                  const u = row.user;
-                  const name = [u?.first_name, u?.last_name].filter(Boolean).join(" ") || "—";
+              ) : (
+                pageRows.map((row, idx) => {
+                  const active = Number(row.status) === 1;
+                  const act = activityOf(row, isDeletedView);
                   const isSelf = Boolean(currentUserId && row.user_id === currentUserId);
                   return (
-                    <TableRow key={row.tenant_user_id} className={cn(selected.has(row.tenant_user_id) && "bg-muted/40")}>
-                      <TableCell>
-                        <Checkbox checked={selected.has(row.tenant_user_id)} onCheckedChange={() => {
+                    <TableRow key={row.tenant_user_id} className={cn(selected.has(row.tenant_user_id) && "bg-primary/5")}>
+                      <TableCell className="px-2 py-1">
+                        <Checkbox checked={selected.has(row.tenant_user_id)} onCheckedChange={(v) => {
                           setSelected((prev) => {
                             const next = new Set(prev);
-                            if (next.has(row.tenant_user_id)) next.delete(row.tenant_user_id);
-                            else next.add(row.tenant_user_id);
+                            if (v) next.add(row.tenant_user_id);
+                            else next.delete(row.tenant_user_id);
                             return next;
                           });
-                        }} />
+                        }} aria-label="انتخاب ردیف" />
                       </TableCell>
+                      <TableCell className="px-2 py-1 text-center text-xs tabular-nums text-muted-foreground">{toFaDigits((safePage - 1) * pageSize + idx + 1)}</TableCell>
                       {visible.name ? (
-                        <TableCell>
-                          <Link href={memberDetailPath(row.tenant_user_id)} className="font-medium hover:underline">{name}</Link>
-                          {isSelf ? <span className="ms-1 text-[10px] text-muted-foreground">(شما)</span> : null}
-                        </TableCell>
-                      ) : null}
-                      {visible.email ? <TableCell className="text-xs text-muted-foreground">{u?.email || "—"}</TableCell> : null}
-                      {visible.mobile ? <TableCell className="tabular-nums text-xs">{u?.mobile ? toFaDigits(u.mobile) : "—"}</TableCell> : null}
-                      {visible.status ? (
-                        <TableCell>
-                          {isDeletedView ? <StatusChip tone="neutral">حذف‌شده</StatusChip> : Number(row.status) === 1 ? <StatusChip tone="success">فعال</StatusChip> : <StatusChip tone="warning">غیرفعال</StatusChip>}
-                        </TableCell>
-                      ) : null}
-                      {visible.roles ? <TableCell className="max-w-[8rem] truncate text-xs">{highestRoleName(row) || "—"}</TableCell> : null}
-                      {visible.scopes ? <TableCell className="max-w-[8rem] truncate text-xs">{scopeNames(row) || "—"}</TableCell> : null}
-                      {visible.joined ? <TableCell className="text-xs text-muted-foreground">{row.created_at ? fdt(row.created_at) : "—"}</TableCell> : null}
-                      {visible.actions ? (
-                        <TableCell className="text-end">
-                          <div className="inline-flex items-center gap-0.5">
-                            <IconAction title="جزئیات" href={memberDetailPath(row.tenant_user_id)}><Eye className="h-3.5 w-3.5" /></IconAction>
-                            {!isDeletedView && canUpdateOp && Number(row.status) === 0 ? (
-                              <IconAction title="فعال‌سازی" onClick={() => void activateOne(row)}><UserCheck className="h-3.5 w-3.5" /></IconAction>
-                            ) : null}
-                            {!isDeletedView && canUpdateOp && Number(row.status) === 1 && !isSelf ? (
-                              <IconAction title="غیرفعال" onClick={() => void deactivateOne(row)}><UserMinus className="h-3.5 w-3.5" /></IconAction>
-                            ) : null}
-                            {!isDeletedView && canDeleteOp && !isSelf ? (
-                              <IconAction title="حذف" onClick={() => void deleteOne(row)} className="text-destructive"><Trash2 className="h-3.5 w-3.5" /></IconAction>
-                            ) : null}
-                            {isDeletedView && canRestoreOp ? (
-                              <IconAction title="بازگردانی" onClick={() => void restoreOne(row)}><RotateCcw className="h-3.5 w-3.5" /></IconAction>
-                            ) : null}
+                        <TableCell className="px-2 py-1">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            {act ? <ActivityBadge kind={act} /> : null}
+                            <Link href={memberDetailPath(row.tenant_user_id)} className="truncate text-sm font-medium hover:underline">{dn(row)}</Link>
                           </div>
                         </TableCell>
                       ) : null}
+                      {visible.email ? <TableCell className="px-2 py-1 text-xs" dir="ltr"><span className="truncate block max-w-[12rem]">{row.user?.email ?? "—"}</span></TableCell> : null}
+                      {visible.mobile ? <TableCell className="px-2 py-1 text-xs tabular-nums" dir="ltr">{row.user?.mobile ? toFaDigits(row.user.mobile) : "—"}</TableCell> : null}
+                      {visible.role ? (
+                        <TableCell className="px-2 py-1 text-xs">
+                          <span className="inline-flex max-w-[10rem] items-center gap-1 truncate">
+                            {row.is_owner ? <Shield className="h-3 w-3 shrink-0 text-amber-600" /> : null}
+                            <span className="truncate">{highestRoleName(row)}</span>
+                          </span>
+                        </TableCell>
+                      ) : null}
+                      {visible.scope ? (
+                        <TableCell className="px-2 py-1 text-xs">
+                          <span className="inline-block max-w-[12rem] truncate" title={scopeNames(row)}>
+                            {scopeNames(row)}
+                          </span>
+                        </TableCell>
+                      ) : null}
+                      {visible.status ? <TableCell className="px-2 py-1"><StatusChip label={active ? "فعال" : "غیرفعال"} tone={active ? "success" : "neutral"} /></TableCell> : null}
+                      {visible.joined ? <TableCell className="px-2 py-1 text-xs tabular-nums text-muted-foreground">{fd(row.created_at as string | null | undefined)}</TableCell> : null}
+                      {visible.lastChange ? (
+                        <TableCell className="px-2 py-1 text-xs tabular-nums text-muted-foreground">
+                          <Tooltip>
+                            <TooltipTrigger asChild><span>{fd(lastChangeAt(row))}</span></TooltipTrigger>
+                            <TooltipContent>{fdt(lastChangeAt(row))}</TooltipContent>
+                          </Tooltip>
+                        </TableCell>
+                      ) : null}
+                      <TableCell className="px-1 py-1">
+                        <div className="flex items-center justify-center gap-0.5">
+                          <IconAction label="مشاهده" onClick={() => { window.location.href = memberDetailPath(row.tenant_user_id); }}>
+                            <Eye className="h-3.5 w-3.5" />
+                          </IconAction>
+                          {!isDeletedView && canUpdateOp && !isSelf ? (
+                            active ? (
+                              <IconAction label="غیرفعال‌سازی" onClick={() => void deactivateOne(row)}>
+                                <UserMinus className="h-3.5 w-3.5" />
+                              </IconAction>
+                            ) : (
+                              <IconAction label="فعال‌سازی" onClick={() => void activateOne(row)}>
+                                <UserCheck className="h-3.5 w-3.5" />
+                              </IconAction>
+                            )
+                          ) : null}
+                          {!isDeletedView && canDeleteOp && !isSelf ? (
+                            <IconAction label="حذف از سازمان" variant="destructive" onClick={() => void deleteOne(row)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </IconAction>
+                          ) : null}
+                          {isDeletedView && canRestore ? (
+                            <IconAction label="بازگردانی" onClick={() => void restoreOne(row)}>
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            </IconAction>
+                          ) : null}
+                        </div>
+                      </TableCell>
                     </TableRow>
                   );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
 
-        {total > 0 ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-            <span>{toFaDigits(total)} مورد · صفحه {toFaDigits(safePage)} از {toFaDigits(totalPages)}</span>
-            <div className="flex items-center gap-2">
-              <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
-                <SelectTrigger className="h-8 w-[4.5rem]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {[10, 20, 50].map((n) => <SelectItem key={n} value={String(n)}>{toFaDigits(n)}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Button size="sm" variant="outline" className="h-8" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>قبلی</Button>
-              <Button size="sm" variant="outline" className="h-8" disabled={safePage >= totalPages} onClick={() => setPage((p) => p + 1)}>بعدی</Button>
-            </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+          <span>
+            {total === 0 ? "موردی نیست" : `نمایش ${toFaDigits((safePage - 1) * pageSize + 1)}–${toFaDigits(Math.min(safePage * pageSize, total))} از ${toFaDigits(total)}`}
+          </span>
+          <div className="flex items-center gap-2">
+            <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
+              <SelectTrigger className="h-7 w-[4.5rem]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {[10, 20, 50, 100].map((n) => (
+                  <SelectItem key={n} value={String(n)}>{toFaDigits(n)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button type="button" size="sm" variant="outline" className="h-7" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>قبلی</Button>
+            <span className="tabular-nums">{toFaDigits(safePage)} / {toFaDigits(totalPages)}</span>
+            <Button type="button" size="sm" variant="outline" className="h-7" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>بعدی</Button>
           </div>
-        ) : null}
+        </div>
 
         {confirm ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-md rounded-xl border bg-background p-4 shadow-lg">
-              <h3 className="font-medium">تأیید عملیات</h3>
+            <div className="w-full max-w-md rounded-xl border bg-card p-5 shadow-lg" role="dialog" aria-modal="true">
+              <p className="text-base font-semibold">
+                {confirm.kind === "activate" && "فعال‌سازی انتخاب‌شده‌ها"}
+                {confirm.kind === "deactivate" && "غیرفعال‌سازی انتخاب‌شده‌ها"}
+                {confirm.kind === "delete" && "حذف از سازمان"}
+                {confirm.kind === "restore" && "بازگردانی انتخاب‌شده‌ها"}
+              </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                {confirm.kind === "delete" && `${toFaDigits(confirm.count)} عضو حذف نرم شوند؟`}
-                {confirm.kind === "activate" && `${toFaDigits(confirm.count)} عضو فعال شوند؟`}
-                {confirm.kind === "deactivate" && `${toFaDigits(confirm.count)} عضو غیرفعال شوند؟`}
-                {confirm.kind === "restore" && `${toFaDigits(confirm.count)} عضو بازگردانی شوند؟`}
+                {toFaDigits(confirm.count)} مورد انتخاب شده است. ادامه می‌دهید؟
               </p>
               <div className="mt-4 flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => setConfirm(null)}>انصراف</Button>
-                <Button size="sm" variant={confirm.kind === "delete" ? "destructive" : "default"} onClick={() => void runBulk(confirm.kind, confirm.targets)}>تأیید</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setConfirm(null)}>انصراف</Button>
+                <Button type="button" size="sm" variant={confirm.kind === "delete" ? "destructive" : "default"} onClick={() => void runBulk(confirm.kind, confirm.targets)}>تأیید</Button>
               </div>
             </div>
           </div>
         ) : null}
 
-        <MemberCreateDrawer open={createOpen} onOpenChange={setCreateOpen} />
+        <MemberCreateDrawer open={createOpen} onOpenChange={setCreateOpen} onCreated={() => void refetch()} />
       </div>
     </TooltipProvider>
   );
