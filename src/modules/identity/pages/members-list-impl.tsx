@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -42,10 +42,10 @@ export function MembersListPage() {
   const canDelete = usePermission(IdentityPermissions.userDelete);
   const canRestore = usePermission(IdentityPermissions.userRestore);
   const { canMutateMembers, isGroupObserver, isBranchScopedOnly } = useIdentityHoldingAccess();
-    const canCreateOp = canCreate && canMutateMembers;
-  const canUpdateOp = canUpdate && canMutateMembers;
-  const canDeleteOp = canDelete && canMutateMembers;
-  const canRestoreOp = canRestore && canMutateMembers;
+const canCreateOp = canCreate && canMutateMembers;
+const canUpdateOp = canUpdate && canMutateMembers;
+const canDeleteOp = canDelete && canMutateMembers;
+const canRestoreOp = canRestore && canMutateMembers;
   const currentUserId = useAuthStore((s) => s.user?.user_id);
 
   const [membershipFilter, setMembershipFilter] = useState<MembershipListFilter>("active");
@@ -122,8 +122,8 @@ export function MembersListPage() {
   const selectedRowsOrdered = useMemo(() => filteredSorted.filter((r) => selected.has(r.tenant_user_id)), [filteredSorted, selected]);
   const exportTarget = selectedRowsOrdered.length > 0 ? selectedRowsOrdered : filteredSorted;
   const exportLabel = isDeletedView
-    ? selected.size > 0 ? `ط®ط±ظˆط¬غŒ ط­ط°ظپâ€Œط´ط¯ظ‡â€Œظ‡ط§غŒ ط§ظ†طھط®ط§ط¨â€Œط´ط¯ظ‡ (${toFaDigits(selected.size)})` : `ط®ط±ظˆط¬غŒ ط­ط°ظپâ€Œط´ط¯ظ‡â€Œظ‡ط§ (${toFaDigits(total)})`
-    : selected.size > 0 ? `ط®ط±ظˆط¬غŒ ط§ظ†طھط®ط§ط¨â€Œط´ط¯ظ‡â€Œظ‡ط§ (${toFaDigits(selected.size)})` : `ط®ط±ظˆط¬غŒ ظپظ‡ط±ط³طھ ظپط¹ظ„غŒ (${toFaDigits(total)})`;
+    ? selected.size > 0 ? `خروجی حذف‌شده‌های انتخاب‌شده (${toFaDigits(selected.size)})` : `خروجی حذف‌شده‌ها (${toFaDigits(total)})`
+    : selected.size > 0 ? `خروجی انتخاب‌شده‌ها (${toFaDigits(selected.size)})` : `خروجی فهرست فعلی (${toFaDigits(total)})`;
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -155,28 +155,28 @@ export function MembersListPage() {
     setBulkBusy(false);
     setConfirm(null);
     setSelected(new Set());
-    if (cancelled) toast.message(`ط¹ظ…ظ„غŒط§طھ ظ…طھظˆظ‚ظپ ط´ط¯ آ· ط§ظ†ط¬ط§ظ…â€Œط´ط¯ظ‡: ${toFaDigits(ok)} آ· ط¨ط§ظ‚غŒâ€Œظ…ط§ظ†ط¯ظ‡ ط§ظ†ط¬ط§ظ… ظ†ط´ط¯`);
+    if (cancelled) toast.message(`عملیات متوقف شد · انجام‌شده: ${toFaDigits(ok)} · باقی‌مانده انجام نشد`);
     else if (ok) toast.success(BULK_SUCCESS[kind](ok));
-    if (fail) toast.error(`${toFaDigits(fail)} ظ…ظˆط±ط¯ ط§ظ†ط¬ط§ظ… ظ†ط´ط¯`);
+    if (fail) toast.error(`${toFaDigits(fail)} مورد انجام نشد`);
   };
 
   const activateOne = async (row: TenantUserDto) => {
     try {
       await updateMutation.mutateAsync({ tenantUserId: row.tenant_user_id, payload: { status: 1 } });
-      toast.success("ع©ط§ط±ط¨ط± ظپط¹ط§ظ„ ط´ط¯.");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "ظپط¹ط§ظ„â€Œط³ط§ط²غŒ ظ…ظ…ع©ظ† ظ†ط´ط¯"); }
+      toast.success("کاربر فعال شد.");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "فعال‌سازی ممکن نشد"); }
   };
 
   const deactivateOne = async (row: TenantUserDto) => {
-    if (currentUserId && row.user_id === currentUserId) { toast.error("ظ†ظ…غŒâ€Œطھظˆط§ظ†غŒط¯ ط®ظˆط¯طھط§ظ† ط±ط§ ط؛غŒط±ظپط¹ط§ظ„ ع©ظ†غŒط¯."); return; }
+    if (currentUserId && row.user_id === currentUserId) { toast.error("نمی‌توانید خودتان را غیرفعال کنید."); return; }
     try {
       await updateMutation.mutateAsync({ tenantUserId: row.tenant_user_id, payload: { status: 0 } });
-      toast.success("ع©ط§ط±ط¨ط± ط؛غŒط±ظپط¹ط§ظ„ ط´ط¯.");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "ط؛غŒط±ظپط¹ط§ظ„â€Œط³ط§ط²غŒ ظ…ظ…ع©ظ† ظ†ط´ط¯"); }
+      toast.success("کاربر غیرفعال شد.");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "غیرفعال‌سازی ممکن نشد"); }
   };
 
   const deleteOne = async (row: TenantUserDto) => {
-    if (currentUserId && row.user_id === currentUserId) { toast.error("ظ†ظ…غŒâ€Œطھظˆط§ظ†غŒط¯ ط®ظˆط¯طھط§ظ† ط±ط§ ط­ط°ظپ ع©ظ†غŒط¯."); return; }
+    if (currentUserId && row.user_id === currentUserId) { toast.error("نمی‌توانید خودتان را حذف کنید."); return; }
     setConfirm({ kind: "delete", count: 1, targets: [row] });
   };
 
@@ -184,7 +184,7 @@ export function MembersListPage() {
     try {
       await restoreMutation.mutateAsync(row.tenant_user_id);
       toast.success(RESTORE_ONE_MSG);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "ط¨ط§ط²ع¯ط±ط¯ط§ظ†غŒ ظ…ظ…ع©ظ† ظ†ط´ط¯"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : "بازگردانی ممکن نشد"); }
   };
 
   const onImportFile = async (file: File) => {
@@ -193,7 +193,7 @@ export function MembersListPage() {
       const table = await readSpreadsheetTable(file);
       const mapped = mapImportRows(table);
       if (!mapped.length) {
-        toast.error("ط¯ط± ظپط§غŒظ„ ط±ط¯غŒظپ ظ…ط¹طھط¨ط±غŒ ظ¾غŒط¯ط§ ظ†ط´ط¯. ط§ط² ط§ظ„ع¯ظˆغŒ ط§ع©ط³ظ„ ط§ط³طھظپط§ط¯ظ‡ ع©ظ†غŒط¯.");
+        toast.error("در فایل ردیف معتبری پیدا نشد. از الگوی اکسل استفاده کنید.");
         return;
       }
       const seen = new Set<string>();
@@ -217,7 +217,7 @@ export function MembersListPage() {
           const local = row.email.split("@")[0]?.toLowerCase().replace(/[^a-z0-9._-]/g, "") || undefined;
           if (!row.mobile) {
             fail += 1;
-            if (failSamples.length < 3) failSamples.push(`${row.email}: ظ…ظˆط¨ط§غŒظ„ ط§ظ„ط²ط§ظ…غŒ ط§ط³طھ`);
+            if (failSamples.length < 3) failSamples.push(`${row.email}: موبایل الزامی است`);
             setBulkProgress({ done: i + 1, total: unique.length });
             continue;
           }
@@ -230,17 +230,17 @@ export function MembersListPage() {
           ok += 1;
         } catch (e) {
           fail += 1;
-          const msg = e instanceof Error ? e.message : "ط®ط·ط§غŒ ظ†ط§ظ…ط´ط®طµ";
+          const msg = e instanceof Error ? e.message : "خطای نامشخص";
           if (failSamples.length < 3) failSamples.push(`${row.email}: ${msg}`);
         }
         setBulkProgress({ done: i + 1, total: unique.length });
       }
       setBulkBusy(false);
-      if (ok) toast.success(`${toFaDigits(ok)} ع©ط§ط±ط¨ط± ط§ط² ظپط§غŒظ„ ط§ظپط²ظˆط¯ظ‡ ط´ط¯`);
-      if (dupInFile) toast.message(`${toFaDigits(dupInFile)} ط±ط¯غŒظپ ط¨ظ‡â€Œط®ط§ط·ط± ط§غŒظ…غŒظ„ طھع©ط±ط§ط±غŒ ط¯ط§ط®ظ„ ظپط§غŒظ„ ظ†ط§ط¯غŒط¯ظ‡ ع¯ط±ظپطھظ‡ ط´ط¯`);
-      if (fail) toast.error(`${toFaDigits(fail)} ط±ط¯غŒظپ ط«ط¨طھ ظ†ط´ط¯. ${failSamples.join(" آ· ")}`);
+      if (ok) toast.success(`${toFaDigits(ok)} کاربر از فایل افزوده شد`);
+      if (dupInFile) toast.message(`${toFaDigits(dupInFile)} ردیف به‌خاطر ایمیل تکراری داخل فایل نادیده گرفته شد`);
+      if (fail) toast.error(`${toFaDigits(fail)} ردیف ثبت نشد. ${failSamples.join(" · ")}`);
     } catch {
-      toast.error("ط®ظˆط§ظ†ط¯ظ† ظپط§غŒظ„ ظ…ظ…ع©ظ† ظ†ط´ط¯. ط§ظ„ع¯ظˆغŒ ط§ع©ط³ظ„ ط±ط§ ط¯ط§ظ†ظ„ظˆط¯ ع©ظ†غŒط¯ ظˆ ط¯ظˆط¨ط§ط±ظ‡ طھظ„ط§ط´ ع©ظ†غŒط¯.");
+      toast.error("خواندن فایل ممکن نشد. الگوی اکسل را دانلود کنید و دوباره تلاش کنید.");
     } finally {
       setImportBusy(false);
       if (importRef.current) importRef.current.value = "";
@@ -252,7 +252,7 @@ export function MembersListPage() {
   if (!canView) {
     return (
       <div className="space-y-6">
-        <PageHeader title="ع©ط§ط±ط¨ط±ط§ظ† ط³ط§ط²ظ…ط§ظ†" breadcrumbs={[{ label: "ط¯ط§ط´ط¨ظˆط±ط¯", href: "/dashboard" }, { label: "ظ‡ظˆغŒطھ ظˆ ط¯ط³طھط±ط³غŒ", href: "/dashboard/identity" }, { label: "ع©ط§ط±ط¨ط±ط§ظ†" }]} />
+        <PageHeader title="کاربران سازمان" breadcrumbs={[{ label: "داشبورد", href: "/dashboard" }, { label: "هویت و دسترسی", href: "/dashboard/identity" }, { label: "کاربران" }]} />
         <div className="rounded-xl border border-dashed px-6 py-12 text-center text-sm text-muted-foreground">{MSG_NO_ACCESS}</div>
       </div>
     );
@@ -262,9 +262,9 @@ export function MembersListPage() {
     <TooltipProvider delayDuration={250}>
       <div className="flex min-h-0 flex-col gap-3">
         <PageHeader
-          title="ع©ط§ط±ط¨ط±ط§ظ† ط³ط§ط²ظ…ط§ظ†"
-          description="ط§ط¹ط¶ط§غŒ ط³ط§ط²ظ…ط§ظ† ط±ط§ ط¬ط³طھط¬ظˆ ع©ظ†غŒط¯طŒ ظˆط¶ط¹غŒطھط´ط§ظ† ط±ط§ طھط؛غŒغŒط± ط¯ظ‡غŒط¯ غŒط§ ط¹ط¶ظˆ ط¬ط¯غŒط¯ ط§ط¶ط§ظپظ‡ ع©ظ†غŒط¯"
-          breadcrumbs={[{ label: "ط¯ط§ط´ط¨ظˆط±ط¯", href: "/dashboard" }, { label: "ظ‡ظˆغŒطھ ظˆ ط¯ط³طھط±ط³غŒ", href: "/dashboard/identity" }, { label: "ع©ط§ط±ط¨ط±ط§ظ†" }]}
+          title="کاربران سازمان"
+          description="اعضای سازمان را جستجو کنید، وضعیتشان را تغییر دهید یا عضو جدید اضافه کنید"
+          breadcrumbs={[{ label: "داشبورد", href: "/dashboard" }, { label: "هویت و دسترسی", href: "/dashboard/identity" }, { label: "کاربران" }]}
           actions={
             <div className="flex flex-wrap items-center gap-2">
               {canCreateOp ? (
@@ -272,11 +272,11 @@ export function MembersListPage() {
                   <input ref={importRef} type="file" accept=".xlsx,.xls,.xlsm,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void onImportFile(f); }} />
                   <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5" disabled={importBusy || bulkBusy} onClick={() => importRef.current?.click()}>
                     {importBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                    ظˆط±ظˆط¯ ط§ط² ط§ع©ط³ظ„
+                    ورود از اکسل
                   </Button>
-                  <Button type="button" size="sm" variant="ghost" className="h-8 text-xs text-muted-foreground" onClick={downloadTemplate}>ط§ظ„ع¯ظˆغŒ ظپط§غŒظ„</Button>
+                  <Button type="button" size="sm" variant="ghost" className="h-8 text-xs text-muted-foreground" onClick={downloadTemplate}>الگوی فایل</Button>
                   <Button type="button" size="sm" className="h-8 gap-1.5" onClick={() => setCreateOpen(true)}>
-                    <Plus className="h-4 w-4" />ط§ظپط²ظˆط¯ظ† ع©ط§ط±ط¨ط±
+                    <Plus className="h-4 w-4" />افزودن کاربر
                   </Button>
                 </>
               ) : null}
@@ -286,18 +286,18 @@ export function MembersListPage() {
 
         {isError ? (
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            <p className="font-medium">ط¨ط§ط±ع¯ط°ط§ط±غŒ ظپظ‡ط±ط³طھ ظ…ظ…ع©ظ† ظ†ط´ط¯</p>
+            <p className="font-medium">بارگذاری فهرست ممکن نشد</p>
             <p className="mt-1 text-xs">{error instanceof Error ? error.message : MSG_LOAD_ERROR}</p>
-            <Button variant="outline" size="sm" className="mt-3 h-8" onClick={() => void refetch()}>طھظ„ط§ط´ ظ…ط¬ط¯ط¯</Button>
+            <Button variant="outline" size="sm" className="mt-3 h-8" onClick={() => void refetch()}>تلاش مجدد</Button>
           </div>
         ) : null}
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[12rem] flex-1 sm:max-w-sm">
             <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input className={cn("h-8 ps-8 text-sm", query && "pe-8")} placeholder="ظ†ط§ظ…طŒ ط§غŒظ…غŒظ„ غŒط§ ظ…ظˆط¨ط§غŒظ„â€¦" value={query} onChange={(e) => { setQuery(e.target.value); setPage(1); }} />
+            <Input className={cn("h-8 ps-8 text-sm", query && "pe-8")} placeholder="نام، ایمیل یا موبایل…" value={query} onChange={(e) => { setQuery(e.target.value); setPage(1); }} />
             {query ? (
-              <button type="button" className="absolute end-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="ظ¾ط§ع© ع©ط±ط¯ظ† ط¬ط³طھط¬ظˆ" onClick={() => { setQuery(""); setPage(1); }}>
+              <button type="button" className="absolute end-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="پاک کردن جستجو" onClick={() => { setQuery(""); setPage(1); }}>
                 <X className="h-3.5 w-3.5" />
               </button>
             ) : null}
@@ -305,20 +305,20 @@ export function MembersListPage() {
           <Select value={membershipFilter} onValueChange={(v) => setMembershipFilter(v as MembershipListFilter)}>
             <SelectTrigger className="h-8 w-[9.5rem]"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="active">ع©ط§ط±ط¨ط±ط§ظ† ط¬ط§ط±غŒ</SelectItem>
-              <SelectItem value="deleted">ع©ط§ط±ط¨ط±ط§ظ† ط­ط°ظپâ€Œط´ط¯ظ‡</SelectItem>
+              <SelectItem value="active">کاربران جاری</SelectItem>
+              <SelectItem value="deleted">کاربران حذف‌شده</SelectItem>
             </SelectContent>
           </Select>
           
       {isGroupObserver && (
         <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
-          ط¯ط³طھط±ط³غŒ ط´ظ…ط§ ط¯ط± ط§غŒظ† ط¨ط®ط´ ظپظ‚ط· ظ…ط´ط§ظ‡ط¯ظ‡ ط§ط³طھط› ط§غŒط¬ط§ط¯ غŒط§ ظˆغŒط±ط§غŒط´ ط¹ط¶ظˆ ظ…ط¬ط§ط² ظ†غŒط³طھ.
+          دسترسی شما در این بخش فقط مشاهده است؛ ایجاد یا ویرایش عضو مجاز نیست.
         </div>
       )}
           
       {isBranchScopedOnly && (
         <div className="rounded-lg border border-sky-200 bg-sky-50/80 px-3 py-2 text-xs text-sky-900">
-          ظ…ط¯غŒط±غŒطھ ط´ظ…ط§ ظ…ط­ط¯ظˆط¯ ط¨ظ‡ ط§ط¹ط¶ط§غŒ ط´ط¹ط¨ظ‡ظ” ظ…ط¬ط§ط² ط§ط³طھط› ط§ط¹ط¶ط§غŒ ط³ط§غŒط± ط´ط¹ط¨ غŒط§ ط´ط±ع©طھâ€Œظ‡ط§ ط¯ط± ط§غŒظ† ظپظ‡ط±ط³طھ ط¯غŒط¯ظ‡ ظ†ظ…غŒâ€Œط´ظˆظ†ط¯.
+          مدیریت شما محدود به اعضای شعبهٔ مجاز است؛ اعضای سایر شعب یا شرکت‌ها در این فهرست دیده نمی‌شوند.
         </div>
       )}
           <MembersCompanyFilter value={companyFilter} onChange={(v) => { setCompanyFilter(v); setPage(1); }} />
@@ -326,18 +326,18 @@ export function MembersListPage() {
             <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as StatusFilter); setPage(1); }}>
               <SelectTrigger className="h-8 w-[8.5rem]"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">ظ‡ظ…ظ‡ ظˆط¶ط¹غŒطھâ€Œظ‡ط§</SelectItem>
-                <SelectItem value="active">ظپط¹ط§ظ„</SelectItem>
-                <SelectItem value="inactive">ط؛غŒط±ظپط¹ط§ظ„</SelectItem>
+                <SelectItem value="all">همه وضعیت‌ها</SelectItem>
+                <SelectItem value="active">فعال</SelectItem>
+                <SelectItem value="inactive">غیرفعال</SelectItem>
               </SelectContent>
             </Select>
           ) : null}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5"><Columns3 className="h-3.5 w-3.5" />ط³طھظˆظ†â€Œظ‡ط§</Button>
+              <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5"><Columns3 className="h-3.5 w-3.5" />ستون‌ها</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>ظ†ظ…ط§غŒط´ ط³طھظˆظ†â€Œظ‡ط§</DropdownMenuLabel>
+              <DropdownMenuLabel>نمایش ستون‌ها</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {COLS.filter((c) => c.hideable !== false).map((c) => (
                 <DropdownMenuItem key={c.id} className="gap-2" onSelect={(e) => { e.preventDefault(); setVisible((p) => ({ ...p, [c.id]: !p[c.id] })); }}>
@@ -348,13 +348,13 @@ export function MembersListPage() {
           </DropdownMenu>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5"><Download className="h-3.5 w-3.5" />ط®ط±ظˆط¬غŒ</Button>
+              <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5"><Download className="h-3.5 w-3.5" />خروجی</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>{exportLabel}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="gap-2" onSelect={() => exportMembersExcel(exportTarget)}><FileSpreadsheet className="h-3.5 w-3.5" />ط§ع©ط³ظ„</DropdownMenuItem>
-              <DropdownMenuItem className="gap-2" onSelect={() => exportMembersPdf(exportTarget)}><FileText className="h-3.5 w-3.5" />PDF / ع†ط§ظ¾</DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onSelect={() => exportMembersExcel(exportTarget)}><FileSpreadsheet className="h-3.5 w-3.5" />اکسل</DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onSelect={() => exportMembersPdf(exportTarget)}><FileText className="h-3.5 w-3.5" />PDF / چاپ</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           {isFetching && !isLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
@@ -365,25 +365,25 @@ export function MembersListPage() {
             {bulkBusy ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>ط¯ط± ط­ط§ظ„ ط§ظ†ط¬ط§ظ…â€¦ {toFaDigits(bulkProgress.done)} ط§ط² {toFaDigits(bulkProgress.total)}</span>
-                <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => { cancelRef.current = true; }}>طھظˆظ‚ظپ</Button>
+                <span>در حال انجام… {toFaDigits(bulkProgress.done)} از {toFaDigits(bulkProgress.total)}</span>
+                <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => { cancelRef.current = true; }}>توقف</Button>
               </>
             ) : (
               <>
-                <span className="text-muted-foreground">{toFaDigits(selected.size)} ظ…ظˆط±ط¯ ط§ظ†طھط®ط§ط¨â€Œط´ط¯ظ‡</span>
+                <span className="text-muted-foreground">{toFaDigits(selected.size)} مورد انتخاب‌شده</span>
                 {!isDeletedView && canUpdate ? (
                   <>
-                    <Button type="button" size="sm" variant="outline" className="h-7 gap-1" onClick={() => setConfirm({ kind: "activate", count: selected.size, targets: selectedRowsOrdered })}><UserCheck className="h-3.5 w-3.5" />ظپط¹ط§ظ„</Button>
-                    <Button type="button" size="sm" variant="outline" className="h-7 gap-1" onClick={() => setConfirm({ kind: "deactivate", count: selected.size, targets: selectedRowsOrdered })}><UserMinus className="h-3.5 w-3.5" />ط؛غŒط±ظپط¹ط§ظ„</Button>
+                    <Button type="button" size="sm" variant="outline" className="h-7 gap-1" onClick={() => setConfirm({ kind: "activate", count: selected.size, targets: selectedRowsOrdered })}><UserCheck className="h-3.5 w-3.5" />فعال</Button>
+                    <Button type="button" size="sm" variant="outline" className="h-7 gap-1" onClick={() => setConfirm({ kind: "deactivate", count: selected.size, targets: selectedRowsOrdered })}><UserMinus className="h-3.5 w-3.5" />غیرفعال</Button>
                   </>
                 ) : null}
                 {!isDeletedView && canDelete ? (
-                  <Button type="button" size="sm" variant="outline" className="h-7 gap-1 text-destructive" onClick={() => setConfirm({ kind: "delete", count: selected.size, targets: selectedRowsOrdered })}><Trash2 className="h-3.5 w-3.5" />ط­ط°ظپ</Button>
+                  <Button type="button" size="sm" variant="outline" className="h-7 gap-1 text-destructive" onClick={() => setConfirm({ kind: "delete", count: selected.size, targets: selectedRowsOrdered })}><Trash2 className="h-3.5 w-3.5" />حذف</Button>
                 ) : null}
                 {isDeletedView && canRestore ? (
-                  <Button type="button" size="sm" variant="outline" className="h-7 gap-1" onClick={() => setConfirm({ kind: "restore", count: selected.size, targets: selectedRowsOrdered })}><RotateCcw className="h-3.5 w-3.5" />ط¨ط§ط²ع¯ط±ط¯ط§ظ†غŒ</Button>
+                  <Button type="button" size="sm" variant="outline" className="h-7 gap-1" onClick={() => setConfirm({ kind: "restore", count: selected.size, targets: selectedRowsOrdered })}><RotateCcw className="h-3.5 w-3.5" />بازگردانی</Button>
                 ) : null}
-                <Button type="button" size="sm" variant="ghost" className="h-7" onClick={() => setSelected(new Set())}>ظ„ط؛ظˆ ط§ظ†طھط®ط§ط¨</Button>
+                <Button type="button" size="sm" variant="ghost" className="h-7" onClick={() => setSelected(new Set())}>لغو انتخاب</Button>
               </>
             )}
           </div>
@@ -401,9 +401,9 @@ export function MembersListPage() {
                       else pageIds.forEach((id) => next.delete(id));
                       return next;
                     });
-                  }} aria-label="ط§ظ†طھط®ط§ط¨ ظ‡ظ…ظ‡ ط§غŒظ† طµظپط­ظ‡" />
+                  }} aria-label="انتخاب همه این صفحه" />
                 </TableHead>
-                <TableHead className="sticky top-0 z-30 w-12 bg-card px-2 text-center text-xs">ط±ط¯غŒظپ</TableHead>
+                <TableHead className="sticky top-0 z-30 w-12 bg-card px-2 text-center text-xs">ردیف</TableHead>
                 {COLS.map((c) => {
                   if (c.id !== "name" && c.id !== "actions" && !visible[c.id]) return null;
                   return (
@@ -428,8 +428,8 @@ export function MembersListPage() {
                   <TableCell colSpan={12} className="p-0">
                     <EmptyState
                       icon={Users}
-                      title={isFiltered ? "ظ†طھغŒط¬ظ‡â€Œط§غŒ ظ¾غŒط¯ط§ ظ†ط´ط¯" : isDeletedView ? "ع©ط§ط±ط¨ط± ط­ط°ظپâ€Œط´ط¯ظ‡â€Œط§غŒ ظ†غŒط³طھ" : "ظ‡ظ†ظˆط² ط¹ط¶ظˆغŒ ط«ط¨طھ ظ†ط´ط¯ظ‡"}
-                      description={isFiltered ? "ط¹ط¨ط§ط±طھ ط¬ط³طھط¬ظˆ غŒط§ ظپغŒظ„طھط± ط±ط§ طھط؛غŒغŒط± ط¯ظ‡غŒط¯." : isDeletedView ? "ط¯ط± طµظˆط±طھ ط­ط°ظپ ط§ط´طھط¨ط§ظ‡طŒ ظ…غŒâ€Œطھظˆط§ظ†غŒط¯ ع©ط§ط±ط¨ط± ط±ط§ ط§ط² ط§غŒظ†ط¬ط§ ط¨ط§ط²ع¯ط±ط¯ط§ظ†غŒط¯." : "ط¨ط±ط§غŒ ط´ط±ظˆط¹طŒ ع©ط§ط±ط¨ط± ط¬ط¯غŒط¯ ط§ط¶ط§ظپظ‡ ع©ظ†غŒط¯ غŒط§ ط§ط² ظپط§غŒظ„ ط§ع©ط³ظ„ ظˆط§ط±ط¯ ع©ظ†غŒط¯."}
+                      title={isFiltered ? "نتیجه‌ای پیدا نشد" : isDeletedView ? "کاربر حذف‌شده‌ای نیست" : "هنوز عضوی ثبت نشده"}
+                      description={isFiltered ? "عبارت جستجو یا فیلتر را تغییر دهید." : isDeletedView ? "در صورت حذف اشتباه، می‌توانید کاربر را از اینجا بازگردانید." : "برای شروع، کاربر جدید اضافه کنید یا از فایل اکسل وارد کنید."}
                     />
                   </TableCell>
                 </TableRow>
@@ -448,7 +448,7 @@ export function MembersListPage() {
                             else next.delete(row.tenant_user_id);
                             return next;
                           });
-                        }} aria-label="ط§ظ†طھط®ط§ط¨ ط±ط¯غŒظپ" />
+                        }} aria-label="انتخاب ردیف" />
                       </TableCell>
                       <TableCell className="px-2 py-1 text-center text-xs tabular-nums text-muted-foreground">{toFaDigits((safePage - 1) * pageSize + idx + 1)}</TableCell>
                       {visible.name ? (
@@ -459,8 +459,8 @@ export function MembersListPage() {
                           </div>
                         </TableCell>
                       ) : null}
-                      {visible.email ? <TableCell className="px-2 py-1 text-xs" dir="ltr"><span className="truncate block max-w-[12rem]">{row.user?.email ?? "â€”"}</span></TableCell> : null}
-                      {visible.mobile ? <TableCell className="px-2 py-1 text-xs tabular-nums" dir="ltr">{row.user?.mobile ? toFaDigits(row.user.mobile) : "â€”"}</TableCell> : null}
+                      {visible.email ? <TableCell className="px-2 py-1 text-xs" dir="ltr"><span className="truncate block max-w-[12rem]">{row.user?.email ?? "—"}</span></TableCell> : null}
+                      {visible.mobile ? <TableCell className="px-2 py-1 text-xs tabular-nums" dir="ltr">{row.user?.mobile ? toFaDigits(row.user.mobile) : "—"}</TableCell> : null}
                       {visible.role ? (
                         <TableCell className="px-2 py-1 text-xs">
                           <span className="inline-flex max-w-[10rem] items-center gap-1 truncate">
@@ -476,7 +476,7 @@ export function MembersListPage() {
                           </span>
                         </TableCell>
                       ) : null}
-                      {visible.status ? <TableCell className="px-2 py-1"><StatusChip label={active ? "ظپط¹ط§ظ„" : "ط؛غŒط±ظپط¹ط§ظ„"} tone={active ? "success" : "neutral"} /></TableCell> : null}
+                      {visible.status ? <TableCell className="px-2 py-1"><StatusChip label={active ? "فعال" : "غیرفعال"} tone={active ? "success" : "neutral"} /></TableCell> : null}
                       {visible.joined ? <TableCell className="px-2 py-1 text-xs tabular-nums text-muted-foreground">{fd(row.created_at as string | null | undefined)}</TableCell> : null}
                       {visible.lastChange ? (
                         <TableCell className="px-2 py-1 text-xs tabular-nums text-muted-foreground">
@@ -488,27 +488,27 @@ export function MembersListPage() {
                       ) : null}
                       <TableCell className="px-1 py-1">
                         <div className="flex items-center justify-center gap-0.5">
-                          <IconAction label="ظ…ط´ط§ظ‡ط¯ظ‡" onClick={() => { window.location.href = memberDetailPath(row.tenant_user_id); }}>
+                          <IconAction label="مشاهده" onClick={() => { window.location.href = memberDetailPath(row.tenant_user_id); }}>
                             <Eye className="h-3.5 w-3.5" />
                           </IconAction>
                           {!isDeletedView && canUpdateOp && !isSelf ? (
                             active ? (
-                              <IconAction label="ط؛غŒط±ظپط¹ط§ظ„â€Œط³ط§ط²غŒ" onClick={() => void deactivateOne(row)}>
+                              <IconAction label="غیرفعال‌سازی" onClick={() => void deactivateOne(row)}>
                                 <UserMinus className="h-3.5 w-3.5" />
                               </IconAction>
                             ) : (
-                              <IconAction label="ظپط¹ط§ظ„â€Œط³ط§ط²غŒ" onClick={() => void activateOne(row)}>
+                              <IconAction label="فعال‌سازی" onClick={() => void activateOne(row)}>
                                 <UserCheck className="h-3.5 w-3.5" />
                               </IconAction>
                             )
                           ) : null}
                           {!isDeletedView && canDeleteOp && !isSelf ? (
-                            <IconAction label="ط­ط°ظپ ط§ط² ط³ط§ط²ظ…ط§ظ†" variant="destructive" onClick={() => void deleteOne(row)}>
+                            <IconAction label="حذف از سازمان" variant="destructive" onClick={() => void deleteOne(row)}>
                               <Trash2 className="h-3.5 w-3.5" />
                             </IconAction>
                           ) : null}
                           {isDeletedView && canRestore ? (
-                            <IconAction label="ط¨ط§ط²ع¯ط±ط¯ط§ظ†غŒ" onClick={() => void restoreOne(row)}>
+                            <IconAction label="بازگردانی" onClick={() => void restoreOne(row)}>
                               <RotateCcw className="h-3.5 w-3.5" />
                             </IconAction>
                           ) : null}
@@ -524,7 +524,7 @@ export function MembersListPage() {
 
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
           <span>
-            {total === 0 ? "ظ…ظˆط±ط¯غŒ ظ†غŒط³طھ" : `ظ†ظ…ط§غŒط´ ${toFaDigits((safePage - 1) * pageSize + 1)}â€“${toFaDigits(Math.min(safePage * pageSize, total))} ط§ط² ${toFaDigits(total)}`}
+            {total === 0 ? "موردی نیست" : `نمایش ${toFaDigits((safePage - 1) * pageSize + 1)}–${toFaDigits(Math.min(safePage * pageSize, total))} از ${toFaDigits(total)}`}
           </span>
           <div className="flex items-center gap-2">
             <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
@@ -535,9 +535,9 @@ export function MembersListPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Button type="button" size="sm" variant="outline" className="h-7" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>ظ‚ط¨ظ„غŒ</Button>
+            <Button type="button" size="sm" variant="outline" className="h-7" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>قبلی</Button>
             <span className="tabular-nums">{toFaDigits(safePage)} / {toFaDigits(totalPages)}</span>
-            <Button type="button" size="sm" variant="outline" className="h-7" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>ط¨ط¹ط¯غŒ</Button>
+            <Button type="button" size="sm" variant="outline" className="h-7" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>بعدی</Button>
           </div>
         </div>
 
@@ -545,17 +545,17 @@ export function MembersListPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
             <div className="w-full max-w-md rounded-xl border bg-card p-5 shadow-lg" role="dialog" aria-modal="true">
               <p className="text-base font-semibold">
-                {confirm.kind === "activate" && "ظپط¹ط§ظ„â€Œط³ط§ط²غŒ ط§ظ†طھط®ط§ط¨â€Œط´ط¯ظ‡â€Œظ‡ط§"}
-                {confirm.kind === "deactivate" && "ط؛غŒط±ظپط¹ط§ظ„â€Œط³ط§ط²غŒ ط§ظ†طھط®ط§ط¨â€Œط´ط¯ظ‡â€Œظ‡ط§"}
-                {confirm.kind === "delete" && "ط­ط°ظپ ط§ط² ط³ط§ط²ظ…ط§ظ†"}
-                {confirm.kind === "restore" && "ط¨ط§ط²ع¯ط±ط¯ط§ظ†غŒ ط§ظ†طھط®ط§ط¨â€Œط´ط¯ظ‡â€Œظ‡ط§"}
+                {confirm.kind === "activate" && "فعال‌سازی انتخاب‌شده‌ها"}
+                {confirm.kind === "deactivate" && "غیرفعال‌سازی انتخاب‌شده‌ها"}
+                {confirm.kind === "delete" && "حذف از سازمان"}
+                {confirm.kind === "restore" && "بازگردانی انتخاب‌شده‌ها"}
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                {toFaDigits(confirm.count)} ظ…ظˆط±ط¯ ط§ظ†طھط®ط§ط¨ ط´ط¯ظ‡ ط§ط³طھ. ط§ط¯ط§ظ…ظ‡ ظ…غŒâ€Œط¯ظ‡غŒط¯طں
+                {toFaDigits(confirm.count)} مورد انتخاب شده است. ادامه می‌دهید؟
               </p>
               <div className="mt-4 flex justify-end gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => setConfirm(null)}>ط§ظ†طµط±ط§ظپ</Button>
-                <Button type="button" size="sm" variant={confirm.kind === "delete" ? "destructive" : "default"} onClick={() => void runBulk(confirm.kind, confirm.targets)}>طھط£غŒغŒط¯</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setConfirm(null)}>انصراف</Button>
+                <Button type="button" size="sm" variant={confirm.kind === "delete" ? "destructive" : "default"} onClick={() => void runBulk(confirm.kind, confirm.targets)}>تأیید</Button>
               </div>
             </div>
           </div>
@@ -566,4 +566,3 @@ export function MembersListPage() {
     </TooltipProvider>
   );
 }
-
